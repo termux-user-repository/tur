@@ -1,0 +1,4 @@
+[submodule "packages"]
+	path = packages
+	url = https://github.com/termux-user-repository/tur
+	branch = termux-packages
