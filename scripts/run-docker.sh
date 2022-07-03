@@ -37,7 +37,7 @@ $SUDO docker start $CONTAINER_NAME >/dev/null 2>&1 || {
 	$SUDO docker run \
 		--detach \
 		--name $CONTAINER_NAME \
-		--volume $REPOROOT:$CONTAINER_HOME_DIR/termux-packages \
+		--volume $REPOROOT:$CONTAINER_HOME_DIR/tur \
 		$SEC_OPT \
 		--tty \
 		$TERMUX_BUILDER_IMAGE_NAME
