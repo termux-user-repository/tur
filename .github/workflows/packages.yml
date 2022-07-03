@@ -207,7 +207,7 @@ jobs:
         name: debs-${{ matrix.target_arch }}-${{ github.sha }}
         path: ./artifacts
     - name: Upload to temporary release.
-      if: always()
+      if: github.event_name != 'pull_request'
       run: | 
           for i in debs/*.deb;do
             gh release upload -R https://github.com/termux-user-repository/tur "0.1" $i
