@@ -1,14 +1,14 @@
-name: Packages
+name: Packages-tur
 
 on:
   push:
     branches:
     - master
     paths:
-    - 'packages/**'
+    - 'tur/**'
   pull_request:
     paths:
-    - 'packages/**'
+    - 'tur/**'
   workflow_dispatch:
     inputs:
       packages:
@@ -175,7 +175,7 @@ jobs:
     - name: Generate build artifacts
       if: always()
       run: |
-        test -d termux-packages/output && mv termux-packages/output/* ./output/
+        test -d tur/output && mv tur/output/* ./output/
         for repo in $(jq --raw-output '.[].name' repo.json); do
           # Put package lists into directory with *.deb files so they will be transferred to
           # upload job.
