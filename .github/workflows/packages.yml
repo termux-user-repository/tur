@@ -30,7 +30,7 @@ jobs:
       uses: actions/checkout@v3
       with:
         fetch-depth: 1000
-        submoudle: true
+        submodules: true
         
     - name: Gather build summary
       run: |
@@ -172,7 +172,7 @@ jobs:
           fi
         done
         if [ ! -z "$packages" ]; then
-          ./scripts/run-docker.sh ./build-package.sh -I -a ${{ matrix.target_arch }} $packages
+          ./scripts/run-docker.sh sh -c "cd ../tur; ./build-package.sh -I -a ${{ matrix.target_arch }} $packages"
         fi
     - name: Generate build artifacts
       if: always()
