@@ -1,3 +1,4 @@
 {
-    "tur":      { "name" : "tur", "distribution" : "stable" }
+    "packages": { "name" : "termux-main", "distribution" : "stable" },
+    "tur":      { "name" : "tur",         "distribution" : "stable" }
 }
