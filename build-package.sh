@@ -438,6 +438,8 @@ if [ "${TERMUX_INSTALL_DEPS-false}" = "true" ]; then
 		gpg --no-tty --command-file <(echo -e "trust\n5\ny")  --edit-key CC72CF8BA7DBFA0182877D045A897D96E57CF20C
 	}
 fi
+## clone termux packages 
+$TERMUX_SCRIPTDIR/scripts/clone-termux-packages.sh $TERMUX_SCRIPTDIR
 
 for ((i=0; i<${#PACKAGE_LIST[@]}; i++)); do
 	# Following commands must be executed under lock to prevent running
