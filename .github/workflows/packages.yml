@@ -209,7 +209,7 @@ jobs:
     - name: Upload to temporary release.
       if: github.event_name != 'pull_request'
       run: | 
-          for i in debs/*.deb;do
+          for i in ./artifacts/*;do
             gh release upload -R https://github.com/termux-user-repository/tur "0.1" $i
             echo "$i  uploaded"
           done
