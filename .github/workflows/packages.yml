@@ -32,7 +32,10 @@ jobs:
       with:
         fetch-depth: 1000
         submodules: true
-        
+
+    - name: Merge repos
+      run: ./setup-environment.sh
+
     - name: Gather build summary
       run: |
         if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
@@ -66,14 +69,15 @@ jobs:
             echo "[!] Force exiting as tag '%ci:no-build' was applied to HEAD commit message."
             exit 0
           fi
+          # XXX: TUR uses the termux-builder directly and may add custom builder image later.
           # Build local Docker image if setup scripts were changed.
           # Useful for pull requests submitting changes for both build environment and packages.
-          if grep -qP '^scripts/(Dockerfile|setup-android-sdk\.sh|setup-ubuntu\.sh)$' <<< "$CHANGED_FILES"; then
-            echo "Detected changes for environment setup scripts. Building custom Docker image now."
-            cd ./scripts
-            docker build -t termux/package-builder:latest .
-            cd ..
-          fi
+          # if grep -qP '^scripts/(Dockerfile|setup-android-sdk\.sh|setup-ubuntu\.sh)$' <<< "$CHANGED_FILES"; then
+          #   echo "Detected changes for environment setup scripts. Building custom Docker image now."
+          #   cd ./scripts
+          #   docker build -t termux/package-builder:latest .
+          #   cd ..
+          # fi
           for repo_path in $(jq --raw-output 'keys | .[]' repo.json); do
             repo=$(jq --raw-output '.["'${repo_path}'"].name' repo.json)
             # Parse changed files and identify new packages and deleted packages.
@@ -144,7 +148,7 @@ jobs:
         done
     - name: Free additional disk space (if necessary)
       run: |
-        if grep -q '^clvk$\|^dart$\|^rust$\|^rustc-nightly$\|^swift$' ./built_termux-main_packages.txt; then
+        if grep -q '^demo-package1$\|^demo-package2$\$' ./built_tur_packages.txt; then
           echo "Free additional disk space on host"
           sudo apt purge -yq $(dpkg -l | grep '^ii' | awk '{ print $2 }' | grep -P '(cabal-|dotnet-|ghc-|libmono|php)') \
             liblldb-6.0 libllvm6.0:amd64 mono-runtime-common monodoc-manual powershell ruby
