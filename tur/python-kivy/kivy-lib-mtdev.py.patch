@@ -1,0 +1,11 @@
+--- a/kivy/lib/mtdev.py
++++ b/kivy/lib/mtdev.py
+@@ -27,7 +27,7 @@
+ 
+ # load library
+ if 'KIVY_DOC' not in os.environ:
+-    libmtdev = cdll.LoadLibrary('libmtdev.so.1')
++    libmtdev = cdll.LoadLibrary('libmtdev.so')
+ 
+ # from linux/input.h
+ MTDEV_CODE_SLOT          = 0x2f  # MT slot being modified
