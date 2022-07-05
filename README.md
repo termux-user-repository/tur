@@ -3,10 +3,13 @@
 Sounds like Archlinux User repository aka AUR ? TUR functioning mechanism is bit different. Instead of building packages in device that too in android is quite hectic work for user. 
 So TUR saves resources and time since user could install pre-compiled package. 
 
-## Add TUR in Termux: 
-**Soon** 
+## Subscribe TUR
+Add TUR in Termux, simply with executing following command:
 
-Let's submit pull request first to add packages.
+```
+echo "deb https://tur.kcubeterm.com tur-packages tur" > $PREFIX/etc/apt/sources.list.d/tur.list
+apt update
+```
 
 ## Contribution: 
 
