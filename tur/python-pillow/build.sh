@@ -1,6 +1,6 @@
 TERMUX_PKG_HOMEPAGE=https://github.com/python-pillow/Pillow
 TERMUX_PKG_DESCRIPTION="The friendly PIL fork (Python Imaging Library)"
-TERMUX_PKG_LICENSE="GNU"
+TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION=9.2.0
 TERMUX_PKG_SRCURL=https://github.com/python-pillow/Pillow/archive/refs/tags/${TERMUX_PKG_VERSION}.tar.gz
