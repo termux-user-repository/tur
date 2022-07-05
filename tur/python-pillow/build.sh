@@ -8,7 +8,7 @@ TERMUX_PKG_SHA256=95836f00972dbf724bf1270178683a0ac4ea23c6c3a980858fc9f2f9456e32
 TERMUX_PKG_DEPENDS="libimagequant,freetype,littlecms,libtiff,libraqm,libxcb,zlib, build-essential, libjpeg-turbo, python"
 TERMUX_PKG_BUILD_IN_SRC=true
 
-_PYTHON_VERSION=3.10.5
+_PYTHON_VERSION=3
 
 termux_step_pre_configure() {
 	termux_setup_python_crossenv
