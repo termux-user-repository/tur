@@ -18,7 +18,10 @@ Please don't Discuss/Open issues about any of TUR packages in Termux Offical for
 ## Contribution: 
 
 ### Add new package. 
-Since TUR is fork of termux-packages. So all building mechanism is same. In order to add a package. Create build.sh file under **tur** directory (_not in packages_). 
+TUR uses same building scripts what Termux does.So all building mechanism is same.
+* Clone this repository.
+* Change directory and Execute `./setup-environment.sh` It will fetch Termux package building scripts. 
+* Create build.sh file under **tur** directory (_not in packages_). 
 Go through the official termux [wiki](https://github.com/termux/termux-packages/wiki). 
 
 
