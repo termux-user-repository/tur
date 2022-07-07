@@ -39,7 +39,9 @@ PACKAGES+=" rust"
 PACKAGES+=" texinfo"
 PACKAGES+=" valac"
 
+sed -i "s/packages.termux.dev/packages-cf.termux.dev/g" /data/data/com.termux/files/usr/etc/apt/sources.list
 apt update
 apt dist-upgrade -o Dpkg::Options::=--force-confnew -y
+sed -i "s/packages.termux.dev/packages-cf.termux.dev/g" /data/data/com.termux/files/usr/etc/apt/sources.list
 apt update
 apt install -y $PACKAGES
