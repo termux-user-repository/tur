@@ -1,7 +1,7 @@
 {
     "packages": { "name" : "termux-main", "distribution" : "stable" },
     "tur":      { "name" : "tur",         "distribution" : "stable" },
-    "tur-on-device": {  "name": "tur",    "distribution" : "unstable" },
-    "root-packages": { "name" : "termux-root", "distribution" : "root" },
-    "x11-packages":  { "name" : "termux-x11",  "distribution" : "x11" }
+    "tur-on-device": { "name": "tur-on-device",  "distribution" : "unstable" },
+    "root-packages": { "name" : "termux-root",   "distribution" : "root" },
+    "x11-packages":  { "name" : "termux-x11",    "distribution" : "x11" }
 }

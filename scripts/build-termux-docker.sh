@@ -42,8 +42,6 @@ $SUDO docker start $CONTAINER_NAME >/dev/null 2>&1 || {
 		--tty \
 		-w $CONTAINER_HOME_DIR/termux-packages \
 		$TERMUX_BUILDER_IMAGE_NAME
-	# Copy the .termuxrc file
-	docker cp $REPOROOT/termuxrc $CONTAINER_NAME:$CONTAINER_HOME_DIR/.termuxrc
 }
 
 if [ "$#" -eq  "0" ]; then
