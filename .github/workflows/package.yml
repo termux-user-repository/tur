@@ -429,8 +429,6 @@ jobs:
     if: github.event_name != 'pull_request'
     needs: [ build-x86, build-arm ]
     runs-on: ubuntu-latest
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
     - name: Clone repository
       uses: actions/checkout@v3
