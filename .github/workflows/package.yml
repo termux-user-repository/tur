@@ -424,3 +424,24 @@ jobs:
       if: always()
       run: |
         rm -rf ./artifacts ./debs
+
+  upload:
+    if: github.event_name != 'pull_request'
+    needs: [ build-x86, build-arm ]
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+    - name: Clone repository
+      uses: actions/checkout@v3
+    - name: Get *.deb files
+      uses: actions/download-artifact@v3
+      with:
+        path: ./
+    - name: Upload to a temporary release
+      run: |
+        GITHUB_SHA=${{ github.sha }}
+        for archive in debs-*/debs-{aarch64,arm,i686,x86_64}-${{ github.sha }}.tar; do
+          gh release upload -R https://github.com/termux-user-repository/tur "0.1" $archive
+          echo "$archive  uploaded"
+        done
