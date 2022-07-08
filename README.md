@@ -1,4 +1,4 @@
-# Termux User Repositoy (on Device)
+# Termux User Repository (on Device)
 
 This project contains some scripts and patches to build packages for the [Termux](https://github.com/termux/termux-app)
 Android application using [Termux-Docker](https://github.com/termux/termux-docker) under self-hosted arm environment
