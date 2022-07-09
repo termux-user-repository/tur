@@ -24,3 +24,8 @@ rm -rf {ndk-patches,packages,x11-packages,root-packages,scripts,build-all.sh,bui
 
 # Move build environment scripts to this folder
 mv ./termux-packages/{ndk-patches,packages,x11-packages,root-packages,scripts,build-all.sh,build-package.sh,clean.sh} ./
+
+# Copy .termuxrc file if it doesn't exist.
+if [ ! -f "$HOME/.termuxrc" ]; then
+	cp ./termuxrc "$HOME/.termuxrc"
+fi

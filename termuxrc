@@ -1,0 +1,26 @@
+# Import kcubeterm's GPG key if it is not a on-device build.
+if ! [ "$(uname -o)" = "Android" ] && ! [ -e "/system/bin/app_process" ]; then
+	gpg --list-keys D613AC03FA1859E0337541B96F7DD85B65C5A5DE > /dev/null 2>&1 || {
+		gpg --import "$TERMUX_SCRIPTDIR/packages/termux-keyring/kcubeterm.gpg"
+		gpg --no-tty --command-file <(echo -e "trust\n5\ny")  --edit-key D613AC03FA1859E0337541B96F7DD85B65C5A5DE
+	}
+fi
+
+# Override the apt repo urls. It would be possible to download community debs after termux/termux-packages#11206 is merged.
+TERMUX_REPO_URL=(
+	https://packages-cf.termux.dev/apt/termux-main
+	https://packages-cf.termux.dev/apt/termux-root
+	https://packages-cf.termux.dev/apt/termux-x11
+)
+
+TERMUX_REPO_DISTRIBUTION=(
+	stable
+	root
+	x11
+)
+
+TERMUX_REPO_COMPONENT=(
+	main
+	stable
+	main
+)
