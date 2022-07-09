@@ -4,15 +4,11 @@ TERMUX_PKG_LICENSE="Apache-2.0"
 TERMUX_PKG_LICENSE_FILE="llvm/LICENSE.txt"
 TERMUX_PKG_MAINTAINER="@buttaface, @termux-user-repository"
 TERMUX_PKG_VERSION=11.1.0
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SHA256=74d2529159fd118c3eac6f90107b5611bccc6f647fdea104024183e8d5e25831
 TERMUX_PKG_SRCURL=https://github.com/llvm/llvm-project/releases/download/llvmorg-$TERMUX_PKG_VERSION/llvm-project-$TERMUX_PKG_VERSION.src.tar.xz
 TERMUX_PKG_HOSTBUILD=true
 TERMUX_PKG_DEPENDS="binutils, libc++, ncurses, ndk-sysroot, libffi, zlib"
-# Replace gcc since gcc is deprecated by google on android and is not maintained upstream.
-# Conflict with clang versions earlier than 3.9.1-3 since they bundled llvm.
-TERMUX_PKG_CONFLICTS="gcc, clang (<< 3.9.1-3)"
-TERMUX_PKG_BREAKS="libclang, libclang-dev, libllvm-dev"
-TERMUX_PKG_REPLACES="gcc, libclang, libclang-dev, libllvm-dev"
 _PYTHON_VERSION=$(. $TERMUX_SCRIPTDIR/packages/python/build.sh; echo $_MAJOR_VERSION)
 # See http://llvm.org/docs/CMake.html:
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
