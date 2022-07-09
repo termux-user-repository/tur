@@ -1,7 +1,7 @@
 TERMUX_PKG_HOMEPAGE=https://clang.llvm.org/
 TERMUX_PKG_DESCRIPTION="Modular compiler and toolchain technologies library (Version 11)"
 TERMUX_PKG_LICENSE="Apache-2.0"
-TERMUX_PKG_LICENSE_FILE="llvm/LICENSE.txt"
+TERMUX_PKG_LICENSE_FILE="llvm/LICENSE.TXT"
 TERMUX_PKG_MAINTAINER="@buttaface, @termux-user-repository"
 TERMUX_PKG_VERSION=11.1.0
 TERMUX_PKG_REVISION=1
