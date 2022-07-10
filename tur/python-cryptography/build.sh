@@ -37,7 +37,7 @@ termux_step_configure() {
 	echo "INPUT(-lc)" > $_DUMMY_PTHREAD
 
 	# Update the setuptools version of build python
-	build-pip install --upgrade cffi 'setuptools>=62.6' setuptools_rust semantic_version
+	build-pip install --upgrade cffi 'setuptools>=60.10' setuptools_rust semantic_version
 	cross-expose cffi
 	# Cross python should have the same version of setuptools of build python
 	SETUPTOOLS_VERSION=$(build-python -m pip show setuptools | grep "Version"  | sed -E "s/Version\: //g")
