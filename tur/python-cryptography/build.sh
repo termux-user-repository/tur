@@ -31,7 +31,7 @@ termux_step_pre_configure() {
 	pushd ${_CROSSENV_PREFIX}/build/lib/python${_PYTHON_VERSION}/site-packages
 	patch --silent -p1 < $TERMUX_PKG_BUILDER_DIR/setuptools-44.1.1-no-bdist_wininst.diff || :
 	popd
-	build-pip install cffi
+	build-pip install cffi setuptools_rust
 	LDFLAGS+=" -lpython${_PYTHON_VERSION}"
 	python setup.py install --force
 }
