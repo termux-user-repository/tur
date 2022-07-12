@@ -1,0 +1,39 @@
+diff -uNr flang-src/clang/lib/Driver/ToolChains/Gnu.cpp flang-src.mod/clang/lib/Driver/ToolChains/Gnu.cpp
+--- flang-src/clang/lib/Driver/ToolChains/Gnu.cpp
++++ flang-src.mod/clang/lib/Driver/ToolChains/Gnu.cpp
+@@ -178,15 +178,7 @@
+       A.render(Args, CmdArgs);
+     }
+   }
+-
+-  const std::string &customGCCName = D.getCCCGenericGCCName();
+-  const char *GCCName;
+-  if (!customGCCName.empty())
+-    GCCName = customGCCName.c_str();
+-  else if (D.CCCIsCXX()) {
+-    GCCName = "g++";
+-  } else
+-    GCCName = "gcc";
++  const char *GCCName = "false";
+ 
+   const char *Exec = Args.MakeArgString(getToolChain().GetProgramPath(GCCName));
+   C.addCommand(std::make_unique<Command>(JA, *this, Exec, CmdArgs, Inputs));
+@@ -548,7 +540,7 @@
+       if (OnlyLibstdcxxStatic)
+         CmdArgs.push_back("-Bdynamic");
+     }
+-    CmdArgs.push_back("-lm");
++    // CmdArgs.push_back("-lm");
+   }
+   // Silence warnings when linking C code with a C++ '-stdlib' argument.
+   Args.ClaimAllArgs(options::OPT_stdlib_EQ);
+@@ -582,6 +574,9 @@
+ 
+       AddRunTimeLibs(ToolChain, D, CmdArgs, Args);
+ 
++      if (D.CCCIsCXX())
++        CmdArgs.push_back("-lm");
++
+       if (WantPthread && !isAndroid)
+         CmdArgs.push_back("-lpthread");
+ 

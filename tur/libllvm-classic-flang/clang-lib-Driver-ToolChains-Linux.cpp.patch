@@ -1,0 +1,27 @@
+diff -uNr flang/clang/lib/Driver/ToolChains/Linux.cpp flang.mod/clang/lib/Driver/ToolChains/Linux.cpp
+--- flang/clang/lib/Driver/ToolChains/Linux.cpp
++++ flang.mod/clang/lib/Driver/ToolChains/Linux.cpp
+@@ -194,8 +194,8 @@
+   // FIXME: This is a bit of a hack. We should really unify this code for
+   // reasoning about oslibdir spellings with the lib dir spellings in the
+   // GCCInstallationDetector, but that is a more significant refactoring.
+-  if (Triple.getArch() == llvm::Triple::x86 ||
+-      Triple.getArch() == llvm::Triple::ppc)
++  if (!Triple.isAndroid() && (Triple.getArch() == llvm::Triple::x86 ||
++      Triple.getArch() == llvm::Triple::ppc))
+     return "lib32";
+
+   if (Triple.getArch() == llvm::Triple::x86_64 &&
+@@ -452,6 +452,12 @@
+
+   addPathIfExists(D, SysRoot + "/lib", Paths);
+   addPathIfExists(D, SysRoot + "/usr/lib", Paths);
++
++  if (IsAndroid) {
++    addPathIfExists(D, SysRoot + "/usr/" + MultiarchTriple + "/lib", Paths);
++    addPathIfExists(D, "/system/" + OSLibDir, Paths);
++    ExtraOpts.push_back("-rpath=" + SysRoot + "/usr/lib");
++  }
+ }
+
+ ToolChain::CXXStdlibType Linux::GetDefaultCXXStdlibType() const {
