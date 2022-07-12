@@ -1,0 +1,29 @@
+diff -uNr flang-src/clang/lib/Driver/ToolChain.cpp flang-src.mod/clang/lib/Driver/ToolChain.cpp
+--- flang-src/clang/lib/Driver/ToolChain.cpp
++++ flang-src.mod/clang/lib/Driver/ToolChain.cpp
+@@ -379,7 +379,7 @@
+   case llvm::Triple::Solaris:
+     return "sunos";
+   default:
+-    return getOS();
++    return Triple.isAndroid() ? "android":getOS();
+   }
+ }
+
+@@ -899,7 +899,7 @@
+
+   switch (Type) {
+   case ToolChain::CST_Libcxx:
+-    CmdArgs.push_back("-lc++");
++    CmdArgs.push_back("-lc++_shared");
+     break;
+
+   case ToolChain::CST_Libstdcxx:
+@@ -942,6 +942,7 @@
+
+   if (staticFlangLibs)
+     CmdArgs.push_back("-Bstatic");
++  CmdArgs.push_back("-landroid-mathlib");
+   CmdArgs.push_back("-lflang");
+   CmdArgs.push_back("-lflangrti");
+   CmdArgs.push_back("-lpgmath");
