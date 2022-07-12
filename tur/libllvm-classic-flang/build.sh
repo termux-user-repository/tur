@@ -1,0 +1,104 @@
+TERMUX_PKG_HOMEPAGE=https://github.com/flang-compiler/classic-flang-llvm-project/
+TERMUX_PKG_DESCRIPTION="Modular compiler and toolchain technologies library (Version 10, Classic Flang Fork)"
+TERMUX_PKG_LICENSE="Apache-2.0"
+TERMUX_PKG_LICENSE_FILE="llvm/LICENSE.TXT"
+TERMUX_PKG_MAINTAINER="@termux-user-repository"
+_DATE=2022.05.23
+TERMUX_PKG_VERSION=${_DATE//./}
+_LLVM_COMMIT=4a566ddfa4157ed1a24920ab7673ccc01c46fd99
+TERMUX_PKG_SRCURL=https://github.com/flang-compiler/classic-flang-llvm-project/archive/${_LLVM_COMMIT}.zip
+TERMUX_PKG_SHA256=d390229b7ffa7b1db7b8bf2fe9352b597da801913df8d2dc2e65d27377433d2d
+TERMUX_PKG_HOSTBUILD=true
+TERMUX_PKG_DEPENDS="binutils, libc++, ncurses, ndk-sysroot, libffi, zlib"
+TERMUX_PKG_SUGGESTS="libandroid-mathlib, classic-flang"
+# XXX: We may add this package later I suppose.
+TERMUX_PKG_PROVIDES="libllvm-10, clang-10, lld-10"
+TERMUX_PKG_REPLACES="libllvm-10, clang-10, lld-10"
+TERMUX_PKG_CONFLICTS="libllvm-10, clang-10, lld-10"
+_PYTHON_VERSION=$(. $TERMUX_SCRIPTDIR/packages/python/build.sh; echo $_MAJOR_VERSION)
+_INSTALL_PREFIX_R="opt/classic-flang"
+_INSTALL_PREFIX="$TERMUX_PREFIX/$_INSTALL_PREFIX_R"
+# See http://llvm.org/docs/CMake.html:
+TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
+-DANDROID_PLATFORM_LEVEL=$TERMUX_PKG_API_LEVEL
+-DPYTHON_EXECUTABLE=$(command -v python3)
+-DLLVM_ENABLE_CLASSIC_FLANG=ON
+-DLLVM_ENABLE_PIC=ON
+-DLLVM_ENABLE_PROJECTS=clang;compiler-rt;lld;openmp
+-DLLVM_ENABLE_LIBEDIT=OFF
+-DLLVM_INCLUDE_TESTS=OFF
+-DCLANG_DEFAULT_RTLIB=compiler-rt
+-DCLANG_DEFAULT_CXX_STDLIB=libc++
+-DCLANG_DEFAULT_LINKER=lld-10
+-DCLANG_INCLUDE_TESTS=OFF
+-DCLANG_TOOL_C_INDEX_TEST_BUILD=OFF
+-DCOMPILER_RT_USE_BUILTINS_LIBRARY=ON
+-DDEFAULT_SYSROOT=$(dirname $TERMUX_PREFIX)
+-DLLVM_LINK_LLVM_DYLIB=ON
+-DCLANG_TABLEGEN=$TERMUX_PKG_HOSTBUILD_DIR/bin/clang-tblgen
+-DLLVM_TABLEGEN=$TERMUX_PKG_HOSTBUILD_DIR/bin/llvm-tblgen
+-DLIBOMP_ENABLE_SHARED=FALSE
+-DOPENMP_ENABLE_LIBOMPTARGET=OFF
+-DLLVM_ENABLE_SPHINX=ON
+-DSPHINX_OUTPUT_MAN=ON
+-DSPHINX_WARNINGS_AS_ERRORS=OFF
+-DLLVM_TARGETS_TO_BUILD=all
+-DPERL_EXECUTABLE=$(command -v perl)
+-DLLVM_ENABLE_FFI=ON
+-DLLVM_INSTALL_UTILS=ON
+-DCMAKE_INSTALL_PREFIX=$_INSTALL_PREFIX
+"
+
+if [ $TERMUX_ARCH_BITS = 32 ]; then
+	# Do not set _FILE_OFFSET_BITS=64
+	TERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DLLVM_FORCE_SMALLFILE_FOR_ANDROID=on"
+fi
+
+TERMUX_PKG_FORCE_CMAKE=true
+TERMUX_PKG_HAS_DEBUG=false
+
+termux_step_host_build() {
+	termux_setup_cmake
+	termux_setup_ninja
+
+	cmake -G Ninja "-DLLVM_ENABLE_PROJECTS=clang" $TERMUX_PKG_SRCDIR/llvm
+	ninja -j $TERMUX_MAKE_PROCESSES llvm-tblgen clang-tblgen
+}
+
+termux_step_pre_configure() {
+	# Add unknown vendor, otherwise it screws with the default LLVM triple
+	# detection.
+	export LLVM_DEFAULT_TARGET_TRIPLE=${CCTERMUX_HOST_PLATFORM/-/-unknown-}
+	export LLVM_TARGET_ARCH
+	if [ $TERMUX_ARCH = "arm" ]; then
+		LLVM_TARGET_ARCH=ARM
+		CFLAGS=${CFLAGS//-mthumb /}
+		CXXFLAGS=${CXXFLAGS//-mthumb /}
+	elif [ $TERMUX_ARCH = "aarch64" ]; then
+		LLVM_TARGET_ARCH=AArch64
+	elif [ $TERMUX_ARCH = "i686" ] || [ $TERMUX_ARCH = "x86_64" ]; then
+		LLVM_TARGET_ARCH=X86
+	else
+		termux_error_exit "Invalid arch: $TERMUX_ARCH"
+	fi
+	# see CMakeLists.txt and tools/clang/CMakeLists.txt
+	TERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DLLVM_TARGET_ARCH=$LLVM_TARGET_ARCH"
+	TERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DLLVM_HOST_TRIPLE=$LLVM_DEFAULT_TARGET_TRIPLE"
+	_RPATH_FLAG="-Wl,-rpath=$TERMUX_PREFIX/lib"
+	_RPATH_FLAG_ADD="-Wl,-rpath='\$ORIGIN/../lib' -Wl,-rpath=$TERMUX_PREFIX/lib"
+	LDFLAGS="${LDFLAGS/$_RPATH_FLAG/$_RPATH_FLAG_ADD $_RPATH_FLAG}"
+	echo $LDFLAGS
+	export TERMUX_SRCDIR_SAVE=$TERMUX_PKG_SRCDIR
+	TERMUX_PKG_SRCDIR=$TERMUX_PKG_SRCDIR/llvm
+}
+
+termux_step_post_configure() {
+	TERMUX_PKG_SRCDIR=$TERMUX_SRCDIR_SAVE
+}
+
+termux_step_post_make_install() {
+	ln -sfr $_INSTALL_PREFIX/bin/flang $TERMUX_PREFIX/bin/
+	ln -sfr $_INSTALL_PREFIX/bin/clang-10 $TERMUX_PREFIX/bin/
+	ln -sfr $_INSTALL_PREFIX/bin/lld $TERMUX_PREFIX/bin/lld-10
+	ln -sfr $_INSTALL_PREFIX/lib/libLLVM-10.so $TERMUX_PREFIX/lib/
+}
