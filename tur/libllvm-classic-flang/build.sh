@@ -5,6 +5,7 @@ TERMUX_PKG_LICENSE_FILE="llvm/LICENSE.TXT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 _DATE=2022.05.23
 TERMUX_PKG_VERSION=${_DATE//./}
+TERMUX_PKG_REVISION=1
 _LLVM_COMMIT=4a566ddfa4157ed1a24920ab7673ccc01c46fd99
 TERMUX_PKG_SRCURL=https://github.com/flang-compiler/classic-flang-llvm-project/archive/${_LLVM_COMMIT}.zip
 TERMUX_PKG_SHA256=d390229b7ffa7b1db7b8bf2fe9352b597da801913df8d2dc2e65d27377433d2d
@@ -101,6 +102,6 @@ termux_step_post_make_install() {
 	ln -sfr $_INSTALL_PREFIX/bin/clang-10 $TERMUX_PREFIX/bin/
 	ln -sfr $_INSTALL_PREFIX/bin/lld $_INSTALL_PREFIX/bin/lld-10
 	ln -sfr $_INSTALL_PREFIX/bin/lld $TERMUX_PREFIX/bin/lld-10
-	ln -sfr $_INSTALL_PREFIX/bin/lld $TERMUX_PREFIX/bin/ld.lld-10
+	ln -sfr $_INSTALL_PREFIX/bin/ld.lld $TERMUX_PREFIX/bin/ld.lld-10
 	ln -sfr $_INSTALL_PREFIX/lib/libLLVM-10.so $TERMUX_PREFIX/lib/
 }
