@@ -4,12 +4,12 @@ Sounds like Archlinux User repository aka AUR ? TUR functioning mechanism is bit
 So TUR saves resources and time since user could install pre-compiled package. 
 
 ## Subscribe TUR
-Add TUR in Termux, simply with executing following command:
+Add TUR in Termux. 
+```
+pkg install tur-repo
+```
+Once `tur-repo` successfully installed. TUR packages can be install with pkg or apt in same ways. 
 
-```
-echo "deb https://tur.kcubeterm.com tur-packages tur" > $PREFIX/etc/apt/sources.list.d/tur.list
-apt update
-```
 ## Request:
 *Request to all TUR users.*
 
