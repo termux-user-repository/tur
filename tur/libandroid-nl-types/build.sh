@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="Shared library for catopen/catgets/catclose of Bionic Li
 TERMUX_PKG_LICENSE="BSD 2-Clause"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_SRCURL="https://android.googlesource.com/platform/bionic/+/refs/heads/master/libc/bionic/nl_types.cpp"
+TERMUX_PKG_SHA256=SKIP_CHECKSUM
 TERMUX_PKG_VERSION=0.1
 TERMUX_PKG_SKIP_SRC_EXTRACT=true
 TERMUX_PKG_BUILD_IN_SRC=true
