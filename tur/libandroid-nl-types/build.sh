@@ -18,7 +18,7 @@ termux_step_get_source() {
 # Files are taken from the Bionic libc repo. 
 # nl_types.cpp: https://android.googlesource.com/platform/bionic/+/refs/heads/master/libc/bionic/nl_types.cpp
 termux_step_make() {
-	$CXX $CFLAGS $CPPFLAGS -I$TERMUX_PKG_BUILDER_DIR -c $TERMUX_PKG_BUILDER_DIR/nl_types.cpp
+	$CXX $CFLAGS $CPPFLAGS -I$TERMUX_PKG_BUILDER_DIR -c nl_types.cpp
 	$CXX $LDFLAGS -shared nl_types.o -o libandroid-nl-types.so
 	$AR rcu libandroid-nl-types.a nl_types.o
 	cp -f $TERMUX_PKG_BUILDER_DIR/LICENSE $TERMUX_PKG_SRCDIR
