@@ -15,7 +15,7 @@ termux_step_pre_configure() {
 }
 
 termux_step_make() {
-	go build -o go-cqhttp -ldflags="-w -s -X 'github.com/bloznelis/typioca/internal/base.Version=${TERMUX_PKG_VERSION}'"
+	go build -o typioca -ldflags="-w -s -X 'github.com/bloznelis/typioca/internal/base.Version=${TERMUX_PKG_VERSION}'"
 }
 
 termux_step_make_install() {
