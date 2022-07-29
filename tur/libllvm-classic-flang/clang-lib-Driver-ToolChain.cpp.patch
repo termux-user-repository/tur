@@ -23,7 +23,7 @@ diff -uNr flang-src/clang/lib/Driver/ToolChain.cpp flang-src.mod/clang/lib/Drive
 
    if (staticFlangLibs)
      CmdArgs.push_back("-Bstatic");
-+  # CmdArgs.push_back("-landroid-mathlib"); CmdArgs.push_back("-landroid-nl-types");
++   // CmdArgs.push_back("-landroid-mathlib"); CmdArgs.push_back("-landroid-nl-types");
    CmdArgs.push_back("-lflang");
    CmdArgs.push_back("-lflangrti");
    CmdArgs.push_back("-lpgmath");
