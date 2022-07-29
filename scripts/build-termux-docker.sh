@@ -1,19 +1,11 @@
 #!/bin/sh
 set -e -u
 
-: ${TERMUX_BUILDER_IMAGE_NAME:=termux/termux-docker:$ARCH}
+: ${TERMUX_BUILDER_IMAGE_NAME:=ghcr.io/termux-user-repository/termux-docker-android-7:$ARCH}
 : ${CONTAINER_NAME:=termux-$ARCH}
 
 CONTAINER_HOME_DIR=/data/data/com.termux/files/home
-UNAME=$(uname)
-if [ "$UNAME" = Darwin ]; then
-	# Workaround for mac readlink not supporting -f.
-	REPOROOT=$PWD
-	SEC_OPT=""
-else
-	REPOROOT="$(dirname $(readlink -f $0))/../"
-	SEC_OPT=" --security-opt seccomp=$REPOROOT/scripts/profile.json"
-fi
+REPOROOT="$(dirname $(readlink -f $0))/../"
 
 # Check whether attached to tty and adjust docker flags accordingly.
 if [ -t 1 ]; then
@@ -32,13 +24,12 @@ echo "Running container '$CONTAINER_NAME' from image '$TERMUX_BUILDER_IMAGE_NAME
 
 $SUDO docker start $CONTAINER_NAME >/dev/null 2>&1 || {
 	echo "Creating new container..."
-	# sudo chmod -R 777 $REPOROOT
 	$SUDO docker run \
 		--detach \
 		--name $CONTAINER_NAME \
 		--network=host \
 		--volume $REPOROOT:$CONTAINER_HOME_DIR/termux-packages \
-		$SEC_OPT \
+		--security-opt seccomp=unconfined \
 		--tty \
 		-w $CONTAINER_HOME_DIR/termux-packages \
 		$TERMUX_BUILDER_IMAGE_NAME
