@@ -1,0 +1,85 @@
+--- a/runtime/flang/async.c
++++ b/runtime/flang/async.c
+@@ -17,6 +17,7 @@
+  * Fio_asy_close - called from close
+  */
+ 
++#if !defined(__ANDROID__)
+ #if !defined(TARGET_WIN)
+ #include <unistd.h>
+ #include <stdlib.h>
+@@ -401,4 +402,74 @@
+   free(asy);
+   return (n);
+ }
++
++#else /* dummy versions of routines */
++
++int
++Fio_asy_fseek(void *asy, long offset, int whence)
++{
++  __abort(1, "asynchronous I/O not implemented");
++  return (0);
++}
++
++/* enable fd, disable fp */
++
++int
++Fio_asy_enable(void *asy)
++{
++  __abort(1, "asynchronous I/O not implemented");
++  return (0);
++}
++
++/* disable fd, enable fp */
++
++int
++Fio_asy_disable(void *asy)
++{
++  __abort(1, "asynchronous I/O not implemented");
++  return (0);
++}
++
++/* init file for asynch i/o, called from open */
++
++int
++Fio_asy_open(void *fp, void **pasy)
++{
++  __abort(1, "asynchronous I/O not implemented");
++  return (0);
++}
+ 
++/* start an asynch read */
++
++int
++Fio_asy_read(void *asy, void *adr, long len)
++{
++  __abort(1, "asynchronous I/O not implemented");
++  return (0);
++}
++
++/* start an asynch write */
++
++int
++Fio_asy_write(void *asy, void *adr, long len)
++{
++  __abort(1, "asynchronous I/O not implemented");
++  return (0);
++}
++
++int
++Fio_asy_start(void *asy)
++{
++  __abort(1, "asynchronous I/O not implemented");
++  return (0);
++}
++
++/* close asynch i/o called from close */
++
++int
++Fio_asy_close(void *asy)
++{
++  __abort(1, "asynchronous I/O not implemented");
++  return (0);
++}
++#endif

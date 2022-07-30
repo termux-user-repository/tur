@@ -1,0 +1,12 @@
+diff -uNr a/runtime/libpgmath/lib/common/sincos/gsincos.cpp b/runtime/libpgmath/lib/common/sincos/gsincos.cpp
+--- a/runtime/libpgmath/lib/common/sincos/gsincos.cpp     2022-05-20 23:03:17.000000000 +0800
++++ b/runtime/libpgmath/lib/common/sincos/gsincos.cpp 2022-06-02 11:27:24.219415500 +0800
+@@ -68,7 +68,7 @@
+   #error Unknown architecture
+ #endif
+
+-extern "C" void sincos(double, double*, double*) throw();
++extern "C" void sincos(double, double*, double*);
+ extern "C" VFLOAT  VFLOATRETURN(VFLOAT, VFLOAT);
+
+ extern "C" VFLOAT
