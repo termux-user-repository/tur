@@ -1,5 +1,5 @@
 # Import TUR Action's GPG key if it is not a on-device build.
-if ! [ "$(uname -o)" = "Android" ] && ! [ -e "/system/bin/app_process" ]; then
+if [[ ${TERMUX_SCRIPTDIR} ]] && ! [ "$(uname -o)" = "Android" ] && ! [ -e "/system/bin/app_process" ]; then
 	gpg --list-keys 43EEC3A2934343315717FF6F6A5C550C260667D1 > /dev/null 2>&1 || {
 		gpg --import "$TERMUX_SCRIPTDIR/packages/tur-repo/tur.gpg"
 		gpg --no-tty --command-file <(echo -e "trust\n5\ny")  --edit-key 43EEC3A2934343315717FF6F6A5C550C260667D1
