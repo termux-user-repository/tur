@@ -1,0 +1,148 @@
+This patch is based on the setup-scripts from its-pointless repo. It defines
+some builtin functions which is available in clang but not available in gcc.
+diff -uNr a/sys/cdefs.h b/sys/cdefs.h
+--- a/sys/cdefs.h	2022-08-06 14:48:49.633955200 +0800
++++ b/sys/cdefs.h	2022-08-06 15:10:18.821676800 +0800
+@@ -42,6 +42,28 @@
+  */
+ #define __BIONIC__ 1
+ 
++#ifndef __has_extension
++#define __has_extension         __has_feature
++#endif
++#ifndef __has_feature
++#define __has_feature(x)        0
++#endif
++#ifndef __has_include
++#define __has_include(x)        0
++#endif
++#ifndef __has_builtin
++#define __has_builtin(x)        0
++#endif
++#ifndef __has_attribute
++#define __has_attribute(x)      0
++#endif
++
++#if !defined(__clang__)
++// TODO: Replace all the functions use _Nonnull with __nonnull__
++#define _Nonnull
++#define _Nullable
++#endif
++
+ #if defined(__cplusplus)
+ #define __BEGIN_DECLS extern "C" {
+ #define __END_DECLS }
+@@ -131,12 +153,25 @@
+ 
+ #define __wur __attribute__((__warn_unused_result__))
+ 
+-#define __errorattr(msg) __attribute__((unavailable(msg)))
+-#define __warnattr(msg) __attribute__((deprecated(msg)))
+-#define __warnattr_real(msg) __attribute__((deprecated(msg)))
+-#define __enable_if(cond, msg) __attribute__((enable_if(cond, msg)))
+-#define __clang_error_if(cond, msg) __attribute__((diagnose_if(cond, msg, "error")))
+-#define __clang_warning_if(cond, msg) __attribute__((diagnose_if(cond, msg, "warning")))
++#ifdef __clang__
++#  define __errorattr(msg) __attribute__((unavailable(msg)))
++#  define __warnattr(msg) __attribute__((deprecated(msg)))
++#  define __warnattr_real(msg) __attribute__((deprecated(msg)))
++#  define __enable_if(cond, msg) __attribute__((enable_if(cond, msg)))
++#  define __clang_error_if(cond, msg) __attribute__((diagnose_if(cond, msg, "error")))
++#  define __clang_warning_if(cond, msg) __attribute__((diagnose_if(cond, msg, "warning")))
++#else
++#  define __errorattr(msg) __attribute__((__error__(msg)))
++#  define __warnattr(msg) __attribute__((__warning__(msg)))
++#  define __warnattr_real __warnattr
++/* enable_if doesn't exist on other compilers; give an error if it's used. */
++/* diagnose_if doesn't exist either, but it's often tagged on non-clang-specific functions */
++#  define __clang_error_if(cond, msg)
++#  define __clang_warning_if(cond, msg)
++
++/* errordecls really don't work as well in clang as they do in GCC. */
++#  define __errordecl(name, msg) extern void name(void) __errorattr(msg)
++#endif
+ 
+ #if defined(ANDROID_STRICT)
+ /*
+@@ -273,19 +308,20 @@
+ 
+ #if defined(__BIONIC_FORTIFY)
+ #  define __bos0(s) __bosn((s), 0)
+-#  define __pass_object_size_n(n) __attribute__((pass_object_size(n)))
++#  if defined(__clang__)
++#    define __pass_object_size_n(n) __attribute__((pass_object_size(n)))
+ /*
+  * FORTIFY'ed functions all have either enable_if or pass_object_size, which
+  * makes taking their address impossible. Saying (&read)(foo, bar, baz); will
+  * therefore call the unFORTIFYed version of read.
+  */
+-#  define __call_bypassing_fortify(fn) (&fn)
++#    define __call_bypassing_fortify(fn) (&fn)
+ /*
+  * Because clang-FORTIFY uses overloads, we can't mark functions as `extern inline` without making
+  * them available externally. FORTIFY'ed functions try to be as close to possible as 'invisible';
+  * having stack protectors detracts from that (b/182948263).
+  */
+-#  define __BIONIC_FORTIFY_INLINE static __inline__ __attribute__((no_stack_protector)) \
++#    define __BIONIC_FORTIFY_INLINE static __inline__ __attribute__((no_stack_protector)) \
+       __always_inline __VERSIONER_FORTIFY_INLINE
+ /*
+  * We should use __BIONIC_FORTIFY_VARIADIC instead of __BIONIC_FORTIFY_INLINE
+@@ -293,9 +329,21 @@
+  * The __always_inline attribute is useless, misleading, and could trigger
+  * clang compiler bug to incorrectly inline variadic functions.
+  */
+-#  define __BIONIC_FORTIFY_VARIADIC static __inline__
++#    define __BIONIC_FORTIFY_VARIADIC static __inline__
+ /* Error functions don't have bodies, so they can just be static. */
+-#  define __BIONIC_ERROR_FUNCTION_VISIBILITY static __attribute__((unused))
++#    define __BIONIC_ERROR_FUNCTION_VISIBILITY static __attribute__((unused))
++#  else
++/*
++ * Where they can, GCC and clang-style FORTIFY share implementations.
++ * So, make these nops in GCC.
++ */
++#    define __pass_object_size_n(n)
++#    define __call_bypassing_fortify(fn) (fn)
++/* __BIONIC_FORTIFY_NONSTATIC_INLINE is pointless in GCC's FORTIFY */
++#    define __BIONIC_FORTIFY_INLINE extern __inline__ __always_inline __attribute__((gnu_inline)) __attribute__((__artificial__))
++/* __always_inline is probably okay and ignored by gcc in __BIONIC_FORTIFY_VARIADIC */
++#    define __BIONIC_FORTIFY_VARIADIC __BIONIC_FORTIFY_INLINE
++#  endif
+ #else
+ /* Further increase sharing for some inline functions */
+ #  define __pass_object_size_n(n)
+@@ -325,7 +373,16 @@
+ #  define __BIONIC_INCLUDE_FORTIFY_HEADERS 1
+ #endif
+ 
+-#define __overloadable __attribute__((overloadable))
++#if !defined(__clang__) && defined(__BIONIC_INCLUDE_FORTIFY_HEADERS)
++#undef __BIONIC_INCLUDE_FORTIFY_HEADERS
++#warning "Fortify headers are not supported and will not used without clang."
++#endif
++
++#if defined(__clang__)
++#  define __overloadable __attribute__((overloadable))
++#else
++#  define __overloadable
++#endif
+ 
+ /* Used to tag non-static symbols that are private and never exposed by the shared library. */
+ #define __LIBC_HIDDEN__ __attribute__((visibility("hidden")))
+@@ -358,6 +415,7 @@
+ }
+ #endif
+ 
++#if defined(__clang__)
+ /*
+  * Used when we need to check for overflow when multiplying x and y. This
+  * should only be used where __size_mul_overflow can not work, because it makes
+@@ -366,6 +424,7 @@
+  * __size_mul_overflow.
+  */
+ #define __unsafe_check_mul_overflow(x, y) ((__SIZE_TYPE__)-1 / (x) < (y))
++#endif
+ 
+ #include <android/versioning.h>
+ #include <android/api-level.h>
