@@ -1,0 +1,26 @@
+diff -uNr sysroot/usr/include/paths.h sysroot.mod/usr/include/paths.h
+--- sysroot/usr/include/paths.h
++++ sysroot.mod/usr/include/paths.h
+@@ -35,14 +35,20 @@
+ #include <sys/cdefs.h>
+ 
+ #ifndef _PATH_BSHELL
+-#define	_PATH_BSHELL	"/system/bin/sh"
++#define _PATH_BSHELL "@TERMUX_PREFIX@/bin/sh"
+ #endif
+ #define	_PATH_CONSOLE	"/dev/console"
+-#define	_PATH_DEFPATH	"/sbin:/system/sbin:/system/bin:/system/xbin:/odm/bin:/vendor/bin:/vendor/xbin"
++#define _PATH_BSHELL "@TERMUX_PREFIX@/bin/sh"
+ #define	_PATH_DEV	"/dev/"
+ #define	_PATH_DEVNULL	"/dev/null"
+ #define	_PATH_KLOG	"/proc/kmsg"
+ #define	_PATH_MOUNTED	"/proc/mounts"
+ #define	_PATH_TTY	"/dev/tty"
+ 
++#define        _PATH_STDPATH   _PATH_DEFPATH
++#define        _PATH_TMP       "@TERMUX_PREFIX@/tmp/"
++#define        _PATH_VARDB     "@TERMUX_PREFIX@/var/db/"
++#define        _PATH_VARRUN    "@TERMUX_PREFIX@/var/run/"
++#define        _PATH_VARTMP    "@TERMUX_PREFIX@/var/tmp/"
++
+ #endif /* !_PATHS_H_ */

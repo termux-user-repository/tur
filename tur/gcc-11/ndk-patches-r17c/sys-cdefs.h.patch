@@ -1,0 +1,11 @@
+diff -uNr sysroot/usr/include/sys/cdefs.h sysroot.mod/usr/include/sys/cdefs.h
+--- sysroot/usr/include/sys/cdefs.h
++++ sysroot.mod/usr/include/sys/cdefs.h
+@@ -399,4 +399,7 @@
+ #define __unsafe_check_mul_overflow(x, y) ((__SIZE_TYPE__)-1 / (x) < (y))
+ #endif
+ 
++#define __TERMUX__ 1
++#define __TERMUX_PREFIX__ "@TERMUX_PREFIX@"
++
+ #endif /* !_SYS_CDEFS_H_ */

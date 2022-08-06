@@ -1,0 +1,22 @@
+diff -uNr sysroot/usr/include/asm-generic/termbits.h sysroot.mod/usr/include/asm-generic/termbits.h
+--- sysroot/usr/include/asm-generic/termbits.h
++++ sysroot.mod/usr/include/asm-generic/termbits.h
+@@ -190,5 +190,6 @@
+ #define TCIOFLUSH 2
+ #define TCSANOW 0
+ #define TCSADRAIN 1
+-#define TCSAFLUSH 2
++/* TCSAFLUSH is patched to be TCSANOW in Termux to work around Android SELinux rule */
++#define TCSAFLUSH 0
+ #endif
+diff -uNr sysroot/usr/include/bits/termios_inlines.h sysroot.mod/usr/include/bits/termios_inlines.h
+--- sysroot/usr/include/bits/termios_inlines.h
++++ sysroot.mod/usr/include/bits/termios_inlines.h
+@@ -117,7 +117,6 @@
+   switch (optional_actions) {
+     case TCSANOW: cmd = TCSETS; break;
+     case TCSADRAIN: cmd = TCSETSW; break;
+-    case TCSAFLUSH: cmd = TCSETSF; break;
+     default: errno = EINVAL; return -1;
+   }
+   return ioctl(fd, cmd, s);

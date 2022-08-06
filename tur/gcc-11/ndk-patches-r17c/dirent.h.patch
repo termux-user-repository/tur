@@ -1,0 +1,13 @@
+diff -uNr sysroot/usr/include/dirent.h sysroot.mod/usr/include/dirent.h
+--- sysroot/usr/include/dirent.h
++++ sysroot.mod/usr/include/dirent.h
+@@ -47,6 +47,9 @@
+ #define DT_WHT 14
+ #endif
+ 
++#define IFTODT(x) ((x)>>12 & 0xF)
++#define DTTOIF(x) ((x)<<12)
++
+ #if defined(__LP64__)
+ #define __DIRENT64_INO_T ino_t
+ #else

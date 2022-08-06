@@ -1,0 +1,18 @@
+diff -uNr sysroot/usr/include/semaphore.h sysroot.mod/usr/include/semaphore.h
+--- sysroot/usr/include/semaphore.h
++++ sysroot.mod/usr/include/semaphore.h
+@@ -64,8 +64,14 @@
+ int sem_wait(sem_t* __sem);
+ 
+ /* These aren't actually implemented. */
++#undef sem_open
++#define sem_open libandroid_sem_open
+ sem_t* sem_open(const char* __name, int _flags, ...);
++#undef sem_close
++#define sem_close libandroid_sem_close
+ int sem_close(sem_t* __sem);
++#undef sem_close
++#define sem_close libandroid_sem_close
+ int sem_unlink(const char* __name);
+ 
+ __END_DECLS
