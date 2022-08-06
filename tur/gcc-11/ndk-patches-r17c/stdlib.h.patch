@@ -1,0 +1,13 @@
+diff -uNr sysroot/usr/include/stdlib.h sysroot.mod/usr/include/stdlib.h
+--- sysroot/usr/include/stdlib.h
++++ sysroot.mod/usr/include/stdlib.h
+@@ -211,8 +211,7 @@
+ size_t wcstombs(char* __dst, const wchar_t* __src, size_t __n);
+ 
+ #if __ANDROID_API__ >= __ANDROID_API_L__
+-size_t __ctype_get_mb_cur_max(void) __INTRODUCED_IN(21);
+-#define MB_CUR_MAX __ctype_get_mb_cur_max()
++#define MB_CUR_MAX 4
+ #else
+ /*
+  * Pre-L we didn't have any locale support and so we were always the POSIX

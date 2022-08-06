@@ -1,0 +1,81 @@
+In Termux, libc++_shared (renamed from libc++) should be used by default.
+diff -uNr a/gcc/cp/g++spec.c b/gcc/cp/g++spec.c
+--- a/gcc/cp/g++spec.c
++++ b/gcc/cp/g++spec.c
+@@ -39,14 +39,14 @@
+ #define MATH_LIBRARY_PROFILE MATH_LIBRARY
+ #endif
+ 
+-#ifndef LIBSTDCXX
+-#define LIBSTDCXX "stdc++"
++#ifndef LIBCXX_SHARED
++#define LIBCXX_SHARED "c++_shared"
+ #endif
+-#ifndef LIBSTDCXX_PROFILE
+-#define LIBSTDCXX_PROFILE LIBSTDCXX
++#ifndef LIBCXX_SHARED_PROFILE
++#define LIBCXX_SHARED_PROFILE LIBCXX_SHARED
+ #endif
+-#ifndef LIBSTDCXX_STATIC
+-#define LIBSTDCXX_STATIC NULL
++#ifndef LIBCXX_SHARED_STATIC
++#define LIBCXX_SHARED_STATIC NULL
+ #endif
+ 
+ #ifndef LIBCXX
+@@ -73,7 +73,7 @@
+    in c.opt.  */
+ enum stdcxxlib_kind
+ {
+-  USE_LIBSTDCXX = 1,
++  USE_LIBCXX_SHARED = 1,
+   USE_LIBCXX = 2
+ };
+ 
+@@ -95,7 +95,7 @@
+   int library = 0;
+ 
+   /* Which c++ runtime library to link.  */
+-  stdcxxlib_kind which_library = USE_LIBSTDCXX;
++  stdcxxlib_kind which_library = USE_LIBCXX_SHARED;
+ 
+   /* The number of arguments being added to what's in argv, other than
+      libraries.  We use this to track the number of times we've inserted
+@@ -382,14 +382,14 @@
+ 	}
+       else
+ 	generate_option (OPT_l,
+-			 saw_profile_flag ? LIBSTDCXX_PROFILE : LIBSTDCXX, 1,
++			 saw_profile_flag ? LIBCXX_SHARED_PROFILE : LIBCXX_SHARED, 1,
+ 			 CL_DRIVER, &new_decoded_options[j]);
+       added_libraries++;
+       j++;
+       /* Add target-dependent static library, if necessary.  */
+-      if ((static_link || library > 1) && LIBSTDCXX_STATIC != NULL)
++      if ((static_link || library > 1) && LIBCXX_SHARED_STATIC != NULL)
+ 	{
+-	  generate_option (OPT_l, LIBSTDCXX_STATIC, 1,
++	  generate_option (OPT_l, LIBCXX_SHARED_STATIC, 1,
+ 			   CL_DRIVER, &new_decoded_options[j]);
+ 	  added_libraries++;
+ 	  j++;
+diff -uNr a/gcc/c-family/c.opt b/gcc/c-family/c.opt
+--- a/gcc/c-family/c.opt
++++ b/gcc/c-family/c.opt
+@@ -2369,14 +2369,14 @@
+ 
+ stdlib=
+ Driver C++ ObjC++ Common Condition(ENABLE_STDLIB_OPTION) Var(flag_stdlib_kind) Joined Enum(stdlib_kind) RejectNegative Init(1)
+--stdlib=[libstdc++|libc++]	The standard library to be used for C++ headers
++-stdlib=[libc++_shared|libc++]	The standard library to be used for C++ headers
+ and runtime.
+ 
+ Enum
+ Name(stdlib_kind) Type(int)
+ 
+ EnumValue
+-Enum(stdlib_kind) String(libstdc++) Value(1)
++Enum(stdlib_kind) String(libc++_shared) Value(1)
+ 
+ EnumValue
+ Enum(stdlib_kind) String(libc++) Value(2)
