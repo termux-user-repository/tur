@@ -1,0 +1,359 @@
+This patch is based on the setup-scripts from its-pointless repo. It reverts
+some changes that makes the NDK headers support clang only.
+diff -uNr a/bits/ioctl.h b/bits/ioctl.h
+--- a/bits/ioctl.h	2022-08-06 14:48:47.524999800 +0800
++++ b/bits/ioctl.h	2022-08-06 15:51:08.476122900 +0800
+@@ -55,7 +55,8 @@
+  * - defining BIONIC_IOCTL_NO_SIGNEDNESS_OVERLOAD, which will make the
+  *   overloading go away.
+  */
+-#if !defined(BIONIC_IOCTL_NO_SIGNEDNESS_OVERLOAD)
++#if defined(__clang__) && __has_extension(overloadable_unmarked) && \
++  !defined(BIONIC_IOCTL_NO_SIGNEDNESS_OVERLOAD)
+ /* enable_if(1) just exists to break overloading ties. */
+ int ioctl(int __fd, unsigned __request, ...) __overloadable __enable_if(1, "") __RENAME(ioctl);
+ #endif
+diff -uNr a/bits/stdatomic.h b/bits/stdatomic.h
+--- a/bits/stdatomic.h	2022-08-06 14:48:47.472671200 +0800
++++ b/bits/stdatomic.h	2022-08-06 16:35:43.342368000 +0800
+@@ -41,7 +41,7 @@
+  */
+ 
+ #include <stddef.h>  /* For ptrdiff_t. */
+-#include <stdint.h>
++#include <stdint.h>  /* TODO: don't drag in all the macros, just the types. */
+ // Include uchar.h only when available.  Bionic's stdatomic.h is also used for
+ // the host (via a copy in prebuilts/clang) and uchar.h is not available in the
+ // glibc used for the host.
+@@ -49,6 +49,20 @@
+ # include <uchar.h>  /* For char16_t and char32_t.              */
+ #endif
+ 
++
++#ifdef __clang__
++# if __has_extension(c_atomic) || __has_extension(cxx_atomic)
++#  define       __CLANG_ATOMICS
++# else
++#  error "stdatomic.h does not support your compiler"
++# endif
++# if __has_builtin(__sync_swap)
++#  define __HAS_BUILTIN_SYNC_SWAP
++# endif
++#else
++# define __GNUC_ATOMICS
++#endif
++
+ /*
+  * 7.17.1 Atomic lock-free macros.
+  */
+@@ -88,8 +102,13 @@
+  * 7.17.2 Initialization.
+  */
+ 
++#if defined(__CLANG_ATOMICS)
+ #define	ATOMIC_VAR_INIT(value)		(value)
+ #define	atomic_init(obj, value)		__c11_atomic_init(obj, value)
++#else
++#define	ATOMIC_VAR_INIT(value)		{ .__val = (value) }
++#define	atomic_init(obj, value)		((void)((obj)->__val = (value)))
++#endif
+ 
+ /*
+  * Clang and recent GCC both provide predefined macros for the memory
+@@ -138,24 +157,63 @@
+  * 7.17.4 Fences.
+  */
+ 
+-static __inline void atomic_thread_fence(memory_order __order __attribute__((unused))) {
++static __inline void
++atomic_thread_fence(memory_order __order __attribute__((unused)))
++{
++
++#ifdef __CLANG_ATOMICS
+ 	__c11_atomic_thread_fence(__order);
++#elif defined(__GNUC_ATOMICS)
++	__atomic_thread_fence(__order);
++#else
++	__sync_synchronize();
++#endif
+ }
+ 
+-static __inline void atomic_signal_fence(memory_order __order __attribute__((unused))) {
++static __inline void
++atomic_signal_fence(memory_order __order __attribute__((unused)))
++{
++
++#ifdef __CLANG_ATOMICS
+ 	__c11_atomic_signal_fence(__order);
++#elif defined(__GNUC_ATOMICS)
++	__atomic_signal_fence(__order);
++#else
++	__asm volatile ("" ::: "memory");
++#endif
+ }
+ 
+ /*
+  * 7.17.5 Lock-free property.
+  */
+ 
+-#define	atomic_is_lock_free(obj) __c11_atomic_is_lock_free(sizeof(*(obj)))
++#if defined(_KERNEL)
++/* Atomics in kernelspace are always lock-free. */
++#define	atomic_is_lock_free(obj) \
++	((void)(obj), (_Bool)1)
++#elif defined(__CLANG_ATOMICS)
++#define	atomic_is_lock_free(obj) \
++	__c11_atomic_is_lock_free(sizeof(*(obj)))
++#elif defined(__GNUC_ATOMICS)
++#define	atomic_is_lock_free(obj) \
++	__atomic_is_lock_free(sizeof((obj)->__val), &(obj)->__val)
++#else
++#define	atomic_is_lock_free(obj) \
++	((void)(obj), sizeof((obj)->__val) <= sizeof(void *))
++#endif
+ 
+ /*
+  * 7.17.6 Atomic integer types.
+  */
+ 
++#ifndef __CLANG_ATOMICS
++/*
++ * No native support for _Atomic(). Place object in structure to prevent
++ * most forms of direct non-atomic access.
++ */
++#define _Atomic(T)              struct { T volatile __val; }
++#endif
++
+ typedef _Atomic(bool)			atomic_bool;
+ typedef _Atomic(char)			atomic_char;
+ typedef _Atomic(signed char)		atomic_schar;
+@@ -204,6 +262,7 @@
+  * Compiler-specific operations.
+  */
+ 
++#if defined(__CLANG_ATOMICS)
+ #define	atomic_compare_exchange_strong_explicit(object, expected,	\
+     desired, success, failure)						\
+ 	__c11_atomic_compare_exchange_strong(object, expected, desired,	\
+@@ -228,11 +287,91 @@
+ 	__c11_atomic_load(object, order)
+ #define	atomic_store_explicit(object, desired, order)			\
+ 	__c11_atomic_store(object, desired, order)
++#elif defined(__GNUC_ATOMICS)
++#define	atomic_compare_exchange_strong_explicit(object, expected,	\
++    desired, success, failure)						\
++	__atomic_compare_exchange_n(&(object)->__val, expected,		\
++	    desired, 0, success, failure)
++#define	atomic_compare_exchange_weak_explicit(object, expected,		\
++    desired, success, failure)						\
++	__atomic_compare_exchange_n(&(object)->__val, expected,		\
++	    desired, 1, success, failure)
++#define	atomic_exchange_explicit(object, desired, order)		\
++	__atomic_exchange_n(&(object)->__val, desired, order)
++#define	atomic_fetch_add_explicit(object, operand, order)		\
++	__atomic_fetch_add(&(object)->__val, operand, order)
++#define	atomic_fetch_and_explicit(object, operand, order)		\
++	__atomic_fetch_and(&(object)->__val, operand, order)
++#define	atomic_fetch_or_explicit(object, operand, order)		\
++	__atomic_fetch_or(&(object)->__val, operand, order)
++#define	atomic_fetch_sub_explicit(object, operand, order)		\
++	__atomic_fetch_sub(&(object)->__val, operand, order)
++#define	atomic_fetch_xor_explicit(object, operand, order)		\
++	__atomic_fetch_xor(&(object)->__val, operand, order)
++#define	atomic_load_explicit(object, order)				\
++	__atomic_load_n(&(object)->__val, order)
++#define	atomic_store_explicit(object, desired, order)			\
++	__atomic_store_n(&(object)->__val, desired, order)
++#else
++#define	__atomic_apply_stride(object, operand) \
++	(((__typeof__((object)->__val))0) + (operand))
++#define	atomic_compare_exchange_strong_explicit(object, expected,	\
++    desired, success, failure)	__extension__ ({			\
++	__typeof__(expected) __ep = (expected);				\
++	__typeof__(*__ep) __e = *__ep;					\
++	(void)(success); (void)(failure);				\
++	(bool)((*__ep = __sync_val_compare_and_swap(&(object)->__val,	\
++	    __e, desired)) == __e);					\
++})
++#define	atomic_compare_exchange_weak_explicit(object, expected,		\
++    desired, success, failure)						\
++	atomic_compare_exchange_strong_explicit(object, expected,	\
++		desired, success, failure)
++#ifdef __HAS_BUILTIN_SYNC_SWAP
++/* Clang provides a full-barrier atomic exchange - use it if available. */
++#define	atomic_exchange_explicit(object, desired, order)		\
++	((void)(order), __sync_swap(&(object)->__val, desired))
++#else
++/*
++ * __sync_lock_test_and_set() is only an acquire barrier in theory (although in
++ * practice it is usually a full barrier) so we need an explicit barrier before
++ * it.
++ */
++#define	atomic_exchange_explicit(object, desired, order)		\
++__extension__ ({							\
++	__typeof__(object) __o = (object);				\
++	__typeof__(desired) __d = (desired);				\
++	(void)(order);							\
++	__sync_synchronize();						\
++	__sync_lock_test_and_set(&(__o)->__val, __d);			\
++})
++#endif
++#define	atomic_fetch_add_explicit(object, operand, order)		\
++	((void)(order), __sync_fetch_and_add(&(object)->__val,		\
++	    __atomic_apply_stride(object, operand)))
++#define	atomic_fetch_and_explicit(object, operand, order)		\
++	((void)(order), __sync_fetch_and_and(&(object)->__val, operand))
++#define	atomic_fetch_or_explicit(object, operand, order)		\
++	((void)(order), __sync_fetch_and_or(&(object)->__val, operand))
++#define	atomic_fetch_sub_explicit(object, operand, order)		\
++	((void)(order), __sync_fetch_and_sub(&(object)->__val,		\
++	    __atomic_apply_stride(object, operand)))
++#define	atomic_fetch_xor_explicit(object, operand, order)		\
++	((void)(order), __sync_fetch_and_xor(&(object)->__val, operand))
++#define	atomic_load_explicit(object, order)				\
++	((void)(order), __sync_fetch_and_add(&(object)->__val, 0))
++#define	atomic_store_explicit(object, desired, order)			\
++	((void)atomic_exchange_explicit(object, desired, order))
++#endif
+ 
+ /*
+  * Convenience functions.
++ *
++ * Don't provide these in kernel space. In kernel space, we should be
++ * disciplined enough to always provide explicit barriers.
+  */
+ 
++#ifndef _KERNEL
+ #define	atomic_compare_exchange_strong(object, expected, desired)	\
+ 	atomic_compare_exchange_strong_explicit(object, expected,	\
+ 	    desired, memory_order_seq_cst, memory_order_seq_cst)
+@@ -255,6 +394,7 @@
+ 	atomic_load_explicit(object, memory_order_seq_cst)
+ #define	atomic_store(object, desired)					\
+ 	atomic_store_explicit(object, desired, memory_order_seq_cst)
++#endif /* !_KERNEL */
+ 
+ /*
+  * 7.17.8 Atomic flag type and operations.
+@@ -269,18 +409,33 @@
+ 
+ #define	ATOMIC_FLAG_INIT		{ ATOMIC_VAR_INIT(false) }
+ 
+-static __inline bool atomic_flag_test_and_set_explicit(volatile atomic_flag *__object, memory_order __order) {
++static __inline bool
++atomic_flag_test_and_set_explicit(volatile atomic_flag *__object,
++    memory_order __order)
++{
+ 	return (atomic_exchange_explicit(&__object->__flag, 1, __order));
+ }
+ 
+-static __inline void atomic_flag_clear_explicit(volatile atomic_flag *__object, memory_order __order) {
++static __inline void
++atomic_flag_clear_explicit(volatile atomic_flag *__object, memory_order __order)
++{
++
+ 	atomic_store_explicit(&__object->__flag, 0, __order);
+ }
+ 
+-static __inline bool atomic_flag_test_and_set(volatile atomic_flag *__object) {
+-	return (atomic_flag_test_and_set_explicit(__object, memory_order_seq_cst));
++#ifndef _KERNEL
++static __inline bool
++atomic_flag_test_and_set(volatile atomic_flag *__object)
++{
++
++	return (atomic_flag_test_and_set_explicit(__object,
++	    memory_order_seq_cst));
+ }
+ 
+-static __inline void atomic_flag_clear(volatile atomic_flag *__object) {
++static __inline void
++atomic_flag_clear(volatile atomic_flag *__object)
++{
++
+ 	atomic_flag_clear_explicit(__object, memory_order_seq_cst);
+ }
++#endif /* !_KERNEL */
+diff -uNr a/complex.h b/complex.h
+--- a/complex.h	2022-08-06 14:48:52.639751200 +0800
++++ b/complex.h	2022-08-06 15:55:58.240936500 +0800
+@@ -44,9 +44,15 @@
+ #define	I		_Complex_I
+ 
+ #if __STDC_VERSION__ >= 201112L
++#ifdef __clang__
+ #define	CMPLX(x, y)	((double complex){ x, y })
+ #define	CMPLXF(x, y)	((float complex){ x, y })
+ #define	CMPLXL(x, y)	((long double complex){ x, y })
++#else
++#define	CMPLX(x, y)	__builtin_complex((double)(x), (double)(y))
++#define	CMPLXF(x, y)	__builtin_complex((float)(x), (float)(y))
++#define	CMPLXL(x, y)	__builtin_complex((long double)(x), (long double)(y))
++#endif
+ #endif
+ 
+ __BEGIN_DECLS
+diff -uNr a/malloc.h b/malloc.h
+--- a/malloc.h	2022-08-06 14:48:48.739114400 +0800
++++ b/malloc.h	2022-08-06 16:00:29.648086400 +0800
+@@ -31,7 +31,11 @@
+ 
+ __BEGIN_DECLS
+ 
++#if defined(__clang__) && !__has_attribute(alloc_size)
++#define __BIONIC_ALLOC_SIZE(...)
++#else
+ #define __BIONIC_ALLOC_SIZE(...) __attribute__((__alloc_size__(__VA_ARGS__)))
++#endif
+ 
+ /**
+  * [malloc(3)](http://man7.org/linux/man-pages/man3/malloc.3.html) allocates
+diff -uNr a/stdatomic.h b/stdatomic.h
+--- a/stdatomic.h	2022-08-06 14:48:49.278954700 +0800
++++ b/stdatomic.h	2022-08-06 16:32:05.634401300 +0800
+@@ -32,8 +32,12 @@
+ 
+ #include <sys/cdefs.h>
+ 
+-#if defined(__cplusplus) && __cplusplus >= 201103L && __has_include(<atomic>)
+-# if __has_feature(cxx_atomic)
++#if defined(__cplusplus) && __cplusplus >= 201103L && defined(_USING_LIBCXX)
++# ifdef __clang__
++#  if __has_feature(cxx_atomic)
++#   define _STDATOMIC_HAVE_ATOMIC
++#  endif
++# else /* gcc */
+ #  define _STDATOMIC_HAVE_ATOMIC
+ # endif
+ #endif
+diff -uNr a/string.h b/string.h
+--- a/string.h
++++ b/string.h
+@@ -188,7 +188,7 @@
+ #endif
+
+ /* Const-correct overloads. Placed after FORTIFY so we call those functions, if possible. */
+-#if defined(__cplusplus)
++#if defined(__cplusplus) && defined(__clang__)
+ /*
+  * Use two enable_ifs so these overloads don't conflict with + are preferred over libcxx's. This can
+  * be reduced to 1 after libcxx recognizes that we have const-correct overloads.
+diff -uNr a/sys/mman.h b/sys/mman.h
+--- a/sys/mman.h	2022-08-06 14:48:49.466955000 +0800
++++ b/sys/mman.h	2022-08-06 16:38:31.091859400 +0800
+@@ -50,7 +50,14 @@
+  * and returns `MAP_FAILED` and sets `errno` on failure.
+  */
+ #if defined(__USE_FILE_OFFSET64)
+-void* mmap(void* __addr, size_t __size, int __prot, int __flags, int __fd, off_t __offset) __RENAME(mmap64);
++void* mmap(void* __addr, size_t __size, int __prot, int __flags, int __fd, off_t __offset)
++#  if !defined(__clang__) && __ANDROID_API__ < 21
++      __attribute__((error("mmap is not available with _FILE_OFFSET_BITS=64 when using GCC until "
++                           "android-21. Either raise your minSdkVersion, disable "
++                           "_FILE_OFFSET_BITS=64, or switch to Clang.")));
++#  else
++    __RENAME(mmap64);
++#  endif
+ #else
+ void* mmap(void* __addr, size_t __size, int __prot, int __flags, int __fd, off_t __offset);
+ #endif

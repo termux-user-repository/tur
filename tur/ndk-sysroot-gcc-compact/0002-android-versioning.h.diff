@@ -1,0 +1,16 @@
+This patch will make __INTRODUCED_IN() macro work properly as `__availability__`
+attribute is not available in GCC.
+
+[1]: https://github.com/its-pointless/gcc_termux/issues/141
+[2]: https://android.googlesource.com/platform/bionic/+/bfb6bae9fb5ef42e4f9ae2847f30f41938c04900
+--- a/android/versioning.h
++++ b/android/versioning.h
+@@ -18,7 +18,7 @@
+ 
+ // The `annotate` attribute always pulls the annotated (inline) function into the object files, thus
+ // we should only annotate headers when we are running versioner.
+-#if defined(__BIONIC_VERSIONER)
++#if defined(__BIONIC_VERSIONER) || ! defined(__clang__)
+ 
+ #define __INTRODUCED_IN(api_level) __attribute__((annotate("introduced_in=" #api_level)))
+ #define __INTRODUCED_IN_NO_GUARD_FOR_NDK(api_level) __attribute__((annotate("introduced_in=" #api_level))) __VERSIONER_NO_GUARD
