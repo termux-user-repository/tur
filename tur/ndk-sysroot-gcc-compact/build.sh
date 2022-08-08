@@ -26,15 +26,7 @@ termux_step_extract_into_massagedir() {
 	for f in $(find "$TERMUX_PKG_BUILDER_DIR/" -maxdepth 1 -type f -name *.diff | sort); do
 		echo "Applying patch: $(basename $f)"
 		patch -d "$TERMUX_PKG_MASSAGEDIR/$TERMUX_PREFIX/include/" -p1 < "$f";
-		# sed "s%\@TERMUX_PREFIX\@%${TERMUX_PREFIX}%g" "$f" | \
-		# 	sed "s%\@TERMUX_HOME\@%${TERMUX_ANDROID_HOME}%g" | \
-		# 	patch --silent -p1;
 	done
-	# patch -d $TERMUX_PKG_MASSAGEDIR/$TERMUX_PREFIX/include/  -p1 < $TERMUX_PKG_BUILDER_DIR/0001-c++-v1-math-headers.diff
-	# patch -d $TERMUX_PKG_MASSAGEDIR/$TERMUX_PREFIX/include/  -p1 < $TERMUX_PKG_BUILDER_DIR/0002-android-versioning.h.diff
-	# patch -d $TERMUX_PKG_MASSAGEDIR/$TERMUX_PREFIX/include/  -p1 < $TERMUX_PKG_BUILDER_DIR/0003-sys-cdefs.h.diff
-	# patch -d $TERMUX_PKG_MASSAGEDIR/$TERMUX_PREFIX/include/  -p1 < $TERMUX_PKG_BUILDER_DIR/0004-compact-with-clang-builtins.diff
-
 	cp $TERMUX_STANDALONE_TOOLCHAIN/sysroot/usr/lib/$TERMUX_HOST_PLATFORM/$TERMUX_PKG_API_LEVEL/*.o \
 		$TERMUX_PKG_MASSAGEDIR/$TERMUX_PREFIX/lib
 
