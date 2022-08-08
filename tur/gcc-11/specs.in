@@ -18,7 +18,7 @@
 + -I@TERMUX_PREFIX@/include/c++/v1  %{!fpie: %{!fPIE: %{!fpic: %{!fPIC: %{!fno-pic:-fPIC}}}}} %{!frtti: %{!fno-rtti: -frtti}} 
 
 *link:
-+ -L@TERMUX_PREFIX@/lib/gcc/@TERMUX_HOST_PLATFORM@/11.1.0 -L@TERMUX_PREFIX@/lib   %{!nopie: %{!static: %{!shared: %{!nostdlib: %{!nostartfiles: %{!fno-PIE: %{!fno-pie: -pie}}}}}}} --enable-new-dtags --eh-frame-hdr  -rpath=@TERMUX_PREFIX@/lib
++ -L@TERMUX_PREFIX@/lib/gcc/@TERMUX_HOST_PLATFORM@/@TERMUX_PKG_VERSION@ -L@TERMUX_PREFIX@/lib   %{!nopie: %{!static: %{!shared: %{!nostdlib: %{!nostartfiles: %{!fno-PIE: %{!fno-pie: -pie}}}}}}} --enable-new-dtags --eh-frame-hdr  -rpath=@TERMUX_PREFIX@/lib
 
 *cc1:
 + -I@TERMUX_PREFIX@/include/@TERMUX_HOST_PLATFORM@ -I@TERMUX_PREFIX@/include 

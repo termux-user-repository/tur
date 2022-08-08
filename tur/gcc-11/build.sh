@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="GNU C compiler"
 TERMUX_PKG_LICENSE="GPL-3.0"
 TERMUX_PKG_DEPENDS="binutils, libc++, libgmp, libmpfr, libmpc, libisl, zlib"
 TERMUX_PKG_VERSION=11.3.0
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_MAINTAINER="@licy183"
 TERMUX_PKG_SRCURL=https://ftp.gnu.org/gnu/gcc/gcc-${TERMUX_PKG_VERSION}/gcc-${TERMUX_PKG_VERSION}.tar.gz
 TERMUX_PKG_SHA256=98438e6cc7294298b474cf0da7655d9a8c8b796421bb0210531c294a950374ed
@@ -159,6 +160,7 @@ termux_step_pre_configure() {
 	# Add the specs file
 	sed "s|@TERMUX_PREFIX@|$TERMUX_PREFIX|g" $TERMUX_PKG_BUILDER_DIR/specs.in |
 		sed "s|@TERMUX_HOST_PLATFORM@|$TERMUX_HOST_PLATFORM|g" |
+		sed "s|@TERMUX_PKG_VERSION@|$TERMUX_PKG_VERSION|g" |
 		sed "s|@ARCH_PLACEHOLDER@|$_ARCH_SPECS|g" > $TERMUX_PKG_TMPDIR/specs
 	TERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" --with-stage1-ldflags=\"-specs=$TERMUX_PKG_TMPDIR/specs\""
 
