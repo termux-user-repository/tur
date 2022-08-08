@@ -3,7 +3,7 @@ TERMUX_PKG_DESCRIPTION="GNU C compiler"
 TERMUX_PKG_LICENSE="GPL-3.0"
 TERMUX_PKG_DEPENDS="binutils, libc++, libgmp, libmpfr, libmpc, libisl, zlib"
 TERMUX_PKG_VERSION=11.3.0
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_REVISION=2
 TERMUX_PKG_MAINTAINER="@licy183"
 TERMUX_PKG_SRCURL=https://ftp.gnu.org/gnu/gcc/gcc-${TERMUX_PKG_VERSION}/gcc-${TERMUX_PKG_VERSION}.tar.gz
 TERMUX_PKG_SHA256=98438e6cc7294298b474cf0da7655d9a8c8b796421bb0210531c294a950374ed
@@ -39,6 +39,11 @@ TERMUX_PKG_EXTRA_CONFIGURE_ARGS+="\
 --with-isl=$TERMUX_PREFIX
 --with-gxx-include-dir=$TERMUX_PREFIX/include/c++/v1
 --program-suffix=-11
+"
+
+TERMUX_PKG_RM_AFTER_INSTALL="
+share/info
+share/man/man7
 "
 
 _EXTRA_HOST_BUILD=""
