@@ -1,0 +1,13 @@
+In Termux, libc++_shared (renamed from libc++) should be used by default.
+diff -uNr a/gcc/cp/g++spec.c b/gcc/cp/g++spec.c
+--- a/gcc/cp/g++spec.c
++++ b/gcc/cp/g++spec.c
+@@ -46,7 +46,7 @@
+ #endif
+ 
+ #ifndef LIBSTDCXX
+-#define LIBSTDCXX "stdc++"
++#define LIBSTDCXX "c++_shared"
+ #endif
+ #ifndef LIBSTDCXX_PROFILE
+ #define LIBSTDCXX_PROFILE LIBSTDCXX
