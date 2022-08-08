@@ -61,7 +61,7 @@ if $TERMUX_ON_DEVICE_BUILD; then
 	termux_error_exit "Package '$TERMUX_PKG_NAME' is not available for on-device builds."
 fi
 
-source $TERMUX_PKG_BUILDER_DIR/setup_toolchain_ndk_r17c.sh
+source $TERMUX_SCRIPTDIR/common-files/setup_toolchain_ndk_r17c.sh
 
 termux_step_host_build() {
 	if [ -f $TERMUX_PKG_CACHEDIR/.placeholder-newer-toolchain-$TERMUX_ARCH ]; then
@@ -142,7 +142,8 @@ termux_step_pre_configure() {
 	export ac_cv_func_memalign=no
 	export ac_cv_c_bigendian=no
 
-	_setup_toolchain_ndk_r17c
+	export OLD_NDK_TOOLCHAIN=$TERMUX_PKG_TMPDIR/android-ndk-r17c-$TERMUX_ARCH
+	_setup_toolchain_ndk_r17c $OLD_NDK_TOOLCHAIN
 
 	# Merge toolchain
 	cp -R $TERMUX_PKG_CACHEDIR/newer-toolchain-$TERMUX_ARCH/* $OLD_NDK_TOOLCHAIN/

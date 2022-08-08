@@ -42,7 +42,7 @@ _setup_standalone_toolchain_ndk_r17c() {
 	cd $TOOLCHAIN_DIR/sysroot
 
 	# Apply patches
-	for f in $TERMUX_PKG_BUILDER_DIR/ndk-patches-r17c/*.patch; do
+	for f in $TERMUX_SCRIPTDIR/common-files/ndk-patches-r17c/*.patch; do
 		echo "Applying ndk-patch: $(basename $f)"
 		sed "s%\@TERMUX_PREFIX\@%${TERMUX_PREFIX}%g" "$f" | \
 			sed "s%\@TERMUX_HOME\@%${TERMUX_ANDROID_HOME}%g" | \
@@ -68,7 +68,8 @@ _setup_standalone_toolchain_ndk_r17c() {
 }
 
 _setup_toolchain_ndk_r17c() {
-	export OLD_NDK_TOOLCHAIN=$TERMUX_PKG_TMPDIR/android-ndk-r17c-$TERMUX_ARCH
+	local _NDK_TOOLCHAIN="$1"
+	rm -rf $_NDK_TOOLCHAIN
 
 	export CFLAGS=""
 	export CPPFLAGS=""
@@ -88,7 +89,7 @@ _setup_toolchain_ndk_r17c() {
 	export NM=$TERMUX_HOST_PLATFORM-nm
 
 	if [ "$TERMUX_ON_DEVICE_BUILD" = "false" ]; then
-		export PATH=$OLD_NDK_TOOLCHAIN/bin:$PATH
+		export PATH=$_NDK_TOOLCHAIN/bin:$PATH
 		export CC_FOR_BUILD=gcc
 		export PKG_CONFIG=$TERMUX_STANDALONE_TOOLCHAIN/bin/pkg-config
 		export PKGCONFIG=$PKG_CONFIG
@@ -157,5 +158,5 @@ _setup_toolchain_ndk_r17c() {
 	export ac_cv_func_sigsetmask=no
 	export ac_cv_c_bigendian=no
 
-	_setup_standalone_toolchain_ndk_r17c $OLD_NDK_TOOLCHAIN
+	_setup_standalone_toolchain_ndk_r17c $_NDK_TOOLCHAIN
 }
