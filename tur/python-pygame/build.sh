@@ -41,5 +41,6 @@ termux_step_pre_configure() {
 termux_step_make_install() {
         export PYTHONPATH=$TERMUX_PREFIX/lib/python${_PYTHON_VERSION}/site-packages
         export PATH=$TERMUX_PREFIX/bin
+        ls $TERMUX_PREFIX/bin | grep sdl2
         python setup.py install --force --prefix $TERMUX_PREFIX
 }
