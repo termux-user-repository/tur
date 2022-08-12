@@ -1,0 +1,33 @@
+When building for arm, it complains about undefined reference to `delete` function. 
+Hopefully including <new> header explicitly will solve this issue.
+
+```
+c-family/c-format.o:c-format.c:function range_label_for_format_type_mismatch::~range_label_for_format_type_mismatch(): error: undefined reference to 'operator delete(void*, unsigned int)'
+libbackend.a(alloc-pool.o):alloc-pool.c:function mem_alloc_description<pool_usage>::~mem_alloc_description(): error: undefined reference to 'operator delete(void*, unsigned int)'
+libbackend.a(alloc-pool.o):alloc-pool.c:function mem_alloc_description<pool_usage>::~mem_alloc_description(): error: undefined reference to 'operator delete(void*, unsigned int)'
+libbackend.a(alloc-pool.o):alloc-pool.c:function mem_alloc_description<pool_usage>::~mem_alloc_description(): error: undefined reference to 'operator delete(void*, unsigned int)'
+libcommon.a(input.o):input.c:function diagnostic_file_cache_fini(): error: undefined reference to 'operator delete[](void*, unsigned int)'
+collect2: error: ld returned 1 exit status
+```
+--- a/gcc/mem-stats.h
++++ b/gcc/mem-stats.h
+@@ -21,6 +21,8 @@
+ #ifndef GCC_MEM_STATS_H
+ #define GCC_MEM_STATS_H
+ 
++#include <new>
++
+ /* Forward declaration.  */
+ template<typename Key, typename Value,
+ 	 typename Traits = simple_hashmap_traits<default_hash_traits<Key>,
+--- a/gcc/input.c
++++ b/gcc/input.c
+@@ -26,6 +26,8 @@
+ #include "selftest.h"
+ #include "cpplib.h"
+ 
++#include <new>
++
+ #ifndef HAVE_ICONV
+ #define HAVE_ICONV 0
+ #endif
