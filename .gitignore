@@ -1,16 +1,16 @@
 # These files are from termux/termux-packages
-/termux-packages/
-/disabled-packages/
-/ndk-patches/
-/packages/
-/root-packages/
-/scripts/
-/x11-packages/
-/CODEOWNERS
-/CONTRIBUTING.md
-/build-all.sh
-/build-package.sh
-/clean.sh
+#/termux-packages/
+#/disabled-packages/
+#/ndk-patches/
+#/packages/
+#/root-packages/
+#/scripts/
+#/x11-packages/
+#/CODEOWNERS
+#/CONTRIBUTING.md
+#/build-all.sh
+#/build-package.sh
+#/clean.sh
 
 # Vim
 [._]*.s[a-w][a-z]

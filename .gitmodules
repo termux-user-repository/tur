@@ -1,0 +1,3 @@
+[submodule "termux-packages"]
+	path = termux-packages
+	url = https://github.com/termux/termux-packages
