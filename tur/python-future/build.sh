@@ -7,6 +7,7 @@ TERMUX_PKG_SRCURL=https://github.com/PythonCharmers/python-future/archive/refs/t
 TERMUX_PKG_SHA256=43c1feae4170742671ffef900acd5dbe7c72099aa602d58e95e22c2174edd057
 TERMUX_PKG_DEPENDS="python"
 TERMUX_PKG_BUILD_IN_SRC=true
+TERMUX_PKG_PLATFORM_INDEPENDENT=true
 
 termux_step_pre_configure() {
 	_PYTHON_VERSION=$(. $TERMUX_SCRIPTDIR/packages/python/build.sh; echo $_MAJOR_VERSION) 
