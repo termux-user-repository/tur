@@ -5,9 +5,10 @@ TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION=2.1.3.dev4
 TERMUX_PKG_SRCURL=https://github.com/pygame/pygame/archive/refs/tags/${TERMUX_PKG_VERSION}.tar.gz
 TERMUX_PKG_SHA256=bbe14ca0efc6f711e36cbf3cffc3801e0e72ba11d3beb7b2a2859805dd1d5fbe
-TERMUX_PKG_DEPENDS="freetype, portmidi, python, sdl2, sdl2-image, sdl2-mixer, sdl2-ttf"
+TERMUX_PKG_DEPENDS="x11-repo, freetype, portmidi, python, sdl2, sdl2-image, sdl2-mixer, sdl2-ttf"
 TERMUX_PKG_BUILD_DEPENDS="xorgproto"
 TERMUX_PKG_BUILD_IN_SRC=true
+TERMUX_PKG_REVISION=1
 _PYTHON_VERSION=$(. $TERMUX_SCRIPTDIR/packages/python/build.sh; echo $_MAJOR_VERSION)
 
 TERMUX_PKG_RM_AFTER_INSTALL="
