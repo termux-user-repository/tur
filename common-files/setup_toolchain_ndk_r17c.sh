@@ -176,7 +176,7 @@ _setup_toolchain_ndk_r17c() {
 
 _setup_toolchain_ndk_r17c_newer_gcc() {
 	if [ "$TERMUX_ON_DEVICE_BUILD" = "true" ]; then
-		termux_error_exit "NDK toolchain r17c with gcc 11 is not available for on-device builds."
+		termux_error_exit "NDK toolchain r17c with newer gcc is not available for on-device builds."
 	fi
 
 	# XXX: Install some build dependencies
