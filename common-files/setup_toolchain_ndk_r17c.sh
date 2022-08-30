@@ -157,7 +157,7 @@ _setup_toolchain_ndk_r17c_envs() {
 }
 
 _setup_toolchain_ndk_r17c() {
-	GCC_STANDALONE_TOOLCHAIN="$TERMUX_COMMON_CACHEDIR/android-r17c-api-${TERMUX_PKG_API_LEVEL}-gcc-4.9"
+	GCC_STANDALONE_TOOLCHAIN="$TERMUX_COMMON_CACHEDIR/android-r17c-api-${TERMUX_PKG_API_LEVEL}-$TERMUX_HOST_PLATFORM-gcc-4.9"
 	GCC_STANDALONE_TOOLCHAIN+="-v0"
 
 	_setup_toolchain_ndk_r17c_envs
