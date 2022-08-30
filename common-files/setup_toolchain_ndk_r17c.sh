@@ -67,10 +67,7 @@ _setup_standalone_toolchain_ndk_r17c() {
 	popd
 }
 
-_setup_toolchain_ndk_r17c() {
-	local _NDK_TOOLCHAIN="$1"
-	rm -rf $_NDK_TOOLCHAIN
-
+_setup_toolchain_ndk_r17c_envs() {
 	export CFLAGS=""
 	export CPPFLAGS=""
 	export LDFLAGS="-L${TERMUX_PREFIX}/lib"
@@ -89,7 +86,7 @@ _setup_toolchain_ndk_r17c() {
 	export NM=$TERMUX_HOST_PLATFORM-nm
 
 	if [ "$TERMUX_ON_DEVICE_BUILD" = "false" ]; then
-		export PATH=$_NDK_TOOLCHAIN/bin:$PATH
+		export PATH=$GCC_STANDALONE_TOOLCHAIN/bin:$PATH
 		export CC_FOR_BUILD=gcc
 		export PKG_CONFIG=$TERMUX_STANDALONE_TOOLCHAIN/bin/pkg-config
 		export PKGCONFIG=$PKG_CONFIG
@@ -157,6 +154,145 @@ _setup_toolchain_ndk_r17c() {
 	export ac_cv_func_getpwuid=no
 	export ac_cv_func_sigsetmask=no
 	export ac_cv_c_bigendian=no
+}
 
-	_setup_standalone_toolchain_ndk_r17c $_NDK_TOOLCHAIN
+_setup_toolchain_ndk_r17c() {
+	GCC_STANDALONE_TOOLCHAIN="$TERMUX_COMMON_CACHEDIR/android-r17c-api-${TERMUX_PKG_API_LEVEL}-gcc-4.9"
+	GCC_STANDALONE_TOOLCHAIN+="-v0"
+
+	_setup_toolchain_ndk_r17c_envs
+
+	if [ "$TERMUX_ON_DEVICE_BUILD" = "true" ] || [ -d $GCC_STANDALONE_TOOLCHAIN ]; then
+		return
+	fi
+
+	local GCC_STANDALONE_TOOLCHAIN_TMP="$GCC_STANDALONE_TOOLCHAIN"-tmp
+
+	# Setup a standalone toolchain
+	_setup_standalone_toolchain_ndk_r17c "$GCC_STANDALONE_TOOLCHAIN_TMP"
+
+	mv $GCC_STANDALONE_TOOLCHAIN_TMP $GCC_STANDALONE_TOOLCHAIN
+}
+
+_setup_toolchain_ndk_r17c_newer_gcc() {
+	if [ "$TERMUX_ON_DEVICE_BUILD" = "true" ]; then
+		termux_error_exit "NDK toolchain r17c with gcc 11 is not available for on-device builds."
+	fi
+
+	# XXX: Install some build dependencies
+	# XXX: So should TUR use a custom builder image?
+	env -i PATH="$PATH" sudo apt update
+	env -i PATH="$PATH" sudo apt install -y libgmp-dev libmpfr-dev libmpc-dev zlib1g-dev libisl-dev libtinfo5 libncurses5
+
+	local GCC_VERSION="$1"
+	local GCC_TOOLCHAIN_REVISION="$2"
+	local GCC_PREBUILT_SHA256="$3"
+
+	local GCC_PREBUILT_URL=https://github.com/termux-user-repository/ndk-toolchain-gcc-${GCC_VERSION%%.*}/releases/download/v$GCC_VERSION-r$GCC_TOOLCHAIN_REVISION/gcc-$GCC_VERSION-$TERMUX_ARCH.tar.bz2
+	local GCC_PREBUILT_FILE=$TERMUX_COMMON_CACHEDIR/gcc-$GCC_VERSION-r$GCC_TOOLCHAIN_REVISION-$TERMUX_ARCH.tar.bz2
+	termux_download $GCC_PREBUILT_URL $GCC_PREBUILT_FILE $GCC_PREBUILT_SHA256
+
+	GCC_STANDALONE_TOOLCHAIN="$TERMUX_COMMON_CACHEDIR/android-r17c-api-${TERMUX_PKG_API_LEVEL}-$TERMUX_HOST_PLATFORM-gcc-$GCC_VERSION-r$GCC_TOOLCHAIN_REVISION"
+	GCC_STANDALONE_TOOLCHAIN+="-v0"
+
+	_setup_toolchain_ndk_r17c_envs
+
+	if ! [ -d $GCC_STANDALONE_TOOLCHAIN ]; then
+		local GCC_STANDALONE_TOOLCHAIN_TMP="$GCC_STANDALONE_TOOLCHAIN"-tmp
+
+		# Setup a standalone toolchain
+		_setup_standalone_toolchain_ndk_r17c "$GCC_STANDALONE_TOOLCHAIN_TMP"
+
+		# Merge toolchain
+		tar -jxf $GCC_PREBUILT_FILE -C $TERMUX_PKG_TMPDIR
+		rm -rf $TERMUX_PKG_TMPDIR/gcc-$GCC_VERSION-$TERMUX_ARCH/sysroot
+		cp -R $TERMUX_PKG_TMPDIR/gcc-$GCC_VERSION-$TERMUX_ARCH/* $GCC_STANDALONE_TOOLCHAIN_TMP/
+		rm -rf $TERMUX_PKG_TMPDIR/gcc-$GCC_VERSION-$TERMUX_ARCH
+		mv $GCC_STANDALONE_TOOLCHAIN_TMP/include/c++/4.9.x $GCC_STANDALONE_TOOLCHAIN_TMP/include/c++/$GCC_VERSION
+		cp -R $GCC_STANDALONE_TOOLCHAIN_TMP/sysroot/usr/include/$TERMUX_HOST_PLATFORM/* $GCC_STANDALONE_TOOLCHAIN_TMP/sysroot/usr/include/
+
+		mv $GCC_STANDALONE_TOOLCHAIN_TMP $GCC_STANDALONE_TOOLCHAIN
+	fi
+
+	# Set FC
+	export FC=$TERMUX_HOST_PLATFORM-gfortran
+	export FCFLAGS=""
+
+	# Explicitly define __BIONIC__ and __ANDROID__API__
+	CFLAGS+=" -D__BIONIC__ -D__ANDROID_API__=$TERMUX_PKG_API_LEVEL"
+	CPPFLAGS+=" -D__BIONIC__ -D__ANDROID_API__=$TERMUX_PKG_API_LEVEL"
+	CXXFLAGS+=" -D__BIONIC__ -D__ANDROID_API__=$TERMUX_PKG_API_LEVEL"
+	FCFLAGS+=" -D__ANDROID_API__=$TERMUX_PKG_API_LEVEL"
+}
+
+_setup_toolchain_ndk_r17c_gcc_11() {
+	local GCC_VERSION=11.3.0
+	local GCC_TOOLCHAIN_REVISION=0
+	local GCC_PREBUILT_SHA256
+
+	if [ "$TERMUX_ARCH" == "aarch64" ]; then
+		GCC_PREBUILT_SHA256=b1b7bc20f4112236c7962e031ae0b648939424b80342f0cd3e7a11266c147e30
+	elif [ "$TERMUX_ARCH" == "arm" ]; then
+		GCC_PREBUILT_SHA256=b93b93ef89304d86a1714cfb2cb22b7728a709efec12e6536568fb64e6bb5116
+	elif [ "$TERMUX_ARCH" == "x86_64" ]; then
+		GCC_PREBUILT_SHA256=b5de13b6fdd03b42e0f6292f4f51aaad8a643cb1fe7f2014d26026009317d6ed
+	elif [ "$TERMUX_ARCH" == "i686" ]; then
+		GCC_PREBUILT_SHA256=4e03c55dd3956e2b3edbe576d4c346435a582b053dd8703992621bddd5bb408b
+	fi
+
+	_setup_toolchain_ndk_r17c_newer_gcc "$GCC_VERSION" "$GCC_TOOLCHAIN_REVISION" "$GCC_PREBUILT_SHA256"
+}
+
+_setup_toolchain_ndk_r17c_gcc_10() {
+	local GCC_VERSION=10.4.0
+	local GCC_TOOLCHAIN_REVISION=0
+	local GCC_PREBUILT_SHA256
+
+	if [ "$TERMUX_ARCH" == "aarch64" ]; then
+		GCC_PREBUILT_SHA256=db44b64c08456b5ec690c86a090c564961ebc7f7c01dd4f1a17898be4e1e555f
+	elif [ "$TERMUX_ARCH" == "arm" ]; then
+		GCC_PREBUILT_SHA256=6dc2f2762b12784f5f88f3f1d4bb3f724d282a39d680cfad03d7c1d53f041570
+	elif [ "$TERMUX_ARCH" == "x86_64" ]; then
+		GCC_PREBUILT_SHA256=6a4c26c0a2b5c4813f082d67e3dc993d134d13191dba5de98b83bb0fff886589
+	elif [ "$TERMUX_ARCH" == "i686" ]; then
+		GCC_PREBUILT_SHA256=d8ca463c925d456e92c8a1d0d9c39521abe318e5c1e73e92a6fc7c2dae05b8ec
+	fi
+
+	_setup_toolchain_ndk_r17c_newer_gcc "$GCC_VERSION" "$GCC_TOOLCHAIN_REVISION" "$GCC_PREBUILT_SHA256"
+}
+
+_setup_toolchain_ndk_r17c_gcc_9() {
+	local GCC_VERSION=9.5.0
+	local GCC_TOOLCHAIN_REVISION=0
+	local GCC_PREBUILT_SHA256
+
+	if [ "$TERMUX_ARCH" == "aarch64" ]; then
+		GCC_PREBUILT_SHA256=fb1dbedf4df7bbf2241c1d630004818c585c993a930a190a1e0ce407e1ae5526
+	elif [ "$TERMUX_ARCH" == "arm" ]; then
+		GCC_PREBUILT_SHA256=7f82cda41b75836f599e31b3e8130093ef4098bbbe5d663e9058c05c98915fab
+	elif [ "$TERMUX_ARCH" == "x86_64" ]; then
+		GCC_PREBUILT_SHA256=fb103e232166f07fbc48fa7cd1dcba828f6a8b9a96e5990906eb2039cd758fbe
+	elif [ "$TERMUX_ARCH" == "i686" ]; then
+		GCC_PREBUILT_SHA256=05c5ee59e6ef3ac5b9a30329cfc6a270313ba608c9ef801784abed02c4f2fdfc
+	fi
+
+	_setup_toolchain_ndk_r17c_newer_gcc "$GCC_VERSION" "$GCC_TOOLCHAIN_REVISION" "$GCC_PREBUILT_SHA256"
+}
+
+_setup_toolchain_ndk_r17c_gcc_12() {
+	local GCC_VERSION=12.1.0
+	local GCC_TOOLCHAIN_REVISION=0
+	local GCC_PREBUILT_SHA256
+
+	if [ "$TERMUX_ARCH" == "aarch64" ]; then
+		GCC_PREBUILT_SHA256=b4efd7e65344805464f87fbee9effe44ad6224faf6f9fd20289598c00d0c1cfd
+	elif [ "$TERMUX_ARCH" == "arm" ]; then
+		GCC_PREBUILT_SHA256=e4b91ed417bdf6d32371d663ed3b5115e895a928259e51e4c9fd24acb142ec84
+	elif [ "$TERMUX_ARCH" == "x86_64" ]; then
+		GCC_PREBUILT_SHA256=bf807564d80ac7a1da4bca4f86cd6ed1f60dc0234753a5052329b35655d7b81b
+	elif [ "$TERMUX_ARCH" == "i686" ]; then
+		GCC_PREBUILT_SHA256=2694628eee5e5a8097364cceef71502e21a4ad53b10154c69e7d0f7689583dba
+	fi
+
+	_setup_toolchain_ndk_r17c_newer_gcc "$GCC_VERSION" "$GCC_TOOLCHAIN_REVISION" "$GCC_PREBUILT_SHA256"
 }
