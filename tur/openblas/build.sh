@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="An optimized BLAS library"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION=0.3.21
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://github.com/xianyi/OpenBLAS.git
 TERMUX_PKG_PROVIDES="libopenblas"
 TERMUX_PKG_REPLACES="libopenblas"
