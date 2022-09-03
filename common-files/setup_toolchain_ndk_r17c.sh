@@ -156,6 +156,20 @@ _setup_toolchain_ndk_r17c_envs() {
 	export ac_cv_c_bigendian=no
 }
 
+_setup_toolchain_ndk_r17c_envs_with_fc() {
+	_setup_toolchain_ndk_r17c_envs
+
+	# Set FC
+	export FC=$TERMUX_HOST_PLATFORM-gfortran
+	export FCFLAGS=""
+
+	# Explicitly define __BIONIC__ and __ANDROID__API__
+	CFLAGS+=" -D__BIONIC__ -D__ANDROID_API__=$TERMUX_PKG_API_LEVEL"
+	CPPFLAGS+=" -D__BIONIC__ -D__ANDROID_API__=$TERMUX_PKG_API_LEVEL"
+	CXXFLAGS+=" -D__BIONIC__ -D__ANDROID_API__=$TERMUX_PKG_API_LEVEL"
+	FCFLAGS+=" -D__ANDROID_API__=$TERMUX_PKG_API_LEVEL"
+}
+
 _setup_toolchain_ndk_r17c() {
 	GCC_STANDALONE_TOOLCHAIN="$TERMUX_COMMON_CACHEDIR/android-r17c-api-${TERMUX_PKG_API_LEVEL}-$TERMUX_HOST_PLATFORM-gcc-4.9"
 	GCC_STANDALONE_TOOLCHAIN+="-v0"
@@ -174,7 +188,7 @@ _setup_toolchain_ndk_r17c() {
 	mv $GCC_STANDALONE_TOOLCHAIN_TMP $GCC_STANDALONE_TOOLCHAIN
 }
 
-_setup_toolchain_ndk_r17c_newer_gcc() {
+_setup_standalone_toolchain_ndk_r17c_newer_gcc() {
 	if [ "$TERMUX_ON_DEVICE_BUILD" = "true" ]; then
 		termux_error_exit "NDK toolchain r17c with newer gcc is not available for on-device builds."
 	fi
@@ -195,8 +209,6 @@ _setup_toolchain_ndk_r17c_newer_gcc() {
 
 	GCC_STANDALONE_TOOLCHAIN="$TERMUX_COMMON_CACHEDIR/android-r17c-api-${TERMUX_PKG_API_LEVEL}-$TERMUX_HOST_PLATFORM-gcc-$GCC_VERSION-r$GCC_TOOLCHAIN_REVISION-v$GCC_TOOLCHAIN_VERSION"
 
-	_setup_toolchain_ndk_r17c_envs
-
 	if ! [ -d $GCC_STANDALONE_TOOLCHAIN ]; then
 		local GCC_STANDALONE_TOOLCHAIN_TMP="$GCC_STANDALONE_TOOLCHAIN"-tmp
 
@@ -213,16 +225,6 @@ _setup_toolchain_ndk_r17c_newer_gcc() {
 
 		mv $GCC_STANDALONE_TOOLCHAIN_TMP $GCC_STANDALONE_TOOLCHAIN
 	fi
-
-	# Set FC
-	export FC=$TERMUX_HOST_PLATFORM-gfortran
-	export FCFLAGS=""
-
-	# Explicitly define __BIONIC__ and __ANDROID__API__
-	CFLAGS+=" -D__BIONIC__ -D__ANDROID_API__=$TERMUX_PKG_API_LEVEL"
-	CPPFLAGS+=" -D__BIONIC__ -D__ANDROID_API__=$TERMUX_PKG_API_LEVEL"
-	CXXFLAGS+=" -D__BIONIC__ -D__ANDROID_API__=$TERMUX_PKG_API_LEVEL"
-	FCFLAGS+=" -D__ANDROID_API__=$TERMUX_PKG_API_LEVEL"
 }
 
 _setup_toolchain_ndk_r17c_gcc_11() {
@@ -241,7 +243,8 @@ _setup_toolchain_ndk_r17c_gcc_11() {
 		GCC_PREBUILT_SHA256=4e03c55dd3956e2b3edbe576d4c346435a582b053dd8703992621bddd5bb408b
 	fi
 
-	_setup_toolchain_ndk_r17c_newer_gcc "$GCC_VERSION" "$GCC_TOOLCHAIN_REVISION" "$GCC_PREBUILT_SHA256" "$GCC_TOOLCHAIN_VERSION"
+	_setup_standalone_toolchain_ndk_r17c_newer_gcc "$GCC_VERSION" "$GCC_TOOLCHAIN_REVISION" "$GCC_PREBUILT_SHA256" "$GCC_TOOLCHAIN_VERSION"
+	_setup_toolchain_ndk_r17c_envs_with_fc
 }
 
 _setup_toolchain_ndk_r17c_gcc_10() {
@@ -260,7 +263,8 @@ _setup_toolchain_ndk_r17c_gcc_10() {
 		GCC_PREBUILT_SHA256=d8ca463c925d456e92c8a1d0d9c39521abe318e5c1e73e92a6fc7c2dae05b8ec
 	fi
 
-	_setup_toolchain_ndk_r17c_newer_gcc "$GCC_VERSION" "$GCC_TOOLCHAIN_REVISION" "$GCC_PREBUILT_SHA256" "$GCC_TOOLCHAIN_VERSION"
+	_setup_standalone_toolchain_ndk_r17c_newer_gcc "$GCC_VERSION" "$GCC_TOOLCHAIN_REVISION" "$GCC_PREBUILT_SHA256" "$GCC_TOOLCHAIN_VERSION"
+	_setup_toolchain_ndk_r17c_envs_with_fc
 }
 
 _setup_toolchain_ndk_r17c_gcc_9() {
@@ -279,7 +283,8 @@ _setup_toolchain_ndk_r17c_gcc_9() {
 		GCC_PREBUILT_SHA256=05c5ee59e6ef3ac5b9a30329cfc6a270313ba608c9ef801784abed02c4f2fdfc
 	fi
 
-	_setup_toolchain_ndk_r17c_newer_gcc "$GCC_VERSION" "$GCC_TOOLCHAIN_REVISION" "$GCC_PREBUILT_SHA256" "$GCC_TOOLCHAIN_VERSION"
+	_setup_standalone_toolchain_ndk_r17c_newer_gcc "$GCC_VERSION" "$GCC_TOOLCHAIN_REVISION" "$GCC_PREBUILT_SHA256" "$GCC_TOOLCHAIN_VERSION"
+	_setup_toolchain_ndk_r17c_envs_with_fc
 }
 
 _setup_toolchain_ndk_r17c_gcc_12() {
@@ -298,5 +303,6 @@ _setup_toolchain_ndk_r17c_gcc_12() {
 		GCC_PREBUILT_SHA256=2694628eee5e5a8097364cceef71502e21a4ad53b10154c69e7d0f7689583dba
 	fi
 
-	_setup_toolchain_ndk_r17c_newer_gcc "$GCC_VERSION" "$GCC_TOOLCHAIN_REVISION" "$GCC_PREBUILT_SHA256" "$GCC_TOOLCHAIN_VERSION"
+	_setup_standalone_toolchain_ndk_r17c_newer_gcc "$GCC_VERSION" "$GCC_TOOLCHAIN_REVISION" "$GCC_PREBUILT_SHA256" "$GCC_TOOLCHAIN_VERSION"
+	_setup_toolchain_ndk_r17c_envs_with_fc
 }
