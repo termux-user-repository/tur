@@ -8,78 +8,44 @@ TERMUX_PKG_DEPENDS="libc++, openblas, python, python-numpy"
 TERMUX_PKG_BUILD_DEPENDS="python-numpy-static"
 TERMUX_PKG_BUILD_IN_SRC=true
 
-_PYTHON_VERSION=$(. $TERMUX_SCRIPTDIR/packages/python/build.sh; echo $_MAJOR_VERSION)
-_NUMPY_VERSION=$(. $TERMUX_SCRIPTDIR/tur/python-numpy/build.sh; echo $TERMUX_PKG_VERSION)
-_PKG_PYTHON_DEPENDS="numpy==$_NUMPY_VERSION"
-
-if $TERMUX_ON_DEVICE_BUILD; then
-	termux_error_exit "Package '$TERMUX_PKG_NAME' is not available for on-device builds."
-fi
+# Tests will hang on arm and will failed with `Segmentation fault` on i686.
+# See https://github.com/termux-user-repository/tur/pull/21#issue-1295483266.
+# 
+# The logs of this crash on i686 are as following. 
+# linalg/tests/test_basic.py: Fatal Python error: Segmentation fault
+# 
+# Current thread 0xf7f4b580 (most recent call first):
+#   File "/data/data/com.termux/files/usr/lib/python3.10/site-packages/scipy-1.8.0-py3.10-linux-i686.egg/scipy/linalg/_basic.py", line 1227 in lstsq
+#   File "/data/data/com.termux/files/usr/lib/python3.10/site-packages/scipy-1.8.0-py3.10-linux-i686.egg/scipy/linalg/tests/test_basic.py", line 1047 in test_simple_overdet_complex
+TERMUX_PKG_BLACKLISTED_ARCHES="arm, i686"
 
 TERMUX_PKG_RM_AFTER_INSTALL="
 bin/
 "
 
-# XXX: This step will setup an old NDK toolchain (r17c) containing gcc and
-# XXX: gfortran. If NDK toolchain with llvm contains fortran compiler, this
-# XXX: step may be unnecessary.
-_setup_fortran_toolchain_r17c() {
-	mkdir -p $TERMUX_COMMON_CACHEDIR/android-gfortran/r17c
-	local _NDK_ARCHIVE_FILE=$TERMUX_COMMON_CACHEDIR/android-gfortran/android-ndk-r17c-linux-x86_64.zip
-	local _NDK_URL=https://dl.google.com/android/repository/android-ndk-r17c-linux-x86_64.zip
-	local _NDK_SHA256=3f541adbd0330a9205ba12697f6d04ec90752c53d6b622101a2a8a856e816589
-	local _NDK_GF_ARCH
-	local _NDK_GF_SHA256
-	if [ "$TERMUX_ARCH" == "aarch64" ]; then
-		_NDK_GF_ARCH="arm64"
-		_NDK_GF_SHA256=dcbed5edeabb77533fcef0e76a9da9e4b1e23089f3a6be31824ff411058df7fd
-		_NDK_GF_TOOLCHAIN_NAME="aarch64-linux-android-4.9"
-	elif [ "$TERMUX_ARCH" == "arm" ]; then
-		_NDK_GF_ARCH="arm"
-		_NDK_GF_SHA256=75a15fd03e139f6326be604728cbec9d9d3d295942cc13d91766e40bcdd9a9e8
-		_NDK_GF_TOOLCHAIN_NAME="arm-linux-androideabi-4.9"
-	elif [ "$TERMUX_ARCH" == "x86_64" ]; then
-		_NDK_GF_ARCH="x86_64"
-		_NDK_GF_SHA256=27f683840e0453bd63cee5c9d3a6e41d2b90b4e86f20a13e74f78a9699d73401
-		_NDK_GF_TOOLCHAIN_NAME="x86_64-4.9"
-	elif [ "$TERMUX_ARCH" == "i686" ]; then
-		_NDK_GF_ARCH="x86"
-		_NDK_GF_SHA256=35f1491a9067c1a593430ebda812346ed528921730f2473c8dd9e847401167a2
-		_NDK_GF_TOOLCHAIN_NAME="x86-4.9"
-	fi
-	local _NDK_GF_FILE=$TERMUX_COMMON_CACHEDIR/android-gfortran/r17c/gcc-$_NDK_GF_ARCH-linux-x86_64.tar.bz2
-	local _NDK_GF_URL=https://github.com/licy183/android-gfortran/releases/download/r17/gcc-$_NDK_GF_ARCH-linux-x86_64.tar.bz2
-	local _NDK_TOOLCHAIN_TARGET=$TERMUX_PKG_TMPDIR/android-ndk-r17c/toolchains/$_NDK_GF_TOOLCHAIN_NAME/prebuilt/linux-x86_64
-	termux_download $_NDK_URL $_NDK_ARCHIVE_FILE $_NDK_SHA256
-	unzip -d $TERMUX_PKG_TMPDIR/ $_NDK_ARCHIVE_FILE > /dev/null 2>&1
-	termux_download $_NDK_GF_URL $_NDK_GF_FILE $_NDK_GF_SHA256
-	tar -jxf $_NDK_GF_FILE -C $TERMUX_PKG_TMPDIR/
-	rm -rf $_NDK_TOOLCHAIN_TARGET
-	mv $TERMUX_PKG_TMPDIR/$_NDK_GF_TOOLCHAIN_NAME $_NDK_TOOLCHAIN_TARGET
-	export GFORTRAN_TOOLCHAIN=$TERMUX_PKG_TMPDIR/ndk-$TERMUX_ARCH-with-gfortran
-	python $TERMUX_PKG_TMPDIR/android-ndk-r17c/build/tools/make_standalone_toolchain.py \
-					--arch $_NDK_GF_ARCH --api $TERMUX_PKG_API_LEVEL --install-dir $GFORTRAN_TOOLCHAIN
-}
+source $TERMUX_SCRIPTDIR/common-files/setup_toolchain_ndk_r17c.sh
+source $TERMUX_SCRIPTDIR/common-files/setup_cmake_with_gcc.sh
 
 termux_step_configure() {
-	_setup_fortran_toolchain_r17c
-	CFLAGS="${CFLAGS/-static-openmp/''}"
-	CXXFLAGS="${CXXFLAGS/-static-openmp/''}"
-	LDFLAGS="${LDFLAGS/-static-openmp/''}"
-
-	CROSS_PREFIX=$TERMUX_ARCH-linux-android
-	if [ "$TERMUX_ARCH" == "arm" ]; then
-		CROSS_PREFIX=arm-linux-androideabi
+	if $TERMUX_ON_DEVICE_BUILD; then
+		termux_error_exit "Package '$TERMUX_PKG_NAME' is not available for on-device builds."
 	fi
 
-	# XXX: Only using gfortran, is it compatible with llvm?
-	export FC=$CROSS_PREFIX-gfortran
+	_PYTHON_VERSION=$(. $TERMUX_SCRIPTDIR/packages/python/build.sh; echo $_MAJOR_VERSION)
+	_NUMPY_VERSION=$(. $TERMUX_SCRIPTDIR/packages/python-numpy/build.sh; echo $TERMUX_PKG_VERSION)
+	_PKG_PYTHON_DEPENDS="numpy==$_NUMPY_VERSION"
+
+	_setup_toolchain_ndk_with_gfortran_11
+
+	LDFLAGS="${LDFLAGS/-static-openmp/}"
+
 	# XXX: `python` from main repo is built by TERMUX_STANDALONE_TOOLCHAIN and its _sysconfigdata.py
-	# XXX: contains some FLAGS which is not supported by clang/ld.lld from GFORTRAN_TOOLCHAIN,
-	# XXX: such as `-static-openmp`. Replacing these FLAGS in `_sysconfigdata.py` is a solution,
-	# XXX: but I think it is unnecessary. That is the reason why putting GFORTRAN_TOOLCHAIN
-	# XXX: behind TERMUX_STANDALONE_TOOLCHAIN.
-	export PATH="$PATH:$GFORTRAN_TOOLCHAIN/bin"
+	# XXX: contains some FLAGS which is not supported by GNU Compiler Collections, such as 
+	# XXX: `-static-openmp`. So use a wrapper of $PLATFORM-gfortran to ignore these options.
+	mkdir -p $TERMUX_PKG_TMPDIR/fake-bin
+	cat $TERMUX_PKG_BUILDER_DIR/fake-gfortran > $TERMUX_PKG_TMPDIR/fake-bin/$TERMUX_HOST_PLATFORM-gfortran
+	chmod +x $TERMUX_PKG_TMPDIR/fake-bin/$TERMUX_HOST_PLATFORM-gfortran
+	export PATH="$TERMUX_PKG_TMPDIR/fake-bin:$PATH"
 
 	# We set `python-scipy` as dependencies, but python-crossenv prefer to use a fake one.
 	DEVICE_STIE=$TERMUX_PREFIX/lib/python${_PYTHON_VERSION}/site-packages
