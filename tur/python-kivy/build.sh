@@ -12,9 +12,6 @@ TERMUX_PKG_BUILD_IN_SRC=true
 
 TERMUX_PKG_RM_AFTER_INSTALL="
 bin/
-lib/python${_PYTHON_VERSION}/site-packages/__pycache__
-lib/python${_PYTHON_VERSION}/site-packages/easy-install.pth
-lib/python${_PYTHON_VERSION}/site-packages/site.py
 "
 
 termux_step_pre_configure() {
@@ -53,6 +50,15 @@ termux_step_make_install() {
 		fi
 	done
 	test -n "${_KIVY_EGGDIR}"
+	popd
+}
+
+termux_step_post_make_install() {
+	# Delete the easy-install related files, since we use postinst/prerm to handle it.
+	pushd $TERMUX_PREFIX
+	rm -rf lib/python${_PYTHON_VERSION}/site-packages/__pycache__
+	rm -rf lib/python${_PYTHON_VERSION}/site-packages/easy-install.pth
+	rm -rf lib/python${_PYTHON_VERSION}/site-packages/site.py
 	popd
 }
 
