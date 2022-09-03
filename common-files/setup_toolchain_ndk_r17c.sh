@@ -306,3 +306,34 @@ _setup_toolchain_ndk_r17c_gcc_12() {
 	_setup_standalone_toolchain_ndk_r17c_newer_gcc "$GCC_VERSION" "$GCC_TOOLCHAIN_REVISION" "$GCC_PREBUILT_SHA256" "$GCC_TOOLCHAIN_VERSION"
 	_setup_toolchain_ndk_r17c_envs_with_fc
 }
+
+_setup_toolchain_ndk_with_gfortran_11() {
+	local GCC_VERSION=11.3.0
+	local GCC_TOOLCHAIN_REVISION=0
+	local GCC_TOOLCHAIN_VERSION=0
+	local GCC_PREBUILT_SHA256
+
+	if [ "$TERMUX_ARCH" == "aarch64" ]; then
+		GCC_PREBUILT_SHA256=b1b7bc20f4112236c7962e031ae0b648939424b80342f0cd3e7a11266c147e30
+	elif [ "$TERMUX_ARCH" == "arm" ]; then
+		GCC_PREBUILT_SHA256=b93b93ef89304d86a1714cfb2cb22b7728a709efec12e6536568fb64e6bb5116
+	elif [ "$TERMUX_ARCH" == "x86_64" ]; then
+		GCC_PREBUILT_SHA256=b5de13b6fdd03b42e0f6292f4f51aaad8a643cb1fe7f2014d26026009317d6ed
+	elif [ "$TERMUX_ARCH" == "i686" ]; then
+		GCC_PREBUILT_SHA256=4e03c55dd3956e2b3edbe576d4c346435a582b053dd8703992621bddd5bb408b
+	fi
+
+	_setup_standalone_toolchain_ndk_r17c_newer_gcc "$GCC_VERSION" "$GCC_TOOLCHAIN_REVISION" "$GCC_PREBUILT_SHA256" "$GCC_TOOLCHAIN_VERSION"
+
+	# Set FC
+	export FC=$TERMUX_HOST_PLATFORM-gfortran
+	export FCFLAGS=""
+
+	# Explicitly define __BIONIC__ and __ANDROID__API__
+	CFLAGS+=" -D__BIONIC__ -D__ANDROID_API__=$TERMUX_PKG_API_LEVEL"
+	CPPFLAGS+=" -D__BIONIC__ -D__ANDROID_API__=$TERMUX_PKG_API_LEVEL"
+	CXXFLAGS+=" -D__BIONIC__ -D__ANDROID_API__=$TERMUX_PKG_API_LEVEL"
+	FCFLAGS+=" -D__ANDROID_API__=$TERMUX_PKG_API_LEVEL"
+
+	export PATH="$PATH:$GCC_STANDALONE_TOOLCHAIN/bin"
+}
