@@ -49,7 +49,7 @@ termux_step_extract_into_massagedir() {
 	cd $TERMUX_PKG_MASSAGEDIR/$TERMUX_PREFIX/lib
 	NDK_ARCH=$TERMUX_ARCH
 	test $NDK_ARCH == 'i686' && NDK_ARCH='i386'
-	# clang 13 requires libunwind on Android.
+	# clang 13+ requires libunwind on Android.
 	cp $TERMUX_STANDALONE_TOOLCHAIN/lib64/clang/14.0.6/lib/linux/$NDK_ARCH/libunwind.a .
 
 	for lib in librt.so libpthread.so libutil.so; do
