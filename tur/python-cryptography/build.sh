@@ -13,7 +13,6 @@ TERMUX_PKG_SHA256=26cb3b7e5cb14345502737c30188b807c1a58e64c535d961e683e86d3300c1
 TERMUX_PKG_DEPENDS="libffi, openssl, python"
 TERMUX_PKG_BUILD_IN_SRC=true
 
-_PYTHON_VERSION=$(. $TERMUX_SCRIPTDIR/packages/python/build.sh; echo $_MAJOR_VERSION)
 _PKG_PYTHON_DEPENDS="'cffi>=1.12'"
 
 TERMUX_PKG_RM_AFTER_INSTALL="
@@ -21,6 +20,7 @@ bin/
 "
 
 termux_step_configure() {
+	_PYTHON_VERSION=$(. $TERMUX_SCRIPTDIR/packages/python/build.sh; echo $_MAJOR_VERSION)
 	termux_setup_python_crossenv
 	pushd $TERMUX_PYTHON_CROSSENV_SRCDIR
 	_CROSSENV_PREFIX=$TERMUX_PKG_BUILDDIR/python-crossenv-prefix

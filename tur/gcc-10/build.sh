@@ -59,13 +59,13 @@ elif [ "$TERMUX_ARCH" = "x86_64" ]; then
 	TERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" --with-arch=x86-64 --with-fpmath=sse"
 fi
 
-if $TERMUX_ON_DEVICE_BUILD; then
-	termux_error_exit "Package '$TERMUX_PKG_NAME' is not available for on-device builds."
-fi
-
 source $TERMUX_SCRIPTDIR/common-files/setup_toolchain_ndk_r17c.sh
 
 termux_step_pre_configure() {
+	if $TERMUX_ON_DEVICE_BUILD; then
+		termux_error_exit "Package '$TERMUX_PKG_NAME' is not available for on-device builds."
+	fi
+
 	export ac_cv_func_aligned_alloc=no
 	export ac_cv_func__aligned_malloc=no
 	export ac_cv_func_memalign=no

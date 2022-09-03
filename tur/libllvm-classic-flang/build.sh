@@ -16,7 +16,7 @@ TERMUX_PKG_SUGGESTS="libandroid-mathlib, classic-flang"
 TERMUX_PKG_PROVIDES="libllvm-10, clang-10, lld-10"
 TERMUX_PKG_REPLACES="libllvm-10, clang-10, lld-10"
 TERMUX_PKG_CONFLICTS="libllvm-10, clang-10, lld-10"
-_PYTHON_VERSION=$(. $TERMUX_SCRIPTDIR/packages/python/build.sh; echo $_MAJOR_VERSION)
+
 _INSTALL_PREFIX_R="opt/classic-flang"
 _INSTALL_PREFIX="$TERMUX_PREFIX/$_INSTALL_PREFIX_R"
 # See http://llvm.org/docs/CMake.html:

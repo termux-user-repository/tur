@@ -10,7 +10,7 @@ TERMUX_PKG_SRCURL=https://github.com/llvm/llvm-project/archive/${_LLVM_COMMIT}.z
 TERMUX_PKG_SHA256=5683fa04f591055270acc2f340638166f0581ffc652f5a148abd8830e261aeb9
 TERMUX_PKG_HOSTBUILD=true
 TERMUX_PKG_DEPENDS="binutils, libc++, ncurses, ndk-sysroot, libffi, zlib"
-_PYTHON_VERSION=$(. $TERMUX_SCRIPTDIR/packages/python/build.sh; echo $_MAJOR_VERSION)
+
 _INSTALL_PREFIX_R="opt/libllvm-15"
 _INSTALL_PREFIX="$TERMUX_PREFIX/$_INSTALL_PREFIX_R"
 # See http://llvm.org/docs/CMake.html:

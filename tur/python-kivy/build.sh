@@ -10,8 +10,6 @@ TERMUX_PKG_BUILD_DEPENDS="xorgproto"
 _PKG_PYTHON_DEPENDS="'Kivy-Garden>=0.1.4' docutils pygments"
 TERMUX_PKG_BUILD_IN_SRC=true
 
-_PYTHON_VERSION=$(. $TERMUX_SCRIPTDIR/packages/python/build.sh; echo $_MAJOR_VERSION)
-
 TERMUX_PKG_RM_AFTER_INSTALL="
 bin/
 lib/python${_PYTHON_VERSION}/site-packages/__pycache__
@@ -20,6 +18,7 @@ lib/python${_PYTHON_VERSION}/site-packages/site.py
 "
 
 termux_step_pre_configure() {
+	_PYTHON_VERSION=$(. $TERMUX_SCRIPTDIR/packages/python/build.sh; echo $_MAJOR_VERSION)
 	termux_setup_python_crossenv
 	pushd $TERMUX_PYTHON_CROSSENV_SRCDIR
 	_CROSSENV_PREFIX=$TERMUX_PKG_BUILDDIR/python-crossenv-prefix

@@ -9,30 +9,27 @@ TERMUX_PKG_DEPENDS="x11-repo, freetype, portmidi, python, sdl2, sdl2-image, sdl2
 TERMUX_PKG_BUILD_DEPENDS="xorgproto"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_REVISION=1
-_PYTHON_VERSION=$(. $TERMUX_SCRIPTDIR/packages/python/build.sh; echo $_MAJOR_VERSION)
 
 TERMUX_PKG_RM_AFTER_INSTALL="
 bin/
-lib/python${_PYTHON_VERSION}/site-packages/__pycache__
-lib/python${_PYTHON_VERSION}/site-packages/easy-install.pth
-lib/python${_PYTHON_VERSION}/site-packages/site.py
 "
 
 termux_step_pre_configure() {
-        termux_setup_python_crossenv
-        pushd $TERMUX_PYTHON_CROSSENV_SRCDIR
-        _CROSSENV_PREFIX=$TERMUX_PKG_BUILDDIR/python-crossenv-prefix
-        python${_PYTHON_VERSION} -m crossenv \
-                $TERMUX_PREFIX/bin/python${_PYTHON_VERSION} \
-                ${_CROSSENV_PREFIX}
-        popd
-        . ${_CROSSENV_PREFIX}/bin/activate
+	_PYTHON_VERSION=$(. $TERMUX_SCRIPTDIR/packages/python/build.sh; echo $_MAJOR_VERSION)
+	termux_setup_python_crossenv
+	pushd $TERMUX_PYTHON_CROSSENV_SRCDIR
+	_CROSSENV_PREFIX=$TERMUX_PKG_BUILDDIR/python-crossenv-prefix
+	python${_PYTHON_VERSION} -m crossenv \
+		$TERMUX_PREFIX/bin/python${_PYTHON_VERSION} \
+		${_CROSSENV_PREFIX}
+	popd
+	. ${_CROSSENV_PREFIX}/bin/activate
 
-        pushd ${_CROSSENV_PREFIX}/build/lib/python${_PYTHON_VERSION}/site-packages
-        patch --silent -p1 < $TERMUX_PKG_BUILDER_DIR/setuptools-44.1.1-no-bdist_wininst.diff || :
-        popd
+	pushd ${_CROSSENV_PREFIX}/build/lib/python${_PYTHON_VERSION}/site-packages
+	patch --silent -p1 < $TERMUX_PKG_BUILDER_DIR/setuptools-44.1.1-no-bdist_wininst.diff || :
+	popd
 
-        LDFLAGS+=" -lpython${_PYTHON_VERSION}"
+	LDFLAGS+=" -lpython${_PYTHON_VERSION}"
 	CPPFLAGS+="
 		-I$TERMUX_PREFIX/include/python${_PYTHON_VERSION}
 		-I$TERMUX_PREFIX/include/python${_PYTHON_VERSION}/cpython
@@ -40,8 +37,17 @@ termux_step_pre_configure() {
 }
 
 termux_step_make_install() {
-        export PYTHONPATH=$TERMUX_PREFIX/lib/python${_PYTHON_VERSION}/site-packages
+	export PYTHONPATH=$TERMUX_PREFIX/lib/python${_PYTHON_VERSION}/site-packages
 	export PATH=$PATH:$TERMUX_PREFIX/bin
 
-        python setup.py install --force --prefix $TERMUX_PREFIX
+	python setup.py install --force --prefix $TERMUX_PREFIX
+}
+
+termux_step_post_make_install() {
+	# Delete the easy-install related files, since we use postinst/prerm to handle it.
+	pushd $TERMUX_PREFIX
+	rm -rf lib/python${_PYTHON_VERSION}/site-packages/__pycache__
+	rm -rf lib/python${_PYTHON_VERSION}/site-packages/easy-install.pth
+	rm -rf lib/python${_PYTHON_VERSION}/site-packages/site.py
+	popd
 }

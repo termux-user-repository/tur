@@ -8,17 +8,17 @@ TERMUX_PKG_SHA256=95836f00972dbf724bf1270178683a0ac4ea23c6c3a980858fc9f2f9456e32
 TERMUX_PKG_DEPENDS="freetype, libimagequant, libjpeg-turbo, libraqm, libtiff, libxcb, littlecms, python, zlib"
 TERMUX_PKG_BUILD_IN_SRC=true
 
-_PYTHON_VERSION=$(. $TERMUX_SCRIPTDIR/packages/python/build.sh; echo $_MAJOR_VERSION)
-
 TERMUX_PKG_RM_AFTER_INSTALL="
 bin/
 "
 
-if $TERMUX_ON_DEVICE_BUILD; then
-	termux_error_exit "Package '$TERMUX_PKG_NAME' is not available for on-device builds."
-fi
-
 termux_step_pre_configure() {
+	_PYTHON_VERSION=$(. $TERMUX_SCRIPTDIR/packages/python/build.sh; echo $_MAJOR_VERSION)
+
+	if $TERMUX_ON_DEVICE_BUILD; then
+		termux_error_exit "Package '$TERMUX_PKG_NAME' is not available for on-device builds."
+	fi
+
 	termux_setup_python_crossenv
 	pushd $TERMUX_PYTHON_CROSSENV_SRCDIR
 	_CROSSENV_PREFIX=$TERMUX_PKG_BUILDDIR/python-crossenv-prefix
