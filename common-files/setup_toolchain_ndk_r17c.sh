@@ -187,13 +187,13 @@ _setup_toolchain_ndk_r17c_newer_gcc() {
 	local GCC_VERSION="$1"
 	local GCC_TOOLCHAIN_REVISION="$2"
 	local GCC_PREBUILT_SHA256="$3"
+	local GCC_TOOLCHAIN_VERSION="$4"
 
 	local GCC_PREBUILT_URL=https://github.com/termux-user-repository/ndk-toolchain-gcc-${GCC_VERSION%%.*}/releases/download/v$GCC_VERSION-r$GCC_TOOLCHAIN_REVISION/gcc-$GCC_VERSION-$TERMUX_ARCH.tar.bz2
 	local GCC_PREBUILT_FILE=$TERMUX_COMMON_CACHEDIR/gcc-$GCC_VERSION-r$GCC_TOOLCHAIN_REVISION-$TERMUX_ARCH.tar.bz2
 	termux_download $GCC_PREBUILT_URL $GCC_PREBUILT_FILE $GCC_PREBUILT_SHA256
 
-	GCC_STANDALONE_TOOLCHAIN="$TERMUX_COMMON_CACHEDIR/android-r17c-api-${TERMUX_PKG_API_LEVEL}-$TERMUX_HOST_PLATFORM-gcc-$GCC_VERSION-r$GCC_TOOLCHAIN_REVISION"
-	GCC_STANDALONE_TOOLCHAIN+="-v0"
+	GCC_STANDALONE_TOOLCHAIN="$TERMUX_COMMON_CACHEDIR/android-r17c-api-${TERMUX_PKG_API_LEVEL}-$TERMUX_HOST_PLATFORM-gcc-$GCC_VERSION-r$GCC_TOOLCHAIN_REVISION-v$GCC_TOOLCHAIN_VERSION"
 
 	_setup_toolchain_ndk_r17c_envs
 
@@ -228,6 +228,7 @@ _setup_toolchain_ndk_r17c_newer_gcc() {
 _setup_toolchain_ndk_r17c_gcc_11() {
 	local GCC_VERSION=11.3.0
 	local GCC_TOOLCHAIN_REVISION=0
+	local GCC_TOOLCHAIN_VERSION=0
 	local GCC_PREBUILT_SHA256
 
 	if [ "$TERMUX_ARCH" == "aarch64" ]; then
@@ -240,12 +241,13 @@ _setup_toolchain_ndk_r17c_gcc_11() {
 		GCC_PREBUILT_SHA256=4e03c55dd3956e2b3edbe576d4c346435a582b053dd8703992621bddd5bb408b
 	fi
 
-	_setup_toolchain_ndk_r17c_newer_gcc "$GCC_VERSION" "$GCC_TOOLCHAIN_REVISION" "$GCC_PREBUILT_SHA256"
+	_setup_toolchain_ndk_r17c_newer_gcc "$GCC_VERSION" "$GCC_TOOLCHAIN_REVISION" "$GCC_PREBUILT_SHA256" "$GCC_TOOLCHAIN_VERSION"
 }
 
 _setup_toolchain_ndk_r17c_gcc_10() {
 	local GCC_VERSION=10.4.0
 	local GCC_TOOLCHAIN_REVISION=0
+	local GCC_TOOLCHAIN_VERSION=0
 	local GCC_PREBUILT_SHA256
 
 	if [ "$TERMUX_ARCH" == "aarch64" ]; then
@@ -258,12 +260,13 @@ _setup_toolchain_ndk_r17c_gcc_10() {
 		GCC_PREBUILT_SHA256=d8ca463c925d456e92c8a1d0d9c39521abe318e5c1e73e92a6fc7c2dae05b8ec
 	fi
 
-	_setup_toolchain_ndk_r17c_newer_gcc "$GCC_VERSION" "$GCC_TOOLCHAIN_REVISION" "$GCC_PREBUILT_SHA256"
+	_setup_toolchain_ndk_r17c_newer_gcc "$GCC_VERSION" "$GCC_TOOLCHAIN_REVISION" "$GCC_PREBUILT_SHA256" "$GCC_TOOLCHAIN_VERSION"
 }
 
 _setup_toolchain_ndk_r17c_gcc_9() {
 	local GCC_VERSION=9.5.0
 	local GCC_TOOLCHAIN_REVISION=0
+	local GCC_TOOLCHAIN_VERSION=0
 	local GCC_PREBUILT_SHA256
 
 	if [ "$TERMUX_ARCH" == "aarch64" ]; then
@@ -276,12 +279,13 @@ _setup_toolchain_ndk_r17c_gcc_9() {
 		GCC_PREBUILT_SHA256=05c5ee59e6ef3ac5b9a30329cfc6a270313ba608c9ef801784abed02c4f2fdfc
 	fi
 
-	_setup_toolchain_ndk_r17c_newer_gcc "$GCC_VERSION" "$GCC_TOOLCHAIN_REVISION" "$GCC_PREBUILT_SHA256"
+	_setup_toolchain_ndk_r17c_newer_gcc "$GCC_VERSION" "$GCC_TOOLCHAIN_REVISION" "$GCC_PREBUILT_SHA256" "$GCC_TOOLCHAIN_VERSION"
 }
 
 _setup_toolchain_ndk_r17c_gcc_12() {
 	local GCC_VERSION=12.1.0
 	local GCC_TOOLCHAIN_REVISION=0
+	local GCC_TOOLCHAIN_VERSION=0
 	local GCC_PREBUILT_SHA256
 
 	if [ "$TERMUX_ARCH" == "aarch64" ]; then
@@ -294,5 +298,5 @@ _setup_toolchain_ndk_r17c_gcc_12() {
 		GCC_PREBUILT_SHA256=2694628eee5e5a8097364cceef71502e21a4ad53b10154c69e7d0f7689583dba
 	fi
 
-	_setup_toolchain_ndk_r17c_newer_gcc "$GCC_VERSION" "$GCC_TOOLCHAIN_REVISION" "$GCC_PREBUILT_SHA256"
+	_setup_toolchain_ndk_r17c_newer_gcc "$GCC_VERSION" "$GCC_TOOLCHAIN_REVISION" "$GCC_PREBUILT_SHA256" "$GCC_TOOLCHAIN_VERSION"
 }
