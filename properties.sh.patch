@@ -1,0 +1,25 @@
+diff -uNr a/scripts/properties.sh b/scripts/properties.sh
+--- a/scripts/properties.sh	2022-09-04 12:29:45.326341000 +0800
++++ b/scripts/properties.sh	2022-09-04 12:31:16.675164400 +0800
+@@ -42,18 +42,21 @@
+ 	https://packages-cf.termux.dev/apt/termux-main
+ 	https://packages-cf.termux.dev/apt/termux-root
+ 	https://packages-cf.termux.dev/apt/termux-x11
++	https://tur.kcubeterm.com
+ )
+ 
+ TERMUX_REPO_DISTRIBUTION=(
+ 	stable
+ 	root
+ 	x11
++	tur-packages
+ )
+ 
+ TERMUX_REPO_COMPONENT=(
+ 	main
+ 	stable
+ 	main
++	tur tur-on-device
+ )
+ 
+ # Allow to override setup.
