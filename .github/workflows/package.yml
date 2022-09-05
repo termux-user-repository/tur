@@ -28,7 +28,7 @@ jobs:
       uses: actions/checkout@v3
       with:
         fetch-depth: 1000
-        path: ${{ github.workspace }}/this-repo
+        path: ${{ github.workspace }}
     - name: Clone tur
       uses: actions/checkout@v3
       with:
@@ -43,13 +43,10 @@ jobs:
         path: ${{ github.workspace }}/main-repo
     - name: Merge repos
       run: |
-        cp -rf ./main-repo/* ./
+        cp -rn ./main-repo/* ./
         rm -rf ./main-repo
-        cp -rf ./tur-repo/* ./
+        cp -rn ./tur-repo/* ./
         rm -rf ./tur-repo
-        cp -rf ./this-repo/* ./
-        cp -rf ./this-repo/.git ./
-        rm -rf ./this-repo
     - name: Gather build summary
       run: |
         if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
@@ -210,6 +207,7 @@ jobs:
         # Files containing certain symbols (e.g. ":") will cause failure in actions/upload-artifact.
         # Archiving *.deb files in a tarball to avoid issues with uploading.
         tar cf artifacts/debs-${{ matrix.target_arch }}-${{ github.sha }}.tar debs
+        rm -rf output
     - name: Checksums for built *.deb files
       if: always()
       run: |
@@ -232,7 +230,7 @@ jobs:
       uses: actions/checkout@v3
       with:
         fetch-depth: 1000
-        path: ${{ github.workspace }}/this-repo
+        path: ${{ github.workspace }}
     - name: Clone tur
       uses: actions/checkout@v3
       with:
@@ -247,13 +245,10 @@ jobs:
         path: ${{ github.workspace }}/main-repo
     - name: Merge repos
       run: |
-        cp -rf ./main-repo/* ./
+        cp -rn ./main-repo/* ./
         rm -rf ./main-repo
-        cp -rf ./tur-repo/* ./
+        cp -rn ./tur-repo/* ./
         rm -rf ./tur-repo
-        cp -rf ./this-repo/* ./
-        cp -rf ./this-repo/.git ./
-        rm -rf ./this-repo
     - name: Gather build summary
       run: |
         if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
@@ -383,6 +378,9 @@ jobs:
         if [ ! -z "$packages" ]; then
           ./scripts/build-termux-docker.sh login ./build-package.sh -I $packages
         fi
+    - name: Waiting for debugger
+      if: ${{ failure() }}
+      uses: mxschmitt/action-tmate@v3
     - name: Clean up docker containers
       env:
         ARCH: ${{ matrix.target_arch }}
