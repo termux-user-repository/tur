@@ -8,7 +8,7 @@ lib/libpython3.so
 "
 
 termux_step_create_subpkg_debscripts() {
-    # Post-installation script for installing symlinks of pip.
+	# Post-installation script for installing symlinks of pip.
 	cat <<- POSTINST_EOF > ./postinst
 	#!$TERMUX_PREFIX/bin/sh
 
