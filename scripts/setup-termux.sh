@@ -41,8 +41,6 @@ PACKAGES+=" valac"
 
 # Tier 3: requirements for community repos.
 PACKAGES+=" tur-repo"
-PACKAGES+=" x11-repo"
-PACKAGES+=" root-repo"
 echo "" >> /system/etc/static-dns-hosts.txt
 echo "# Community TUR Repo" >> /system/etc/static-dns-hosts.txt
 echo "tur.kcubeterm.com" >> /system/etc/static-dns-hosts.txt
