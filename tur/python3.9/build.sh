@@ -4,13 +4,14 @@ TERMUX_PKG_LICENSE="PythonPL"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 _MAJOR_VERSION=3.9
 TERMUX_PKG_VERSION=${_MAJOR_VERSION}.13
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_REVISION=2
 TERMUX_PKG_SRCURL=https://www.python.org/ftp/python/${TERMUX_PKG_VERSION}/Python-${TERMUX_PKG_VERSION}.tar.xz
 TERMUX_PKG_SHA256=125b0c598f1e15d2aa65406e83f792df7d171cdf38c16803b149994316a3080f
 TERMUX_PKG_DEPENDS="gdbm, libandroid-posix-semaphore, libandroid-support, libbz2, libcrypt, libffi, liblzma, libsqlite, ncurses, ncurses-ui-libs, openssl, readline, zlib"
 TERMUX_PKG_RECOMMENDS="clang, make, pkg-config"
 TERMUX_PKG_SUGGESTS="python${_MAJOR_VERSION}-tkinter"
 TERMUX_PKG_BREAKS="python2 (<= 2.7.15)"
+TERMUX_PKG_HOSTBUILD=true
 # Set ac_cv_func_wcsftime=no to avoid errors such as "character U+ca0025 is not in range [U+0000; U+10ffff]"
 # when executing e.g. "from time import time, strftime, localtime; print(strftime(str('%Y-%m-%d %H:%M'), localtime()))"
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="ac_cv_file__dev_ptmx=yes ac_cv_file__dev_ptc=no ac_cv_func_wcsftime=no"
@@ -41,7 +42,9 @@ lib/python${_MAJOR_VERSION}/test
 lib/python${_MAJOR_VERSION}/*/test
 lib/python${_MAJOR_VERSION}/*/tests
 "
+
 termux_step_pre_configure() {
+	export PATH="$TERMUX_PKG_HOSTBUILD_DIR:$PATH"
 	# -O3 gains some additional performance on at least aarch64.
 	CFLAGS="${CFLAGS/-Oz/-O3}"
 	# Needed when building with clang, as setup.py only probes
@@ -62,8 +65,8 @@ termux_step_pre_configure() {
 
 termux_step_make_install() {
 	make altinstall
-	# XXX: Remove libpython3.so. This may not be a proper way.
-	rm -rf $TERMUX_PREFIX/lib/libpython3.so
+	ln -sfr $TERMUX_PREFIX/bin/python3.9 $TERMUX_PREFIX/bin/python
+	ln -sfr $TERMUX_PREFIX/bin/python3.9 $TERMUX_PREFIX/bin/python3
 }
 
 termux_step_post_massage() {
