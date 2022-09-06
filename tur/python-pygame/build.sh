@@ -8,7 +8,7 @@ TERMUX_PKG_SHA256=bbe14ca0efc6f711e36cbf3cffc3801e0e72ba11d3beb7b2a2859805dd1d5f
 TERMUX_PKG_DEPENDS="x11-repo, freetype, portmidi, python, sdl2, sdl2-image, sdl2-mixer, sdl2-ttf"
 TERMUX_PKG_BUILD_DEPENDS="xorgproto"
 TERMUX_PKG_BUILD_IN_SRC=true
-TERMUX_PKG_REVISION=2
+TERMUX_PKG_REVISION=3
 
 TERMUX_PKG_RM_AFTER_INSTALL="
 bin/
@@ -58,7 +58,7 @@ termux_step_post_make_install() {
 termux_step_create_debscripts() {
 	cat <<- EOF > ./postinst
 	#!$TERMUX_PREFIX/bin/sh
-	echo "Installing Pillow..."
+	echo "Installing pygame..."
 	echo "./${_PYGAME_EGGDIR}" >> $TERMUX_PREFIX/lib/python${_PYTHON_VERSION}/site-packages/easy-install.pth
 	EOF
 
