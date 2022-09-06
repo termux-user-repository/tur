@@ -8,7 +8,7 @@ TERMUX_PKG_SHA256=bbe14ca0efc6f711e36cbf3cffc3801e0e72ba11d3beb7b2a2859805dd1d5f
 TERMUX_PKG_DEPENDS="x11-repo, freetype, portmidi, python, sdl2, sdl2-image, sdl2-mixer, sdl2-ttf"
 TERMUX_PKG_BUILD_DEPENDS="xorgproto"
 TERMUX_PKG_BUILD_IN_SRC=true
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_REVISION=2
 
 TERMUX_PKG_RM_AFTER_INSTALL="
 bin/
@@ -25,15 +25,7 @@ termux_step_pre_configure() {
 	popd
 	. ${_CROSSENV_PREFIX}/bin/activate
 
-	pushd ${_CROSSENV_PREFIX}/build/lib/python${_PYTHON_VERSION}/site-packages
-	patch --silent -p1 < $TERMUX_PKG_BUILDER_DIR/setuptools-44.1.1-no-bdist_wininst.diff || :
-	popd
-
 	LDFLAGS+=" -lpython${_PYTHON_VERSION}"
-	CPPFLAGS+="
-		-I$TERMUX_PREFIX/include/python${_PYTHON_VERSION}
-		-I$TERMUX_PREFIX/include/python${_PYTHON_VERSION}/cpython
-		"
 }
 
 termux_step_make_install() {
@@ -41,6 +33,17 @@ termux_step_make_install() {
 	export PATH=$PATH:$TERMUX_PREFIX/bin
 
 	python setup.py install --force --prefix $TERMUX_PREFIX
+
+	pushd $PYTHONPATH
+	_PYGAME_EGGDIR=
+	for f in pygame-${TERMUX_PKG_VERSION}-py${_PYTHON_VERSION}-linux-*.egg; do
+		if [ -f "$f" ]|| [ -d "$f" ]; then
+			_PYGAME_EGGDIR="$f"
+			break
+		fi
+	done
+	test -n "${_PYGAME_EGGDIR}"
+	popd
 }
 
 termux_step_post_make_install() {
@@ -50,4 +53,17 @@ termux_step_post_make_install() {
 	rm -rf lib/python${_PYTHON_VERSION}/site-packages/easy-install.pth
 	rm -rf lib/python${_PYTHON_VERSION}/site-packages/site.py
 	popd
+}
+
+termux_step_create_debscripts() {
+	cat <<- EOF > ./postinst
+	#!$TERMUX_PREFIX/bin/sh
+	echo "Installing Pillow..."
+	echo "./${_PYGAME_EGGDIR}" >> $TERMUX_PREFIX/lib/python${_PYTHON_VERSION}/site-packages/easy-install.pth
+	EOF
+
+	cat <<- EOF > ./prerm
+	#!$TERMUX_PREFIX/bin/sh
+	sed -i "/\.\/${_PYGAME_EGGDIR//./\\.}/d" $TERMUX_PREFIX/lib/python${_PYTHON_VERSION}/site-packages/easy-install.pth
+	EOF
 }
