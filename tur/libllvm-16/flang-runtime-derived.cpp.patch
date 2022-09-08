@@ -1,0 +1,19 @@
+diff -uNr a/flang/runtime/derived.cpp b/flang/runtime/derived.cpp
+--- a/flang/runtime/derived.cpp
++++ b/flang/runtime/derived.cpp
+@@ -188,9 +188,15 @@
+       SubscriptValue extent[maxRank];
+       const typeInfo::Value *bounds{comp.bounds()};
+       for (int dim{0}; dim < comp.rank(); ++dim) {
++#ifndef __LP64__
++        SubscriptValue lb{static_cast<SubscriptValue>(bounds[2 * dim].GetValue(&descriptor).value_or(0))};
++        SubscriptValue ub{static_cast<SubscriptValue>(
++            bounds[2 * dim + 1].GetValue(&descriptor).value_or(0))};
++#else
+         SubscriptValue lb{bounds[2 * dim].GetValue(&descriptor).value_or(0)};
+         SubscriptValue ub{
+             bounds[2 * dim + 1].GetValue(&descriptor).value_or(0)};
++#endif
+         extent[dim] = ub >= lb ? ub - lb + 1 : 0;
+       }
+       StaticDescriptor<maxRank, true, 0> staticDescriptor;

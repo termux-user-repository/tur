@@ -8,4 +8,4 @@ $_INSTALL_PREFIX/lib/libFortran*
 $_INSTALL_PREFIX/lib/cmake/flang
 "
 TERMUX_SUBPKG_DESCRIPTION="Fortran language frontend for LLVM"
-TERMUX_SUBPKG_DEPENDS="clang-15, lld-15, llvm-15, mlir-15"
+TERMUX_SUBPKG_DEPENDS="clang-16, lld-16, llvm-16, mlir-16"

@@ -1,0 +1,27 @@
+diff -uNr a/flang/runtime/transformational.cpp b/flang/runtime/transformational.cpp
+--- a/flang/runtime/transformational.cpp
++++ b/flang/runtime/transformational.cpp
+@@ -191,7 +191,11 @@
+   SubscriptValue lb{sourceDim.LowerBound()};
+   for (SubscriptValue j{0}; j < extent; ++j) {
+     SubscriptValue resultAt{1 + j};
++#ifndef __LP64__
++    SubscriptValue sourceAt{lb + (j + static_cast<SubscriptValue>(shift)) % extent};
++#else
+     SubscriptValue sourceAt{lb + (j + shift) % extent};
++#endif
+     if (sourceAt < lb) {
+       sourceAt += extent;
+     }
+@@ -302,7 +306,11 @@
+   }
+   SubscriptValue lb{source.GetDimension(0).LowerBound()};
+   for (SubscriptValue j{1}; j <= extent; ++j) {
++#ifndef __LP64__
++    SubscriptValue sourceAt{lb + j - 1 + static_cast<SubscriptValue>(shift)};
++#else
+     SubscriptValue sourceAt{lb + j - 1 + shift};
++#endif
+     if (sourceAt >= lb && sourceAt < lb + extent) {
+       CopyElement(result, &j, source, &sourceAt, terminator);
+     } else if (boundary) {

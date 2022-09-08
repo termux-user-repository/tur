@@ -35,4 +35,4 @@ $_INSTALL_PREFIX/share/man/man1/scan-*
 $_INSTALL_PREFIX/share/scan-*
 "
 TERMUX_SUBPKG_DESCRIPTION="C language frontend for LLVM"
-TERMUX_SUBPKG_DEPENDS="libcompiler-rt-15, lld-15, llvm-15, ndk-sysroot"
+TERMUX_SUBPKG_DEPENDS="libcompiler-rt-16, lld-16, llvm-16, ndk-sysroot"
