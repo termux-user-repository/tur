@@ -51,7 +51,6 @@ jobs:
           GIT_COMMIT_PACKAGES: "true"
           GIT_PUSH_PACKAGES: "true"
         run: |
-          ./scripts/run-docker.sh cp ./termuxrc /home/builder/.termuxrc
           git config --global user.name "TUR Github Actions"
           git config --global user.email "abc@example.com"
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then

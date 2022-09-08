@@ -192,7 +192,6 @@ jobs:
             packages="$packages $(cat ./built_${repo}_packages.txt)"
           fi
         done
-        ./scripts/run-docker.sh cp ./termuxrc /home/builder/.termuxrc
         if [ ! -z "$packages" ]; then
           ./scripts/run-docker.sh ./build-package.sh -I -a ${{ matrix.target_arch }} $packages
         fi
