@@ -63,3 +63,12 @@ Only search packages from TUR repository when auto-updating.
  				if [ -d "${repo_dir}/${pkg}" ]; then
  					pkg="${repo_dir}/${pkg}"
  					break
+@@ -231,7 +231,7 @@
+ 	local body
+ 
+ 	if [[ "${assignee:-termuxbot2}" == "termuxbot2" ]]; then
+-		assignee="MrAdityaAlok" # Assign myself if termuxbot2 is the actor.
++		assignee="licy183" # Assign licy183 if termuxbot2 is the actor.
+ 	fi
+ 
+ 	body="$(
