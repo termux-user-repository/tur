@@ -46,7 +46,7 @@ jobs:
 
       - name: Process package updates
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BUILD_PACKAGES: "true"
           GIT_COMMIT_PACKAGES: "true"
           GIT_PUSH_PACKAGES: "true"
