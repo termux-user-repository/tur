@@ -1,0 +1,18 @@
+diff -uNr a/flang/include/flang/Optimizer/Builder/Runtime/RTBuilder.h b/flang/include/flang/Optimizer/Builder/Runtime/RTBuilder.h
+--- a/flang/include/flang/Optimizer/Builder/Runtime/RTBuilder.h
++++ b/flang/include/flang/Optimizer/Builder/Runtime/RTBuilder.h
+@@ -70,6 +70,14 @@
+     return mlir::IntegerType::get(context, 8 * sizeof(int));
+   };
+ }
++#ifndef __LP64__
++template <>
++constexpr TypeBuilderFunc getModel<unsigned int>() {
++  return [](mlir::MLIRContext *context) -> mlir::Type {
++    return mlir::IntegerType::get(context, 8 * sizeof(unsigned int));
++  };
++}
++#endif // __LP64__
+ template <>
+ constexpr TypeBuilderFunc getModel<int &>() {
+   return [](mlir::MLIRContext *context) -> mlir::Type {

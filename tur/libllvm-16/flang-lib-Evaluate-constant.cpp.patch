@@ -1,0 +1,15 @@
+diff -uNr a/flang/lib/Evaluate/constant.cpp b/flang/lib/Evaluate/constant.cpp
+--- a/flang/lib/Evaluate/constant.cpp
++++ b/flang/lib/Evaluate/constant.cpp
+@@ -293,7 +293,11 @@
+     return count;
+   } else {
+     std::size_t copied{0};
++#ifndef __LP64__
++    std::size_t elementBytes{static_cast<std::size_t>(length_ * sizeof(decltype(values_[0])))};
++#else
+     std::size_t elementBytes{length_ * sizeof(decltype(values_[0]))};
++#endif
+     ConstantSubscripts sourceSubscripts{source.lbounds()};
+     while (copied < count) {
+       auto *dest{&values_.at(SubscriptsToOffset(resultSubscripts) * length_)};

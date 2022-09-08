@@ -1,0 +1,14 @@
+This option prevents the correct linking of the flang runtime library when customizing the installation prefix.
+--- a/clang/lib/Driver/ToolChains/CommonArgs.cpp
++++ b/clang/lib/Driver/ToolChains/CommonArgs.cpp
+@@ -763,8 +763,8 @@
+   // NOTE: Generating executables by Flang is considered an "experimental"
+   // feature and hence this is guarded with a command line option.
+   // TODO: Make this work unconditionally once Flang is mature enough.
+-  if (!Args.hasArg(options::OPT_flang_experimental_exec))
+-    return;
++  // if (!Args.hasArg(options::OPT_flang_experimental_exec))
++  //   return;
+ 
+   // Default to the <driver-path>/../lib directory. This works fine on the
+   // platforms that we have tested so far. We will probably have to re-fine

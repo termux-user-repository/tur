@@ -1,0 +1,14 @@
+--- a/flang/runtime/command.cpp
++++ b/flang/runtime/command.cpp
+@@ -31,7 +31,11 @@
+   if constexpr (sizeof(std::size_t) < sizeof(std::int64_t)) {
+     return static_cast<std::int64_t>(length);
+   } else {
++#ifndef __LP64__
++    std::size_t max{static_cast<std::size_t>(std::numeric_limits<std::int64_t>::max())};
++#else
+     std::size_t max{std::numeric_limits<std::int64_t>::max()};
++#endif
+     return length > max ? 0 // Just fail.
+                         : static_cast<std::int64_t>(length);
+   }
