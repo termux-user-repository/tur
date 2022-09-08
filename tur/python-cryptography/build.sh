@@ -12,6 +12,7 @@ TERMUX_PKG_SRCURL=https://github.com/pyca/cryptography/archive/refs/tags/${TERMU
 TERMUX_PKG_SHA256=26cb3b7e5cb14345502737c30188b807c1a58e64c535d961e683e86d3300c112
 TERMUX_PKG_DEPENDS="libffi, openssl, python"
 TERMUX_PKG_BUILD_IN_SRC=true
+TERMUX_PKG_AUTO_UPDATE=true
 
 _PKG_PYTHON_DEPENDS="'cffi>=1.12'"
 
