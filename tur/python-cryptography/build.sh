@@ -7,9 +7,9 @@ LICENSE.APACHE
 LICENSE.BSD
 LICENSE.PSF"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION=37.0.4
+TERMUX_PKG_VERSION=38.0.1
 TERMUX_PKG_SRCURL=https://github.com/pyca/cryptography/archive/refs/tags/${TERMUX_PKG_VERSION}.tar.gz
-TERMUX_PKG_SHA256=26cb3b7e5cb14345502737c30188b807c1a58e64c535d961e683e86d3300c112
+TERMUX_PKG_SHA256=4d2e2b3192cd3767bdb68c22dd40c07a1deb209a05daee21df74fbf2df8bfbed
 TERMUX_PKG_DEPENDS="libffi, openssl, python"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_AUTO_UPDATE=true
@@ -39,15 +39,14 @@ termux_step_configure() {
 	echo "INPUT(-lc)" > $_DUMMY_PTHREAD
 
 	# Update the setuptools version of build python
-	build-pip install --upgrade cffi 'setuptools>=60.10' setuptools_rust semantic_version
+	build-pip install --upgrade cffi setuptools==60.10 setuptools_rust semantic_version
 	cross-expose cffi
-	# Cross python should have the same version of setuptools of build python
-	SETUPTOOLS_VERSION=$(build-python -m pip show setuptools | grep "Version"  | sed -E "s/Version\: //g")
-	python -m pip install setuptools==$SETUPTOOLS_VERSION setuptools_rust semantic_version
+	python -m pip install setuptools==60.10 setuptools_rust semantic_version
 
 	# Setup rust cross toolchain
 	termux_setup_rust
 	export CARGO_BUILD_TARGET=$CARGO_TARGET_NAME
+	# export PYO3_CROSS_LIB_DIR="$TERMUX_PREFIX/lib/python$_PYTHON_VERSION"
 }
 
 termux_step_make() {
@@ -66,7 +65,7 @@ termux_step_make_install() {
 			break
 		fi
 	done
-	test -n "${_CRYPTOGRAPHY_EGGDIR}"
+	test -n "${_CRYPTOGRAPHY_EGGDIR}" || (termux_error_exit "Failed to find the egg file/directory, does the .egg-info file exists?")
 	popd
 }
 
