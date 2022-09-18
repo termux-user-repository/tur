@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="Fundamental algorithms for scientific computing in Pytho
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION=1.8.0
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://github.com/scipy/scipy.git
 TERMUX_PKG_DEPENDS="libc++, openblas, python, python-numpy"
 TERMUX_PKG_BUILD_DEPENDS="python-numpy-static"
@@ -17,7 +18,8 @@ TERMUX_PKG_BUILD_IN_SRC=true
 # Current thread 0xf7f4b580 (most recent call first):
 #   File "/data/data/com.termux/files/usr/lib/python3.10/site-packages/scipy-1.8.0-py3.10-linux-i686.egg/scipy/linalg/_basic.py", line 1227 in lstsq
 #   File "/data/data/com.termux/files/usr/lib/python3.10/site-packages/scipy-1.8.0-py3.10-linux-i686.egg/scipy/linalg/tests/test_basic.py", line 1047 in test_simple_overdet_complex
-TERMUX_PKG_BLACKLISTED_ARCHES="arm, i686"
+# XXX: Although it doesn't seem to work fine, I'd like to enable this package as it happens only on some functions.
+# TERMUX_PKG_BLACKLISTED_ARCHES="arm, i686"
 
 TERMUX_PKG_RM_AFTER_INSTALL="
 bin/
@@ -125,13 +127,24 @@ termux_step_make_install() {
 		fi
 	done
 	test -n "${_SCIPY_EGGDIR}"
+
+	# XXX: Fix the EXT_SUFFIX. More investigation is needed to find the underlying cause.
+	pushd "${_SCIPY_EGGDIR}"
+	local old_suffix=".cpython-310-$TERMUX_HOST_PLATFORM.so"
+	local new_suffix=".cpython-310.so"
+
+	find . \
+		-name '*'"$old_suffix" \
+		-exec sh -c '_f="{}"; mv -- "$_f" "${_f%'"$old_suffix"'}'"$new_suffix"'"' \;
+	popd
+
 	popd
 }
 
 termux_step_post_make_install() {
 	# Remove these dummy files.
 	rm "${_ADDTIONAL_FILES[@]}"
-	# Recovery numpy
+	# Recover numpy
 	mv $TERMUX_PREFIX/tmp/$_NUMPY_EGGDIR $DEVICE_STIE/$_NUMPY_EGGDIR
 	# Delete the easy-install related files, since we use postinst/prerm to handle it.
 	pushd $TERMUX_PREFIX
@@ -144,13 +157,17 @@ termux_step_post_make_install() {
 termux_step_create_debscripts() {
 	cat <<- EOF > ./postinst
 	#!$TERMUX_PREFIX/bin/sh
-	echo "Installing dependencies through pip. This may take a while..."
+	echo "Installing scipy and its dependencies through pip. This may take a while..."
 	pip3 install ${_PKG_PYTHON_DEPENDS}
+	if [ "$TERMUX_ARCH" == "arm" ] || [ "$TERMUX_ARCH" == "i686" ]; then
+		echo "WARNING: python-numpy doesn't work fine on 32-bit arches. See https://github.com/termux-user-repository/tur/pull/21#issue-1295483266 for detail."
+	fi
 	echo "./${_SCIPY_EGGDIR}" >> $TERMUX_PREFIX/lib/python${_PYTHON_VERSION}/site-packages/easy-install.pth
 	EOF
 
 	cat <<- EOF > ./prerm
 	#!$TERMUX_PREFIX/bin/sh
+	echo "Removing scipy..."
 	sed -i "/\.\/${_SCIPY_EGGDIR//./\\.}/d" $TERMUX_PREFIX/lib/python${_PYTHON_VERSION}/site-packages/easy-install.pth
 	EOF
 }
