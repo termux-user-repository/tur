@@ -223,6 +223,12 @@ _setup_standalone_toolchain_ndk_r17c_newer_gcc() {
 		mv $GCC_STANDALONE_TOOLCHAIN_TMP/include/c++/4.9.x $GCC_STANDALONE_TOOLCHAIN_TMP/include/c++/$GCC_VERSION
 		cp -R $GCC_STANDALONE_TOOLCHAIN_TMP/sysroot/usr/include/$TERMUX_HOST_PLATFORM/* $GCC_STANDALONE_TOOLCHAIN_TMP/sysroot/usr/include/
 
+		# Remove the older version of clang toolchain
+		rm -rf $GCC_STANDALONE_TOOLCHAIN_TMP/bin/clang*
+		rm -rf $GCC_STANDALONE_TOOLCHAIN_TMP/bin/llvm*
+		rm -rf $GCC_STANDALONE_TOOLCHAIN_TMP/bin/$TERMUX_HOST_PLATFORM-clang*
+		rm -rf $GCC_STANDALONE_TOOLCHAIN_TMP/bin/$TERMUX_HOST_PLATFORM-gcc-4.9*
+
 		mv $GCC_STANDALONE_TOOLCHAIN_TMP $GCC_STANDALONE_TOOLCHAIN
 	fi
 }
