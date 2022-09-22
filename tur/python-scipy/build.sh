@@ -2,8 +2,7 @@ TERMUX_PKG_HOMEPAGE=https://scipy.org/
 TERMUX_PKG_DESCRIPTION="Fundamental algorithms for scientific computing in Python"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION=1.8.0
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_VERSION=1.9.0
 TERMUX_PKG_SRCURL=https://github.com/scipy/scipy.git
 TERMUX_PKG_DEPENDS="libc++, openblas, python, python-numpy"
 TERMUX_PKG_BUILD_DEPENDS="python-numpy-static"
@@ -36,17 +35,16 @@ termux_step_configure() {
 	_NUMPY_VERSION=$(. $TERMUX_SCRIPTDIR/packages/python-numpy/build.sh; echo $TERMUX_PKG_VERSION)
 	_PKG_PYTHON_DEPENDS="numpy==$_NUMPY_VERSION"
 
-	_setup_toolchain_ndk_with_gfortran_11
-
-	LDFLAGS="${LDFLAGS/-static-openmp/}"
+	_setup_toolchain_ndk_gcc_11
 
 	# XXX: `python` from main repo is built by TERMUX_STANDALONE_TOOLCHAIN and its _sysconfigdata.py
-	# XXX: contains some FLAGS which is not supported by GNU Compiler Collections, such as 
-	# XXX: `-static-openmp`. So use a wrapper of $PLATFORM-gfortran to ignore these options.
-	mkdir -p $TERMUX_PKG_TMPDIR/fake-bin
-	cat $TERMUX_PKG_BUILDER_DIR/fake-gfortran > $TERMUX_PKG_TMPDIR/fake-bin/$TERMUX_HOST_PLATFORM-gfortran
-	chmod +x $TERMUX_PKG_TMPDIR/fake-bin/$TERMUX_HOST_PLATFORM-gfortran
-	export PATH="$TERMUX_PKG_TMPDIR/fake-bin:$PATH"
+	# XXX: contains some FLAGS which is not supported by GNU Compiler Collections, such as '-Oz',  
+	# XXX: `-static-openmp`. So we need to modify the _sysconfigdata.py.
+	SYS_CONFIG_DATA_FILE="$(find $TERMUX_PREFIX/lib/python${_PYTHON_VERSION} -name "_sysconfigdata*.py")"
+	rm -rf  $TERMUX_PREFIX/lib/python${_PYTHON_VERSION}/__pycache__
+	sed -E 's|-O[123sz]|-Os|g;s|-static-openmp||g' $SYS_CONFIG_DATA_FILE |
+		sed "s|$TERMUX_HOST_PLATFORM-clang++|$TERMUX_HOST_PLATFORM-g++|g" |
+		sed "s|$TERMUX_HOST_PLATFORM-clang|$TERMUX_HOST_PLATFORM-gcc|g" | tee $SYS_CONFIG_DATA_FILE
 
 	# We set `python-scipy` as dependencies, but python-crossenv prefer to use a fake one.
 	DEVICE_STIE=$TERMUX_PREFIX/lib/python${_PYTHON_VERSION}/site-packages

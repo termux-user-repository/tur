@@ -1,9 +1,0 @@
-#!/usr/bin/env bash
-
-args=""
-for arg in "$@"; do
-    if [ ! "$arg" = "-static-openmp" ]; then
-        args+=" $arg"
-    fi
-done
-command "$(which -a -- "$(basename -- "$0")" | sed -n '2p')" $args
