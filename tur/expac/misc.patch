@@ -1,0 +1,40 @@
+diff --git a/src/expac.c b/src/expac.c
+index 91ba2d5..492e74d 100644
+--- a/src/expac.c
++++ b/src/expac.c
+@@ -49,6 +49,8 @@
+ #define PATH_MAX  4096
+ #endif
+ 
++#define program_invocation_short_name "expac"
++
+ static char const digits[] = "0123456789";
+ static char const printf_flags[] = "'-+ #0I";
+ 
+@@ -61,7 +63,7 @@ const char *opt_format = NULL;
+ const char *opt_timefmt = DEFAULT_TIMEFMT;
+ const char *opt_listdelim = DEFAULT_LISTDELIM;
+ const char *opt_delim = DEFAULT_DELIM;
+-const char *opt_config_file = "/etc/pacman.conf";
++const char *opt_config_file = "@TERMUX_PREFIX@/etc/pacman.conf";
+ int opt_pkgcounter = 0;
+ 
+ typedef const char *(*extractfn)(void*);
+@@ -148,7 +150,7 @@ static void usage(void)
+       "  -l, --listdelim <string>  separator used between list elements (default: \"  \")\n"
+       "  -p, --file                query local files instead of the DB\n"
+       "  -t, --timefmt <fmt>       date format passed to strftime (default: \"%%c\")\n"
+-      "      --config <file>       read from <file> for alpm initialization (default: /etc/pacman.conf)\n\n"
++      "      --config <file>       read from <file> for alpm initialization (default: @TERMUX_PREFIX@/etc/pacman.conf)\n\n"
+       "  -v, --verbose             be more verbose\n\n"
+       "  -V, --version             display version information and exit\n"
+       "  -h, --help                display this help and exit\n\n"
+@@ -726,7 +728,7 @@ static int expac_new(expac_t **expac, const char *config_file)
+   enum _alpm_errno_t alpm_errno = 0;
+   config_t config;
+   const char *dbroot = "/";
+-  const char *dbpath = "/var/lib/pacman";
++  const char *dbpath = "@TERMUX_PREFIX@/var/lib/pacman";
+   int r;
+ 
+   e = calloc(1, sizeof(*e));
