@@ -1,0 +1,1392 @@
+From 50b009c5daef92bc60fc26fcc4c495e117667387 Mon Sep 17 00:00:00 2001
+From: Martin Liska <mliska@suse.cz>
+Date: Tue, 10 May 2022 16:00:53 +0200
+Subject: [PATCH 1/5] libiberty: stop using PTR macro
+
+include/ChangeLog:
+
+	* hashtab.h (HTAB_EMPTY_ENTRY): Use void * instead PTR.
+	(HTAB_DELETED_ENTRY): Likewise.
+
+libiberty/ChangeLog:
+
+	* alloca.c (C_alloca): Use void * instead PTR.
+	* calloc.c (malloc): Likewise.
+	(bzero): Likewise.
+	(calloc): Likewise.
+	* hashtab.c (find_empty_slot_for_expand): Likewise.
+	(eq_pointer): Likewise.
+	(htab_create_alloc_ex): Likewise.
+	(htab_create_typed_alloc): Likewise.
+	(htab_set_functions_ex): Likewise.
+	(htab_delete): Likewise.
+	(htab_empty): Likewise.
+	(htab_expand): Likewise.
+	(htab_find_with_hash): Likewise.
+	(htab_find): Likewise.
+	(htab_find_slot_with_hash): Likewise.
+	(htab_find_slot): Likewise.
+	(htab_remove_elt): Likewise.
+	(htab_remove_elt_with_hash): Likewise.
+	(htab_clear_slot): Likewise.
+	(htab_traverse_noresize): Likewise.
+	(htab_traverse): Likewise.
+	(htab_hash_string): Likewise.
+	(iterative_hash): Likewise.
+	(hash_pointer): Likewise.
+	* memchr.c (memchr): Likewise.
+	* memcmp.c (memcmp): Likewise.
+	* memcpy.c (memcpy): Likewise.
+	* memmove.c (memmove): Likewise.
+	* mempcpy.c (memcpy): Likewise.
+	(mempcpy): Likewise.
+	* memset.c (memset): Likewise.
+	* objalloc.c (malloc): Likewise.
+	(free): Likewise.
+	(objalloc_create): Likewise.
+	(_objalloc_alloc): Likewise.
+	(objalloc_free_block): Likewise.
+	* random.c (PTR): Likewise.
+	(void): Likewise.
+	(initstate): Likewise.
+	(setstate): Likewise.
+	* regex.c: Likewise.
+	* spaces.c (malloc): Likewise.
+	(free): Likewise.
+	* stpcpy.c (memcpy): Likewise.
+	* strdup.c (malloc): Likewise.
+	(memcpy): Likewise.
+	* strerror.c (malloc): Likewise.
+	(memset): Likewise.
+	* strndup.c (malloc): Likewise.
+	(memcpy): Likewise.
+	* strsignal.c (malloc): Likewise.
+	(memset): Likewise.
+	* vasprintf.c (malloc): Likewise.
+	* vprintf-support.c: Likewise.
+	* xatexit.c (malloc): Likewise.
+	* xmalloc.c (xmalloc): Likewise.
+	(xcalloc): Likewise.
+	(xrealloc): Likewise.
+	* xmemdup.c (xmemdup): Likewise.
+---
+ include/hashtab.h           |  4 +-
+ libiberty/alloca.c          |  6 +--
+ libiberty/calloc.c          |  8 ++--
+ libiberty/hashtab.c         | 94 ++++++++++++++++++-------------------
+ libiberty/memchr.c          |  6 +--
+ libiberty/memcmp.c          |  2 +-
+ libiberty/memcpy.c          |  4 +-
+ libiberty/memmove.c         |  4 +-
+ libiberty/mempcpy.c         |  6 +--
+ libiberty/memset.c          |  4 +-
+ libiberty/objalloc.c        | 22 ++++-----
+ libiberty/random.c          | 16 +++----
+ libiberty/regex.c           |  8 ++--
+ libiberty/spaces.c          |  4 +-
+ libiberty/stpcpy.c          |  2 +-
+ libiberty/strdup.c          |  4 +-
+ libiberty/strerror.c        |  4 +-
+ libiberty/strndup.c         |  4 +-
+ libiberty/strsignal.c       |  4 +-
+ libiberty/vasprintf.c       |  2 +-
+ libiberty/vprintf-support.c |  2 +-
+ libiberty/xatexit.c         |  2 +-
+ libiberty/xmalloc.c         | 14 +++---
+ libiberty/xmemdup.c         |  8 ++--
+ 24 files changed, 117 insertions(+), 117 deletions(-)
+
+diff --git a/include/hashtab.h b/include/hashtab.h
+index 7117eee2afb6..e74d2226e08a 100644
+--- a/include/hashtab.h
++++ b/include/hashtab.h
+@@ -79,12 +79,12 @@ typedef void (*htab_free_with_arg) (void *, void *);
+ 
+ /* This macro defines reserved value for empty table entry.  */
+ 
+-#define HTAB_EMPTY_ENTRY    ((PTR) 0)
++#define HTAB_EMPTY_ENTRY    ((void *) 0)
+ 
+ /* This macro defines reserved value for table entry which contained
+    a deleted element. */
+ 
+-#define HTAB_DELETED_ENTRY  ((PTR) 1)
++#define HTAB_DELETED_ENTRY  ((void *) 1)
+ 
+ /* Hash tables are of the following type.  The structure
+    (implementation) of this type is not needed for using the hash
+diff --git a/libiberty/alloca.c b/libiberty/alloca.c
+index 9b2e9cb12b63..b75f7560f945 100644
+--- a/libiberty/alloca.c
++++ b/libiberty/alloca.c
+@@ -158,7 +158,7 @@ static header *last_alloca_header = NULL;	/* -> last alloca header.  */
+ 
+ /* @undocumented C_alloca */
+ 
+-PTR
++void *
+ C_alloca (size_t size)
+ {
+   auto char probe;		/* Probes stack depth: */
+@@ -181,7 +181,7 @@ C_alloca (size_t size)
+ 	{
+ 	  register header *np = hp->h.next;
+ 
+-	  free ((PTR) hp);	/* Collect garbage.  */
++	  free ((void *) hp);	/* Collect garbage.  */
+ 
+ 	  hp = np;		/* -> next header.  */
+ 	}
+@@ -210,7 +210,7 @@ C_alloca (size_t size)
+ 
+     /* User storage begins just after header.  */
+ 
+-    return (PTR) ((char *) new_storage + sizeof (header));
++    return (void *) ((char *) new_storage + sizeof (header));
+   }
+ }
+ 
+diff --git a/libiberty/calloc.c b/libiberty/calloc.c
+index f4bd27b1cd2a..c7d97a6e362d 100644
+--- a/libiberty/calloc.c
++++ b/libiberty/calloc.c
+@@ -16,13 +16,13 @@ Uses @code{malloc} to allocate storage for @var{nelem} objects of
+ #include <stddef.h>
+ 
+ /* For systems with larger pointers than ints, this must be declared.  */
+-PTR malloc (size_t);
+-void bzero (PTR, size_t);
++void *malloc (size_t);
++void bzero (void *, size_t);
+ 
+-PTR
++void *
+ calloc (size_t nelem, size_t elsize)
+ {
+-  register PTR ptr;  
++  register void *ptr;
+ 
+   if (nelem == 0 || elsize == 0)
+     nelem = elsize = 1;
+diff --git a/libiberty/hashtab.c b/libiberty/hashtab.c
+index d3cc86b75d64..f7621cd47e55 100644
+--- a/libiberty/hashtab.c
++++ b/libiberty/hashtab.c
+@@ -73,7 +73,7 @@ static hashval_t htab_mod_m2 (hashval_t, htab_t);
+ static hashval_t hash_pointer (const void *);
+ static int eq_pointer (const void *, const void *);
+ static int htab_expand (htab_t);
+-static PTR *find_empty_slot_for_expand (htab_t, hashval_t);
++static void **find_empty_slot_for_expand (htab_t, hashval_t);
+ 
+ /* At some point, we could make these be NULL, and modify the
+    hash-table routines to handle NULL specially; that would avoid
+@@ -196,7 +196,7 @@ higher_prime_index (unsigned long n)
+ /* Returns non-zero if P1 and P2 are equal.  */
+ 
+ static int
+-eq_pointer (const PTR p1, const PTR p2)
++eq_pointer (const void *p1, const void *p2)
+ {
+   return p1 == p2;
+ }
+@@ -304,7 +304,7 @@ htab_create_alloc_ex (size_t size, htab_hash hash_f, htab_eq eq_f,
+   result = (htab_t) (*alloc_f) (alloc_arg, 1, sizeof (struct htab));
+   if (result == NULL)
+     return NULL;
+-  result->entries = (PTR *) (*alloc_f) (alloc_arg, size, sizeof (PTR));
++  result->entries = (void **) (*alloc_f) (alloc_arg, size, sizeof (void *));
+   if (result->entries == NULL)
+     {
+       if (free_f != NULL)
+@@ -357,7 +357,7 @@ htab_create_typed_alloc (size_t size, htab_hash hash_f, htab_eq eq_f,
+   result = (htab_t) (*alloc_tab_f) (1, sizeof (struct htab));
+   if (result == NULL)
+     return NULL;
+-  result->entries = (PTR *) (*alloc_f) (size, sizeof (PTR));
++  result->entries = (void **) (*alloc_f) (size, sizeof (void *));
+   if (result->entries == NULL)
+     {
+       if (free_f != NULL)
+@@ -379,7 +379,7 @@ htab_create_typed_alloc (size_t size, htab_hash hash_f, htab_eq eq_f,
+ 
+ void
+ htab_set_functions_ex (htab_t htab, htab_hash hash_f, htab_eq eq_f,
+-                       htab_del del_f, PTR alloc_arg,
++                       htab_del del_f, void *alloc_arg,
+                        htab_alloc_with_arg alloc_f, htab_free_with_arg free_f)
+ {
+   htab->hash_f = hash_f;
+@@ -412,7 +412,7 @@ void
+ htab_delete (htab_t htab)
+ {
+   size_t size = htab_size (htab);
+-  PTR *entries = htab->entries;
++  void **entries = htab->entries;
+   int i;
+ 
+   if (htab->del_f)
+@@ -438,7 +438,7 @@ void
+ htab_empty (htab_t htab)
+ {
+   size_t size = htab_size (htab);
+-  PTR *entries = htab->entries;
++  void **entries = htab->entries;
+   int i;
+ 
+   if (htab->del_f)
+@@ -447,9 +447,9 @@ htab_empty (htab_t htab)
+ 	(*htab->del_f) (entries[i]);
+ 
+   /* Instead of clearing megabyte, downsize the table.  */
+-  if (size > 1024*1024 / sizeof (PTR))
++  if (size > 1024*1024 / sizeof (void *))
+     {
+-      int nindex = higher_prime_index (1024 / sizeof (PTR));
++      int nindex = higher_prime_index (1024 / sizeof (void *));
+       int nsize = prime_tab[nindex].prime;
+ 
+       if (htab->free_f != NULL)
+@@ -457,15 +457,15 @@ htab_empty (htab_t htab)
+       else if (htab->free_with_arg_f != NULL)
+ 	(*htab->free_with_arg_f) (htab->alloc_arg, htab->entries);
+       if (htab->alloc_with_arg_f != NULL)
+-	htab->entries = (PTR *) (*htab->alloc_with_arg_f) (htab->alloc_arg, nsize,
+-						           sizeof (PTR *));
++	htab->entries = (void **) (*htab->alloc_with_arg_f) (htab->alloc_arg, nsize,
++						           sizeof (void **));
+       else
+-	htab->entries = (PTR *) (*htab->alloc_f) (nsize, sizeof (PTR *));
++	htab->entries = (void **) (*htab->alloc_f) (nsize, sizeof (void **));
+      htab->size = nsize;
+      htab->size_prime_index = nindex;
+     }
+   else
+-    memset (entries, 0, size * sizeof (PTR));
++    memset (entries, 0, size * sizeof (void *));
+   htab->n_deleted = 0;
+   htab->n_elements = 0;
+ }
+@@ -477,12 +477,12 @@ htab_empty (htab_t htab)
+    This function also assumes there are no deleted entries in the table.
+    HASH is the hash value for the element to be inserted.  */
+ 
+-static PTR *
++static void **
+ find_empty_slot_for_expand (htab_t htab, hashval_t hash)
+ {
+   hashval_t index = htab_mod (hash, htab);
+   size_t size = htab_size (htab);
+-  PTR *slot = htab->entries + index;
++  void **slot = htab->entries + index;
+   hashval_t hash2;
+ 
+   if (*slot == HTAB_EMPTY_ENTRY)
+@@ -516,10 +516,10 @@ find_empty_slot_for_expand (htab_t htab, hashval_t hash)
+ static int
+ htab_expand (htab_t htab)
+ {
+-  PTR *oentries;
+-  PTR *olimit;
+-  PTR *p;
+-  PTR *nentries;
++  void **oentries;
++  void **olimit;
++  void **p;
++  void **nentries;
+   size_t nsize, osize, elts;
+   unsigned int oindex, nindex;
+ 
+@@ -543,10 +543,10 @@ htab_expand (htab_t htab)
+     }
+ 
+   if (htab->alloc_with_arg_f != NULL)
+-    nentries = (PTR *) (*htab->alloc_with_arg_f) (htab->alloc_arg, nsize,
+-						  sizeof (PTR *));
++    nentries = (void **) (*htab->alloc_with_arg_f) (htab->alloc_arg, nsize,
++						  sizeof (void **));
+   else
+-    nentries = (PTR *) (*htab->alloc_f) (nsize, sizeof (PTR *));
++    nentries = (void **) (*htab->alloc_f) (nsize, sizeof (void **));
+   if (nentries == NULL)
+     return 0;
+   htab->entries = nentries;
+@@ -558,11 +558,11 @@ htab_expand (htab_t htab)
+   p = oentries;
+   do
+     {
+-      PTR x = *p;
++      void *x = *p;
+ 
+       if (x != HTAB_EMPTY_ENTRY && x != HTAB_DELETED_ENTRY)
+ 	{
+-	  PTR *q = find_empty_slot_for_expand (htab, (*htab->hash_f) (x));
++	  void **q = find_empty_slot_for_expand (htab, (*htab->hash_f) (x));
+ 
+ 	  *q = x;
+ 	}
+@@ -581,12 +581,12 @@ htab_expand (htab_t htab)
+ /* This function searches for a hash table entry equal to the given
+    element.  It cannot be used to insert or delete an element.  */
+ 
+-PTR
+-htab_find_with_hash (htab_t htab, const PTR element, hashval_t hash)
++void *
++htab_find_with_hash (htab_t htab, const void *element, hashval_t hash)
+ {
+   hashval_t index, hash2;
+   size_t size;
+-  PTR entry;
++  void *entry;
+ 
+   htab->searches++;
+   size = htab_size (htab);
+@@ -615,8 +615,8 @@ htab_find_with_hash (htab_t htab, const PTR element, hashval_t hash)
+ /* Like htab_find_slot_with_hash, but compute the hash value from the
+    element.  */
+ 
+-PTR
+-htab_find (htab_t htab, const PTR element)
++void *
++htab_find (htab_t htab, const void *element)
+ {
+   return htab_find_with_hash (htab, element, (*htab->hash_f) (element));
+ }
+@@ -629,14 +629,14 @@ htab_find (htab_t htab, const PTR element)
+    slot.  When inserting an entry, NULL may be returned if memory
+    allocation fails.  */
+ 
+-PTR *
+-htab_find_slot_with_hash (htab_t htab, const PTR element,
++void **
++htab_find_slot_with_hash (htab_t htab, const void *element,
+                           hashval_t hash, enum insert_option insert)
+ {
+-  PTR *first_deleted_slot;
++  void **first_deleted_slot;
+   hashval_t index, hash2;
+   size_t size;
+-  PTR entry;
++  void *entry;
+ 
+   size = htab_size (htab);
+   if (insert == INSERT && size * 3 <= htab->n_elements * 4)
+@@ -697,8 +697,8 @@ htab_find_slot_with_hash (htab_t htab, const PTR element,
+ /* Like htab_find_slot_with_hash, but compute the hash value from the
+    element.  */
+ 
+-PTR *
+-htab_find_slot (htab_t htab, const PTR element, enum insert_option insert)
++void **
++htab_find_slot (htab_t htab, const void *element, enum insert_option insert)
+ {
+   return htab_find_slot_with_hash (htab, element, (*htab->hash_f) (element),
+ 				   insert);
+@@ -709,7 +709,7 @@ htab_find_slot (htab_t htab, const PTR element, enum insert_option insert)
+    element in the hash table, this function does nothing.  */
+ 
+ void
+-htab_remove_elt (htab_t htab, PTR element)
++htab_remove_elt (htab_t htab, void *element)
+ {
+   htab_remove_elt_with_hash (htab, element, (*htab->hash_f) (element));
+ }
+@@ -720,9 +720,9 @@ htab_remove_elt (htab_t htab, const PTR element)
+    function does nothing.  */
+ 
+ void
+-htab_remove_elt_with_hash (htab_t htab, PTR element, hashval_t hash)
++htab_remove_elt_with_hash (htab_t htab, void *element, hashval_t hash)
+ {
+-  PTR *slot;
++  void **slot;
+ 
+   slot = htab_find_slot_with_hash (htab, element, hash, NO_INSERT);
+   if (slot == NULL)
+@@ -740,7 +740,7 @@ htab_remove_elt_with_hash (htab_t htab, const PTR element, hashval_t hash)
+    again.  */
+ 
+ void
+-htab_clear_slot (htab_t htab, PTR *slot)
++htab_clear_slot (htab_t htab, void **slot)
+ {
+   if (slot < htab->entries || slot >= htab->entries + htab_size (htab)
+       || *slot == HTAB_EMPTY_ENTRY || *slot == HTAB_DELETED_ENTRY)
+@@ -759,17 +759,17 @@ htab_clear_slot (htab_t htab, PTR *slot)
+    argument.  */
+ 
+ void
+-htab_traverse_noresize (htab_t htab, htab_trav callback, PTR info)
++htab_traverse_noresize (htab_t htab, htab_trav callback, void *info)
+ {
+-  PTR *slot;
+-  PTR *limit;
++  void **slot;
++  void **limit;
+   
+   slot = htab->entries;
+   limit = slot + htab_size (htab);
+ 
+   do
+     {
+-      PTR x = *slot;
++      void *x = *slot;
+ 
+       if (x != HTAB_EMPTY_ENTRY && x != HTAB_DELETED_ENTRY)
+ 	if (!(*callback) (slot, info))
+@@ -782,7 +782,7 @@ htab_traverse_noresize (htab_t htab, htab_trav callback, PTR info)
+    too empty to improve effectivity of subsequent calls.  */
+ 
+ void
+-htab_traverse (htab_t htab, htab_trav callback, PTR info)
++htab_traverse (htab_t htab, htab_trav callback, void *info)
+ {
+   size_t size = htab_size (htab);
+   if (htab_elements (htab) * 8 < size && size > 32)
+@@ -829,7 +829,7 @@ htab_collisions (htab_t htab)
+    function they just started using for Perl's hashes.  */
+ 
+ hashval_t
+-htab_hash_string (const PTR p)
++htab_hash_string (const void *p)
+ {
+   const unsigned char *str = (const unsigned char *) p;
+   hashval_t r = 0;
+@@ -926,7 +926,7 @@ acceptable.  Do NOT use for cryptographic purposes.
+ */
+ 
+ hashval_t
+-iterative_hash (const PTR k_in /* the key */,
++iterative_hash (const void *k_in /* the key */,
+                 register size_t  length /* the length of the key */,
+                 register hashval_t initval /* the previous hash, or
+                                               an arbitrary value */)
+@@ -990,7 +990,7 @@ iterative_hash (const PTR k_in /* the key */,
+ /* Returns a hash code for pointer P. Simplified version of evahash */
+ 
+ static hashval_t
+-hash_pointer (const PTR p)
++hash_pointer (const void *p)
+ {
+   intptr_t v = (intptr_t) p;
+   unsigned a, b, c;
+diff --git a/libiberty/memchr.c b/libiberty/memchr.c
+index 7448ab9e71c3..7551b140b59e 100644
+--- a/libiberty/memchr.c
++++ b/libiberty/memchr.c
+@@ -18,15 +18,15 @@ returned.
+ #include <ansidecl.h>
+ #include <stddef.h>
+ 
+-PTR
+-memchr (register const PTR src_void, int c, size_t length)
++void *
++memchr (register const void *src_void, int c, size_t length)
+ {
+   const unsigned char *src = (const unsigned char *)src_void;
+   
+   while (length-- > 0)
+   {
+     if (*src == c)
+-     return (PTR)src;
++     return (void *)src;
+     src++;
+   }
+   return NULL;
+diff --git a/libiberty/memcmp.c b/libiberty/memcmp.c
+index 37db60f38267..5b1af020e6cc 100644
+--- a/libiberty/memcmp.c
++++ b/libiberty/memcmp.c
+@@ -20,7 +20,7 @@ as if comparing unsigned char arrays.
+ #include <stddef.h>
+ 
+ int
+-memcmp (const PTR str1, const PTR str2, size_t count)
++memcmp (const void *str1, const void *str2, size_t count)
+ {
+   register const unsigned char *s1 = (const unsigned char*)str1;
+   register const unsigned char *s2 = (const unsigned char*)str2;
+diff --git a/libiberty/memcpy.c b/libiberty/memcpy.c
+index 7f67d0bd1f26..c627fa4ee9ea 100644
+--- a/libiberty/memcpy.c
++++ b/libiberty/memcpy.c
+@@ -18,8 +18,8 @@ Copies @var{length} bytes from memory region @var{in} to region
+ 
+ void bcopy (const void*, void*, size_t);
+ 
+-PTR
+-memcpy (PTR out, const PTR in, size_t length)
++void *
++memcpy (void *out, const void *in, size_t length)
+ {
+     bcopy(in, out, length);
+     return out;
+diff --git a/libiberty/memmove.c b/libiberty/memmove.c
+index ebda7cbb41ca..8c92d6b9c210 100644
+--- a/libiberty/memmove.c
++++ b/libiberty/memmove.c
+@@ -18,8 +18,8 @@ Copies @var{count} bytes from memory area @var{from} to memory area
+ 
+ void bcopy (const void*, void*, size_t);
+ 
+-PTR
+-memmove (PTR s1, const PTR s2, size_t n)
++void *
++memmove (void *s1, const void *s2, size_t n)
+ {
+   bcopy (s2, s1, n);
+   return s1;
+diff --git a/libiberty/mempcpy.c b/libiberty/mempcpy.c
+index 34d9b2f4297c..94f0872d8d05 100644
+--- a/libiberty/mempcpy.c
++++ b/libiberty/mempcpy.c
+@@ -33,10 +33,10 @@ Copies @var{length} bytes from memory region @var{in} to region
+ #include <ansidecl.h>
+ #include <stddef.h>
+ 
+-extern PTR memcpy (PTR, const PTR, size_t);
++extern void *memcpy (void *, const void *, size_t);
+ 
+-PTR
+-mempcpy (PTR dst, const PTR src, size_t len)
++void *
++mempcpy (void *dst, const void *src, size_t len)
+ {
+   return (char *) memcpy (dst, src, len) + len;
+ }
+diff --git a/libiberty/memset.c b/libiberty/memset.c
+index 476668961271..084e5dc01584 100644
+--- a/libiberty/memset.c
++++ b/libiberty/memset.c
+@@ -16,8 +16,8 @@ Sets the first @var{count} bytes of @var{s} to the constant byte
+ #include <ansidecl.h>
+ #include <stddef.h>
+ 
+-PTR
+-memset (PTR dest, register int val, register size_t len)
++void *
++memset (void *dest, register int val, register size_t len)
+ {
+   register unsigned char *ptr = (unsigned char*)dest;
+   while (len-- > 0)
+diff --git a/libiberty/objalloc.c b/libiberty/objalloc.c
+index cf5de1fcb2da..3f8c5f7ab278 100644
+--- a/libiberty/objalloc.c
++++ b/libiberty/objalloc.c
+@@ -37,8 +37,8 @@ Boston, MA 02110-1301, USA.  */
+ #include <stdlib.h>
+ #else
+ /* For systems with larger pointers than ints, this must be declared.  */
+-extern PTR malloc (size_t);
+-extern void free (PTR);
++extern void *malloc (size_t);
++extern void free (void *);
+ #endif
+ 
+ #endif
+@@ -92,7 +92,7 @@ objalloc_create (void)
+   if (ret == NULL)
+     return NULL;
+ 
+-  ret->chunks = (PTR) malloc (CHUNK_SIZE);
++  ret->chunks = (void *) malloc (CHUNK_SIZE);
+   if (ret->chunks == NULL)
+     {
+       free (ret);
+@@ -111,7 +111,7 @@ objalloc_create (void)
+ 
+ /* Allocate space from an objalloc structure.  */
+ 
+-PTR
++void *
+ _objalloc_alloc (struct objalloc *o, unsigned long original_len)
+ {
+   unsigned long len = original_len;
+@@ -132,7 +132,7 @@ _objalloc_alloc (struct objalloc *o, unsigned long original_len)
+     {
+       o->current_ptr += len;
+       o->current_space -= len;
+-      return (PTR) (o->current_ptr - len);
++      return (void *) (o->current_ptr - len);
+     }
+ 
+   if (len >= BIG_REQUEST)
+@@ -148,9 +148,9 @@ _objalloc_alloc (struct objalloc *o, unsigned long original_len)
+       chunk->next = (struct objalloc_chunk *) o->chunks;
+       chunk->current_ptr = o->current_ptr;
+ 
+-      o->chunks = (PTR) chunk;
++      o->chunks = (void *) chunk;
+ 
+-      return (PTR) (ret + CHUNK_HEADER_SIZE);
++      return (void *) (ret + CHUNK_HEADER_SIZE);
+     }
+   else
+     {
+@@ -165,7 +165,7 @@ _objalloc_alloc (struct objalloc *o, unsigned long original_len)
+       o->current_ptr = (char *) chunk + CHUNK_HEADER_SIZE;
+       o->current_space = CHUNK_SIZE - CHUNK_HEADER_SIZE;
+ 
+-      o->chunks = (PTR) chunk;
++      o->chunks = (void *) chunk;
+ 
+       return objalloc_alloc (o, len);
+     }
+@@ -195,7 +195,7 @@ objalloc_free (struct objalloc *o)
+    recently allocated blocks.  */
+ 
+ void
+-objalloc_free_block (struct objalloc *o, PTR block)
++objalloc_free_block (struct objalloc *o, void *block)
+ {
+   struct objalloc_chunk *p, *small;
+   char *b = (char *) block;
+@@ -257,7 +257,7 @@ objalloc_free_block (struct objalloc *o, PTR block)
+ 
+       if (first == NULL)
+ 	first = p;
+-      o->chunks = (PTR) first;
++      o->chunks = (void *) first;
+ 
+       /* Now start allocating from this small block again.  */
+       o->current_ptr = b;
+@@ -287,7 +287,7 @@ objalloc_free_block (struct objalloc *o, PTR block)
+ 	  q = next;
+ 	}
+ 
+-      o->chunks = (PTR) p;
++      o->chunks = (void *) p;
+ 
+       while (p->current_ptr != NULL)
+ 	p = p->next;
+diff --git a/libiberty/random.c b/libiberty/random.c
+index b1d3c6c6ae44..be8819dd6b8b 100644
+--- a/libiberty/random.c
++++ b/libiberty/random.c
+@@ -68,12 +68,12 @@ control over the state of the random number generator.
+ #define	LONG_MAX   ((long)(ULONG_MAX >> 1))   /* 0x7FFFFFFF for 32-bits*/
+ 
+ #ifdef __STDC__
+-#  define PTR void *
++#  define void *void *
+ #  ifndef NULL
+ #    define NULL (void *) 0
+ #  endif
+ #else
+-#  define PTR char *
++#  define void *char *
+ #  ifndef NULL
+ #    define NULL (void *) 0
+ #  endif
+@@ -254,10 +254,10 @@ srandom (unsigned int x)
+    Note: The first thing we do is save the current state, if any, just like
+    setstate so that it doesn't matter when initstate is called.
+    Returns a pointer to the old state.  */
+-PTR
+-initstate (unsigned int seed, PTR arg_state, unsigned long n)
++void *
++initstate (unsigned int seed, void *arg_state, unsigned long n)
+ {
+-  PTR ostate = (PTR) &state[-1];
++  void *ostate = (void *) &state[-1];
+ 
+   if (rand_type == TYPE_0)
+     state[-1] = rand_type;
+@@ -320,13 +320,13 @@ initstate (unsigned int seed, PTR arg_state, unsigned long n)
+    same state as the current state
+    Returns a pointer to the old state information.  */
+ 
+-PTR
+-setstate (PTR arg_state)
++void *
++setstate (void *arg_state)
+ {
+   register long int *new_state = (long int *) arg_state;
+   register int type = new_state[0] % MAX_TYPES;
+   register int rear = new_state[0] / MAX_TYPES;
+-  PTR ostate = (PTR) &state[-1];
++  void *ostate = (void *) &state[-1];
+ 
+   if (rand_type == TYPE_0)
+     state[-1] = rand_type;
+diff --git a/libiberty/regex.c b/libiberty/regex.c
+index 84af5276ae81..c1738c989aba 100644
+--- a/libiberty/regex.c
++++ b/libiberty/regex.c
+@@ -384,8 +384,8 @@ typedef unsigned long int uintptr_t;
+ # endif /* not using relocating allocator */
+ 
+ 
+-/* True if `size1' is non-NULL and PTR is pointing anywhere inside
+-   `string1' or just past its end.  This works if PTR is NULL, which is
++/* True if `size1' is non-NULL and void *is pointing anywhere inside
++   `string1' or just past its end.  This works if void *is NULL, which is
+    a good thing.  */
+ # define FIRST_STRING_P(ptr) 					\
+   (size1 && string1 <= (ptr) && (ptr) <= string1 + size1)
+@@ -5256,7 +5256,7 @@ PREFIX(re_search_2) (struct re_pattern_buffer *bufp, const char *string1,
+ }
+ 
+ #ifdef WCHAR
+-/* This converts PTR, a pointer into one of the search wchar_t strings
++/* This converts void *, a pointer into one of the search wchar_t strings
+    `string1' and `string2' into an multibyte string offset from the
+    beginning of that string. We use mbs_offset to optimize.
+    See convert_mbs_to_wcs.  */
+@@ -5266,7 +5266,7 @@ PREFIX(re_search_2) (struct re_pattern_buffer *bufp, const char *string1,
+    : ((regoff_t)((mbs_offset2 != NULL? mbs_offset2[(ptr)-string2] : 0)	\
+ 		 + csize1)))
+ #else /* BYTE */
+-/* This converts PTR, a pointer into one of the search strings `string1'
++/* This converts void *, a pointer into one of the search strings `string1'
+    and `string2' into an offset from the beginning of that string.  */
+ # define POINTER_TO_OFFSET(ptr)			\
+   (FIRST_STRING_P (ptr)				\
+diff --git a/libiberty/spaces.c b/libiberty/spaces.c
+index 50d15882ee61..2b6971c4b933 100644
+--- a/libiberty/spaces.c
++++ b/libiberty/spaces.c
+@@ -40,8 +40,8 @@ valid until at least the next call.
+ #include <unixlib.h>
+ #else
+ /* For systems with larger pointers than ints, these must be declared.  */
+-extern PTR malloc (size_t);
+-extern void free (PTR);
++extern void *malloc (size_t);
++extern void free (void *);
+ #endif
+ 
+ const char *
+diff --git a/libiberty/stpcpy.c b/libiberty/stpcpy.c
+index 880e4fca7c7d..2d3eb4c71cda 100644
+--- a/libiberty/stpcpy.c
++++ b/libiberty/stpcpy.c
+@@ -33,7 +33,7 @@ Copies the string @var{src} into @var{dst}.  Returns a pointer to
+ #include <stddef.h>
+ 
+ extern size_t strlen (const char *);
+-extern PTR memcpy (PTR, const PTR, size_t);
++extern void *memcpy (void *, const void *, size_t);
+ 
+ char *
+ stpcpy (char *dst, const char *src)
+diff --git a/libiberty/strdup.c b/libiberty/strdup.c
+index 78c2093b61a3..8a4188eadfbc 100644
+--- a/libiberty/strdup.c
++++ b/libiberty/strdup.c
+@@ -13,8 +13,8 @@ Returns a pointer to a copy of @var{s} in memory obtained from
+ #include <stddef.h>
+ 
+ extern size_t	strlen (const char*);
+-extern PTR	malloc (size_t);
+-extern PTR	memcpy (PTR, const PTR, size_t);
++extern void *malloc (size_t);
++extern void *memcpy (void *, const void *, size_t);
+ 
+ char *
+ strdup(const char *s)
+diff --git a/libiberty/strerror.c b/libiberty/strerror.c
+index cc7692c1d695..07db71698d9e 100644
+--- a/libiberty/strerror.c
++++ b/libiberty/strerror.c
+@@ -30,13 +30,13 @@
+ #ifdef HAVE_STDLIB_H
+ #include <stdlib.h>
+ #else
+-extern PTR malloc ();
++extern void *malloc ();
+ #endif
+ 
+ #ifdef HAVE_STRING_H
+ #include <string.h>
+ #else
+-extern PTR memset ();
++extern void *memset ();
+ #endif
+ 
+ #ifndef MAX
+diff --git a/libiberty/strndup.c b/libiberty/strndup.c
+index 5992ee9cfa13..cfbb381ad0d9 100644
+--- a/libiberty/strndup.c
++++ b/libiberty/strndup.c
+@@ -34,8 +34,8 @@ memory was available.  The result is always NUL terminated.
+ #include <stddef.h>
+ 
+ extern size_t	strnlen (const char *s, size_t maxlen);
+-extern PTR	malloc (size_t);
+-extern PTR	memcpy (PTR, const PTR, size_t);
++extern void *malloc (size_t);
++extern void *memcpy (void *, const void *, size_t);
+ 
+ char *
+ strndup (const char *s, size_t n)
+diff --git a/libiberty/strsignal.c b/libiberty/strsignal.c
+index 666b1b4f15e5..36b41f17e123 100644
+--- a/libiberty/strsignal.c
++++ b/libiberty/strsignal.c
+@@ -26,13 +26,13 @@
+ #ifdef HAVE_STDLIB_H
+ #include <stdlib.h>
+ #else
+-extern PTR malloc ();
++extern void *malloc ();
+ #endif
+ 
+ #ifdef HAVE_STRING_H
+ #include <string.h>
+ #else
+-extern PTR memset ();
++extern void *memset ();
+ #endif
+ 
+ /* Undefine the macro we used to hide the definition of sys_siglist
+diff --git a/libiberty/vasprintf.c b/libiberty/vasprintf.c
+index e2717d83f378..c8c0152865b2 100644
+--- a/libiberty/vasprintf.c
++++ b/libiberty/vasprintf.c
+@@ -33,7 +33,7 @@ Floor, Boston, MA 02110-1301, USA.  */
+ #ifdef HAVE_STDLIB_H
+ #include <stdlib.h>
+ #else
+-extern PTR malloc ();
++extern void *malloc ();
+ #endif
+ #include "libiberty.h"
+ #include "vprintf-support.h"
+diff --git a/libiberty/vprintf-support.c b/libiberty/vprintf-support.c
+index 231e584bbc12..92aedce1edd0 100644
+--- a/libiberty/vprintf-support.c
++++ b/libiberty/vprintf-support.c
+@@ -49,7 +49,7 @@ libiberty_vprintf_buffer_size (const char *format, va_list args)
+ #ifdef va_copy
+   va_copy (ap, args);
+ #else
+-  memcpy ((PTR) &ap, (PTR) &args, sizeof (va_list));
++  memcpy ((void *) &ap, (void *) &args, sizeof (va_list));
+ #endif
+ 
+   while (*p != '\0')
+diff --git a/libiberty/xatexit.c b/libiberty/xatexit.c
+index 6fdad9ed806a..8a985cab4bc7 100644
+--- a/libiberty/xatexit.c
++++ b/libiberty/xatexit.c
+@@ -37,7 +37,7 @@ failure.  If you use @code{xatexit} to register functions, you must use
+ #include <unixlib.h>
+ #else
+ /* For systems with larger pointers than ints, this must be declared.  */
+-PTR malloc (size_t);
++void *malloc (size_t);
+ #endif
+ 
+ static void xatexit_cleanup (void);
+diff --git a/libiberty/xmalloc.c b/libiberty/xmalloc.c
+index e7d52683d350..3cc4cea37c35 100644
+--- a/libiberty/xmalloc.c
++++ b/libiberty/xmalloc.c
+@@ -139,10 +139,10 @@ xmalloc_failed (size_t size)
+   xexit (1);
+ }  
+ 
+-PTR
++void *
+ xmalloc (size_t size)
+ {
+-  PTR newmem;
++  void *newmem;
+ 
+   if (size == 0)
+     size = 1;
+@@ -153,10 +153,10 @@ xmalloc (size_t size)
+   return (newmem);
+ }
+ 
+-PTR
++void *
+ xcalloc (size_t nelem, size_t elsize)
+ {
+-  PTR newmem;
++  void *newmem;
+ 
+   if (nelem == 0 || elsize == 0)
+     nelem = elsize = 1;
+@@ -168,10 +168,10 @@ xcalloc (size_t nelem, size_t elsize)
+   return (newmem);
+ }
+ 
+-PTR
+-xrealloc (PTR oldmem, size_t size)
++void *
++xrealloc (void *oldmem, size_t size)
+ {
+-  PTR newmem;
++  void *newmem;
+ 
+   if (size == 0)
+     size = 1;
+diff --git a/libiberty/xmemdup.c b/libiberty/xmemdup.c
+index 4602afd7d9f6..f2ed41f9b4d9 100644
+--- a/libiberty/xmemdup.c
++++ b/libiberty/xmemdup.c
+@@ -31,11 +31,11 @@ allocated, the remaining memory is zeroed.
+ # endif
+ #endif
+ 
+-PTR
+-xmemdup (const PTR input, size_t copy_size, size_t alloc_size)
++void *
++xmemdup (const void *input, size_t copy_size, size_t alloc_size)
+ {
+-  PTR output = xmalloc (alloc_size);
++  void *output = xmalloc (alloc_size);
+   if (alloc_size > copy_size)
+     memset ((char *) output + copy_size, 0, alloc_size - copy_size);
+-  return (PTR) memcpy (output, input, copy_size);
++  return (void *) memcpy (output, input, copy_size);
+ }
+
+From 137da38377eb4ff53a71b199802a22d28c12d077 Mon Sep 17 00:00:00 2001
+From: Martin Liska <mliska@suse.cz>
+Date: Tue, 10 May 2022 09:47:08 +0200
+Subject: [PATCH 2/5] Remove non-ANSI C macros in ansidecl.h.
+
+include/ChangeLog:
+
+	* ansidecl.h (PTR): Remove.
+	(const): Likewise.
+	(volatile): Likewise.
+	(signed): Likewise.
+---
+ include/ansidecl.h | 28 ++--------------------------
+ 1 file changed, 2 insertions(+), 26 deletions(-)
+
+--- a/include/ansidecl.h
++++ b/include/ansidecl.h
+@@ -1,5 +1,5 @@
+-/* ANSI and traditional C compatability macros
+-   Copyright (C) 1991-2019 Free Software Foundation, Inc.
++/* Compiler compatibility macros
++   Copyright (C) 1991-2022 Free Software Foundation, Inc.
+    This file is part of the GNU C Library.
+ 
+ This program is free software; you can redistribute it and/or modify
+@@ -16,18 +16,7 @@
+ along with this program; if not, write to the Free Software
+ Foundation, Inc., 51 Franklin Street - Fifth Floor, Boston, MA 02110-1301, USA.  */
+ 
+-/* ANSI and traditional C compatibility macros
+-
+-   ANSI C is assumed if __STDC__ is #defined.
+-
+-   Macro		ANSI C definition	Traditional C definition
+-   -----		---- - ----------	----------- - ----------
+-   PTR			`void *'		`char *'
+-   const		not defined		`'
+-   volatile		not defined		`'
+-   signed		not defined		`'
+-
+-   For ease of writing code which uses GCC extensions but needs to be
++/* For ease of writing code which uses GCC extensions but needs to be
+    portable to other compilers, we provide the GCC_VERSION macro that
+    simplifies testing __GNUC__ and __GNUC_MINOR__ together, and various
+    wrappers around __attribute__.  Also, __extension__ will be #defined
+@@ -62,20 +51,6 @@
+ #define GCC_VERSION (__GNUC__ * 1000 + __GNUC_MINOR__)
+ #endif /* GCC_VERSION */
+ 
+-#if defined (__STDC__) || defined(__cplusplus) || defined (_AIX) || (defined (__mips) && defined (_SYSTYPE_SVR4)) || defined(_WIN32)
+-/* All known AIX compilers implement these things (but don't always
+-   define __STDC__).  The RISC/OS MIPS compiler defines these things
+-   in SVR4 mode, but does not define __STDC__.  */
+-/* eraxxon@alumni.rice.edu: The Compaq C++ compiler, unlike many other
+-   C++ compilers, does not define __STDC__, though it acts as if this
+-   was so. (Verified versions: 5.7, 6.2, 6.3, 6.5) */
+-
+-#define PTR		void *
+-
+-#undef const
+-#undef volatile
+-#undef signed
+-
+ /* inline requires special treatment; it's in C99, and GCC >=2.7 supports
+    it too, but it's not in C89.  */
+ #undef inline
+@@ -89,21 +64,6 @@
+ # endif
+ #endif
+ 
+-#else	/* Not ANSI C.  */
+-
+-#define PTR		char *
+-
+-/* some systems define these in header files for non-ansi mode */
+-#undef const
+-#undef volatile
+-#undef signed
+-#undef inline
+-#define const
+-#define volatile
+-#define signed
+-#define inline
+-
+-#endif	/* ANSI C.  */
+ 
+ /* Define macros for some gcc attributes.  This permits us to use the
+    macros freely, and know that they will come into play for the
+
+From 9cb69e7884f829ff2d09444730ef268e0e31d560 Mon Sep 17 00:00:00 2001
+From: Martin Liska <mliska@suse.cz>
+Date: Tue, 10 May 2022 17:00:34 +0200
+Subject: [PATCH 3/5] libiberty: fix bad replacement.
+
+libiberty/ChangeLog:
+
+	* random.c: Remove 'define PTR'.
+---
+ libiberty/random.c | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/libiberty/random.c b/libiberty/random.c
+index be8819dd6b8b..cd0b7399e731 100644
+--- a/libiberty/random.c
++++ b/libiberty/random.c
+@@ -68,12 +68,10 @@ control over the state of the random number generator.
+ #define	LONG_MAX   ((long)(ULONG_MAX >> 1))   /* 0x7FFFFFFF for 32-bits*/
+ 
+ #ifdef __STDC__
+-#  define void *void *
+ #  ifndef NULL
+ #    define NULL (void *) 0
+ #  endif
+ #else
+-#  define void *char *
+ #  ifndef NULL
+ #    define NULL (void *) 0
+ #  endif
+
+From 5dac43b43c3999f94b451cd7925e24d8e7c38a7a Mon Sep 17 00:00:00 2001
+From: Martin Liska <mliska@suse.cz>
+Date: Tue, 10 May 2022 17:31:24 +0200
+Subject: [PATCH 4/5] libiberty: fix type in allocation
+
+The allocation function alloc_f is called for nsize
+items where each is of type void *.
+
+libiberty/ChangeLog:
+
+	* hashtab.c (htab_empty): Use void * type instead of void **.
+	(htab_expand): Likewise.
+
+Co-Authored-By: Alan Modra <amodra@gmail.com>
+---
+ libiberty/hashtab.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/libiberty/hashtab.c b/libiberty/hashtab.c
+index f7621cd47e55..470d3e66c32b 100644
+--- a/libiberty/hashtab.c
++++ b/libiberty/hashtab.c
+@@ -458,9 +458,9 @@ htab_empty (htab_t htab)
+ 	(*htab->free_with_arg_f) (htab->alloc_arg, htab->entries);
+       if (htab->alloc_with_arg_f != NULL)
+ 	htab->entries = (void **) (*htab->alloc_with_arg_f) (htab->alloc_arg, nsize,
+-						           sizeof (void **));
++							     sizeof (void *));
+       else
+-	htab->entries = (void **) (*htab->alloc_f) (nsize, sizeof (void **));
++	htab->entries = (void **) (*htab->alloc_f) (nsize, sizeof (void *));
+      htab->size = nsize;
+      htab->size_prime_index = nindex;
+     }
+@@ -544,9 +544,9 @@ htab_expand (htab_t htab)
+ 
+   if (htab->alloc_with_arg_f != NULL)
+     nentries = (void **) (*htab->alloc_with_arg_f) (htab->alloc_arg, nsize,
+-						  sizeof (void **));
++						    sizeof (void *));
+   else
+-    nentries = (void **) (*htab->alloc_f) (nsize, sizeof (void **));
++    nentries = (void **) (*htab->alloc_f) (nsize, sizeof (void *));
+   if (nentries == NULL)
+     return 0;
+   htab->entries = nentries;
+
+From 098f02aa154b308111cc1f520a577f5bb5f08377 Mon Sep 17 00:00:00 2001
+From: Martin Liska <mliska@suse.cz>
+Date: Tue, 10 May 2022 17:36:28 +0200
+Subject: [PATCH 5/5] libiberty: fix wrong replacent in comments
+
+libiberty/ChangeLog:
+
+	* regex.c: Restore comments.
+---
+ libiberty/regex.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/libiberty/regex.c b/libiberty/regex.c
+index c1738c989aba..84af5276ae81 100644
+--- a/libiberty/regex.c
++++ b/libiberty/regex.c
+@@ -384,8 +384,8 @@ typedef unsigned long int uintptr_t;
+ # endif /* not using relocating allocator */
+ 
+ 
+-/* True if `size1' is non-NULL and void *is pointing anywhere inside
+-   `string1' or just past its end.  This works if void *is NULL, which is
++/* True if `size1' is non-NULL and PTR is pointing anywhere inside
++   `string1' or just past its end.  This works if PTR is NULL, which is
+    a good thing.  */
+ # define FIRST_STRING_P(ptr) 					\
+   (size1 && string1 <= (ptr) && (ptr) <= string1 + size1)
+@@ -5256,7 +5256,7 @@ PREFIX(re_search_2) (struct re_pattern_buffer *bufp, const char *string1,
+ }
+ 
+ #ifdef WCHAR
+-/* This converts void *, a pointer into one of the search wchar_t strings
++/* This converts PTR, a pointer into one of the search wchar_t strings
+    `string1' and `string2' into an multibyte string offset from the
+    beginning of that string. We use mbs_offset to optimize.
+    See convert_mbs_to_wcs.  */
+@@ -5266,7 +5266,7 @@ PREFIX(re_search_2) (struct re_pattern_buffer *bufp, const char *string1,
+    : ((regoff_t)((mbs_offset2 != NULL? mbs_offset2[(ptr)-string2] : 0)	\
+ 		 + csize1)))
+ #else /* BYTE */
+-/* This converts void *, a pointer into one of the search strings `string1'
++/* This converts PTR, a pointer into one of the search strings `string1'
+    and `string2' into an offset from the beginning of that string.  */
+ # define POINTER_TO_OFFSET(ptr)			\
+   (FIRST_STRING_P (ptr)				\
+
+From 4b86508194463b601000bfa779bce0834247c66c Mon Sep 17 00:00:00 2001
+From: Martin Liska <mliska@suse.cz>
+Date: Tue, 10 May 2022 09:45:16 +0200
+Subject: [PATCH] Replace PTR with 'void *' in compiler.
+
+gcc/ada/ChangeLog:
+
+	* gcc-interface/decl.c (compare_field_bitpos): Use void *
+	instead PTR.
+	* gcc-interface/utils2.c (compare_elmt_bitpos): Likewise.
+
+gcc/ChangeLog:
+
+	* basic-block.h (struct basic_block_d): Use void *
+	instead PTR.
+	* cfgloop.h: Likewise.
+	* cgraph.h: Likewise.
+	* gengtype-state.c (state_ident_by_name): Likewise.
+	(record_type): Likewise.
+	(read_state_already_seen_type): Likewise.
+	* gengtype.c (dump_type): Likewise.
+	(input_file_by_name): Likewise.
+	(main): Likewise.
+	* ggc-common.c (ggc_cleared_alloc_ptr_array_two_args): Likewise.
+	* ipa-utils.h (struct ipa_dfs_info): Likewise.
+	* plugin.c (htab_hash_plugin): Likewise.
+---
+ gcc/ada/gcc-interface/decl.c   | 4 ++--
+ gcc/ada/gcc-interface/utils2.c | 2 +-
+ gcc/basic-block.h               | 4 ++--
+ gcc/cfgloop.h                   | 2 +-
+ gcc/cgraph.h                    | 4 ++--
+ gcc/gengtype-state.c           | 6 +++---
+ gcc/gengtype.c                 | 6 +++---
+ gcc/ggc-common.c               | 4 ++--
+ gcc/ipa-utils.h                 | 2 +-
+ gcc/plugin.c                   | 2 +-
+ 10 files changed, 18 insertions(+), 18 deletions(-)
+
+diff --git a/gcc/ada/gcc-interface/decl.c b/gcc/ada/gcc-interface/decl.c
+index 1c7a716840eb..d52c4fb36233 100644
+--- a/gcc/ada/gcc-interface/decl.c
++++ b/gcc/ada/gcc-interface/decl.c
+@@ -224,7 +224,7 @@ static bool constructor_address_p (tree);
+ static bool allocatable_size_p (tree, bool);
+ static bool initial_value_needs_conversion (tree, tree);
+ static tree update_n_elem (tree, tree, tree);
+-static int compare_field_bitpos (const PTR, const PTR);
++static int compare_field_bitpos (const void *, const void *);
+ static bool components_to_record (Node_Id, Entity_Id, tree, tree, int, bool,
+ 				  bool, bool, bool, bool, bool, bool, tree,
+ 				  tree *);
+@@ -7712,7 +7712,7 @@ field_has_variable_size (tree field)
+ /* qsort comparer for the bit positions of two record components.  */
+ 
+ static int
+-compare_field_bitpos (const PTR rt1, const PTR rt2)
++compare_field_bitpos (const void *rt1, const void *rt2)
+ {
+   const_tree const field1 = * (const_tree const *) rt1;
+   const_tree const field2 = * (const_tree const *) rt2;
+diff --git a/gcc/ada/gcc-interface/utils2.c b/gcc/ada/gcc-interface/utils2.c
+index e5cd85662b92..76622da80810 100644
+--- a/gcc/ada/gcc-interface/utils2.c
++++ b/gcc/ada/gcc-interface/utils2.c
+@@ -1936,7 +1936,7 @@ build_call_raise_range (int msg, Node_Id gnat_node, char kind,
+    for record components.  */
+ 
+ static int
+-compare_elmt_bitpos (const PTR rt1, const PTR rt2)
++compare_elmt_bitpos (const void *rt1, const void *rt2)
+ {
+   const constructor_elt * const elmt1 = (const constructor_elt *) rt1;
+   const constructor_elt * const elmt2 = (const constructor_elt *) rt2;
+diff --git a/gcc/basic-block.h b/gcc/basic-block.h
+index 21a9b24dbf9e..c9d1fc91bbbc 100644
+--- a/gcc/basic-block.h
++++ b/gcc/basic-block.h
+@@ -36,7 +36,7 @@ class GTY((user)) edge_def {
+   } insns;
+ 
+   /* Auxiliary info specific to a pass.  */
+-  PTR aux;
++  void *aux;
+ 
+   /* Location of any goto implicit in the edge.  */
+   location_t goto_locus;
+@@ -120,7 +120,7 @@ struct GTY((chain_next ("%h.next_bb"), chain_prev ("%h.prev_bb"))) basic_block_d
+   vec<edge, va_gc> *succs;
+ 
+   /* Auxiliary info specific to a pass.  */
+-  PTR GTY ((skip (""))) aux;
++  void *GTY ((skip (""))) aux;
+ 
+   /* Innermost loop containing the block.  */
+   class loop *loop_father;
+diff --git a/gcc/cfgloop.h b/gcc/cfgloop.h
+index d2714e20cb0b..528b1219bc37 100644
+--- a/gcc/cfgloop.h
++++ b/gcc/cfgloop.h
+@@ -148,7 +148,7 @@ class GTY ((chain_next ("%h.next"))) loop {
+   class loop *next;
+ 
+   /* Auxiliary info specific to a pass.  */
+-  PTR GTY ((skip (""))) aux;
++  void *GTY ((skip (""))) aux;
+ 
+   /* The number of times the latch of the loop is executed.  This can be an
+      INTEGER_CST, or a symbolic expression representing the number of
+diff --git a/gcc/cgraph.h b/gcc/cgraph.h
+index 8c512b648ee5..4be67e3cea90 100644
+--- a/gcc/cgraph.h
++++ b/gcc/cgraph.h
+@@ -628,7 +628,7 @@ struct GTY((desc ("%h.type"), tag ("SYMTAB_SYMBOL"),
+   /* File stream where this node is being written to.  */
+   struct lto_file_decl_data * lto_file_data;
+ 
+-  PTR GTY ((skip)) aux;
++  void *GTY ((skip)) aux;
+ 
+   /* Comdat group the symbol is in.  Can be private if GGC allowed that.  */
+   tree x_comdat_group;
+@@ -1895,7 +1895,7 @@ class GTY((chain_next ("%h.next_caller"), chain_prev ("%h.prev_caller"),
+   /* Additional information about an indirect call.  Not cleared when an edge
+      becomes direct.  */
+   cgraph_indirect_call_info *indirect_info;
+-  PTR GTY ((skip (""))) aux;
++  void *GTY ((skip (""))) aux;
+   /* When equal to CIF_OK, inline this call.  Otherwise, points to the
+      explanation why function was not inlined.  */
+   enum cgraph_inline_failed_t inline_failed;
+diff --git a/gcc/gengtype-state.c b/gcc/gengtype-state.c
+index dfd9ea52785f..2c7f642cd3d4 100644
+--- a/gcc/gengtype-state.c
++++ b/gcc/gengtype-state.c
+@@ -313,7 +313,7 @@ fatal_reading_state (struct state_token_st* tok, const char*msg)
+ static struct state_ident_st *
+ state_ident_by_name (const char *name, enum insert_option optins)
+ {
+-  PTR *slot = NULL;
++  void **slot = NULL;
+   int namlen = 0;
+   struct state_ident_st *stid = NULL;
+ 
+@@ -1435,7 +1435,7 @@ static void read_state_common_type_content (type_p current);
+ static void
+ record_type (type_p type)
+ {
+-  PTR *slot;
++  void **slot;
+ 
+   slot = htab_find_slot (state_seen_types, type, INSERT);
+   gcc_assert (slot);
+@@ -1451,7 +1451,7 @@ read_state_already_seen_type (type_p *type)
+ 
+   if (state_token_kind (t0) == STOK_INTEGER)
+     {
+-      PTR *slot = NULL;
++      void **slot = NULL;
+       struct type loctype = { TYPE_SCALAR, 0, 0, 0, GC_UNUSED, {0} };
+ 
+       loctype.state_number = t0->stok_un.stok_num;
+diff --git a/gcc/gengtype.c b/gcc/gengtype.c
+index 793ebd709069..e11da9e46d0c 100644
+--- a/gcc/gengtype.c
++++ b/gcc/gengtype.c
+@@ -4869,7 +4869,7 @@ static htab_t seen_types;
+ static void
+ dump_type (int indent, type_p t)
+ {
+-  PTR *slot;
++  void **slot;
+ 
+   printf ("%*cType at %p: ", indent, ' ', (void *) t);
+   if (t->kind == TYPE_UNDEFINED)
+@@ -5118,7 +5118,7 @@ static htab_t input_file_htab;
+ input_file*
+ input_file_by_name (const char* name)
+ {
+-  PTR* slot;
++  void ** slot;
+   input_file* f = NULL;
+   int namlen = 0;
+   if (!name)
+@@ -5227,7 +5227,7 @@ main (int argc, char **argv)
+       POS_HERE (do_scalar_typedef ("machine_mode", &pos));
+       POS_HERE (do_scalar_typedef ("fixed_size_mode", &pos));
+       POS_HERE (do_scalar_typedef ("CONSTEXPR", &pos));
+-      POS_HERE (do_typedef ("PTR", 
++      POS_HERE (do_typedef ("void *",
+ 			    create_pointer (resolve_typedef ("void", &pos)),
+ 			    &pos));
+ #undef POS_HERE
+diff --git a/gcc/ggc-common.c b/gcc/ggc-common.c
+index 9d737d079aac..8b3389e8760e 100644
+--- a/gcc/ggc-common.c
++++ b/gcc/ggc-common.c
+@@ -175,8 +175,8 @@ ggc_cleared_alloc_htab_ignore_args (size_t c ATTRIBUTE_UNUSED,
+ void *
+ ggc_cleared_alloc_ptr_array_two_args (size_t c, size_t n)
+ {
+-  gcc_assert (sizeof (PTR *) == n);
+-  return ggc_cleared_vec_alloc<PTR *> (c);
++  gcc_assert (sizeof (void **) == n);
++  return ggc_cleared_vec_alloc<void **> (c);
+ }
+ 
+ /* These are for splay_tree_new_ggc.  */
+diff --git a/gcc/ipa-utils.h b/gcc/ipa-utils.h
+index dc6ba0d52cb4..3ca058c0b560 100644
+--- a/gcc/ipa-utils.h
++++ b/gcc/ipa-utils.h
+@@ -30,7 +30,7 @@ struct ipa_dfs_info {
+   bool new_node;
+   bool on_stack;
+   struct cgraph_node* next_cycle;
+-  PTR aux;
++  void *aux;
+ };
+ 
+ 
+diff --git a/gcc/plugin.c b/gcc/plugin.c
+index cbe4b7eff600..17b33e463a93 100644
+--- a/gcc/plugin.c
++++ b/gcc/plugin.c
+@@ -128,7 +128,7 @@ static const char *str_license = "plugin_is_GPL_compatible";
+    structure to be inserted into the hash table.  */
+ 
+ static hashval_t
+-htab_hash_plugin (const PTR p)
++htab_hash_plugin (const void *p)
+ {
+   const struct plugin_name_args *plugin = (const struct plugin_name_args *) p;
+   return htab_hash_string (plugin->base_name);

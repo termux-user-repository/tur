@@ -59,7 +59,7 @@ elif [ "$TERMUX_ARCH" = "x86_64" ]; then
 	TERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" --with-arch=x86-64 --with-fpmath=sse"
 fi
 
-source $TERMUX_SCRIPTDIR/common-files/setup_toolchain_ndk_r17c.sh
+source $TERMUX_SCRIPTDIR/common-files/setup_toolchain_gcc.sh
 
 termux_step_pre_configure() {
 	if $TERMUX_ON_DEVICE_BUILD; then
@@ -71,7 +71,13 @@ termux_step_pre_configure() {
 	export ac_cv_func_memalign=no
 	export ac_cv_c_bigendian=no
 
-	_setup_toolchain_ndk_r17c_gcc_11
+	_setup_toolchain_ndk_gcc_11
+
+	# Explicitly define __BIONIC__ and __ANDROID__API__
+	CFLAGS+=" -D__BIONIC__ -D__ANDROID_API__=$TERMUX_PKG_API_LEVEL"
+	CPPFLAGS+=" -D__BIONIC__ -D__ANDROID_API__=$TERMUX_PKG_API_LEVEL"
+	CXXFLAGS+=" -D__BIONIC__ -D__ANDROID_API__=$TERMUX_PKG_API_LEVEL"
+	FCFLAGS=" -D__ANDROID_API__=$TERMUX_PKG_API_LEVEL"
 
 	# Add the specs file
 	sed "s|@TERMUX_PREFIX@|$TERMUX_PREFIX|g" $TERMUX_PKG_BUILDER_DIR/specs.in |
@@ -82,28 +88,14 @@ termux_step_pre_configure() {
 
 	# Add host and target flag
 	TERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" --host=$TERMUX_HOST_PLATFORM --target=$TERMUX_HOST_PLATFORM"
-
-	# Dummpy an INPUT script for libstdc++.so when building for arm.
-	if [ "$TERMUX_ARCH" = "arm" ]; then
-		echo "INPUT(-lc++_shared)" > $TERMUX_PREFIX/lib/libstdc++.so
-	fi
 }
 
 termux_step_post_make_install() {
-	# Delete the dummy INPUT script
-	if [ "$TERMUX_ARCH" = "arm" ]; then
-		rm -f $TERMUX_PREFIX/lib/libstdc++.so
-	fi
 	# GCC searches $PREFIX/$TERMUX_HOST_PLATFORM/include, so just make a symlink
 	mkdir -p $TERMUX_PREFIX/$TERMUX_HOST_PLATFORM/include
 	ln -sfr $TERMUX_PREFIX/include/$TERMUX_HOST_PLATFORM/asm $TERMUX_PREFIX/$TERMUX_HOST_PLATFORM/include/
 	# Copy the build spec file
 	cp $TERMUX_PKG_TMPDIR/specs $TERMUX_PREFIX/lib/gcc/$TERMUX_HOST_PLATFORM/$TERMUX_PKG_VERSION/
-	# XXX: This is pretty hacking anyway, but I cannot find a better solution. 
-	# XXX: `ndk-sysroot` has a different version of Android headers (like 23c)
-	# XXX: but our custom toolchain should use the Android headers versioning 17c.
-	# XXX: Another way to solve this issue is adding `ndk-sysroot-gcc-compact` to
-	# XXX: `TERMUX_PKG_RECOMMENDS`, but that would break `gcc` if someone installs
-	# XXX: `ndk-sysroot-gcc-compact` and `gcc`, and then install `ndk-sysroot` manually.
+	# Avoid extract `ndk-sysroot-gcc-compact` at building time.
 	TERMUX_PKG_DEPENDS+=", ndk-sysroot-gcc-compact"
 }

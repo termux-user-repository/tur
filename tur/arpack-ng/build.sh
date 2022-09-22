@@ -7,10 +7,9 @@ TERMUX_PKG_SRCURL=https://github.com/opencollab/arpack-ng/archive/refs/tags/${TE
 TERMUX_PKG_SHA256=ada5aeb3878874383307239c9235b716a8a170c6d096a6625bfd529844df003d
 TERMUX_PKG_DEPENDS="openblas"
 
-source $TERMUX_SCRIPTDIR/common-files/setup_toolchain_ndk_r17c.sh
-source $TERMUX_SCRIPTDIR/common-files/setup_cmake_with_gcc.sh
+source $TERMUX_SCRIPTDIR/common-files/setup_toolchain_gcc.sh
 
 termux_step_pre_configure() {
-	_setup_toolchain_ndk_r17c_gcc_11
+	_setup_toolchain_ndk_gcc_11
 	_override_configure_cmake_for_gcc
 }

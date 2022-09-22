@@ -25,8 +25,7 @@ TERMUX_PKG_RM_AFTER_INSTALL="
 bin/
 "
 
-source $TERMUX_SCRIPTDIR/common-files/setup_toolchain_ndk_r17c.sh
-source $TERMUX_SCRIPTDIR/common-files/setup_cmake_with_gcc.sh
+source $TERMUX_SCRIPTDIR/common-files/setup_toolchain_gcc.sh
 
 termux_step_configure() {
 	if $TERMUX_ON_DEVICE_BUILD; then
@@ -146,6 +145,9 @@ termux_step_post_make_install() {
 	rm "${_ADDTIONAL_FILES[@]}"
 	# Recover numpy
 	mv $TERMUX_PREFIX/tmp/$_NUMPY_EGGDIR $DEVICE_STIE/$_NUMPY_EGGDIR
+	# Remove __pycache__ and _sysconfigdata.py
+	rm $SYS_CONFIG_DATA_FILE
+	rm -rf $TERMUX_PREFIX/lib/python${_PYTHON_VERSION}/__pycache__
 	# Delete the easy-install related files, since we use postinst/prerm to handle it.
 	pushd $TERMUX_PREFIX
 	rm -rf lib/python${_PYTHON_VERSION}/site-packages/__pycache__
