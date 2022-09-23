@@ -1,0 +1,37 @@
+--- a/mk/make-config.sh	2022-03-26 23:28:51.000000000 +0800
++++ b/mk/make-config.sh	2022-09-23 12:21:33.954446786 +0800
+@@ -2239,29 +2239,19 @@
+ if [ -n "${have_setlocale}" ]; then
+    link_check c90amend1 'ISO/IEC 9899:1990/Amendment 1:1995' \
+       '#define mx_HAVE_C90AMEND1' << \!
+-#include <limits.h>
+-#include <stdlib.h>
+-#include <wchar.h>
+-#include <wctype.h>
++#include <locale.h>
+ int main(void){
+-   char mbb[MB_LEN_MAX + 1];
+-   wchar_t wc;
+-
+-   iswprint(L'c');
+-   towupper(L'c');
+-   mbtowc(&wc, "x", 1);
+-   mbrtowc(&wc, "x", 1, NULL);
+-   wctomb(mbb, wc);
+-   return (mblen("\0", 1) == 0);
++   setlocale(LC_ALL, "");
++   return 0;
+ }
+ !
+    [ -n "${have_c90amend1}" ] && OPT_MULTIBYTE_CHARSETS=1
+ 
+    if [ -n "${have_c90amend1}" ]; then
+       link_check wcwidth 'wcwidth(3)' '#define mx_HAVE_WCWIDTH' << \!
+-#include <wchar.h>
++#include <locale.h>
+ int main(void){
+-   wcwidth(L'c');
++   setlocale(LC_ALL, "");
+    return 0;
+ }
+ !
