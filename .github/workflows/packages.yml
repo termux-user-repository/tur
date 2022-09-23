@@ -33,7 +33,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     env:
       ANDROID_HOME: "/opt/termux/android-sdk"
       NDK: "/opt/termux/android-ndk"
@@ -165,9 +165,8 @@ jobs:
     - name: Free additional disk space (if necessary)
       run: |
         if grep -q '^demo-package1$\|^demo-package2$\$' ./built_tur_packages.txt; then
-          echo "Free additional disk space on host"
-          sudo apt purge -yq $(dpkg -l | grep '^ii' | awk '{ print $2 }' | grep -P '(cabal-|dotnet-|ghc-|libmono|php)') \
-            liblldb-6.0 libllvm6.0:amd64 mono-runtime-common monodoc-manual powershell ruby
+          sudo apt purge -yq $(dpkg -l | grep '^ii' | awk '{ print $2 }' | grep -P '(cabal-|dotnet-|ghc-|libmono|php|aspnetcore)') \
+            mono-runtime-common monodoc-manual ruby
           sudo apt autoremove -yq
           sudo rm -rf /opt/hostedtoolcache /usr/local /usr/share/dotnet /usr/share/swift
         fi
@@ -233,4 +232,11 @@ jobs:
             gh release upload -R https://github.com/termux-user-repository/tur "0.1" $i
             echo "$i  uploaded"
           done
-  
+    - name: Trigger workflow in dists repository
+      if: github.event_name != 'pull_request'
+      env:
+        EVENT: "from_tur"
+        ORG: "termux-user-repository"
+        REPO: "dists"
+      run: |​
+        curl -d "{\"event_type\": \"${EVENT}\"}" -H "Content-Type: application/json" -H "Authorization: token ${GITHUB_TOKEN}" -H "Accept: application/vnd.github.everest-preview+json" "https://api.github.com/repos/${ORG}/${REPO}/dispatches"
