@@ -1,0 +1,13 @@
+diff --git a/src/mx/ui-str.c b/src/mx/ui-str.c
+index 8ef4e48..bc8a99c 100644
+--- a/src/mx/ui-str.c
++++ b/src/mx/ui-str.c
+@@ -54,6 +54,8 @@
+ /* TODO fake */
+ #include "su/code-in.h"
+ 
++int mblen(const char *s, size_t n) {return mbtowc(0, s, n);}
++
+ #ifdef mx_HAVE_NATCH_CHAR
+ struct a_uis_bidi_info{
+    struct str bi_start; /* Start of (possibly) bidirectional text */
