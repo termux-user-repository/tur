@@ -232,9 +232,14 @@ jobs:
             gh release upload -R https://github.com/termux-user-repository/tur "0.1" $i
             echo "$i  uploaded"
           done
+  trigeer:
+    runs-on: ubuntu-22.04
+    if: github.event_name != 'pull_request'
+    needs: build
+    steps:
     - name: Trigger workflow in dists repository
-      if: github.event_name != 'pull_request'
       env:
+        GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         EVENT: "from_tur"
         ORG: "termux-user-repository"
         REPO: "dists"
