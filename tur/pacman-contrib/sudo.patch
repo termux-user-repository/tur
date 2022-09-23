@@ -1,0 +1,43 @@
+diff --git a/src/paccache.sh.in b/src/paccache.sh.in
+index 2f74539..b1e6d72 100644
+--- a/src/paccache.sh.in
++++ b/src/paccache.sh.in
+@@ -137,16 +137,7 @@ pkgfilter() {
+ m4_include(../lib/size_to_human.sh)
+ 
+ runcmd() {
+-	if (( needsroot && EUID != 0 )); then
+-		msg 'Escalating privileges using sudo'
+-		if sudo -v &>/dev/null && sudo -l &>/dev/null; then
+-			sudo "$@"
+-		else
+-			die 'Failed to escalate'
+-		fi
+-	else
+ 		"$@"
+-	fi
+ }
+ 
+ summarize() {
+diff --git a/src/pacscripts.sh.in b/src/pacscripts.sh.in
+index 7c6d67d..22cb0d2 100644
+--- a/src/pacscripts.sh.in
++++ b/src/pacscripts.sh.in
+@@ -63,17 +63,7 @@ version() {
+ }
+ 
+ spacman() {
+-	if [ $EUID -eq 0 ]; then
+ 		pacman "$@"
+-	else
+-		if ! type -p sudo; then
+-			error "Cannot find the sudo binary!"
+-			error "${myname} requires root privileges. Either install \"sudo\" or run as root."
+-			exit 1
+-		else
+-			sudo pacman "$@"
+-		fi
+-	fi
+ }
+ 
+ print_db() {
