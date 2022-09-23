@@ -443,3 +443,11 @@ jobs:
           gh release upload -R https://github.com/termux-user-repository/tur "0.1" $archive
           echo "$archive  uploaded"
         done
+    - name: Trigger workflow in dists repository
+      env:
+        GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+        EVENT: "from_tur"
+        ORG: "termux-user-repository"
+        REPO: "dists"
+      run: |
+        curl -d "{\"event_type\": \"${EVENT}\"}" -H "Content-Type: application/json" -H "Authorization: token ${GITHUB_TOKEN}" -H "Accept: application/vnd.github.everest-preview+json" "https://api.github.com/repos/${ORG}/${REPO}/dispatches"
