@@ -1,0 +1,42 @@
+diff --git a/src/pacreport.c b/src/pacreport.c
+index 61674bd..fffac40 100644
+--- a/src/pacreport.c
++++ b/src/pacreport.c
+@@ -495,21 +495,17 @@ int file_is_unowned(alpm_handle_t *handle, const char *path) {
+ void _scan_filesystem(alpm_handle_t *handle, const char *dir, int backups,
+     int orphans, alpm_list_t **backups_found, alpm_list_t **orphans_found) {
+   static char *skip[] = {
+-    "/etc/ssl/certs",
++    "@TERMUX_PREFIX@/etc/ssl/certs",
+     "/dev",
+-    "/home",
+-    "/media",
++    "@TERMUX_HOME@",
+     "/mnt",
+     "/proc",
+-    "/root",
+-    "/run",
+     "/sys",
+-    "/tmp",
+-    "/usr/share/mime",
+-    "/var/cache",
+-    "/var/log",
+-    "/var/run",
+-    "/var/tmp",
++    "@TERMUX_PREFIX@/tmp",
++    "@TERMUX_PREFIX@/share/mime",
++    "@TERMUX_PREFIX@/var/cache",
++    "@TERMUX_PREFIX@/var/log",
++    "@TERMUX_PREFIX@/var/tmp",
+     NULL
+   };
+ 
+@@ -599,7 +595,7 @@ void find_backups(alpm_handle_t *handle, alpm_list_t **backups) {
+ }
+ 
+ void scan_filesystem(alpm_handle_t *handle, int backups, int orphans) {
+-  char *base_dir = "/etc/";
++  char *base_dir = "@TERMUX_PREFIX@/etc/";
+   alpm_list_t *orphans_found = NULL, *backups_found = NULL;
+   if (backups > 1 || orphans) {
+     base_dir = "/";
