@@ -1,0 +1,69 @@
+From 43590072013526fd3b035dcfdfef19bedf4520e9 Mon Sep 17 00:00:00 2001
+From: anon <anon@localhost>
+Date: Sun, 25 Sep 2022 04:28:47 +0800
+Subject: [PATCH 2/2] pathfix
+
+---
+ checkrebuild          | 14 +++++++-------
+ rebuild-detector.hook |  2 +-
+ 2 files changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/checkrebuild b/checkrebuild
+index cf69683..4dbdd04 100755
+--- a/checkrebuild
++++ b/checkrebuild
+@@ -81,8 +81,8 @@ get_broken_python_pkgs() {
+     command -v python >/dev/null || return
+     python_version="$(python3 -c 'import sys; print (sys.version_info.minor)')"
+     pkgs="$log/$RANDOM"
+-    pacman -Qqo /usr/lib/python3.!("$python_version") 2>/dev/null | grep -v '^python3[0-9]' | filter_packages_by_repos | tee "$pkgs"
+-    (( verbose )) && pacman -Qo /usr/lib/python3.!("$python_version") 2>/dev/null | grep -f "$pkgs" >"$log/$RANDOM"
++    pacman -Qqo @TERMUX_PREFIX@/lib/python3.!("$python_version") 2>/dev/null | grep -v '^python3[0-9]' | filter_packages_by_repos | tee "$pkgs"
++    (( verbose )) && pacman -Qo @TERMUX_PREFIX@/lib/python3.!("$python_version") 2>/dev/null | grep -f "$pkgs" >"$log/$RANDOM"
+     rm -f "$pkgs"
+ }
+ 
+@@ -90,8 +90,8 @@ get_broken_perl_pkgs() {
+     command -v perl >/dev/null || return
+     perl_version="$(perl -E 'say $^V =~ /(\d+[.]\d+)/')"
+     pkgs="$log/$RANDOM"
+-    pacman -Qqo /usr/lib/perl*/!("$perl_version") 2>/dev/null | filter_packages_by_repos | tee "$pkgs"
+-    (( verbose )) && pacman -Qo /usr/lib/perl*/!("$perl_version") 2>/dev/null | grep -f "$pkgs" >"$log/$RANDOM"
++    pacman -Qqo @TERMUX_PREFIX@/lib/perl*/!("$perl_version") 2>/dev/null | filter_packages_by_repos | tee "$pkgs"
++    (( verbose )) && pacman -Qo @TERMUX_PREFIX@/lib/perl*/!("$perl_version") 2>/dev/null | grep -f "$pkgs" >"$log/$RANDOM"
+     rm -f "$pkgs"
+ }
+ 
+@@ -110,8 +110,8 @@ get_broken_haskell_pkgs() {
+     command -v ghc >/dev/null || return
+     haskell_version="$(ghc --numeric-version)"
+     pkgs="$log/$RANDOM"
+-    pacman -Qqo /usr/lib/ghc-!("$haskell_version") 2>/dev/null | filter_packages_by_repos | tee "$pkgs"
+-    (( verbose )) && pacman -Qo /usr/lib/ghc-!("$haskell_version") 2>/dev/null | grep -f "$pkgs" >"$log/$RANDOM"
++    pacman -Qqo @TERMUX_PREFIX@/lib/ghc-!("$haskell_version") 2>/dev/null | filter_packages_by_repos | tee "$pkgs"
++    (( verbose )) && pacman -Qo @TERMUX_PREFIX@/lib/ghc-!("$haskell_version") 2>/dev/null | grep -f "$pkgs" >"$log/$RANDOM"
+     rm -f "$pkgs"
+ }
+ 
+@@ -146,4 +146,4 @@ if (( verbose )); then
+     done
+ fi
+ 
+-exit 0
++exit 0
+\ No newline at end of file
+diff --git a/rebuild-detector.hook b/rebuild-detector.hook
+index a276a83..78e9e88 100644
+--- a/rebuild-detector.hook
++++ b/rebuild-detector.hook
+@@ -5,6 +5,6 @@ Target = *
+ 
+ [Action]
+ Description = Checking which packages need to be rebuilt
+-Exec = /usr/bin/checkrebuild
++Exec = @TERMUX_PREFIX@/bin/checkrebuild
+ When = PostTransaction
+ NeedsTargets
+-- 
+2.37.3
+
