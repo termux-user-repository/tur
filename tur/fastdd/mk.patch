@@ -1,0 +1,21 @@
+diff --git a/GNUmakefile b/GNUmakefile
+index 0feea43..c58fd4c 100644
+--- a/GNUmakefile
++++ b/GNUmakefile
+@@ -15,11 +15,11 @@ os := $(shell uname)
+ Linux_DEFS = -D_GNU_SOURCE=1 -D_LARGEFILE64_SOURCE=1
+ Darwin_DEFS =
+ 
+-CC = gcc
+-CFLAGS = -Wall -Wuninitialized -g \
+-         -I ./portable/inc/$(os) -I./portable/inc $(DEFS) $($(os)_DEFS)
+-LD = $(CC)
+-LDFLAGS = -g
++CC ?= gcc
++CFLAGS ?= ${CFLAGS}
++CFLAGS += ${CPPFLAGS} -I./portable/inc/$(os) -I./portable/inc $(DEFS) $($(os)_DEFS)
++LD ?= $(CC)
++LDFLAGS ?= ${LDFLAGS}
+ 
+ MKGETOPT = mkgetopt.py
+ 
