@@ -1,0 +1,32 @@
+diff --git a/fakepkg b/fakepkg
+index b53f73b..33157c0 100755
+--- a/fakepkg
++++ b/fakepkg
+@@ -95,22 +95,12 @@ function fakebuild() {
+ 
+ 	# Taring things together
+ 	if [[ $3 -ge "1" ]]; then
+-		#XZ_OPT="-T 0" \
+-		tar --ignore-failed-read --owner=0 --group=0 --no-recursion -c -a \
+-			--force-local -f "${PKG_NAME}${PKGEXT}" \
+-			-C "${ROOT_DIR:-/}" -T ./package_file_list -C "$TMPDIR" \
+-			"${aux_files[@]}"
++		bsdtar -cnf - -C "${ROOT_DIR:-/}" -T ./package_file_list
++		bsdtar -cf - -C "$TMPDIR" "${aux_files[@]}"
+ 	else
+-		#XZ_OPT="-T 0" \
+-		if tar --ignore-failed-read --owner=0 --group=0 --no-recursion -c -a \
+-			--force-local -f "${PKG_NAME}${PKGEXT}" \
+-			-C "${ROOT_DIR:-/}" -T ./package_file_list -C "$TMPDIR" \
+-			"${aux_files[@]}" 2>&1 >/dev/null \
+-			| grep -i "permission denied" >/dev/null -; then
+-
+-			>&2 echo -e "The permission to open one or more directories was denied for \e[39;1m${PKG_NAME}\e[0m. The package may be incomplete!"
+-		fi
+-	fi
++		bsdtar -cnf - -C "${ROOT_DIR:-/}" -T ./package_file_list 2>/dev/null
++		bsdtar -cf - -C "$TMPDIR" "${aux_files[@]}"
++	fi | bsdtar -caf "${PKG_NAME}${PKGEXT}" --format cpio --ignore-zeros --uid=0 --gid=0 @-
+ 
+ 	# Cleanup
+ 	if [[ -f ${PKG_NAME}${PKGEXT} ]]; then
