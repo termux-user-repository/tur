@@ -1,0 +1,54 @@
+diff --git a/pacman/read-db.go b/pacman/read-db.go
+index f150267..a40f393 100644
+--- a/pacman/read-db.go
++++ b/pacman/read-db.go
+@@ -23,16 +23,16 @@ import (
+ 
+ // PacmanConfPath contains the path to the pacman configuration.
+ // This is provided for those with special needs, such as me ;)
+-var PacmanConfPath = "/etc/pacman.conf"
++var PacmanConfPath = "@TERMUX_PREFIX@/etc/pacman.conf"
+ 
+ // PacmanLocalDatabasePath contains the path to the local pacman library.
+ // This is provided for those with special needs to modify at their own risk.
+-var PacmanLocalDatabasePath = "/var/lib/pacman/local"
++var PacmanLocalDatabasePath = "@TERMUX_PREFIX@/var/lib/pacman/local"
+ 
+ // PacmanSyncDatabaseFormat is the format that fmt.Sprinf needs to interpolate
+ // a repository name into a package database path.
+ // This is provided for those with special needs to modify at their own risk.
+-var PacmanSyncDatabaseFormat = "/var/lib/pacman/sync/%s.db"
++var PacmanSyncDatabaseFormat = "@TERMUX_PREFIX@/var/lib/pacman/sync/%s.db"
+ 
+ // IsDatabaseLocked returns whether the database given at the path
+ // is currently locked for writing or not.
+diff --git a/repo/database.go b/repo/database.go
+index f02f731..9873848 100644
+--- a/repo/database.go
++++ b/repo/database.go
+@@ -16,8 +16,8 @@ import (
+ )
+ 
+ var (
+-	SystemRepoAdd    = "/usr/bin/repo-add"
+-	SystemRepoRemove = "/usr/bin/repo-remove"
++	SystemRepoAdd    = "@TERMUX_PREFIX@/usr/bin/repo-add"
++	SystemRepoRemove = "@TERMUX_PREFIX@/usr/bin/repo-remove"
+ )
+ 
+ // DeleteDatabase deletes the repository database (but not the files).
+diff --git a/vendor/github.com/goulash/xdg/xdg.go b/vendor/github.com/goulash/xdg/xdg.go
+index 28acc49..704dddf 100644
+--- a/vendor/github.com/goulash/xdg/xdg.go
++++ b/vendor/github.com/goulash/xdg/xdg.go
+@@ -194,8 +194,8 @@ func Init() {
+ 	CacheHome = xdgPath("XDG_CACHE_HOME", "$HOME/.cache")
+ 	tmp := path.Join(os.TempDir(), fmt.Sprintf("xdg-%d", os.Getuid()))
+ 	RuntimeDir = xdgPath("XDG_RUNTIME_DIR", tmp)
+-	ConfigDirs = xdgPaths("XDG_CONFIG_DIRS", "/etc/xdg")
+-	DataDirs = xdgPaths("XDG_DATA_DIRS", "/usr/local/share:/usr/share")
++	ConfigDirs = xdgPaths("XDG_CONFIG_DIRS", "@TERMUX_PREFIX@/etc/xdg")
++	DataDirs = xdgPaths("XDG_DATA_DIRS", "@TERMUX_PREFIX@/usr/local/share:@TERMUX_PREFIX@/usr/share")
+ 	ConfigHomeDirs = combine(ConfigHome, ConfigDirs)
+ 	DataHomeDirs = combine(DataHome, DataDirs)
+ }
