@@ -1,0 +1,31 @@
+diff --git a/fakepkg b/fakepkg
+index 0f3647d..b6b30d0 100755
+--- a/fakepkg
++++ b/fakepkg
+@@ -17,7 +17,7 @@ declare -r myver='1.42.2'
+ declare -r tmp_root='fakepkg'
+ 
+ # Standard path where pacman db resides
+-declare -r db_path='/var/lib/pacman'
++declare -r db_path='@TERMUX_PREFIX@/var/lib/pacman'
+ 
+ # Error codes
+ declare -r ERROR_USAGE=1
+@@ -41,7 +41,7 @@ function fakebuild() {
+ 	fi
+ 
+ 	# Create and enter a temporary dir
+-	TMPDIR=$(mktemp -q -p /tmp -t -d "${tmp_root}".XXX)
++	TMPDIR=$(mktemp -q -p @TERMUX_PREFIX@/tmp -t -d "${tmp_root}".XXX)
+ 	cd "${TMPDIR}" || return ${ERROR_OPERATION}
+ 
+ 	# Fetching the .PKGINFO, .Changelog, .MTREE and .INSTALL file
+@@ -173,7 +173,7 @@ function version() {
+ 
+ # Clean up temporary dirs recursively
+ function clean_up {
+-	rm -r /tmp/"${tmp_root}".*
++	rm -r @TERMUX_PREFIX@/tmp/"${tmp_root}".*
+ 	echo
+ 	exit
+ }
