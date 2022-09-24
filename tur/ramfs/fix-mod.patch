@@ -1,0 +1,71 @@
+diff --git a/cmd/racon/main.go b/cmd/racon/main.go
+index 4b7cc56..bc05721 100644
+--- a/cmd/racon/main.go
++++ b/cmd/racon/main.go
+@@ -11,7 +11,6 @@ import (
+ 
+ 	"9fans.net/go/plan9"
+ 	"9fans.net/go/plan9/client"
+-	"code.google.com/p/snappy-go/snappy"
+ )
+ 
+ const (
+@@ -26,7 +25,6 @@ var (
+ 	long    = flag.Bool("l", false, "use a long listing format")
+ 	uname   = flag.String("uname", os.Getenv("USER"), "username (default: $USER)")
+ 	aname   = flag.String("aname", "", "attach to the file system named aname")
+-	comp    = flag.Bool("snappy", false, "use snappy en-/decompression")
+ )
+ 
+ const usageMsg = `
+@@ -217,15 +215,7 @@ func write(fs *client.Fsys, args []string) {
+ 			os.Exit(1)
+ 		}
+ 
+-		if *comp {
+-			buf, err = snappy.Encode(buf, data[0:n])
+-			if err != nil {
+-				fmt.Fprintf(os.Stderr, "compress %s: %v", name, err)
+-				os.Exit(1)
+-			}
+-		} else {
+ 			buf = data[0:n]
+-		}
+ 
+ 		n = len(buf)
+ 		m, err := f.WriteAt(buf, offset)
+@@ -266,15 +256,7 @@ func read(fs *client.Fsys, args []string) {
+ 
+ 			offset += int64(n)
+ 
+-			if *comp {
+-				buf, err = snappy.Decode(buf, data[0:n])
+-				if err != nil {
+-					fmt.Fprintf(os.Stderr, "decompress %s: %v", name, err)
+-					os.Exit(1)
+-				}
+-			} else {
+ 				buf = data[0:n]
+-			}
+ 
+ 			if _, err = os.Stdout.Write(buf); err != nil {
+ 				fmt.Fprintf(os.Stderr, "write stdout: %v", err)
+diff --git a/go.mod b/go.mod
+new file mode 100644
+index 0000000..c1198e3
+--- /dev/null
++++ b/go.mod
+@@ -0,0 +1,5 @@
++module github.com/mars9/ramfs
++
++go 1.19
++
++require 9fans.net/go v0.0.4
+diff --git a/go.sum b/go.sum
+new file mode 100644
+index 0000000..4a6085f
+--- /dev/null
++++ b/go.sum
+@@ -0,0 +1,2 @@
++9fans.net/go v0.0.4 h1:g7K+b5I1PlSBFLnjuco3LAx5boK39UUl0Gsrmw6Gl2U=
++9fans.net/go v0.0.4/go.mod h1:lfPdxjq9v8pVQXUMBCx5EO5oLXWQFlKRQgs1kEkjoIM=
