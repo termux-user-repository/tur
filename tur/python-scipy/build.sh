@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="Fundamental algorithms for scientific computing in Pytho
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION=1.9.0
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://github.com/scipy/scipy.git
 TERMUX_PKG_DEPENDS="libc++, openblas, python, python-numpy"
 TERMUX_PKG_BUILD_DEPENDS="python-numpy-static"
@@ -159,7 +160,7 @@ termux_step_create_debscripts() {
 	#!$TERMUX_PREFIX/bin/sh
 	echo "Installing scipy and its dependencies through pip. This may take a while..."
 	pip3 install ${_PKG_PYTHON_DEPENDS}
-	if [ "$TERMUX_ARCH" == "arm" ] || [ "$TERMUX_ARCH" == "i686" ]; then
+	if [ "$TERMUX_ARCH" = "arm" ] || [ "$TERMUX_ARCH" = "i686" ]; then
 		echo "WARNING: python-numpy doesn't work fine on 32-bit arches. See https://github.com/termux-user-repository/tur/pull/21#issue-1295483266 for detail."
 	fi
 	echo "./${_SCIPY_EGGDIR}" >> $TERMUX_PREFIX/lib/python${_PYTHON_VERSION}/site-packages/easy-install.pth
