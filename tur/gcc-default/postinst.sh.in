@@ -1,0 +1,26 @@
+#!@TERMUX_PREFIX@/bin/sh
+
+set -e
+
+TERMUX_ARCH="$(dpkg --print-architecture)"
+TERMUX_PLATFORM="$TERMUX_ARCH-linux-android"
+test $TERMUX_ARCH = "arm" && TERMUX_PLATFORM+="eabi"
+
+CLANG_INSTALLED="false"
+test -e @TERMUX_PREFIX@/bin/clang && CLANG_INSTALLED="true"
+
+if [ "$CLANG_INSTALLED" = "true" ]; then
+	for tool in cc c++ cpp gcc g++ $TERMUX_PLATFORM-gcc $TERMUX_PLATFORM-g++ $TERMUX_PLATFORM-cpp; do
+		mv -v @TERMUX_PREFIX@/bin/$tool @TERMUX_PREFIX@/share/@TERMUX_PKG_NAME@/$tool
+	done
+fi
+
+ln -sfv gcc-@DEFAULT_GCC_VERSION@ @TERMUX_PREFIX@/bin/gcc
+ln -sfv gcc-@DEFAULT_GCC_VERSION@ @TERMUX_PREFIX@/bin/$TERMUX_PLATFORM-gcc
+ln -sfv g++-@DEFAULT_GCC_VERSION@ @TERMUX_PREFIX@/bin/g++
+ln -sfv g++-@DEFAULT_GCC_VERSION@ @TERMUX_PREFIX@/bin/$TERMUX_PLATFORM-g++
+ln -sfv cpp-@DEFAULT_GCC_VERSION@ @TERMUX_PREFIX@/bin/cpp
+ln -sfv cpp-@DEFAULT_GCC_VERSION@ @TERMUX_PREFIX@/bin/$TERMUX_PLATFORM-cpp
+ln -sfv gfortran-@DEFAULT_GCC_VERSION@ @TERMUX_PREFIX@/bin/$TERMUX_PLATFORM-gfortran
+ln -sfv gfortran-@DEFAULT_GCC_VERSION@ @TERMUX_PREFIX@/bin/f90
+ln -sfv gfortran-@DEFAULT_GCC_VERSION@ @TERMUX_PREFIX@/bin/f77
