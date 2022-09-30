@@ -12,6 +12,7 @@ test -e @TERMUX_PREFIX@/bin/clang && CLANG_INSTALLED="true"
 rm -fv @TERMUX_PREFIX@/bin/$TERMUX_PLATFORM-gfortran
 rm -fv @TERMUX_PREFIX@/bin/f90
 rm -fv @TERMUX_PREFIX@/bin/f77
+rm -fv @TERMUX_PREFIX@/bin/gfortran
 
 if [ "$CLANG_INSTALLED" = "true" ]; then
 	for tool in cc c++ cpp gcc g++ $TERMUX_PLATFORM-gcc $TERMUX_PLATFORM-g++ $TERMUX_PLATFORM-cpp; do
