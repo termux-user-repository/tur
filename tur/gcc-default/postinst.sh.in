@@ -24,3 +24,4 @@ ln -sfv cpp-@DEFAULT_GCC_VERSION@ @TERMUX_PREFIX@/bin/$TERMUX_PLATFORM-cpp
 ln -sfv gfortran-@DEFAULT_GCC_VERSION@ @TERMUX_PREFIX@/bin/$TERMUX_PLATFORM-gfortran
 ln -sfv gfortran-@DEFAULT_GCC_VERSION@ @TERMUX_PREFIX@/bin/f90
 ln -sfv gfortran-@DEFAULT_GCC_VERSION@ @TERMUX_PREFIX@/bin/f77
+ln -sfv gfortran-@DEFAULT_GCC_VERSION@ @TERMUX_PREFIX@/bin/gfortran
