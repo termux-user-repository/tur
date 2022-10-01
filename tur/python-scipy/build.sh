@@ -43,9 +43,11 @@ termux_step_configure() {
 	# XXX: `-static-openmp`. So we need to modify the _sysconfigdata.py.
 	SYS_CONFIG_DATA_FILE="$(find $TERMUX_PREFIX/lib/python${_PYTHON_VERSION} -name "_sysconfigdata*.py")"
 	rm -rf  $TERMUX_PREFIX/lib/python${_PYTHON_VERSION}/__pycache__
-	sed -E 's|-O[123sz]|-Os|g;s|-static-openmp||g' $SYS_CONFIG_DATA_FILE |
+	cp $SYS_CONFIG_DATA_FILE $TERMUX_PKG_TMPDIR/$(basename $SYS_CONFIG_DATA_FILE)
+	sed -E 's|-O[123sz]|-Os|g;s|-static-openmp||g' $TERMUX_PKG_TMPDIR/$(basename $SYS_CONFIG_DATA_FILE) |
 		sed "s|$TERMUX_HOST_PLATFORM-clang++|$TERMUX_HOST_PLATFORM-g++|g" |
-		sed "s|$TERMUX_HOST_PLATFORM-clang|$TERMUX_HOST_PLATFORM-gcc|g" | tee $SYS_CONFIG_DATA_FILE
+		sed "s|$TERMUX_HOST_PLATFORM-clang|$TERMUX_HOST_PLATFORM-gcc|g" > $SYS_CONFIG_DATA_FILE
+	rm $TERMUX_PKG_TMPDIR/$(basename $SYS_CONFIG_DATA_FILE)
 
 	# We set `python-scipy` as dependencies, but python-crossenv prefer to use a fake one.
 	DEVICE_STIE=$TERMUX_PREFIX/lib/python${_PYTHON_VERSION}/site-packages
