@@ -10,7 +10,7 @@ TERMUX_PKG_BUILD_DEPENDS="asciidoc, perl, bsdtar"
 TERMUX_PKG_RECOMMENDS="diffutils, bsdtar"
 TERMUX_PKG_SUGGESTS="vim, mlocate, perl"
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="--disable-git-version"
-TERMUX_PKG_AUTO_UPDATE=true
+#TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_UPDATE_METHOD=repology
 
 termux_step_pre_configure() {
