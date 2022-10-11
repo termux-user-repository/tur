@@ -7,7 +7,7 @@ TERMUX_PKG_SRCURL="https://github.com/cassava/repoctl/releases/download/v$TERMUX
 TERMUX_PKG_SHA256=b6abb00c57475c6bbef48d1a6831fa30e82950fe1f5a599cc7aff6d6f86435e9
 TERMUX_PKG_DEPENDS="pacman"
 TERMUX_PKG_BUILD_IN_SRC=true
-TERMUX_PKG_AUTO_UPDATE=true
+#TERMUX_PKG_AUTO_UPDATE=true
 
 termux_step_make() {
 	termux_setup_golang
