@@ -15,4 +15,4 @@ termux_step_make_install(){
 	cp -fr setup file .github LICENSE manpage cloudshell shark $TERMUX_PREFIX/share/shark/
 	7z x file && rm -rf file
 	chmod +x $TERMUX_PREFIX/bin/shark
-}:
+}
