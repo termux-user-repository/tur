@@ -12,7 +12,7 @@ termux_step_make_install(){
 	mkdir $TERMUX_PREFIX/share/shark
 	cd $TERMUX_PKG_SRCDIR
 	cp shark $TERMUX_PREFIX/bin/shark
-	cp -fr setup file .github LICENSE manpage cloudshell shark $TERMUX_PREFIX/share/shark/
+	cp -fr file setup shark $TERMUX_PREFIX/share/shark/
 	7z x file && rm -rf file
 	chmod +x $TERMUX_PREFIX/bin/shark
 }
