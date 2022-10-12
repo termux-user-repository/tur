@@ -1,7 +1,7 @@
 TERMUX_PKG_HOMEPAGE=https://github.com/Bhaviktutorials/shark
 TERMUX_PKG_DESCRIPTION="🦈Future Of Phishing With less delay!!🦈"
 TERMUX_PKG_LICENSE="BSD-3-Clause"
-TERMUX_PKG_MAINTAINER="@termux-user-repository"
+TERMUX_PKG_MAINTAINER="@E343IO"
 TERMUX_PKG_VERSION=2.5.0
 TERMUX_PKG_SRCURL=https://github.com/E343IO/shark/archive/refs/tags/${TERMUX_PKG_VERSION}.tar.gz
 TERMUX_PKG_SHA256=c57958d775af9119f28f36c05d713092aa0749e8d0e72738290cd538fd762642
