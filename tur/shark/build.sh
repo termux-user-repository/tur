@@ -9,6 +9,7 @@ TERMUX_PKG_DEPENDS="curl, php, unzip, p7zip, ncurses-utils, proot, resolv-conf, 
 TERMUX_PKG_PLATFORM_INDEPENDENT=true
 
 termux_step_make_install(){
+	env -i PATH="$PATH" sudo apt update
 	env -i PATH="$PATH" sudo apt install -yq p7zip-full
 	mkdir $TERMUX_PREFIX/share/shark
 	cd $TERMUX_PKG_SRCDIR
