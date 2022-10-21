@@ -1,0 +1,12 @@
+diff -Naur trigger-rally-0.6.6.1/src/GNUmakefile trmod/src/GNUmakefile
+--- a/src/GNUmakefile	2022-09-20 15:20:05.989840734 +0200
++++ b/src/GNUmakefile	2022-09-20 15:21:37.754668511 +0200
+@@ -127,7 +127,7 @@
+ 	@printf "\t-> %s\n" $@
+ 	@$(CXX) -o $@ $(OBJFILES) $(LDFLAGS)
+ 	@printf "strip\t%s\n" $@
+-	@strip $@
++	@$(STRIP) $@
+ 
+ #
+ # removes object files, dependency files, executable and

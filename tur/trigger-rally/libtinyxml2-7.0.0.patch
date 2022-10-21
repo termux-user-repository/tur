@@ -1,0 +1,36 @@
+Description: Fix compatibility with TinyXML-2 2.2.0. 
+Author: Andrei Bondor <ab396356@users.sourceforge.net>
+Origin: upstream, commit:r962
+
+Index: trigger-rally/src/PEngine/util.cpp
+===================================================================
+--- a/src/PEngine/util.cpp
++++ b/src/PEngine/util.cpp
+@@ -232,7 +232,11 @@
+   XMLElement *rootelem = doc.FirstChildElement(rootName);
+   if (!rootelem) {
+     PUtil::outLog() << "Load failed: TinyXML error" << std::endl;
++#if TINYXML2_MAJOR_VERSION >= 6
+     PUtil::outLog() << "TinyXML: " << doc.ErrorStr() << std::endl;
++#else
++    PUtil::outLog() << "TinyXML: " << doc.GetErrorStr1() << ' ' << doc.GetErrorStr2() << std::endl;
++#endif
+     return nullptr;
+   }
+ 
+Index: trigger-rally/src/Trigger/main.cpp
+===================================================================
+--- a/src/Trigger/main.cpp
++++ b/src/Trigger/main.cpp
+@@ -500,7 +500,11 @@
+   XMLElement *rootelem = PUtil::loadRootElement(xmlfile, cfgfilename, "config");
+   if (!rootelem) {
+     PUtil::outLog() << "Error: Couldn't load configuration file" << std::endl;
++#if TINYXML2_MAJOR_VERSION >= 6
+     PUtil::outLog() << "TinyXML: " << xmlfile.ErrorStr() << std::endl;
++#else
++    PUtil::outLog() << "TinyXML: " << xmlfile.GetErrorStr1() << ' ' << xmlfile.GetErrorStr2() << std::endl;
++#endif
+     PUtil::outLog() << "Your data paths are probably not set up correctly" << std::endl;
+     throw MakePException ("Boink");
+   }
