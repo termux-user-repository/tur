@@ -1,0 +1,28 @@
+Description: BLHC tool can't read non-verbose build logs
+Author: Gianfranco Costamagna <locutusofborg@debian.org>
+
+Index: trigger-rally/src/GNUmakefile
+===================================================================
+--- trigger-rally.orig/src/GNUmakefile	2019-02-05 19:36:20.230775701 +0100
++++ trigger-rally/src/GNUmakefile	2019-02-05 19:37:26.133775351 +0100
+@@ -120,12 +120,7 @@
+ 
+ # links the object files into the executable, which it then strips
+ $(TR_EXEFILE): $(OBJFILES)
+-	@printf "%s" $(CXX)
+-	@for file in $(OBJFILES); do \
+-		printf "\t%s\n" $$file; \
+-		done
+-	@printf "\t-> %s\n" $@
+-	@$(CXX) -o $@ $(OBJFILES) $(LDFLAGS)
++	$(CXX) -o $@ $(OBJFILES) $(LDFLAGS)
+ 	@printf "strip\t%s\n" $@
+ 	@strip $@
+ 
+@@ -154,5 +149,4 @@
+ # if this makefile is edited
+ #
+ %.o: %.cpp GNUmakefile
+-	@printf "%s\t%s -> %s\n" $(CXX) $< $@
+-	@$(CXX) $(CXXFLAGS) $(CPPFLAGS) -MMD -MP -c $< -o $@
++	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -MMD -MP -c $< -o $@

@@ -1,0 +1,34 @@
+Description: Fix detection of SDL2
+Origin: https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=952098#14
+Bug-Debian: https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=952098
+Forwarded: no
+Reviewed-by: Tobias Frost <tobi@debian.org>
+Last-Update: 2020-03-31 <YYYY-MM-DD, last update of the meta-information, optional>
+---
+This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+--- a/src/GNUmakefile
++++ b/src/GNUmakefile
+@@ -2,6 +2,12 @@
+ # Trigger Rally GNUmakefile for Linux users
+ #
+ 
++PKG_CONFIG ?= pkg-config
++SDL2_CFLAGS = $(shell ${PKG_CONFIG} --cflags sdl2)
++SDL2_LIBS = $(shell ${PKG_CONFIG} --libs sdl2)
++SDL2_IMAGE_CFLAGS = $(shell ${PKG_CONFIG} --cflags SDL2_image)
++SDL2_IMAGE_LIBS = $(shell ${PKG_CONFIG} --libs SDL2_image)
++
+ # standard GNU and custom variables
+ DISTNAME        := trigger-rally
+ DISTVER         := 0.6.6.1
+@@ -25,8 +31,8 @@
+ DMACROS         := -DNDEBUG -DUNIX -DPACKAGE_VERSION=\"$(DISTVER)\"
+ INCDIRS         := -I'./include'
+ CXXFLAGS        += -std=c++11 $(WARNINGS) $(OPTIMS)
+-CPPFLAGS        += $(DMACROS) $(INCDIRS)
+-EXTRA_LIBS      := -lSDL2main -lGL -lGLU -lGLEW -lSDL2 -lSDL2_image -lphysfs -lopenal -lalut -lpthread -ltinyxml2
++CPPFLAGS        += $(DMACROS) $(INCDIRS) $(SDL2_CFLAGS) $(SDL2_IMAGE_CFLAGS)
++EXTRA_LIBS      := $(SDL2_LIBS) $(SDL2_IMAGE_LIBS) -lGL -lGLU -lGLEW -lSDL2 -lSDL2_image -lphysfs -lopenal -lalut -ldl -lc -ltinyxml2 -lpulse -lX11 -lXext -lXfixes -lXcursor -lXinerama -lXrandr -lXss -lXi -lXxf86vm
+ LDFLAGS         += $(EXTRA_LIBS)
+ INSTALL_PROGRAM := install --mode=0755
+ INSTALL_DATA    := install --mode=0644
