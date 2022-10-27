@@ -1,0 +1,9 @@
+TERMUX_PKG_HOMEPAGE=https://github.com/vancegroup/freealut
+TERMUX_PKG_DESCRIPTION="A free implementation of OpenAL's ALUT standard"
+TERMUX_PKG_LICENSE="LGPL-2.0"
+TERMUX_PKG_MAINTAINER="@termux-user-repository"
+TERMUX_PKG_VERSION=1.1.0
+TERMUX_PKG_REVISION=1
+TERMUX_PKG_SRCURL=http://deb.debian.org/debian/pool/main/f/freealut/freealut_1.1.0.orig.tar.gz
+TERMUX_PKG_SHA256=60d1ea8779471bb851b89b49ce44eecb78e46265be1a6e9320a28b100c8df44f
+TERMUX_PKG_DEPENDS="openal-soft"

@@ -1,0 +1,26 @@
+Description: Fix the configure script template syntax.
+Forwarded: no
+Author: Thierry Reding <thierry@doppeltgemoppelt.de>
+Last-Update: 2007-02-20
+
+--- freealut-1.1.0.orig/configure.ac
++++ freealut-1.1.0/configure.ac
+@@ -2,15 +2,15 @@
+ # Process this file with autoconf to produce a configure script.
+ ################################################################################
+ 
+-AC_INIT([freealut library], [1.1.0], [openal-devel@opensource.creative.com], [freealut])
++AC_INIT([freealut library],[1.1.0],[openal-devel@opensource.creative.com],[freealut])
+ AC_CONFIG_AUX_DIR([admin/autotools])
+ AM_INIT_AUTOMAKE
+-AC_PREREQ([2.56])
++AC_PREREQ(2.61)
+ AC_CONFIG_SRCDIR([AUTHORS])
+ AC_CONFIG_HEADERS([config.h])
+ 
+ # Compatibility hack for older autoconf versions
+-m4_ifdef([AS_HELP_STRING], [], [AC_DEFUN([AS_HELP_STRING], [AC_HELP_STRING($][@)])])
++m4_ifdef([AS_HELP_STRING], [], [AC_DEFUN([AS_HELP_STRING], [AS_HELP_STRING([$@])])])
+ 
+ ################################################################################
+ ## libtool shared library version.
