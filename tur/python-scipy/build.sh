@@ -119,7 +119,7 @@ termux_step_create_debscripts() {
 	cat <<- EOF > ./postinst
 	#!$TERMUX_PREFIX/bin/sh
 	INSTALLED_NUMPY_VERSION=\$(dpkg --list python-numpy | grep python-numpy | awk '{print \$3; exit;}')
-	if [ "\$INSTALLED_NUMPY_VERSION" = "$_NUMPY_VERSION" ]; then
+	if [ "\$INSTALLED_NUMPY_VERSION" != "$_NUMPY_VERSION" ]; then
 		echo "WARNING: python-scipy is compiled with numpy $_NUMPY_VERSION, but numpy \$INSTALLED_NUMPY_VERSION is installed. It seems that python-numpy has been upgraded. Please report it to https://github.com/termux-user-repository/tur if any bug happens."
 	fi
 	if [ "$TERMUX_ARCH" = "arm" ] || [ "$TERMUX_ARCH" = "i686" ]; then
