@@ -3,7 +3,7 @@ TERMUX_PKG_DESCRIPTION="Fundamental algorithms for scientific computing in Pytho
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION=1.9.0
-TERMUX_PKG_REVISION=2
+TERMUX_PKG_REVISION=3
 TERMUX_PKG_SRCURL=https://github.com/scipy/scipy.git
 TERMUX_PKG_DEPENDS="libc++, libopenblas, python, python-numpy"
 TERMUX_PKG_BUILD_DEPENDS="python-numpy-static"
@@ -118,8 +118,8 @@ termux_step_post_make_install() {
 termux_step_create_debscripts() {
 	cat <<- EOF > ./postinst
 	#!$TERMUX_PREFIX/bin/sh
-	INTALLED_NUMPY_VERSION=$(dpkg --list | grep python-numpy | awk '{print $3; exit;}')
-	if [ "\$INTALLED_NUMPY_VERSION" = "$_NUMPY_VERSION" ]; then
+	INSTALLED_NUMPY_VERSION=\$(dpkg --list python-numpy | grep python-numpy | awk '{print \$3; exit;}')
+	if [ "\$INSTALLED_NUMPY_VERSION" = "$_NUMPY_VERSION" ]; then
 		echo "WARNING: python-scipy is compiled with numpy $_NUMPY_VERSION, but numpy \$INTALLED_NUMPY_VERSION is installed. It seems that python-numpy has been upgraded. Please report it to https://github.com/termux-user-repository/tur if any bug happens."
 	fi
 	if [ "$TERMUX_ARCH" = "arm" ] || [ "$TERMUX_ARCH" = "i686" ]; then
