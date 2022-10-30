@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="Clean single-source support for Python 3 and 2"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@fervi"
 TERMUX_PKG_VERSION=0.18.2
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://github.com/PythonCharmers/python-future/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz
 TERMUX_PKG_SHA256=43c1feae4170742671ffef900acd5dbe7c72099aa602d58e95e22c2174edd057
 TERMUX_PKG_DEPENDS="python"
@@ -19,8 +20,11 @@ termux_step_pre_configure() {
 		${_CROSSENV_PREFIX}
 	popd
 	. ${_CROSSENV_PREFIX}/bin/activate
+
+	build-pip install wheel
 }
 
 termux_step_make_install() {
-		python setup.py install --force --prefix $TERMUX_PREFIX
+	export PYTHONPATH=$TERMUX_PREFIX/lib/python${_PYTHON_VERSION}/site-packages
+	pip install --no-deps . --prefix $TERMUX_PREFIX
 }
