@@ -3,9 +3,12 @@ TERMUX_PKG_DESCRIPTION="a modern C++ toolkit containing machine learning algorit
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION=19.24
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://github.com/davisking/dlib/archive/refs/tags/v$TERMUX_PKG_VERSION.tar.gz
 TERMUX_PKG_SHA256=3cc42e84c7b1bb926c6451a21ad1595f56c5b10be3a1d7aa2f3c716a25b7ae39
-TERMUX_PKG_DEPENDS="libx11, libxcb, openblas, python"
+TERMUX_PKG_DEPENDS="libx11, libxcb, libopenblas, python"
+TERMUX_PKG_BUILD_IN_SRC=true
+TERMUX_PKG_AUTO_UPDATE=true
 
 termux_step_pre_configure() {
 	termux_setup_cmake
@@ -27,6 +30,7 @@ termux_step_pre_configure() {
 	. ${_CROSSENV_PREFIX}/bin/activate
 
 	LDFLAGS+=" -lpython${_PYTHON_VERSION}"
+	build-pip install wheel
 }
 
 termux_step_configure() {
@@ -43,10 +47,7 @@ termux_step_configure() {
 }
 
 termux_step_make() {
-	export PYTHONPATH=$TERMUX_PREFIX/lib/python${_PYTHON_VERSION}/site-packages
-	pushd $TERMUX_PKG_SRCDIR
-	python setup.py install --force \
-			--prefix $TERMUX_PREFIX \
+	python setup.py bdist_wheel \
 			-G $TERMUX_CMAKE_BUILD \
 			--set CMAKE_AR="$(command -v $AR)" \
 			--set CMAKE_UNAME="$(command -v uname)" \
@@ -70,51 +71,9 @@ termux_step_make() {
 			--set SSE4_IS_AVAILABLE_ON_HOST=0 \
 			--set AVX_IS_AVAILABLE_ON_HOST=0 \
 			--set ARM_NEON_IS_AVAILABLE=0
-	popd
 }
 
 termux_step_make_install() {
-	pushd $PYTHONPATH
-	_EGGDIR=
-	for f in dlib-${TERMUX_PKG_VERSION}.0-py${_PYTHON_VERSION}-linux-*.egg; do
-		# .egg is a zip file or a directory
-		if [ -f "$f" ] || [ -d "$f" ]; then
-			_EGGDIR="$f"
-			break
-		fi
-	done
-	test -n "${_EGGDIR}"
-	# XXX: Fix the EXT_SUFFIX. More investigation is needed to find the underlying cause.
-	pushd "${_EGGDIR}"
-	local old_suffix=".cpython-310-$TERMUX_HOST_PLATFORM.so"
-	local new_suffix=".cpython-310.so"
-
-	find . \
-		-name '*'"$old_suffix" \
-		-exec sh -c '_f="{}"; mv -- "$_f" "${_f%'"$old_suffix"'}'"$new_suffix"'"' \;
-	popd
-	popd
-}
-
-termux_step_post_make_install() {
-	# Delete the easy-install related files, since we use postinst/prerm to handle it.
-	pushd $TERMUX_PREFIX
-	rm -rf lib/python${_PYTHON_VERSION}/site-packages/__pycache__
-	rm -rf lib/python${_PYTHON_VERSION}/site-packages/easy-install.pth
-	rm -rf lib/python${_PYTHON_VERSION}/site-packages/site.py
-	popd
-}
-
-termux_step_create_debscripts() {
-	cat <<- EOF > ./postinst
-	#!$TERMUX_PREFIX/bin/sh
-	echo "Installing $TERMUX_PKG_NAME..."
-	echo "./${_EGGDIR}" >> $TERMUX_PREFIX/lib/python${_PYTHON_VERSION}/site-packages/easy-install.pth
-	EOF
-
-	cat <<- EOF > ./prerm
-	#!$TERMUX_PREFIX/bin/sh
-	echo "Removing $TERMUX_PKG_NAME..."
-	sed -i "/\.\/${_EGGDIR//./\\.}/d" $TERMUX_PREFIX/lib/python${_PYTHON_VERSION}/site-packages/easy-install.pth
-	EOF
+	export PYTHONPATH=$TERMUX_PREFIX/lib/python${_PYTHON_VERSION}/site-packages
+	pip install --no-deps ./dist/*.whl --prefix=$TERMUX_PREFIX
 }

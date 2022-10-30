@@ -1,0 +1,993 @@
+From 29288e5d895b21f5508c15294f1303b367534a63 Mon Sep 17 00:00:00 2001
+From: Davis King <davis@dlib.net>
+Date: Sun, 31 Jul 2022 17:45:18 -0400
+Subject: [PATCH] Make C++14 and CMake 3.8.0 the new minimum required versions
+
+---
+ CMakeLists.txt                                |   2 +-
+ dlib/CMakeLists.txt                           |  26 ++--
+ dlib/cmake                                    |   2 +-
+ .../add_global_compiler_switch.cmake          |  35 ------
+ ..._avx_instructions_executable_on_host.cmake |   2 +-
+ .../cmake_utils/check_if_neon_available.cmake |   2 +-
+ ...sse4_instructions_executable_on_host.cmake |   2 +-
+ dlib/cmake_utils/find_libjpeg.cmake           |   2 +-
+ dlib/cmake_utils/find_libpng.cmake            |   2 +-
+ .../set_compiler_specific_options.cmake       |  41 +------
+ ..._visual_studio_to_use_static_runtime.cmake |   5 +-
+ dlib/cmake_utils/test_for_avx/CMakeLists.txt  |   2 +-
+ .../cmake_utils/test_for_cpp11/CMakeLists.txt |  17 ---
+ .../cmake_utils/test_for_cpp11/cpp11_test.cpp |  53 --------
+ dlib/cmake_utils/test_for_cuda/CMakeLists.txt |   4 +-
+ .../cmake_utils/test_for_cudnn/CMakeLists.txt |   7 +-
+ .../test_for_libjpeg/CMakeLists.txt           |   2 +-
+ .../test_for_libpng/CMakeLists.txt            |   2 +-
+ dlib/cmake_utils/test_for_neon/CMakeLists.txt |   2 +-
+ dlib/cmake_utils/test_for_sse4/CMakeLists.txt |   2 +-
+ dlib/cmake_utils/use_cpp_11.cmake             | 115 ------------------
+ dlib/external/cblas/CMakeLists.txt            |   2 +-
+ dlib/external/pybind11/CMakeLists.txt         |  14 +--
+ .../pybind11/tools/pybind11Tools.cmake        |   2 +-
+ dlib/java/CMakeLists.txt                      |   2 +-
+ dlib/java/cmake_swig_jni                      |   8 +-
+ dlib/matlab/CMakeLists.txt                    |   2 +-
+ dlib/matlab/cmake_mex_wrapper                 |   2 +-
+ dlib/test/CMakeLists.txt                      |   2 +-
+ dlib/test/blas_bindings/CMakeLists.txt        |   2 +-
+ dlib/test/tools/CMakeLists.txt                |   2 +-
+ examples/CMakeLists.txt                       |  98 ++++++---------
+ tools/archive/CMakeLists.txt                  |   2 +-
+ .../convert_dlib_nets_to_caffe/CMakeLists.txt |   2 +-
+ tools/htmlify/CMakeLists.txt                  |   2 +-
+ tools/imglab/CMakeLists.txt                   |   2 +-
+ tools/python/CMakeLists.txt                   |   7 +-
+ 37 files changed, 81 insertions(+), 397 deletions(-)
+ delete mode 100644 dlib/cmake_utils/add_global_compiler_switch.cmake
+ delete mode 100644 dlib/cmake_utils/test_for_cpp11/CMakeLists.txt
+ delete mode 100644 dlib/cmake_utils/test_for_cpp11/cpp11_test.cpp
+ delete mode 100644 dlib/cmake_utils/use_cpp_11.cmake
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index c46c3e0709..da92454aab 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1,4 +1,4 @@
+-cmake_minimum_required(VERSION 2.8.12)
++cmake_minimum_required(VERSION 3.8.0)
+ 
+ project(dlib_project)
+ 
+diff --git a/dlib/CMakeLists.txt b/dlib/CMakeLists.txt
+index 14a6197802..fb5d7b1574 100644
+--- a/dlib/CMakeLists.txt
++++ b/dlib/CMakeLists.txt
+@@ -4,14 +4,11 @@
+ #
+ 
+ 
+-cmake_minimum_required(VERSION 2.8.12)
++cmake_minimum_required(VERSION 3.8.0)
+ 
+ set(CMAKE_DISABLE_SOURCE_CHANGES ON)
+ set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
+ 
+-if(POLICY CMP0048)
+-   cmake_policy(SET CMP0048 NEW)
+-endif()
+ if(POLICY CMP0077)
+    cmake_policy(SET CMP0077 NEW)
+ endif()
+@@ -36,18 +33,12 @@ include(cmake_utils/set_compiler_specific_options.cmake)
+ # Adhere to GNU filesystem layout conventions
+ include(GNUInstallDirs)
+ 
+-if (POLICY CMP0063)
+-   # This policy tells cmake to really honor CXX_VISIBILITY_PRESET rather than
+-   # ignore it for backwards compatibility.
+-   cmake_policy(SET CMP0063 NEW)
+-endif()
+ if (POLICY CMP0075)
+    cmake_policy(SET CMP0075 NEW)
+ endif()
+ 
+ # default to a Release build (except if CMAKE_BUILD_TYPE is set)
+ include(cmake_utils/release_build_by_default)
+-include(cmake_utils/use_cpp_11.cmake)
+ 
+ # Set DLIB_VERSION in the including CMake file so they can use it to do whatever they want. 
+ get_directory_property(has_parent PARENT_DIRECTORY)
+@@ -644,7 +635,7 @@ if (NOT TARGET dlib)
+             set(CUDA_FOUND 0)
+          endif()
+ 
+-         if (CUDA_FOUND AND (NOT USING_OLD_VISUAL_STUDIO_COMPILER))
++         if (CUDA_FOUND)
+ 
+             # There is some bug in cmake that causes it to mess up the
+             # -std=c++11 option if you let it propagate it to nvcc in some
+@@ -676,7 +667,7 @@ if (NOT TARGET dlib)
+                LIST(APPEND CUDA_NVCC_FLAGS -DDLIB__CMAKE_GENERATED_A_CONFIG_H_FILE)
+             endif()
+             if (NOT MSVC)
+-               list(APPEND CUDA_NVCC_FLAGS "-std=c++11")
++               list(APPEND CUDA_NVCC_FLAGS "-std=c++14")
+             endif()
+             if (CMAKE_POSITION_INDEPENDENT_CODE)
+                # sometimes this setting isn't propagated to NVCC, which then causes the
+@@ -776,7 +767,7 @@ if (NOT TARGET dlib)
+             endif()
+          endif()
+ 
+-         if (CUDA_FOUND AND cudnn AND (NOT USING_OLD_VISUAL_STUDIO_COMPILER) AND cuda_test_compile_worked AND cudnn_test_compile_worked AND cudnn_include)
++         if (CUDA_FOUND AND cudnn AND cuda_test_compile_worked AND cudnn_test_compile_worked AND cudnn_include)
+             set(source_files ${source_files} 
+                cuda/cuda_dlib.cu 
+                cuda/cudnn_dlibapi.cpp
+@@ -802,9 +793,6 @@ if (NOT TARGET dlib)
+          else()
+             set(DLIB_USE_CUDA OFF CACHE STRING ${DLIB_USE_BLAS_STR} FORCE )
+             toggle_preprocessor_switch(DLIB_USE_CUDA)
+-            if (USING_OLD_VISUAL_STUDIO_COMPILER)
+-               message(STATUS "*** Dlib CUDA support requires C++11 but your compiler doesn't support it. ***")
+-            endif()
+             if (NOT CUDA_FOUND)
+                message(STATUS "DID NOT FIND CUDA")
+             endif()
+@@ -889,11 +877,11 @@ if (NOT TARGET dlib)
+       add_library(dlib_all_source_cpp STATIC all/source.cpp) 
+       target_link_libraries(dlib_all_source_cpp dlib)
+       target_compile_options(dlib_all_source_cpp PUBLIC ${active_preprocessor_switches})
+-      enable_cpp11_for_target(dlib_all_source_cpp)
++      target_compile_features(dlib_all_source_cpp PUBLIC cxx_std_14)
+    endif()
+ 
+-   enable_cpp11_for_target(dlib)
+-   if((MSVC AND CMAKE_VERSION VERSION_LESS 3.11) OR CMAKE_VERSION VERSION_LESS 3.3)
++   target_compile_features(dlib PUBLIC cxx_std_14)
++   if((MSVC AND CMAKE_VERSION VERSION_LESS 3.11))
+       target_compile_options(dlib PUBLIC ${active_compile_opts})
+       target_compile_options(dlib PRIVATE ${active_compile_opts_private})
+    else()
+diff --git a/dlib/cmake b/dlib/cmake
+index d3695b30ec..224ba3a491 100644
+--- a/dlib/cmake
++++ b/dlib/cmake
+@@ -1,5 +1,5 @@
+ 
+-cmake_minimum_required(VERSION 2.8.12)
++cmake_minimum_required(VERSION 3.8.0)
+ 
+ add_subdirectory(${CMAKE_CURRENT_LIST_DIR} dlib_build)
+ 
+diff --git a/dlib/cmake_utils/add_global_compiler_switch.cmake b/dlib/cmake_utils/add_global_compiler_switch.cmake
+deleted file mode 100644
+index 5f3d83ce4e..0000000000
+--- a/dlib/cmake_utils/add_global_compiler_switch.cmake
++++ /dev/null
+@@ -1,35 +0,0 @@
+-
+-
+-cmake_minimum_required(VERSION 2.8.12)
+-
+-message(WARNING "add_global_compiler_switch() is deprecated.  Use target_compile_options() instead")
+-
+-# Make macros that can add compiler switches to the entire project.  Not just
+-# to the current cmake folder being built.  
+-macro ( add_global_compiler_switch switch_name )
+-   # If removing the switch would change the flags then it's already present
+-   # and we don't need to do anything.
+-   string(REPLACE "${switch_name}" "" tempstr "${CMAKE_CXX_FLAGS}")
+-   if ("${CMAKE_CXX_FLAGS}" STREQUAL "${tempstr}" )
+-      set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${switch_name}" 
+-         CACHE STRING "Flags used by the compiler during all C++ builds." 
+-         FORCE)
+-   endif ()
+-endmacro()
+-
+-macro ( remove_global_compiler_switch switch_name )
+-   string(REPLACE "${switch_name}" "" tempstr "${CMAKE_CXX_FLAGS}")
+-   if (NOT "${CMAKE_CXX_FLAGS}" STREQUAL "${tempstr}" )
+-      set (CMAKE_CXX_FLAGS "${tempstr}" 
+-         CACHE STRING "Flags used by the compiler during all C++ builds." 
+-         FORCE)
+-   endif ()
+-endmacro()
+-
+-macro (add_global_define def_name)
+-   add_global_compiler_switch(-D${def_name})
+-endmacro()
+-
+-macro (remove_global_define def_name)
+-   remove_global_compiler_switch(-D${def_name})
+-endmacro()
+diff --git a/dlib/cmake_utils/check_if_avx_instructions_executable_on_host.cmake b/dlib/cmake_utils/check_if_avx_instructions_executable_on_host.cmake
+index a5d7320f4e..4f2cfef933 100644
+--- a/dlib/cmake_utils/check_if_avx_instructions_executable_on_host.cmake
++++ b/dlib/cmake_utils/check_if_avx_instructions_executable_on_host.cmake
+@@ -1,6 +1,6 @@
+ # This script checks if your compiler and host processor can generate and then run programs with AVX instructions.
+ 
+-cmake_minimum_required(VERSION 2.8.12)
++cmake_minimum_required(VERSION 3.8.0)
+ 
+ # Don't rerun this script if its already been executed.
+ if (DEFINED AVX_IS_AVAILABLE_ON_HOST)
+diff --git a/dlib/cmake_utils/check_if_neon_available.cmake b/dlib/cmake_utils/check_if_neon_available.cmake
+index 0510707df7..895c810b74 100644
+--- a/dlib/cmake_utils/check_if_neon_available.cmake
++++ b/dlib/cmake_utils/check_if_neon_available.cmake
+@@ -1,6 +1,6 @@
+ # This script checks if __ARM_NEON__ is defined for your compiler
+ 
+-cmake_minimum_required(VERSION 2.8.12)
++cmake_minimum_required(VERSION 3.8.0)
+ 
+ # Don't rerun this script if its already been executed.
+ if (DEFINED ARM_NEON_IS_AVAILABLE)
+diff --git a/dlib/cmake_utils/check_if_sse4_instructions_executable_on_host.cmake b/dlib/cmake_utils/check_if_sse4_instructions_executable_on_host.cmake
+index e2605819ee..c475609970 100644
+--- a/dlib/cmake_utils/check_if_sse4_instructions_executable_on_host.cmake
++++ b/dlib/cmake_utils/check_if_sse4_instructions_executable_on_host.cmake
+@@ -1,6 +1,6 @@
+ # This script checks if your compiler and host processor can generate and then run programs with SSE4 instructions.
+ 
+-cmake_minimum_required(VERSION 2.8.12)
++cmake_minimum_required(VERSION 3.8.0)
+ 
+ # Don't rerun this script if its already been executed.
+ if (DEFINED SSE4_IS_AVAILABLE_ON_HOST)
+diff --git a/dlib/cmake_utils/find_libjpeg.cmake b/dlib/cmake_utils/find_libjpeg.cmake
+index 3b9e656502..028217b075 100644
+--- a/dlib/cmake_utils/find_libjpeg.cmake
++++ b/dlib/cmake_utils/find_libjpeg.cmake
+@@ -1,7 +1,7 @@
+ #This script just runs CMake's built in JPEG finding tool.  But it also checks that the
+ #copy of libjpeg that cmake finds actually builds and links.
+ 
+-cmake_minimum_required(VERSION 2.8.12)
++cmake_minimum_required(VERSION 3.8.0)
+ 
+ if (BUILDING_PYTHON_IN_MSVC)
+    # Never use any system copy of libjpeg when building python in visual studio
+diff --git a/dlib/cmake_utils/find_libpng.cmake b/dlib/cmake_utils/find_libpng.cmake
+index 1b35604315..6760739226 100644
+--- a/dlib/cmake_utils/find_libpng.cmake
++++ b/dlib/cmake_utils/find_libpng.cmake
+@@ -1,7 +1,7 @@
+ #This script just runs CMake's built in PNG finding tool.  But it also checks that the
+ #copy of libpng that cmake finds actually builds and links.
+ 
+-cmake_minimum_required(VERSION 2.8.12)
++cmake_minimum_required(VERSION 3.8.0)
+ 
+ if (BUILDING_PYTHON_IN_MSVC)
+    # Never use any system copy of libpng when building python in visual studio
+diff --git a/dlib/cmake_utils/set_compiler_specific_options.cmake b/dlib/cmake_utils/set_compiler_specific_options.cmake
+index f1f7bcfb19..8093ca6d30 100644
+--- a/dlib/cmake_utils/set_compiler_specific_options.cmake
++++ b/dlib/cmake_utils/set_compiler_specific_options.cmake
+@@ -1,10 +1,5 @@
+ 
+-cmake_minimum_required(VERSION 2.8.12)
+-
+-if (POLICY CMP0054)
+-   cmake_policy(SET CMP0054 NEW)
+-endif()
+-
++cmake_minimum_required(VERSION 3.8.0)
+ 
+ 
+ # Check if we are being built as part of a pybind11 module. 
+@@ -26,40 +21,6 @@ endif()
+ 
+ 
+ 
+-set(USING_OLD_VISUAL_STUDIO_COMPILER 0)
+-if(MSVC AND MSVC_VERSION VERSION_LESS 1900)
+-   message(FATAL_ERROR "C++11 is required to use dlib, but the version of Visual Studio you are using is too old and doesn't support C++11.  You need Visual Studio 2015 or newer. ")
+-elseif(MSVC AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 19.0.24210.0 AND "MSVC" MATCHES ${CMAKE_CXX_COMPILER_ID})
+-   message(STATUS "NOTE: Visual Studio didn't have good enough C++11 support until Visual Studio 2015 update 3 (v19.0.24210.0)")
+-   message(STATUS "So we aren't enabling things that require full C++11 support (e.g. the deep learning tools).")
+-   message(STATUS "Also, be aware that Visual Studio's version naming is confusing, in particular, there are multiple versions of 'update 3'")
+-   message(STATUS "So if you are getting this message you need to update to the newer version of Visual Studio to use full C++11.")
+-   set(USING_OLD_VISUAL_STUDIO_COMPILER 1)
+-elseif(MSVC AND (MSVC_VERSION EQUAL 1911 OR MSVC_VERSION EQUAL 1910))
+-   message(STATUS "******************************************************************************************")
+-   message(STATUS "Your version of Visual Studio has incomplete C++11 support and is unable to compile the ")
+-   message(STATUS "DNN examples. So we are disabling the deep learning tools.  If you want to use the DNN ")
+-   message(STATUS "tools in dlib then update your copy of Visual Studio.")
+-   message(STATUS "******************************************************************************************")
+-   set(USING_OLD_VISUAL_STUDIO_COMPILER 1)
+-endif()
+-
+-if(CMAKE_COMPILER_IS_GNUCXX)
+-   execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion OUTPUT_VARIABLE GCC_VERSION)
+-   if (GCC_VERSION VERSION_LESS 4.9)
+-      message(FATAL_ERROR "C++11 is required to use dlib, but the version of GCC you are using is too old and doesn't support C++11.  You need GCC 4.9 or newer. ")
+-   endif()
+-endif()
+-
+-
+-# push USING_OLD_VISUAL_STUDIO_COMPILER to the parent so we can use it in the
+-# examples CMakeLists.txt file.
+-get_directory_property(has_parent PARENT_DIRECTORY)
+-if(has_parent)
+-   set(USING_OLD_VISUAL_STUDIO_COMPILER ${USING_OLD_VISUAL_STUDIO_COMPILER} PARENT_SCOPE)
+-endif()
+-
+-
+ 
+ set(gcc_like_compilers GNU Clang  Intel)
+ set(intel_archs x86_64 i386 i686 AMD64 amd64 x86)
+diff --git a/dlib/cmake_utils/tell_visual_studio_to_use_static_runtime.cmake b/dlib/cmake_utils/tell_visual_studio_to_use_static_runtime.cmake
+index bc84ba0d62..80122d8018 100644
+--- a/dlib/cmake_utils/tell_visual_studio_to_use_static_runtime.cmake
++++ b/dlib/cmake_utils/tell_visual_studio_to_use_static_runtime.cmake
+@@ -2,10 +2,7 @@
+ # Including this cmake script into your cmake project will cause visual studio
+ # to build your project against the static C runtime.
+ 
+-cmake_minimum_required(VERSION 2.8.12)
+-if (POLICY CMP0054)
+-   cmake_policy(SET CMP0054 NEW)
+-endif()
++cmake_minimum_required(VERSION 3.8.0)
+ 
+ if (MSVC OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
+    option (DLIB_FORCE_MSVC_STATIC_RUNTIME "use static runtime" ON)
+diff --git a/dlib/cmake_utils/test_for_avx/CMakeLists.txt b/dlib/cmake_utils/test_for_avx/CMakeLists.txt
+index 7d72402339..10890153cf 100644
+--- a/dlib/cmake_utils/test_for_avx/CMakeLists.txt
++++ b/dlib/cmake_utils/test_for_avx/CMakeLists.txt
+@@ -1,5 +1,5 @@
+ 
+-cmake_minimum_required(VERSION 2.8.12)
++cmake_minimum_required(VERSION 3.8.0)
+ project(avx_test)
+ 
+ set(USE_AVX_INSTRUCTIONS ON CACHE BOOL "Use AVX instructions")
+diff --git a/dlib/cmake_utils/test_for_cpp11/CMakeLists.txt b/dlib/cmake_utils/test_for_cpp11/CMakeLists.txt
+deleted file mode 100644
+index bc6f025636..0000000000
+--- a/dlib/cmake_utils/test_for_cpp11/CMakeLists.txt
++++ /dev/null
+@@ -1,17 +0,0 @@
+-
+-cmake_minimum_required(VERSION 2.8.12)
+-project(cpp11_test)
+-
+-# Try to enable C++11
+-include(CheckCXXCompilerFlag)
+-CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
+-CHECK_CXX_COMPILER_FLAG("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
+-if(COMPILER_SUPPORTS_CXX11)
+-   message(STATUS "C++11 activated.")
+-   ADD_DEFINITIONS("-std=c++11")
+-elseif(COMPILER_SUPPORTS_CXX0X)
+-   message(STATUS "C++0x activated.")
+-   ADD_DEFINITIONS("-std=c++0x")
+-endif()
+-
+-add_library(cpp11_test STATIC cpp11_test.cpp )
+diff --git a/dlib/cmake_utils/test_for_cpp11/cpp11_test.cpp b/dlib/cmake_utils/test_for_cpp11/cpp11_test.cpp
+deleted file mode 100644
+index 59ca7e8e1c..0000000000
+--- a/dlib/cmake_utils/test_for_cpp11/cpp11_test.cpp
++++ /dev/null
+@@ -1,53 +0,0 @@
+-// Copyright (C) 2015  Davis E. King (davis@dlib.net)
+-// License: Boost Software License   See LICENSE.txt for the full license.
+-
+-#include <memory>
+-#include <iostream>
+-
+-using namespace std;
+-
+-class testme
+-{
+-public:
+-
+-    testme(testme&&) = default;
+-    testme(const testme&) = delete;
+-
+-
+-    template <typename T>
+-    auto auto_return(T f) -> decltype(f(4)) { return f(4); }
+-
+-    template <typename T>
+-    auto auto_return(T f) -> decltype(f()) { return f(); }
+-
+-    static int returnint() { return 0; }
+-
+-    void dostuff()
+-    {
+-        thread_local int stuff1 = 999;
+-        auto x = 4;
+-        ++stuff1;
+-
+-        decltype(x) asdf = 9;
+-        ++asdf;
+-
+-        auto f = []() { cout << "in a lambda!" << endl; };
+-        f();
+-
+-        auto_return(returnint);
+-    }
+-
+-    template <typename ...T>
+-    void variadic_template(
+-        T&& ...args
+-    )
+-    {
+-    }
+-
+-
+-
+-    std::shared_ptr<int> asdf;
+-};
+-
+-// ------------------------------------------------------------------------------------
+-
+diff --git a/dlib/cmake_utils/test_for_cuda/CMakeLists.txt b/dlib/cmake_utils/test_for_cuda/CMakeLists.txt
+index 1826348c78..8b6cd7e7b0 100644
+--- a/dlib/cmake_utils/test_for_cuda/CMakeLists.txt
++++ b/dlib/cmake_utils/test_for_cuda/CMakeLists.txt
+@@ -1,5 +1,5 @@
+ 
+-cmake_minimum_required(VERSION 2.8.12)
++cmake_minimum_required(VERSION 3.8.0)
+ project(cuda_test)
+ 
+ include_directories(../../cuda)
+@@ -9,6 +9,6 @@ add_definitions(-DDLIB_USE_CUDA)
+ option(CUDA_PROPAGATE_HOST_FLAGS "Propage C/CXX_FLAGS and friends to the host compiler via -Xcompile" OFF)
+ find_package(CUDA 7.5 REQUIRED)
+ set(CUDA_HOST_COMPILATION_CPP ON)
+-list(APPEND CUDA_NVCC_FLAGS "-arch=sm_50;-std=c++11;-D__STRICT_ANSI__;-D_MWAITXINTRIN_H_INCLUDED;-D_FORCE_INLINES")
++list(APPEND CUDA_NVCC_FLAGS "-arch=sm_50;-std=c++14;-D__STRICT_ANSI__;-D_MWAITXINTRIN_H_INCLUDED;-D_FORCE_INLINES")
+ 
+ cuda_add_library(cuda_test STATIC cuda_test.cu )
+diff --git a/dlib/cmake_utils/test_for_cudnn/CMakeLists.txt b/dlib/cmake_utils/test_for_cudnn/CMakeLists.txt
+index 0d0d661648..0ca0f6b6a2 100644
+# --- a/dlib/cmake_utils/test_for_cudnn/CMakeLists.txt
+# +++ b/dlib/cmake_utils/test_for_cudnn/CMakeLists.txt
+# @@ -1,13 +1,12 @@
+ 
+# -cmake_minimum_required(VERSION 2.8.12)
+# +cmake_minimum_required(VERSION 3.8.0)
+#  project(cudnn_test)
+# -include(../use_cpp_11.cmake)
+ 
+#  # Override the FindCUDA.cmake setting to avoid duplication of host flags if using a toolchain:
+#  option(CUDA_PROPAGATE_HOST_FLAGS "Propage C/CXX_FLAGS and friends to the host compiler via -Xcompile" OFF)
+#  find_package(CUDA 7.5 REQUIRED)
+#  set(CUDA_HOST_COMPILATION_CPP ON)
+# -list(APPEND CUDA_NVCC_FLAGS "-arch=sm_50;-std=c++11;-D__STRICT_ANSI__")
+# +list(APPEND CUDA_NVCC_FLAGS "-arch=sm_50;-std=c++14;-D__STRICT_ANSI__")
+#  add_definitions(-DDLIB_USE_CUDA)
+ 
+#  include(find_cudnn.txt)
+# @@ -15,5 +14,5 @@ include(find_cudnn.txt)
+#  if (cudnn_include AND cudnn)
+#     include_directories(${cudnn_include})
+#     cuda_add_library(cudnn_test STATIC ../../cuda/cudnn_dlibapi.cpp ${cudnn} )
+# -   enable_cpp11_for_target(cudnn_test)
+# +   target_compile_features(cudnn_test PUBLIC cxx_std_14)
+#  endif()
+diff --git a/dlib/cmake_utils/test_for_libjpeg/CMakeLists.txt b/dlib/cmake_utils/test_for_libjpeg/CMakeLists.txt
+index 1650bd099f..a3c6910dbe 100644
+--- a/dlib/cmake_utils/test_for_libjpeg/CMakeLists.txt
++++ b/dlib/cmake_utils/test_for_libjpeg/CMakeLists.txt
+@@ -1,5 +1,5 @@
+ 
+-cmake_minimum_required(VERSION 2.8.12)
++cmake_minimum_required(VERSION 3.8.0)
+ project(test_if_libjpeg_is_broken)
+ 
+ find_package(JPEG)
+diff --git a/dlib/cmake_utils/test_for_libpng/CMakeLists.txt b/dlib/cmake_utils/test_for_libpng/CMakeLists.txt
+index 65cd85a4d5..0be9206132 100644
+--- a/dlib/cmake_utils/test_for_libpng/CMakeLists.txt
++++ b/dlib/cmake_utils/test_for_libpng/CMakeLists.txt
+@@ -1,5 +1,5 @@
+ 
+-cmake_minimum_required(VERSION 2.8.12)
++cmake_minimum_required(VERSION 3.8.0)
+ project(test_if_libpng_is_broken)
+ 
+ find_package(PNG)
+diff --git a/dlib/cmake_utils/test_for_neon/CMakeLists.txt b/dlib/cmake_utils/test_for_neon/CMakeLists.txt
+index 0b6eb6f288..b9c6e51e8a 100644
+--- a/dlib/cmake_utils/test_for_neon/CMakeLists.txt
++++ b/dlib/cmake_utils/test_for_neon/CMakeLists.txt
+@@ -1,5 +1,5 @@
+ 
+-cmake_minimum_required(VERSION 2.8.12)
++cmake_minimum_required(VERSION 3.8.0)
+ project(neon_test)
+ 
+ add_library(neon_test STATIC neon_test.cpp )
+diff --git a/dlib/cmake_utils/test_for_sse4/CMakeLists.txt b/dlib/cmake_utils/test_for_sse4/CMakeLists.txt
+index 6a07d1a5dc..4cd4e95cef 100644
+--- a/dlib/cmake_utils/test_for_sse4/CMakeLists.txt
++++ b/dlib/cmake_utils/test_for_sse4/CMakeLists.txt
+@@ -1,5 +1,5 @@
+ 
+-cmake_minimum_required(VERSION 2.8.12)
++cmake_minimum_required(VERSION 3.8.0)
+ project(sse4_test)
+ 
+ set(USE_SSE4_INSTRUCTIONS ON CACHE BOOL "Use SSE4 instructions")
+diff --git a/dlib/cmake_utils/use_cpp_11.cmake b/dlib/cmake_utils/use_cpp_11.cmake
+deleted file mode 100644
+index 6b02f740e2..0000000000
+--- a/dlib/cmake_utils/use_cpp_11.cmake
++++ /dev/null
+@@ -1,115 +0,0 @@
+-# This script creates a function, enable_cpp11_for_target(), which checks if your
+-# compiler has C++11 support and enables it if it does.
+-
+-
+-cmake_minimum_required(VERSION 2.8.12)
+-
+-if (POLICY CMP0054)
+-   cmake_policy(SET CMP0054 NEW)
+-endif()
+-
+-
+-set(_where_is_cmake_utils_dir ${CMAKE_CURRENT_LIST_DIR})
+-
+-function(enable_cpp11_for_target target_name)
+-
+-
+-# Set to false unless we find out otherwise in the code below.
+-set(COMPILER_CAN_DO_CPP_11 0)
+-
+-
+-
+-macro(test_compiler_for_cpp11)
+-   message(STATUS "Building a C++11 test project to see if your compiler supports C++11")
+-   try_compile(test_for_cpp11_worked ${PROJECT_BINARY_DIR}/cpp11_test_build 
+-      ${_where_is_cmake_utils_dir}/test_for_cpp11 cpp11_test
+-      OUTPUT_VARIABLE cpp11_test_output)
+-   if (test_for_cpp11_worked)
+-      message(STATUS "C++11 activated.")
+-      set(COMPILER_CAN_DO_CPP_11 1)
+-   else()
+-      set(COMPILER_CAN_DO_CPP_11 0)
+-      message(STATUS "********** Your compiler failed to build a C++11 project.  C++11 is required to use all parts of dlib! **********")
+-      message(STATUS "********** Compiler output: ${cpp11_test_output} **********")
+-   endif()
+-endmacro()
+-
+-# Now turn on the appropriate compiler switch to enable C++11 if you have a
+-# C++11 compiler.  In CMake 3.1 there is a simple flag you can set, but earlier
+-# verions of CMake are not so convenient.
+-if (CMAKE_VERSION VERSION_LESS "3.1.2")
+-   if(CMAKE_COMPILER_IS_GNUCXX)
+-      execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion OUTPUT_VARIABLE GCC_VERSION)
+-      if (GCC_VERSION VERSION_GREATER 4.8 OR GCC_VERSION VERSION_EQUAL 4.8)
+-         message(STATUS "C++11 activated.")
+-         target_compile_options(${target_name} PUBLIC "-std=gnu++11")
+-         set(COMPILER_CAN_DO_CPP_11 1)
+-      endif()
+-   elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+-      execute_process( COMMAND ${CMAKE_CXX_COMPILER} --version OUTPUT_VARIABLE clang_full_version_string )
+-      string (REGEX REPLACE ".*clang version ([0-9]+\\.[0-9]+).*" "\\1" CLANG_VERSION ${clang_full_version_string})
+-      if (CLANG_VERSION VERSION_GREATER 3.3)
+-         message(STATUS "C++11 activated.")
+-         target_compile_options(${target_name} PUBLIC "-std=c++11")
+-         set(COMPILER_CAN_DO_CPP_11 1)
+-      endif()
+-   else()
+-      # Since we don't know what compiler this is just try to build a c++11 project and see if it compiles.
+-      test_compiler_for_cpp11()
+-   endif()
+-else()  
+-
+-   # Set a flag if the compiler you are using is capable of providing C++11 features.
+-   get_property(cxx_features GLOBAL PROPERTY CMAKE_CXX_KNOWN_FEATURES)
+-   if (";${cxx_features};" MATCHES ";cxx_rvalue_references;" AND
+-         ";${cxx_features};" MATCHES ";cxx_variadic_templates;" AND
+-         ";${cxx_features};" MATCHES ";cxx_lambdas;" AND
+-         ";${cxx_features};" MATCHES ";cxx_defaulted_move_initializers;" AND
+-         ";${cxx_features};" MATCHES ";cxx_delegating_constructors;" AND
+-         ";${cxx_features};" MATCHES ";cxx_thread_local;" AND
+-         ";${cxx_features};" MATCHES ";cxx_constexpr;" AND
+-         ";${cxx_features};" MATCHES ";cxx_decltype_incomplete_return_types;" AND
+-         ";${cxx_features};" MATCHES ";cxx_auto_type;")
+-
+-      set(COMPILER_CAN_DO_CPP_11 1)
+-      # Tell cmake that we need C++11 for dlib
+-      target_compile_features(${target_name} 
+-         PUBLIC 
+-            cxx_rvalue_references
+-            cxx_variadic_templates
+-            cxx_lambdas
+-            cxx_defaulted_move_initializers
+-            cxx_delegating_constructors
+-            cxx_thread_local
+-            cxx_constexpr
+-            # cxx_decltype_incomplete_return_types  # purposfully commented out because cmake errors out on this when using visual studio and cmake 3.8.0
+-            cxx_auto_type
+-         )
+-
+-      if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+-         # Sometimes clang will lie and report that it supports C++11 when
+-         # really it doesn't support thread_local.  So check for that.
+-         test_compiler_for_cpp11()
+-      else()
+-         message(STATUS "C++11 activated.")
+-      endif()
+-   endif()
+-endif()
+-
+-# Always enable whatever partial C++11 support we have, even if it isn't full
+-# support, and just hope for the best.
+-if (NOT COMPILER_CAN_DO_CPP_11)
+-   include(CheckCXXCompilerFlag)
+-   CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
+-   CHECK_CXX_COMPILER_FLAG("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
+-   if(COMPILER_SUPPORTS_CXX11)
+-      message(STATUS "C++11 activated (compiler doesn't have full C++11 support).")
+-      target_compile_options(${target_name} PUBLIC "-std=c++11")
+-   elseif(COMPILER_SUPPORTS_CXX0X)
+-      message(STATUS "C++0x activated (compiler doesn't have full C++11 support).")
+-      target_compile_options(${target_name} PUBLIC "-std=c++0x")
+-   endif()
+-endif()
+-
+-endfunction()
+-
+diff --git a/dlib/external/cblas/CMakeLists.txt b/dlib/external/cblas/CMakeLists.txt
+index 0d800ae13f..c5379dd9fa 100644
+--- a/dlib/external/cblas/CMakeLists.txt
++++ b/dlib/external/cblas/CMakeLists.txt
+@@ -4,7 +4,7 @@
+ #
+ 
+ 
+-cmake_minimum_required(VERSION 2.8.12)
++cmake_minimum_required(VERSION 3.8.0)
+ project(cblas)
+ 
+ 
+diff --git a/dlib/external/pybind11/CMakeLists.txt b/dlib/external/pybind11/CMakeLists.txt
+index 85ecd9028f..cbee64be6f 100644
+--- a/dlib/external/pybind11/CMakeLists.txt
++++ b/dlib/external/pybind11/CMakeLists.txt
+@@ -5,19 +5,9 @@
+ # All rights reserved. Use of this source code is governed by a
+ # BSD-style license that can be found in the LICENSE file.
+ 
+-cmake_minimum_required(VERSION 2.8.12)
++cmake_minimum_required(VERSION 3.8.0)
+ 
+-if (POLICY CMP0048)
+-  # cmake warns if loaded from a min-3.0-required parent dir, so silence the warning:
+-  cmake_policy(SET CMP0048 NEW)
+-endif()
+-
+-# CMake versions < 3.4.0 do not support try_compile/pthread checks without C as active language.
+-if(CMAKE_VERSION VERSION_LESS 3.4.0)
+-  project(pybind11)
+-else()
+-  project(pybind11 CXX)
+-endif()
++project(pybind11 CXX)
+ 
+ # Check if pybind11 is being used directly or via add_subdirectory
+ set(PYBIND11_MASTER_PROJECT OFF)
+diff --git a/dlib/external/pybind11/tools/pybind11Tools.cmake b/dlib/external/pybind11/tools/pybind11Tools.cmake
+index 6293cc6457..63ce75ffe4 100644
+--- a/dlib/external/pybind11/tools/pybind11Tools.cmake
++++ b/dlib/external/pybind11/tools/pybind11Tools.cmake
+@@ -5,7 +5,7 @@
+ # All rights reserved. Use of this source code is governed by a
+ # BSD-style license that can be found in the LICENSE file.
+ 
+-cmake_minimum_required(VERSION 2.8.12)
++cmake_minimum_required(VERSION 3.8.0)
+ 
+ # Add a CMake parameter for choosing a desired Python version
+ if(NOT PYBIND11_PYTHON_VERSION)
+diff --git a/dlib/java/CMakeLists.txt b/dlib/java/CMakeLists.txt
+index 4d66a513c0..b31bfad0d4 100644
+--- a/dlib/java/CMakeLists.txt
++++ b/dlib/java/CMakeLists.txt
+@@ -1,5 +1,5 @@
+ 
+-cmake_minimum_required (VERSION 2.8.12)
++cmake_minimum_required(VERSION 3.8.0)
+ project (myproject)
+ set(java_package_name net.dlib)
+ set(source_files
+diff --git a/dlib/java/cmake_swig_jni b/dlib/java/cmake_swig_jni
+index d74dd60ec0..48f960f41f 100644
+--- a/dlib/java/cmake_swig_jni
++++ b/dlib/java/cmake_swig_jni
+@@ -2,7 +2,7 @@
+ # it by defining some CMake variables and then include(cmake_swig_jni).  You
+ # would make a CMakeLists.txt file that looks like the following:
+ #
+-#   cmake_minimum_required (VERSION 2.8.12)
++#   cmake_minimum_required (VERSION 3.8.0)
+ #   project (example)
+ #   set(java_package_name "org.mycompany")
+ #   set(source_files
+@@ -40,9 +40,7 @@
+ ################################################################################
+ ################################################################################
+ 
+-cmake_minimum_required (VERSION 2.8.12)
+-
+-include(${CMAKE_CURRENT_LIST_DIR}/../cmake_utils/use_cpp_11.cmake)
++cmake_minimum_required (VERSION 3.8.0)
+ 
+ # This block of code tries to figure out what the JAVA_HOME environment
+ # variable should be by looking at the folder that contains the java
+@@ -180,7 +178,7 @@ FILE(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/${binary_dir_name}")
+ 
+ set_source_files_properties(${CMAKE_CURRENT_BINARY_DIR}/swig.i PROPERTIES CPLUSPLUS ON)
+ swig_add_module(${output_library_name} java ${CMAKE_CURRENT_BINARY_DIR}/swig.i ${source_files})
+-enable_cpp11_for_target(${output_library_name})
++target_compile_features(${output_library_name} PUBLIC cxx_std_14)
+ 
+ include_directories(${JNI_INCLUDE_DIRS})
+ swig_link_libraries(${output_library_name}  ${additional_link_libraries})
+diff --git a/dlib/matlab/CMakeLists.txt b/dlib/matlab/CMakeLists.txt
+index b9a0beab9e..2dee98c60c 100644
+--- a/dlib/matlab/CMakeLists.txt
++++ b/dlib/matlab/CMakeLists.txt
+@@ -1,5 +1,5 @@
+ 
+-cmake_minimum_required(VERSION 2.8.12)
++cmake_minimum_required(VERSION 3.8.0)
+ 
+ PROJECT(mex_functions)
+ 
+diff --git a/dlib/matlab/cmake_mex_wrapper b/dlib/matlab/cmake_mex_wrapper
+index 5091e4e5bf..6cbc27afc6 100644
+--- a/dlib/matlab/cmake_mex_wrapper
++++ b/dlib/matlab/cmake_mex_wrapper
+@@ -3,7 +3,7 @@
+ # that additional library dependencies can be added like this: add_mex_function(name lib1 dlib libetc).
+ # That is, just add more libraries after the name and they will be build into the mex file.
+ 
+-cmake_minimum_required(VERSION 2.8.12)
++cmake_minimum_required(VERSION 3.8.0)
+ 
+ set(BUILDING_MATLAB_MEX_FILE true)
+ set(CMAKE_POSITION_INDEPENDENT_CODE True)
+diff --git a/dlib/test/CMakeLists.txt b/dlib/test/CMakeLists.txt
+index 895a07adc7..a2998f0324 100644
+--- a/dlib/test/CMakeLists.txt
++++ b/dlib/test/CMakeLists.txt
+@@ -3,7 +3,7 @@
+ # information about it at http://www.cmake.org
+ #
+ 
+-cmake_minimum_required(VERSION 2.8.12)
++cmake_minimum_required(VERSION 3.8.0)
+ 
+ # create a variable called target_name and set it to the string "dtest"
+ set (target_name dtest)
+diff --git a/dlib/test/blas_bindings/CMakeLists.txt b/dlib/test/blas_bindings/CMakeLists.txt
+index 5deddee04c..f9c0b05a12 100644
+--- a/dlib/test/blas_bindings/CMakeLists.txt
++++ b/dlib/test/blas_bindings/CMakeLists.txt
+@@ -3,7 +3,7 @@
+ # information about it at http://www.cmake.org
+ #
+ 
+-cmake_minimum_required(VERSION 2.8.12)
++cmake_minimum_required(VERSION 3.8.0)
+ 
+ # This variable contains a list of all the tests we are building
+ # into the regression test suite.
+diff --git a/dlib/test/tools/CMakeLists.txt b/dlib/test/tools/CMakeLists.txt
+index adbd43cb91..80371d6d84 100644
+--- a/dlib/test/tools/CMakeLists.txt
++++ b/dlib/test/tools/CMakeLists.txt
+@@ -1,4 +1,4 @@
+-cmake_minimum_required(VERSION 2.8.12)
++cmake_minimum_required(VERSION 3.8.0)
+ 
+ add_subdirectory(../../../tools/imglab imglab_build)
+ add_subdirectory(../../../tools/htmlify htmlify_build)
+diff --git a/examples/CMakeLists.txt b/examples/CMakeLists.txt
+index 3a67e4fe78..ff28f1c036 100644
+--- a/examples/CMakeLists.txt
++++ b/examples/CMakeLists.txt
+@@ -32,7 +32,7 @@
+ #
+ 
+ 
+-cmake_minimum_required(VERSION 2.8.12)
++cmake_minimum_required(VERSION 3.8.0)
+ # Every project needs a name.  We call this the "examples" project.
+ project(examples)
+ 
+@@ -117,66 +117,29 @@ macro(add_gui_example name)
+    endif()
+ endmacro()
+ 
+-# The deep learning toolkit requires a compiler with essentially complete C++11
+-# support.  However, versions of Visual Studio prior to October 2016 didn't
+-# provide enough C++11 support to compile the DNN tooling, but were good enough
+-# to compile the rest of dlib.  So new versions of Visual Studio 2015 will
+-# work.  However, Visual Studio 2017 had some C++11 support regressions, so it
+-# wasn't until December 2017 that Visual Studio 2017 had good enough C++11
+-# support to compile the DNN examples.  So if you are using Visual Studio, make
+-# sure you have an updated version if you want to compile the DNN code.
+-#
+-# Also note that Visual Studio users should give the -T host=x64 option so that
+-# CMake will instruct Visual Studio to use its 64bit toolchain.  If you don't
+-# do this then by default Visual Studio uses a 32bit toolchain, WHICH RESTRICTS
+-# THE COMPILER TO ONLY 2GB OF RAM, causing it to run out of RAM and crash when
+-# compiling some of the DNN examples.  So generate your project with a statement
+-# like this:
+-#   cmake .. -G "Visual Studio 14 2015 Win64" -T host=x64 
+-if (NOT USING_OLD_VISUAL_STUDIO_COMPILER)
+-   add_example(dnn_metric_learning_ex)
+-   add_gui_example(dnn_face_recognition_ex)
+-   add_example(dnn_introduction_ex)
+-   add_example(dnn_introduction2_ex)
+-   add_example(dnn_introduction3_ex)
+-   add_example(dnn_inception_ex)
+-   add_gui_example(dnn_mmod_ex)
+-   add_gui_example(dnn_mmod_face_detection_ex)
+-   add_gui_example(random_cropper_ex)
+-   add_gui_example(dnn_mmod_dog_hipsterizer)
+-   add_gui_example(dnn_imagenet_ex)
+-   add_gui_example(dnn_mmod_find_cars_ex)
+-   add_gui_example(dnn_mmod_find_cars2_ex)
+-   add_example(dnn_mmod_train_find_cars_ex)
+-   add_gui_example(dnn_semantic_segmentation_ex)
+-   add_gui_example(dnn_instance_segmentation_ex)
+-   add_example(dnn_imagenet_train_ex)
+-   add_example(dnn_semantic_segmentation_train_ex)
+-   add_example(dnn_instance_segmentation_train_ex)
+-   add_example(dnn_metric_learning_on_images_ex)
+-   add_gui_example(dnn_dcgan_train_ex)
+-   add_gui_example(dnn_yolo_train_ex)
+-   add_gui_example(dnn_self_supervised_learning_ex)
+-endif()
+-
+-
+-if (DLIB_NO_GUI_SUPPORT)
+-   message("No GUI support, so we won't build the webcam_face_pose_ex example.")
+-else()
+-   find_package(OpenCV QUIET)
+-   if (OpenCV_FOUND)
+-      include_directories(${OpenCV_INCLUDE_DIRS})
+-
+-      add_executable(webcam_face_pose_ex webcam_face_pose_ex.cpp)
+-      target_link_libraries(webcam_face_pose_ex dlib::dlib ${OpenCV_LIBS} )
+-   else()
+-      message("OpenCV not found, so we won't build the webcam_face_pose_ex example.")
+-   endif()
+-endif()
+-
+-
+-
+-#here we apply our macros 
++add_example(dnn_metric_learning_ex)
++add_gui_example(dnn_face_recognition_ex)
++add_example(dnn_introduction_ex)
++add_example(dnn_introduction2_ex)
++add_example(dnn_introduction3_ex)
++add_example(dnn_inception_ex)
++add_gui_example(dnn_mmod_ex)
++add_gui_example(dnn_mmod_face_detection_ex)
++add_gui_example(random_cropper_ex)
++add_gui_example(dnn_mmod_dog_hipsterizer)
++add_gui_example(dnn_imagenet_ex)
++add_gui_example(dnn_mmod_find_cars_ex)
++add_gui_example(dnn_mmod_find_cars2_ex)
++add_example(dnn_mmod_train_find_cars_ex)
++add_gui_example(dnn_semantic_segmentation_ex)
++add_gui_example(dnn_instance_segmentation_ex)
++add_example(dnn_imagenet_train_ex)
++add_example(dnn_semantic_segmentation_train_ex)
++add_example(dnn_instance_segmentation_train_ex)
++add_example(dnn_metric_learning_on_images_ex)
++add_gui_example(dnn_dcgan_train_ex)
++add_gui_example(dnn_yolo_train_ex)
++add_gui_example(dnn_self_supervised_learning_ex)
+ add_gui_example(3d_point_cloud_ex)
+ add_example(bayes_net_ex)
+ add_example(bayes_net_from_disk_ex)
+@@ -264,4 +227,17 @@ if (DLIB_LINK_WITH_SQLITE3)
+    add_example(sqlite_ex)
+ endif()
+ 
++if (DLIB_NO_GUI_SUPPORT)
++   message("No GUI support, so we won't build the webcam_face_pose_ex example.")
++else()
++   find_package(OpenCV QUIET)
++   if (OpenCV_FOUND)
++      include_directories(${OpenCV_INCLUDE_DIRS})
++
++      add_executable(webcam_face_pose_ex webcam_face_pose_ex.cpp)
++      target_link_libraries(webcam_face_pose_ex dlib::dlib ${OpenCV_LIBS} )
++   else()
++      message("OpenCV not found, so we won't build the webcam_face_pose_ex example.")
++   endif()
++endif()
+ 
+diff --git a/tools/archive/CMakeLists.txt b/tools/archive/CMakeLists.txt
+index 8a3e4d7bfc..796e469852 100644
+--- a/tools/archive/CMakeLists.txt
++++ b/tools/archive/CMakeLists.txt
+@@ -4,7 +4,7 @@
+ #
+ 
+ 
+-cmake_minimum_required(VERSION 2.8.12)
++cmake_minimum_required(VERSION 3.8.0)
+ PROJECT(archive)
+ 
+ 
+diff --git a/tools/convert_dlib_nets_to_caffe/CMakeLists.txt b/tools/convert_dlib_nets_to_caffe/CMakeLists.txt
+index f9518df216..2325366fe0 100644
+--- a/tools/convert_dlib_nets_to_caffe/CMakeLists.txt
++++ b/tools/convert_dlib_nets_to_caffe/CMakeLists.txt
+@@ -3,7 +3,7 @@
+ # information about it at http://www.cmake.org
+ #
+ 
+-cmake_minimum_required(VERSION 2.8.12)
++cmake_minimum_required(VERSION 3.8.0)
+ 
+ set (target_name dtoc)
+ 
+diff --git a/tools/htmlify/CMakeLists.txt b/tools/htmlify/CMakeLists.txt
+index 02cae2172e..35f327f275 100644
+--- a/tools/htmlify/CMakeLists.txt
++++ b/tools/htmlify/CMakeLists.txt
+@@ -3,7 +3,7 @@
+ # information about it at http://www.cmake.org
+ #
+ 
+-cmake_minimum_required(VERSION 2.8.12)
++cmake_minimum_required(VERSION 3.8.0)
+ 
+ # create a variable called target_name and set it to the string "htmlify"
+ set (target_name htmlify)
+diff --git a/tools/imglab/CMakeLists.txt b/tools/imglab/CMakeLists.txt
+index 46c64fb3ea..5fb1331d15 100644
+--- a/tools/imglab/CMakeLists.txt
++++ b/tools/imglab/CMakeLists.txt
+@@ -3,7 +3,7 @@
+ # information about it at http://www.cmake.org
+ #
+ 
+-cmake_minimum_required(VERSION 2.8.12)
++cmake_minimum_required(VERSION 3.8.0)
+ 
+ # create a variable called target_name and set it to the string "imglab"
+ set (target_name imglab)
+diff --git a/tools/python/CMakeLists.txt b/tools/python/CMakeLists.txt
+index a67bba8f9f..8309d5fb93 100644
+--- a/tools/python/CMakeLists.txt
++++ b/tools/python/CMakeLists.txt
+@@ -1,5 +1,5 @@
+ 
+-CMAKE_MINIMUM_REQUIRED(VERSION 2.8.12)
++CMAKE_MINIMUM_REQUIRED(VERSION 3.8.0)
+ 
+ if (WIN32 AND NOT "${CMAKE_GENERATOR}" MATCHES "Visual Studio") 
+    message(FATAL_ERROR "\n"
+@@ -38,11 +38,6 @@ endif()
+ add_subdirectory(../../dlib/external/pybind11 pybind11_build)
+ add_subdirectory(../../dlib dlib_build)
+ 
+-if (USING_OLD_VISUAL_STUDIO_COMPILER)
+-   message(FATAL_ERROR "You have to use a version of Visual Studio that supports C++11.  As of December 2017, the only versions that have good enough C++11 support to compile the dlib Python API is a fully updated Visual Studio 2015 or a fully updated Visual Studio 2017.  Older versions of either of these compilers have bad C++11 support and will fail to compile the Python extension. ***SO UPDATE YOUR VISUAL STUDIO TO MAKE THIS ERROR GO AWAY***")
+-endif()
+-
+-
+ add_definitions(-DDLIB_VERSION=${DLIB_VERSION})
+ 
+ # Tell cmake to compile all these cpp files into a dlib python module.
