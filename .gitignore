@@ -10,6 +10,7 @@
 /CONTRIBUTING.md
 /build-all.sh
 /build-package.sh
+/build-package.sh.orig
 /clean.sh
 
 # Vim
@@ -35,3 +36,6 @@ scripts/.vagrant/
 /packages/*/cache
 /root-packages/*/cache
 /x11-packages/*/cache
+
+# VSCode
+.vscode
