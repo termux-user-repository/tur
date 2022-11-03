@@ -1,0 +1,130 @@
+Subject: [PATCH] Use usemozjs rather than jsEngine != 'none'
+
+Commit 7f574fb632c18e96a4dc6df88c476b9b68da4980 makes the option
+`--js-engine` not work, so revert this commit.
+
+diff --git a/SConstruct b/SConstruct
+index e8204878688..201644e0877 100644
+--- a/SConstruct
++++ b/SConstruct
+@@ -1499,7 +1499,9 @@ jsEngine = get_option("js-engine")
+ 
+ serverJs = get_option("server-js") == "on"
+ 
+-if not serverJs and not jsEngine:
++usemozjs = (jsEngine.startswith('mozjs'))
++
++if not serverJs and not usemozjs:
+     print("Warning: --server-js=off is not needed with --js-engine=none")
+ 
+ # We defer building the env until we have determined whether we want certain values. Some values
+@@ -6064,7 +6066,6 @@ Export([
+     'get_option',
+     'has_option',
+     'http_client',
+-    'jsEngine',
+     'module_sconscripts',
+     'optBuild',
+     'releaseBuild',
+@@ -6075,6 +6076,7 @@ Export([
+     'use_system_libunwind',
+     'use_system_version_of_library',
+     'use_vendored_libunwind',
++    'usemozjs',
+     'version_extra',
+     'version_parts',
+     'wiredtiger',
+diff --git a/src/mongo/dbtests/SConscript b/src/mongo/dbtests/SConscript
+index 00f8cd15961..5be6c182c71 100644
+--- a/src/mongo/dbtests/SConscript
++++ b/src/mongo/dbtests/SConscript
+@@ -3,6 +3,7 @@
+ Import("env")
+ Import("get_option")
+ Import("has_option")
++Import("usemozjs")
+ Import("wiredtiger")
+ 
+ env = env.Clone()
+diff --git a/src/mongo/scripting/SConscript b/src/mongo/scripting/SConscript
+index 92578718aef..9c8534ba31d 100644
+--- a/src/mongo/scripting/SConscript
++++ b/src/mongo/scripting/SConscript
+@@ -3,8 +3,8 @@
+ Import([
+     'env',
+     'get_option',
+-    'jsEngine',
+     'serverJs',
++    'usemozjs',
+ ])
+ 
+ env.Library(
+@@ -46,7 +46,7 @@ env.Library(
+     ],
+ )
+ 
+-if jsEngine:
++if usemozjs:
+     scriptingEnv = env.Clone()
+ 
+     scriptingEnv.Append(
+diff --git a/src/mongo/shell/SConscript b/src/mongo/shell/SConscript
+index d99de6a0ed6..e71e32d121c 100644
+--- a/src/mongo/shell/SConscript
++++ b/src/mongo/shell/SConscript
+@@ -4,7 +4,7 @@ Import([
+     'env',
+     'get_option',
+     'has_option',
+-    'jsEngine',
++    'usemozjs',
+     'version_parts',
+     'version_extra',
+ ])
+@@ -241,7 +241,7 @@ env.Library(
+     ],
+ )
+ 
+-if not has_option('noshell') and jsEngine:
++if not has_option('noshell') and usemozjs:
+ 
+     env.Library(
+         target="mongo_initializers",
+diff --git a/src/third_party/SConscript b/src/third_party/SConscript
+index 8f8b559ecd0..a4117a47c0d 100644
+--- a/src/third_party/SConscript
++++ b/src/third_party/SConscript
+@@ -2,16 +2,11 @@
+ 
+ import json
+ 
+-Import([
+-    'env',
+-    'get_option',
+-    'jsEngine',
+-    'use_libunwind',
+-    'use_system_libunwind',
+-    'use_system_version_of_library',
+-    'use_vendored_libunwind',
+-    'wiredtiger',
+-])
++Import("env use_system_version_of_library usemozjs get_option")
++Import("use_libunwind")
++Import("use_system_libunwind")
++Import("use_vendored_libunwind")
++Import("wiredtiger")
+ 
+ snappySuffix = '-1.1.7'
+ icuSuffix = '-57.1'
+@@ -257,7 +257,7 @@
+ s2Env.InjectMongoIncludePaths()
+ s2Env.SConscript('s2/SConscript', exports={'env': s2Env})
+ 
+-if jsEngine:
++if usemozjs:
+     mozjsEnv = env.Clone()
+     mozjsEnv.SConscript('mozjs/SConscript', exports={'env': mozjsEnv})
+ 
+-- 
+2.25.1
