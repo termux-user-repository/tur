@@ -64,8 +64,8 @@ termux_step_make() {
 }
 
 termux_step_make_install() {
-	$STRIP $TERMUX_PKG_SRCDIR/build/install/bin/{mongo{,s,d}}
-	install -Dm700 -t $TERMUX_PREFIX/bin $TERMUX_PKG_SRCDIR/build/install/bin/{mongo{,s,d}}
+	$STRIP $TERMUX_PKG_SRCDIR/build/install/bin/mongo{,s,d}
+	install -Dm700 -t $TERMUX_PREFIX/bin $TERMUX_PKG_SRCDIR/build/install/bin/mongo{,s,d}
 	mkdir -p $TERMUX_PREFIX/var/lib/mongodb/db
 	touch $TERMUX_PREFIX/var/lib/mongodb/db/.placeholder
 }
