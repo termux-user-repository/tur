@@ -7,6 +7,7 @@ build/install/MPL-2
 build/install/THIRD-PARTY-NOTICES"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION=6.1.0
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://github.com/mongodb/mongo/archive/refs/tags/r$TERMUX_PKG_VERSION.tar.gz
 TERMUX_PKG_SHA256=f9aa08d43b87694085b06744025702f80acf0efd373b77704a7fd32a7f54eca5
 TERMUX_PKG_DEPENDS="libcurl, libstemmer, liblzma, libyaml-cpp, openssl, pcre2, zlib, zstd"
@@ -30,16 +31,19 @@ termux_step_pre_configure() {
 		CFLAGS+=" -march=armv8-a+crc -mtune=generic"
 		CXXFLAGS+=" -march=armv8-a+crc -mtune=generic"
 	fi
+
+	pushd $TERMUX_PKG_SRCDIR/src/third_party/mozjs
+	ln -sfr platform/$TERMUX_ARCH/linux platform/$TERMUX_ARCH/android
+	popd
 }
 
 termux_step_make() {
 	. $TERMUX_PKG_HOSTBUILD_DIR/venv-dir/bin/activate
-	python3 ./buildscripts/scons.py install-core \
+	python3 ./buildscripts/scons.py install-devcore \
 				--allocator=system \
 				--libc++=libc++_shared \
 				--linker=lld \
 				--use-libunwind=off \
-				--js-engine=none \
 				--use-system-pcre2 \
 				--use-system-stemmer \
 				--use-system-yaml \
@@ -60,13 +64,8 @@ termux_step_make() {
 }
 
 termux_step_make_install() {
-	bash
-	$STRIP $TERMUX_PKG_SRCDIR/build/install/bin/mongos
-	$STRIP $TERMUX_PKG_SRCDIR/build/install/bin/mongod
-
-	install -Dm700 -t $TERMUX_PREFIX/bin $TERMUX_PKG_SRCDIR/build/install/bin/mongos
-	install -Dm700 -t $TERMUX_PREFIX/bin $TERMUX_PKG_SRCDIR/build/install/bin/mongod
-
+	$STRIP $TERMUX_PKG_SRCDIR/build/install/bin/mongo{,s,d}
+	install -Dm700 -t $TERMUX_PREFIX/bin $TERMUX_PKG_SRCDIR/build/install/bin/mongo{,s,d}
 	mkdir -p $TERMUX_PREFIX/var/lib/mongodb/db
 	touch $TERMUX_PREFIX/var/lib/mongodb/db/.placeholder
 }
