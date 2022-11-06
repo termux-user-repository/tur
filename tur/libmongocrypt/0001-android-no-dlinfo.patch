@@ -29,7 +29,6 @@
 +#include <string.h>
 +#include <stdio.h>
 +#include <stdlib.h>
-+
 +#include <linux/limits.h>
 +
 +#define LINE_MAX (PATH_MAX + 100 + 100)
@@ -107,6 +106,7 @@
 +         continue;
 +      }
 +      // We now get the absolute path
++      dlclose (tmp_handle);
 +      fclose (file);
 +      result->filepath = strdup (tmp_path);
 +      return result;
