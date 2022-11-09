@@ -27,3 +27,7 @@ mv ./termux-packages/{ndk-patches,packages,x11-packages,root-packages,scripts,bu
 
 # Apply script patches.
 patch --silent -p1 < ./common-files/script-patches.patch
+
+# Remove files
+rm build-package.sh.orig
+
