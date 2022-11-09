@@ -2,12 +2,12 @@ TERMUX_PKG_HOMEPAGE=https://scipy.org/
 TERMUX_PKG_DESCRIPTION="Fundamental algorithms for scientific computing in Python"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION=1.9.0
-TERMUX_PKG_REVISION=3
+TERMUX_PKG_VERSION=1.9.3
 TERMUX_PKG_SRCURL=https://github.com/scipy/scipy.git
 TERMUX_PKG_DEPENDS="libc++, libopenblas, python, python-numpy"
 TERMUX_PKG_BUILD_DEPENDS="python-numpy-static"
 TERMUX_PKG_BUILD_IN_SRC=true
+TERMUX_PKG_AUTO_UPDATE=true
 
 # Tests will hang on arm and will failed with `Segmentation fault` on i686.
 # See https://github.com/termux-user-repository/tur/pull/21#issue-1295483266.
@@ -119,8 +119,8 @@ termux_step_create_debscripts() {
 	cat <<- EOF > ./postinst
 	#!$TERMUX_PREFIX/bin/sh
 	INSTALLED_NUMPY_VERSION=\$(dpkg --list python-numpy | grep python-numpy | awk '{print \$3; exit;}')
-	if [ "\$INSTALLED_NUMPY_VERSION" != "$_NUMPY_VERSION" ]; then
-		echo "WARNING: python-scipy is compiled with numpy $_NUMPY_VERSION, but numpy \$INSTALLED_NUMPY_VERSION is installed. It seems that python-numpy has been upgraded. Please report it to https://github.com/termux-user-repository/tur if any bug happens."
+	if [ "\${INSTALLED_NUMPY_VERSION%%-*}" != "$_NUMPY_VERSION" ]; then
+		echo "WARNING: python-scipy is compiled with numpy $_NUMPY_VERSION, but numpy \${INSTALLED_NUMPY_VERSION%%-*} is installed. It seems that python-numpy has been upgraded. Please report it to https://github.com/termux-user-repository/tur if any bug happens."
 	fi
 	if [ "$TERMUX_ARCH" = "arm" ] || [ "$TERMUX_ARCH" = "i686" ]; then
 		echo "WARNING: python-numpy doesn't work fine on 32-bit arches. See https://github.com/termux-user-repository/tur/pull/21#issue-1295483266 for detail."
