@@ -2,32 +2,17 @@ TERMUX_PKG_HOMEPAGE=https://github.com/coder/code-server
 TERMUX_PKG_DESCRIPTION="Run VS Code on any machine anywhere and access it in the browser"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION=(4.8.3)
-TERMUX_PKG_VERSION+=(1.72.1)
-TERMUX_PKG_SRCURL=(https://github.com/coder/code-server/archive/refs/tags/v${TERMUX_PKG_VERSION[0]}.tar.gz)
-TERMUX_PKG_SRCURL+=(https://github.com/microsoft/vscode/archive/refs/tags/${TERMUX_PKG_VERSION[1]}.tar.gz)
-TERMUX_PKG_SHA256=(625fcd13463adb8514395bf0329d4c8aac9e108b98d1f8006d3eb8e8026b4f61)
-TERMUX_PKG_SHA256+=(203af193854b6117fce904d78e9506cdf384dcd594097fd35264c1a5513b7c4e)
+TERMUX_PKG_VERSION=4.8.3
+TERMUX_PKG_SRCURL=https://github.com/coder/code-server.git
 TERMUX_PKG_DEPENDS="libsecret, nodejs-lts"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_HOSTBUILD=true
 TERMUX_PKG_NO_STATICSPLIT=true
 TERMUX_PKG_BLACKLISTED_ARCHES="i686"
-
-VSCODE_DISTRO_COMMIT=129500ee4c8ab7263461ffe327268ba56b9f210d
-
-termux_step_post_get_source() {
-	rm -r lib/vscode
-	mv vscode-${TERMUX_PKG_VERSION[1]} lib/vscode
-	for f in $(cat ./patches/series); do
-		echo "Applying patch: $(basename $f)"
-		patch -d . -p1 < "./patches/$f";
-	done
-}
+TERMUX_PKG_AUTO_UPDATE=true
 
 termux_step_host_build() {
 	mv $TERMUX_PREFIX/bin $TERMUX_PREFIX/bin.bp
-	export VSCODE_DISTRO_COMMIT
 	env -i PATH="$PATH" sudo apt update
 	env -i PATH="$PATH" sudo apt install -yq libxkbfile-dev libsecret-1-dev
 	termux_setup_nodejs
@@ -45,7 +30,6 @@ termux_step_host_build() {
 termux_step_configure() {
 	termux_setup_nodejs
 	export PATH="$TERMUX_PKG_HOSTBUILD_DIR/node_modules/.bin:$PATH"
-	export VSCODE_DISTRO_COMMIT
 }
 
 termux_step_make() {
