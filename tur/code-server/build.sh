@@ -12,6 +12,7 @@ TERMUX_PKG_BLACKLISTED_ARCHES="i686"
 TERMUX_PKG_AUTO_UPDATE=true
 
 termux_step_host_build() {
+	export VERSION=$TERMUX_PKG_VERSION
 	mv $TERMUX_PREFIX/bin $TERMUX_PREFIX/bin.bp
 	env -i PATH="$PATH" sudo apt update
 	env -i PATH="$PATH" sudo apt install -yq libxkbfile-dev libsecret-1-dev
@@ -33,6 +34,7 @@ termux_step_configure() {
 }
 
 termux_step_make() {
+	export VERSION=$TERMUX_PKG_VERSION
 	cp -Rf $TERMUX_PKG_HOSTBUILD_DIR/src/release ./
 	mv $TERMUX_PREFIX/bin $TERMUX_PREFIX/bin.bp
 
