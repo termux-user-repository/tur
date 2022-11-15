@@ -1,0 +1,210 @@
+--- SuiteSparse-6.0.1.orig/AMD/cmake_modules/FindAMD.cmake	2022-11-14 09:04:25.000000000 +0900
++++ SuiteSparse-6.0.1/AMD/cmake_modules/FindAMD.cmake	2022-11-16 01:54:19.000000000 +0900
+@@ -57,6 +57,7 @@
+     AMD_VERSION
+     ${AMD_FILENAME}
+ )
++set (AMD_VERSION 3.0.0)
+ set (AMD_LIBRARIES ${AMD_LIBRARY})
+ 
+ include (FindPackageHandleStandardArgs)
+--- SuiteSparse-6.0.1.orig/BTF/cmake_modules/FindBTF.cmake	2022-11-14 09:04:25.000000000 +0900
++++ SuiteSparse-6.0.1/BTF/cmake_modules/FindBTF.cmake	2022-11-16 01:55:09.000000000 +0900
+@@ -57,6 +57,7 @@
+     BTF_VERSION
+     ${BTF_FILENAME}
+ )
++set (BTF_VERSION 2.0.0)
+ set (BTF_LIBRARIES ${BTF_LIBRARY})
+ 
+ include (FindPackageHandleStandardArgs)
+--- SuiteSparse-6.0.1.orig/CAMD/cmake_modules/FindCAMD.cmake	2022-11-14 09:04:25.000000000 +0900
++++ SuiteSparse-6.0.1/CAMD/cmake_modules/FindCAMD.cmake	2022-11-16 01:56:15.000000000 +0900
+@@ -57,6 +57,7 @@
+     CAMD_VERSION
+     ${CAMD_FILENAME}
+ )
++set (CAMD_VERSION 3.0.0)
+ set (CAMD_LIBRARIES ${CAMD_LIBRARY})
+ 
+ include (FindPackageHandleStandardArgs)
+--- SuiteSparse-6.0.1.orig/CCOLAMD/cmake_modules/FindCCOLAMD.cmake	2022-11-14 09:04:25.000000000 +0900
++++ SuiteSparse-6.0.1/CCOLAMD/cmake_modules/FindCCOLAMD.cmake	2022-11-16 01:56:54.000000000 +0900
+@@ -57,6 +57,7 @@
+     CCOLAMD_VERSION
+     ${CCOLAMD_FILENAME}
+ )
++set (CCOLAMD_VERSION 3.0.0)
+ set (CCOLAMD_LIBRARIES ${CCOLAMD_LIBRARY})
+ 
+ include (FindPackageHandleStandardArgs)
+--- SuiteSparse-6.0.1.orig/CHOLMOD/cmake_modules/FindCHOLMOD.cmake	2022-11-14 09:04:25.000000000 +0900
++++ SuiteSparse-6.0.1/CHOLMOD/cmake_modules/FindCHOLMOD.cmake	2022-11-16 01:57:34.000000000 +0900
+@@ -57,6 +57,7 @@
+     CHOLMOD_VERSION
+     ${CHOLMOD_FILENAME}
+ )
++set (CHOLMOD_VERSION 4.0.1)
+ set (CHOLMOD_LIBRARIES ${CHOLMOD_LIBRARY} )
+ 
+ include (FindPackageHandleStandardArgs)
+--- SuiteSparse-6.0.1.orig/CHOLMOD/cmake_modules/FindCHOLMOD_CUDA.cmake	2022-11-14 09:04:25.000000000 +0900
++++ SuiteSparse-6.0.1/CHOLMOD/cmake_modules/FindCHOLMOD_CUDA.cmake	2022-11-16 01:58:34.000000000 +0900
+@@ -47,6 +47,7 @@
+     CHOLMOD_CUDA_VERSION
+     ${CHOLMOD_CUDA_FILENAME}
+ )
++set (CHOLMOD_CUDA_VERSION 3.0.1)
+ set (CHOLMOD_CUDA_LIBRARIES ${CHOLMOD_CUDA_LIBRARY})
+ 
+ include (FindPackageHandleStandardArgs)
+--- SuiteSparse-6.0.1.orig/COLAMD/cmake_modules/FindCOLAMD.cmake	2022-11-14 09:04:25.000000000 +0900
++++ SuiteSparse-6.0.1/COLAMD/cmake_modules/FindCOLAMD.cmake	2022-11-16 01:59:09.000000000 +0900
+@@ -57,6 +57,7 @@
+     COLAMD_VERSION
+     ${COLAMD_FILENAME}
+ )
++set (COLAMD_VERSION 3.0.0)
+ set (COLAMD_LIBRARIES ${COLAMD_LIBRARY})
+ 
+ include (FindPackageHandleStandardArgs)
+--- SuiteSparse-6.0.1.orig/CXSparse/cmake_modules/FindCXSparse.cmake	2022-11-14 09:04:25.000000000 +0900
++++ SuiteSparse-6.0.1/CXSparse/cmake_modules/FindCXSparse.cmake	2022-11-16 01:59:50.000000000 +0900
+@@ -57,6 +57,7 @@
+     CXSPARSE_VERSION
+     ${CXSPARSE_FILENAME}
+ )
++set (CXSPARSE_VERSION 4.0.0)
+ set (CXSPARSE_LIBRARIES ${CXSPARSE_LIBRARY})
+ 
+ include (FindPackageHandleStandardArgs)
+--- SuiteSparse-6.0.1.orig/GPUQREngine/cmake_modules/FindGPUQREngine.cmake	2022-11-14 09:04:25.000000000 +0900
++++ SuiteSparse-6.0.1/GPUQREngine/cmake_modules/FindGPUQREngine.cmake	2022-11-16 02:00:54.000000000 +0900
+@@ -45,6 +45,7 @@
+     GPUQRENGINE_VERSION
+     ${GPUQRENGINE_FILENAME}
+ )
++set (GPUQRENGINE_VERSION 2.0.0)
+ 
+ # libaries when using GPUQREngine
+ set (GPUQRENGINE_LIBRARIES ${GPUQRENGINE_LIBRARY})
+--- SuiteSparse-6.0.1.orig/GraphBLAS/cmake_modules/FindGraphBLAS.cmake	2022-11-14 09:04:25.000000000 +0900
++++ SuiteSparse-6.0.1/GraphBLAS/cmake_modules/FindGraphBLAS.cmake	2022-11-16 02:02:30.000000000 +0900
+@@ -79,6 +79,7 @@
+     GRAPHBLAS_VERSION
+     ${GRAPHBLAS_FILENAME}
+   )
++set(GRAPHBLAS_VERSION 7.3.2)
+ set(GRAPHBLAS_LIBRARIES ${GRAPHBLAS_LIBRARY})
+ 
+ include(FindPackageHandleStandardArgs)
+--- SuiteSparse-6.0.1.orig/KLU/cmake_modules/FindKLU.cmake	2022-11-14 09:04:25.000000000 +0900
++++ SuiteSparse-6.0.1/KLU/cmake_modules/FindKLU.cmake	2022-11-16 02:03:23.000000000 +0900
+@@ -57,6 +57,7 @@
+     KLU_VERSION
+     ${KLU_FILENAME}
+ )
++set (KLU_VERSION 2.0.0)
+ set (KLU_LIBRARIES ${KLU_LIBRARY})
+ 
+ include (FindPackageHandleStandardArgs)
+--- SuiteSparse-6.0.1.orig/KLU/cmake_modules/FindKLU_CHOLMOD.cmake	2022-11-14 09:04:25.000000000 +0900
++++ SuiteSparse-6.0.1/KLU/cmake_modules/FindKLU_CHOLMOD.cmake	2022-11-16 02:03:43.000000000 +0900
+@@ -57,6 +57,7 @@
+     KLU_CHOLMOD_VERSION
+     ${KLU_CHOLMOD_FILENAME}
+ )
++set (KLU_CHOLMOD_VERSION 2.0.0)
+ set (KLU_CHOLMOD_LIBRARIES ${KLU_CHOLMOD_LIBRARY})
+ 
+ include (FindPackageHandleStandardArgs)
+--- SuiteSparse-6.0.1.orig/LDL/cmake_modules/FindLDL.cmake	2022-11-14 09:04:25.000000000 +0900
++++ SuiteSparse-6.0.1/LDL/cmake_modules/FindLDL.cmake	2022-11-16 02:04:24.000000000 +0900
+@@ -57,6 +57,7 @@
+     LDL_VERSION
+     ${LDL_FILENAME}
+ )
++set (LDL_VERSION 3.0.0)
+ set (LDL_LIBRARIES ${LDL_LIBRARY})
+ 
+ include (FindPackageHandleStandardArgs)
+--- SuiteSparse-6.0.1.orig/Mongoose/cmake_modules/FindMongoose.cmake	2022-11-14 09:04:25.000000000 +0900
++++ SuiteSparse-6.0.1/Mongoose/cmake_modules/FindMongoose.cmake	2022-11-16 02:06:28.000000000 +0900
+@@ -57,6 +57,7 @@
+     MONGOOSE_VERSION
+     ${MONGOOSE_FILENAME}
+ )
++set (MONGOOSE_VERSION 3.0.0)
+ set (MONGOOSE_LIBRARIES ${MONGOOSE_LIBRARY})
+ 
+ include (FindPackageHandleStandardArgs)
+--- SuiteSparse-6.0.1.orig/RBio/cmake_modules/FindRBio.cmake	2022-11-14 09:04:25.000000000 +0900
++++ SuiteSparse-6.0.1/RBio/cmake_modules/FindRBio.cmake	2022-11-16 02:07:00.000000000 +0900
+@@ -57,6 +57,7 @@
+     RBIO_VERSION
+     ${RBIO_FILENAME}
+ )
++set (RBIO_VERSION 3.0.0)
+ set (RBIO_LIBRARIES ${RBIO_LIBRARY})
+ 
+ include (FindPackageHandleStandardArgs)
+--- SuiteSparse-6.0.1.orig/SPEX/cmake_modules/FindSPEX.cmake	2022-11-14 09:04:25.000000000 +0900
++++ SuiteSparse-6.0.1/SPEX/cmake_modules/FindSPEX.cmake	2022-11-16 02:08:54.000000000 +0900
+@@ -57,6 +57,7 @@
+     SPEX_VERSION
+     ${SPEX_FILENAME}
+ )
++set (SPEX_VERSION 2.0.0)
+ set (SPEX_LIBRARIES ${SPEX_LIBRARY})
+ 
+ include (FindPackageHandleStandardArgs)
+--- SuiteSparse-6.0.1.orig/SPQR/cmake_modules/FindSPQR.cmake	2022-11-14 09:04:25.000000000 +0900
++++ SuiteSparse-6.0.1/SPQR/cmake_modules/FindSPQR.cmake	2022-11-16 02:09:51.000000000 +0900
+@@ -57,6 +57,7 @@
+     SPQR_VERSION
+     ${SPQR_FILENAME}
+ )
++set (SPQR_VERSION 3.0.1)
+ set (SPQR_LIBRARIES ${SPQR_LIBRARY})
+ 
+ include (FindPackageHandleStandardArgs)
+--- SuiteSparse-6.0.1.orig/SPQR/cmake_modules/FindSPQR_CUDA.cmake	2022-11-14 09:04:25.000000000 +0900
++++ SuiteSparse-6.0.1/SPQR/cmake_modules/FindSPQR_CUDA.cmake	2022-11-16 02:10:34.000000000 +0900
+@@ -47,6 +47,7 @@
+     SPQR_CUDA_VERSION
+     ${SPQR_CUDA_FILENAME}
+ )
++set (SPQR_CUDA_VERSION 3.0.1)
+ set (SPQR_CUDA_LIBRARIES ${SPQR_CUDA_LIBRARY})
+ 
+ include (FindPackageHandleStandardArgs)
+--- SuiteSparse-6.0.1.orig/SuiteSparse_GPURuntime/cmake_modules/FindSuiteSparse_GPURuntime.cmake	2022-11-14 09:04:25.000000000 +0900
++++ SuiteSparse-6.0.1/SuiteSparse_GPURuntime/cmake_modules/FindSuiteSparse_GPURuntime.cmake	2022-11-16 02:13:25.000000000 +0900
+@@ -45,6 +45,7 @@
+     SUITESPARSE_GPURUNTIME_VERSION
+     ${SUITESPARSE_GPURUNTIME_FILENAME}
+ )
++set (SUITESPARSE_GPURUNTIME_VERSION 2.0.0)
+ 
+ # libaries when using SuiteSparse_GPURuntime
+ set (SUITESPARSE_GPURUNTIME_LIBRARIES ${SUITESPARSE_GPURUNTIME_LIBRARY})
+--- SuiteSparse-6.0.1.orig/SuiteSparse_config/cmake_modules/FindSuiteSparse_config.cmake	2022-11-14 09:04:25.000000000 +0900
++++ SuiteSparse-6.0.1/SuiteSparse_config/cmake_modules/FindSuiteSparse_config.cmake	2022-11-16 01:40:28.000000000 +0900
+@@ -56,6 +56,7 @@
+     SUITESPARSE_CONFIG_VERSION
+     ${SUITESPARSE_CONFIG_FILENAME}
+ )
++set (SUITESPARSE_CONFIG_VERSION 6.0.1)
+ 
+ # libaries when using SuiteSparse_config
+ set (SUITESPARSE_CONFIG_LIBRARIES ${SUITESPARSE_CONFIG_LIBRARY})
+--- SuiteSparse-6.0.1.orig/UMFPACK/cmake_modules/FindUMFPACK.cmake	2022-11-14 09:04:25.000000000 +0900
++++ SuiteSparse-6.0.1/UMFPACK/cmake_modules/FindUMFPACK.cmake	2022-11-16 02:11:53.000000000 +0900
+@@ -57,6 +57,7 @@
+     UMFPACK_VERSION
+     ${UMFPACK_FILENAME}
+ )
++set (UMFPACK_VERSION 6.0.1)
+ set (UMFPACK_LIBRARIES ${UMFPACK_LIBRARY})
+ 
+ include (FindPackageHandleStandardArgs)

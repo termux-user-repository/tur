@@ -1,0 +1,104 @@
+diff -ruN SuiteSparse-6.0.1.orig/CHOLMOD/Tcov/Makefile SuiteSparse-6.0.1/CHOLMOD/Tcov/Makefile
+--- SuiteSparse-6.0.1.orig/CHOLMOD/Tcov/Makefile	2022-11-14 09:04:25.000000000 +0900
++++ SuiteSparse-6.0.1/CHOLMOD/Tcov/Makefile	2022-11-15 21:11:34.000000000 +0900
+@@ -100,7 +100,7 @@
+ CN = $(CC) -O0 -g -fopenmp $(CHOLMOD_CONFIG) $(NANTESTS)
+ 
+ LDLIBS = -L$(SUITESPARSE)/lib -lsuitesparseconfig \
+-  	-lm $(LAPACK) $(BLAS) -lrt -Wl,-rpath=$(SUITESPARSE)/lib
++  	-lm $(LAPACK) $(BLAS) -Wl,-rpath=$(SUITESPARSE)/lib
+ 
+ #-------------------------------------------------------------------------------
+ # With the CUDA BLAS:
+diff -ruN SuiteSparse-6.0.1.orig/KLU/Tcov/Makefile SuiteSparse-6.0.1/KLU/Tcov/Makefile
+--- SuiteSparse-6.0.1.orig/KLU/Tcov/Makefile	2022-11-14 09:04:25.000000000 +0900
++++ SuiteSparse-6.0.1/KLU/Tcov/Makefile	2022-11-15 21:12:15.000000000 +0900
+@@ -19,7 +19,7 @@
+     ../../lib/libcamd.so \
+     ../../lib/libccolamd.so \
+     ../../lib/libcholmod.so \
+-    -lm -lrt \
++    -lm \
+     -Wl,-rpath=../../lib -lstdc++
+ 
+ I = -I../../include -I../Include -I../User -I../../BTF/Include -I../Source
+diff -ruN SuiteSparse-6.0.1.orig/RBio/Tcov/Makefile SuiteSparse-6.0.1/RBio/Tcov/Makefile
+--- SuiteSparse-6.0.1.orig/RBio/Tcov/Makefile	2022-11-14 09:04:25.000000000 +0900
++++ SuiteSparse-6.0.1/RBio/Tcov/Makefile	2022-11-15 21:13:23.000000000 +0900
+@@ -75,10 +75,10 @@
+ 	ln -s ../../SuiteSparse_config/SuiteSparse_config.h
+ 
+ RBdemo: RBdemo.c $(OBJ) $(INC) Makefile
+-	$(C) -o RBdemo RBdemo.c $(OBJ) -lm -lrt
++	$(C) -o RBdemo RBdemo.c $(OBJ) -lm
+ 
+ RBtest: RBtest.c $(OBJ) $(INC) Makefile
+-	$(C) -o RBtest RBtest.c $(OBJ) -lm -lrt
++	$(C) -o RBtest RBtest.c $(OBJ) -lm
+ 
+ RBio.o: RBio.c $(INC)
+ 	$(C) -c RBio.c
+diff -ruN SuiteSparse-6.0.1.orig/Mongoose/CMakeLists.txt SuiteSparse-6.0.1/Mongoose/CMakeLists.txt
+--- SuiteSparse-6.0.1.orig/Mongoose/CMakeLists.txt	2022-11-14 09:04:25.000000000 +0900
++++ SuiteSparse-6.0.1/Mongoose/CMakeLists.txt	2022-11-16 01:46:11.000000000 +0900
+@@ -182,9 +182,9 @@
+ 
+ target_link_libraries(mongoose_lib ${SUITESPARSE_CONFIG_LIBRARY})
+ 
+-if (UNIX AND NOT APPLE)
+-    target_link_libraries(mongoose_lib rt)
+-endif ()
++#if (UNIX AND NOT APPLE)
++#    target_link_libraries(mongoose_lib rt)
++#endif ()
+ 
+ # Build the Mongoose library for dynamic linking
+ add_library(mongoose_dylib SHARED ${MONGOOSE_LIB_FILES})
+@@ -207,9 +207,9 @@
+ set_target_properties(mongoose_dylib PROPERTIES PUBLIC_HEADER Include/Mongoose.hpp)
+ target_include_directories(mongoose_dylib PRIVATE .)
+ 
+-if (UNIX AND NOT APPLE)
+-    target_link_libraries(mongoose_dylib rt)
+-endif ()
++#if (UNIX AND NOT APPLE)
++#    target_link_libraries(mongoose_dylib rt)
++#endif ()
+ 
+ #-------------------------------------------------------------------------------
+ 
+@@ -220,9 +220,9 @@
+ 
+ target_link_libraries(mongoose_lib_dbg ${SUITESPARSE_CONFIG_LIBRARY})
+ 
+-if (UNIX AND NOT APPLE)
+-    target_link_libraries(mongoose_lib_dbg rt)
+-endif ()
++#if (UNIX AND NOT APPLE)
++#    target_link_libraries(mongoose_lib_dbg rt)
++#endif ()
+ 
+ # Build the Mongoose executable
+ add_executable(mongoose_exe ${EXE_FILES})
+diff -ruN SuiteSparse-6.0.1.orig/Mongoose/MATLAB/mongoose_make.m SuiteSparse-6.0.1/Mongoose/MATLAB/mongoose_make.m
+--- SuiteSparse-6.0.1.orig/Mongoose/MATLAB/mongoose_make.m	2022-11-14 09:04:25.000000000 +0900
++++ SuiteSparse-6.0.1/Mongoose/MATLAB/mongoose_make.m	2022-11-15 21:13:12.000000000 +0900
+@@ -40,12 +40,12 @@
+ 
+ cpp_flags = '' ;
+ lib = '';
+-if (isunix)
+-    if(~ismac)
+-        % Mac doesn't need librt
+-        lib = [lib ' -lrt'];
+-    end
+-end
++%if (isunix)
++%    if(~ismac)
++%        % Mac doesn't need librt
++%        lib = [lib ' -lrt'];
++%    end
++%end
+ 
+ % Fix the include & library path.
+ include = strrep (include, '/', filesep) ;
