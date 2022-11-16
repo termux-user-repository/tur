@@ -3,8 +3,9 @@ TERMUX_PKG_DESCRIPTION="Run VS Code on any machine anywhere and access it in the
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION=4.8.3
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://github.com/coder/code-server.git
-TERMUX_PKG_DEPENDS="libsecret, nodejs-lts"
+TERMUX_PKG_DEPENDS="libsecret, nodejs-lts, ripgrep"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_HOSTBUILD=true
 TERMUX_PKG_NO_STATICSPLIT=true
@@ -54,10 +55,21 @@ termux_step_make() {
 }
 
 termux_step_make_install() {
-	# TODO: Replace ./lib/vscode/node_modules/@vscode/ripgrep/bin/rg
+	# Remove some pre-built binaries (currently nodejs and ripgrep) whose target is not Android
 	rm ./release-standalone/lib/node
+	rm ./release-standalone/lib/vscode/node_modules/@vscode/ripgrep/bin/rg
+
+	# Copy release files of code-server
 	mkdir -p $TERMUX_PREFIX/lib/code-server
 	cp -Rf ./release-standalone/* $TERMUX_PREFIX/lib/code-server/
+
+	# Replace nodejs
+	ln -sf $TERMUX_PREFIX/bin/node $TERMUX_PREFIX/lib/code-server/lib/node
+
+	# Replace ripgrep
+	ln -sf $TERMUX_PREFIX/bin/rg $TERMUX_PREFIX/lib/code-server/lib/vscode/node_modules/@vscode/ripgrep/bin/rg
+
+	# Create start script
 	cat << EOF > $TERMUX_PREFIX/bin/code-server
 #!$TERMUX_PREFIX/bin/env sh
 
@@ -65,5 +77,4 @@ exec $TERMUX_PREFIX/lib/code-server/bin/code-server "\$@"
 
 EOF
 	chmod +x $TERMUX_PREFIX/bin/code-server
-	ln -sfr $TERMUX_PREFIX/bin/node $TERMUX_PREFIX/lib/code-server/lib/node
 }
