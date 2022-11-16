@@ -1,0 +1,11 @@
+diff -ruN octave-7.3.0.orig/libinterp/octinterp.in.pc octave-7.3.0/libinterp/octinterp.in.pc
+--- octave-7.3.0.orig/libinterp/octinterp.in.pc	2022-11-03 03:19:56.000000000 +0900
++++ octave-7.3.0/libinterp/octinterp.in.pc	2022-11-18 18:03:37.000000000 +0900
+@@ -4,6 +4,6 @@
+ Version: @PACKAGE_VERSION@
+ Requires: octave = @PACKAGE_VERSION@
+ Requires.private:
+-Libs: -L@octlibdir@ @LIBOCTINTERP@
++Libs: -L@octlibdir@ -Wl,-rpath,@octlibdir@ @LIBOCTINTERP@
+ Libs.private:
+ Cflags: -I@octincludedir@/..
