@@ -60,7 +60,7 @@ if [ "$TUR_CONTINUOUS_FLAG" != "false" ]; then
 	echo "==> Extracting the build status..."
 	# Extract build status to docker
 	time ./scripts/run-docker.sh bash -c 'sudo tar -I zstd -C / -xf ./build-status/tur-continuous-status.tar.zst'
-	rm -f ./build-deps/tur-continuous-status.tar.zst
+	rm -f ./build-status/tur-continuous-status.tar.zst
 fi
 
 echo "==> Current time: $(date)"
