@@ -1,0 +1,11 @@
+--- a/headless/public/headless_browser.h
++++ b/headless/public/headless_browser.h
+@@ -144,7 +144,7 @@
+ 
+   // Run the browser without renderer sandbox. This option can be
+   // a security risk and should be used with caution.
+-  bool disable_sandbox = false;
++  bool disable_sandbox = true;
+ 
+   // Whether or not to enable content::ResourceScheduler. Enabled by default.
+   bool enable_resource_scheduler = true;

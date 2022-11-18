@@ -2,6 +2,7 @@
     "packages": { "name" : "termux-main", "distribution" : "stable" },
     "tur":      { "name" : "tur",         "distribution" : "stable" },
     "tur-hacking": { "name": "tur-hacking", "distribution" : "hacking"},
+    "tur-continuous": { "name": "tur-continuous", "distribution" : "continuous"},
     "root-packages": { "name" : "termux-root", "distribution" : "root" },
     "x11-packages":  { "name" : "termux-x11",  "distribution" : "x11" }
 }
