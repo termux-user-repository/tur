@@ -114,7 +114,6 @@ is_debug = false
 clang_base_path = \"$TERMUX_STANDALONE_TOOLCHAIN\"
 clang_use_chrome_plugins = false
 dcheck_always_on = false
-is_official_build = true
 use_qt = false
 use_dbus = false
 chrome_pgo_phase = 0
