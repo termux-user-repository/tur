@@ -1,0 +1,507 @@
+##
+##  Copyright 2020 Termux
+##
+##  Licensed under the Apache License, Version 2.0 (the "License");
+##  you may not use this file except in compliance with the License.
+##  You may obtain a copy of the License at
+##
+##    http://www.apache.org/licenses/LICENSE-2.0
+##
+##  Unless required by applicable law or agreed to in writing, software
+##  distributed under the License is distributed on an "AS IS" BASIS,
+##  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+##  See the License for the specific language governing permissions and
+##  limitations under the License.
+##
+
+name: Packages-tur-continuous
+
+on:
+  push:
+    branches:
+    - master
+    paths:
+    - 'tur-continuous/**'
+  pull_request:
+    paths:
+    - 'tur-continuous/**'
+  workflow_dispatch:
+    inputs:
+      packages:
+        description: "A space-separated names of packages selected for rebuilding"
+        required: true
+
+jobs:
+  prepare:
+    runs-on: ubuntu-22.04
+    env:
+      ANDROID_HOME: "/opt/termux/android-sdk"
+      NDK: "/opt/termux/android-ndk"
+      GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+    strategy:
+      matrix:
+        target_arch: [aarch64, arm, i686, x86_64]
+      fail-fast: false
+    steps:
+    - name: Clone repository
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 1000
+        submodules: true
+    - name: Merge repos
+      run: ./setup-environment.sh
+    - name: Gather build summary
+      run: |
+        if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+          BASE_COMMIT=$(jq --raw-output .pull_request.base.sha "$GITHUB_EVENT_PATH")
+          OLD_COMMIT=$(jq --raw-output .commits[0].id "$GITHUB_EVENT_PATH")
+          HEAD_COMMIT=$(jq --raw-output .commits[-1].id "$GITHUB_EVENT_PATH")
+          if [ "$BASE_COMMIT" = "null" ]; then
+            if [ "$OLD_COMMIT" = "$HEAD_COMMIT" ]; then
+              # Single-commit push.
+              echo "Processing commit: ${HEAD_COMMIT}"
+              CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r "${HEAD_COMMIT}")
+            else
+              # Multi-commit push.
+              OLD_COMMIT="${OLD_COMMIT}~1"
+              echo "Processing commit range: ${OLD_COMMIT}..${HEAD_COMMIT}"
+              CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r "${OLD_COMMIT}" "${HEAD_COMMIT}")
+            fi
+          else
+            # Pull requests.
+            echo "Processing pull request #$(jq --raw-output .pull_request.number "$GITHUB_EVENT_PATH"): ${BASE_COMMIT}..HEAD"
+            CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r "${BASE_COMMIT}" "HEAD")
+          fi
+        fi
+        mkdir -p ./artifacts ./debs
+        touch ./debs/.placeholder
+        if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+          # Process tag '%ci:no-build' that may be added as line to commit message.
+          # Forces CI to cancel current build with status 'passed'
+          if grep -qiP '^\s*%ci:no-build\s*$' <(git log --format="%B" -n 1 "HEAD"); then
+            tar cf artifacts/debs-${{ matrix.target_arch }}.tar debs
+            echo "[!] Force exiting as tag '%ci:no-build' was applied to HEAD commit message."
+            exit 0
+          fi
+          # XXX: TUR uses the termux-builder directly and may add custom builder image later.
+          # Build local Docker image if setup scripts were changed.
+          # Useful for pull requests submitting changes for both build environment and packages.
+          # if grep -qP '^scripts/(Dockerfile|setup-android-sdk\.sh|setup-ubuntu\.sh)$' <<< "$CHANGED_FILES"; then
+          #   echo "Detected changes for environment setup scripts. Building custom Docker image now."
+          #   cd ./scripts
+          #   docker build -t termux/package-builder:latest .
+          #   cd ..
+          # fi
+          for repo_path in $(jq --raw-output 'keys | .[]' repo.json); do
+            repo=$(jq --raw-output '.["'${repo_path}'"].name' repo.json)
+            # Parse changed files and identify new packages and deleted packages.
+            # Create lists of those packages that will be passed to upload job for
+            # further processing.
+            while read -r file; do
+              if ! [[ $file == ${repo_path}/* ]]; then
+                # This file does not belong to a package, so ignore it
+                continue
+              fi
+              if [[ $file =~ ^${repo_path}/([.a-z0-9+-]*)/([.a-z0-9+-]*).subpackage.sh$ ]]; then
+                # A subpackage was modified, check if it was deleted or just updated
+                pkg=${BASH_REMATCH[1]}
+                subpkg=${BASH_REMATCH[2]}
+                if [ ! -f "${repo_path}/${pkg}/${subpkg}.subpackage.sh" ]; then
+                  echo "$subpkg" >> ./deleted_${repo}_packages.txt
+                fi
+              elif [[ $file =~ ^${repo_path}/([.a-z0-9+-]*)/.*$ ]]; then
+                # package, check if it was deleted or updated
+                pkg=${BASH_REMATCH[1]}
+                if [ -d "${repo_path}/${pkg}" ]; then
+                  echo "$pkg" >> ./built_${repo}_packages.txt
+                  # If there are subpackages we want to create a list of those
+                  # as well
+                  for file in $(find "${repo_path}/${pkg}/" -maxdepth 1 -type f -name \*.subpackage.sh | sort); do
+                    echo "$(basename "${file%%.subpackage.sh}")" >> ./built_${repo}_subpackages.txt
+                  done
+                else
+                  echo "$pkg" >> ./deleted_${repo}_packages
+                fi
+              fi
+            done<<<${CHANGED_FILES}
+          done
+        else
+          for pkg in ${{ github.event.inputs.packages }}; do
+            repo_paths=$(jq --raw-output 'keys | .[]' repo.json)
+            found=false
+            for repo_path in $repo_paths; do
+              repo=$(jq --raw-output '.["'${repo_path}'"].name' repo.json)
+              if [ -d "${repo_path}/${pkg}" ]; then
+                found=true
+                echo "$pkg" >> ./built_${repo}_packages.txt
+                for subpkg in $(find "${repo_path}/${pkg}/" -maxdepth 1 -type f -name \*.subpackage.sh | sort); do
+                  echo "$(basename "${subpkg%%.subpackage.sh}")" >> ./built_${repo}_subpackages.txt
+                done
+              fi
+            done
+            if [ "$found" != true ]; then
+              echo "Package '${pkg}' not found in any of the repo"
+              exit 1
+            fi
+          done
+        fi
+        for repo in $(jq --raw-output '.[].name' repo.json); do
+          # Fix so that lists do not contain duplicates
+          if [ -f ./built_${repo}_packages.txt ]; then
+            uniq ./built_${repo}_packages.txt > ./built_${repo}_packages.txt.tmp
+            mv ./built_${repo}_packages.txt.tmp ./built_${repo}_packages.txt
+          fi
+          if [ -f ./built_${repo}_subpackages.txt ]; then
+            uniq ./built_${repo}_subpackages.txt > ./built_${repo}_subpackages.txt.tmp
+            mv ./built_${repo}_subpackages.txt.tmp ./built_${repo}_subpackages.txt
+          fi
+          if [ -f ./deleted_${repo}_packages.txt ]; then
+            uniq ./deleted_${repo}_packages.txt > ./deleted_${repo}_packages.txt.tmp
+            mv ./deleted_${repo}_packages.txt.tmp ./deleted_${repo}_packages.txt
+          fi
+        done
+        # TODO: Check whether this build process only contains one package.
+        # [[ "$packages" =~ \  ]]
+    - name: Free additional disk space
+      run: |
+        sudo apt purge -yq $(dpkg -l | grep '^ii' | awk '{ print $2 }' | grep -P '(cabal-|dotnet-|ghc-|libmono|php|aspnetcore)') \
+          mono-runtime-common monodoc-manual ruby
+        sudo apt autoremove -yq
+        sudo rm -rf /opt/hostedtoolcache /usr/local /usr/share/dotnet /usr/share/swift
+    - name: Lint packages
+      run: |
+        declare -a package_recipes
+        for repo_path in $(jq --raw-output 'keys | .[]' repo.json); do
+          repo=$(jq --raw-output '.["'${repo_path}'"].name' repo.json)
+          if [ -f ./built_${repo}_packages.txt ]; then
+            package_recipes="$package_recipes $(cat ./built_${repo}_packages.txt | repo_path=${repo_path} awk '{print ENVIRON["repo_path"]"/"$1"/build.sh"}')"
+          fi
+        done
+        if [ ! -z "$package_recipes" ]; then
+          ./scripts/lint-packages.sh $package_recipes
+        fi
+    - name: Build packages
+      run: |
+        declare -a packages
+        for repo_path in $(jq --raw-output 'keys | .[]' repo.json); do
+          repo=$(jq --raw-output '.["'${repo_path}'"].name' repo.json)
+          if [ -f ./built_${repo}_packages.txt ]; then
+            packages="$packages $(cat ./built_${repo}_packages.txt)"
+          fi
+        done
+        if [ ! -z "$packages" ]; then
+          ./continuous-build-wrapper.sh ./build-package.sh -I -a ${{ matrix.target_arch }} $packages
+        fi
+    - name: Waiting for debugger
+      if: ${{ failure() }}
+      uses: mxschmitt/action-tmate@v3
+    - name: Generate build status and build deps
+      run: |
+        tar cf build-status/${{ matrix.target_arch }}-${{ github.sha }}.tar ./*.txt ./debs ./artifacts ./output
+    - name: Upload build deps
+      uses: actions/upload-artifact@v3
+      with:
+        name: build-deps-${{ matrix.target_arch }}-${{ github.sha }}
+        path: ./build-deps
+    - name: Upload build status
+      uses: actions/upload-artifact@v3
+      with:
+        name: build-status-${{ matrix.target_arch }}-${{ github.sha }}
+        path: ./build-status
+
+  build-1:
+    runs-on: ubuntu-22.04
+    needs: prepare
+    env:
+      ANDROID_HOME: "/opt/termux/android-sdk"
+      NDK: "/opt/termux/android-ndk"
+      GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+      TUR_CONTINUOUS_FLAG: true
+    strategy:
+      matrix:
+        target_arch: [aarch64, arm, i686, x86_64]
+      fail-fast: false
+    steps:
+    - name: Clone repository
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 1000
+        submodules: true
+    - name: Merge repos
+      run: ./setup-environment.sh
+    - name: Free additional disk space
+      run: |
+        sudo apt purge -yq $(dpkg -l | grep '^ii' | awk '{ print $2 }' | grep -P '(cabal-|dotnet-|ghc-|libmono|php|aspnetcore)') \
+          mono-runtime-common monodoc-manual ruby
+        sudo apt autoremove -yq
+        sudo rm -rf /opt/hostedtoolcache /usr/local /usr/share/dotnet /usr/share/swift
+    - name: Download build deps
+      uses: actions/download-artifact@v3
+      with:
+        name: build-deps-${{ matrix.target_arch }}-${{ github.sha }}
+        path: ./build-deps
+    - name: Download build status
+      uses: actions/download-artifact@v3
+      with:
+        name: build-status-${{ matrix.target_arch }}-${{ github.sha }}
+        path: ./build-status
+    - name: Extract build status
+      run: |
+        tar xf build-status/${{ matrix.target_arch }}-${{ github.sha }}.tar
+        rm -f build-status/${{ matrix.target_arch }}-${{ github.sha }}.tar
+    - name: Build packages
+      run: |
+        if [ "$(cat ./build-status/tur-continuous-finished-flag)" = "true" ]; then
+          exit 0
+        fi
+        declare -a packages
+        for repo_path in $(jq --raw-output 'keys | .[]' repo.json); do
+          repo=$(jq --raw-output '.["'${repo_path}'"].name' repo.json)
+          if [ -f ./built_${repo}_packages.txt ]; then
+            packages="$packages $(cat ./built_${repo}_packages.txt)"
+          fi
+        done
+        if [ ! -z "$packages" ]; then
+          ./continuous-build-wrapper.sh ./build-package.sh -I -a ${{ matrix.target_arch }} $packages
+        fi
+    - name: Waiting for debugger
+      if: ${{ failure() }}
+      uses: mxschmitt/action-tmate@v3
+    - name: Generate build status
+      run: |
+        tar cf build-status/${{ matrix.target_arch }}-${{ github.sha }}.tar ./*.txt ./debs ./artifacts ./output
+    - name: Upload build status
+      uses: actions/upload-artifact@v3
+      with:
+        name: build-status-${{ matrix.target_arch }}-${{ github.sha }}
+        path: ./build-status
+
+  build-2:
+    runs-on: ubuntu-22.04
+    needs: build-1
+    env:
+      ANDROID_HOME: "/opt/termux/android-sdk"
+      NDK: "/opt/termux/android-ndk"
+      GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+      TUR_CONTINUOUS_FLAG: true
+    strategy:
+      matrix:
+        target_arch: [aarch64, arm, i686, x86_64]
+      fail-fast: false
+    steps:
+    - name: Clone repository
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 1000
+        submodules: true
+    - name: Merge repos
+      run: ./setup-environment.sh
+    - name: Free additional disk space
+      run: |
+        sudo apt purge -yq $(dpkg -l | grep '^ii' | awk '{ print $2 }' | grep -P '(cabal-|dotnet-|ghc-|libmono|php|aspnetcore)') \
+          mono-runtime-common monodoc-manual ruby
+        sudo apt autoremove -yq
+        sudo rm -rf /opt/hostedtoolcache /usr/local /usr/share/dotnet /usr/share/swift
+    - name: Download build deps
+      uses: actions/download-artifact@v3
+      with:
+        name: build-deps-${{ matrix.target_arch }}-${{ github.sha }}
+        path: ./build-deps
+    - name: Download build status
+      uses: actions/download-artifact@v3
+      with:
+        name: build-status-${{ matrix.target_arch }}-${{ github.sha }}
+        path: ./build-status
+    - name: Extract build status
+      run: |
+        tar xf build-status/${{ matrix.target_arch }}-${{ github.sha }}.tar
+        rm -f build-status/${{ matrix.target_arch }}-${{ github.sha }}.tar
+    - name: Build packages
+      run: |
+        if [ "$(cat ./build-status/tur-continuous-finished-flag)" = "true" ]; then
+          exit 0
+        fi
+        declare -a packages
+        for repo_path in $(jq --raw-output 'keys | .[]' repo.json); do
+          repo=$(jq --raw-output '.["'${repo_path}'"].name' repo.json)
+          if [ -f ./built_${repo}_packages.txt ]; then
+            packages="$packages $(cat ./built_${repo}_packages.txt)"
+          fi
+        done
+        if [ ! -z "$packages" ]; then
+          ./continuous-build-wrapper.sh ./build-package.sh -I -a ${{ matrix.target_arch }} $packages
+        fi
+    - name: Waiting for debugger
+      if: ${{ failure() }}
+      uses: mxschmitt/action-tmate@v3
+    - name: Generate build status
+      run: |
+        tar cf build-status/${{ matrix.target_arch }}-${{ github.sha }}.tar ./*.txt ./debs ./artifacts ./output
+    - name: Upload build status
+      uses: actions/upload-artifact@v3
+      with:
+        name: build-status-${{ matrix.target_arch }}-${{ github.sha }}
+        path: ./build-status
+
+  build-3:
+    runs-on: ubuntu-22.04
+    needs: build-2
+    env:
+      ANDROID_HOME: "/opt/termux/android-sdk"
+      NDK: "/opt/termux/android-ndk"
+      GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+      TUR_CONTINUOUS_FLAG: true
+    strategy:
+      matrix:
+        target_arch: [aarch64, arm, i686, x86_64]
+      fail-fast: false
+    steps:
+    - name: Clone repository
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 1000
+        submodules: true
+    - name: Merge repos
+      run: ./setup-environment.sh
+    - name: Free additional disk space
+      run: |
+        sudo apt purge -yq $(dpkg -l | grep '^ii' | awk '{ print $2 }' | grep -P '(cabal-|dotnet-|ghc-|libmono|php|aspnetcore)') \
+          mono-runtime-common monodoc-manual ruby
+        sudo apt autoremove -yq
+        sudo rm -rf /opt/hostedtoolcache /usr/local /usr/share/dotnet /usr/share/swift
+    - name: Download build deps
+      uses: actions/download-artifact@v3
+      with:
+        name: build-deps-${{ matrix.target_arch }}-${{ github.sha }}
+        path: ./build-deps
+    - name: Download build status
+      uses: actions/download-artifact@v3
+      with:
+        name: build-status-${{ matrix.target_arch }}-${{ github.sha }}
+        path: ./build-status
+    - name: Extract build status
+      run: |
+        tar xf build-status/${{ matrix.target_arch }}-${{ github.sha }}.tar
+        rm -f build-status/${{ matrix.target_arch }}-${{ github.sha }}.tar
+    - name: Build packages
+      run: |
+        if [ "$(cat ./build-status/tur-continuous-finished-flag)" = "true" ]; then
+          exit 0
+        fi
+        declare -a packages
+        for repo_path in $(jq --raw-output 'keys | .[]' repo.json); do
+          repo=$(jq --raw-output '.["'${repo_path}'"].name' repo.json)
+          if [ -f ./built_${repo}_packages.txt ]; then
+            packages="$packages $(cat ./built_${repo}_packages.txt)"
+          fi
+        done
+        if [ ! -z "$packages" ]; then
+          ./continuous-build-wrapper.sh ./build-package.sh -I -a ${{ matrix.target_arch }} $packages
+        fi
+    - name: Waiting for debugger
+      if: ${{ failure() }}
+      uses: mxschmitt/action-tmate@v3
+    - name: Generate build status
+      run: |
+        tar cf build-status/${{ matrix.target_arch }}-${{ github.sha }}.tar ./*.txt ./debs ./artifacts ./output
+    - name: Upload build status
+      uses: actions/upload-artifact@v3
+      with:
+        name: build-status-${{ matrix.target_arch }}-${{ github.sha }}
+        path: ./build-status
+
+  finished-build:
+    runs-on: ubuntu-22.04
+    needs: build-3
+    env:
+      ANDROID_HOME: "/opt/termux/android-sdk"
+      NDK: "/opt/termux/android-ndk"
+      GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+    strategy:
+      matrix:
+        target_arch: [aarch64, arm, i686, x86_64]
+      fail-fast: false
+    steps:
+    - name: Clone repository
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 1000
+        submodules: true
+    - name: Merge repos
+      run: ./setup-environment.sh
+    - name: Free additional disk space
+      run: |
+        sudo apt purge -yq $(dpkg -l | grep '^ii' | awk '{ print $2 }' | grep -P '(cabal-|dotnet-|ghc-|libmono|php|aspnetcore)') \
+          mono-runtime-common monodoc-manual ruby
+        sudo apt autoremove -yq
+        sudo rm -rf /opt/hostedtoolcache /usr/local /usr/share/dotnet /usr/share/swift
+    - name: Download build status
+      uses: actions/download-artifact@v3
+      with:
+        name: build-status-${{ matrix.target_arch }}-${{ github.sha }}
+        path: ./build-status
+    - name: Extract build status
+      run: |
+        tar xf build-status/${{ matrix.target_arch }}-${{ github.sha }}.tar
+        rm -f build-status/${{ matrix.target_arch }}-${{ github.sha }}.tar
+    - name: Check build status
+      run: |
+        if [ "$(cat ./build-status/tur-continuous-finished-flag)" != "true" ]; then
+          echo "[ERROR]: Need more time to build!"
+          exit 1
+        fi
+    - name: Waiting for debugger
+      if: ${{ failure() }}
+      uses: mxschmitt/action-tmate@v3
+    - name: Generate build artifacts
+      if: always()
+      run: |
+        test -d tur/output && mv tur/output/* ./output/
+        for repo in $(jq --raw-output '.[].name' repo.json); do
+          # Put package lists into directory with *.deb files so they will be transferred to
+          # upload job.
+          test -f ./built_${repo}_packages.txt && mv ./built_${repo}_packages.txt ./debs/
+          test -f ./built_${repo}_subpackages.txt && cat ./built_${repo}_subpackages.txt >> ./debs/built_${repo}_packages.txt \
+            && rm ./built_${repo}_subpackages.txt
+          test -f ./deleted_${repo}_packages.txt && mv ./deleted_${repo}_packages.txt ./debs/
+          # Move only debs from built_packages into debs/ folder before
+          # creating an archive.
+          while read -r pkg; do
+            # Match both $pkg.deb and $pkg-static.deb.
+            find output \( -name "$pkg_*.deb" -o -name "$pkg-static_*.deb" \) -type f -print0 | xargs -0r mv -t debs/
+          done < <(cat ./debs/built_${repo}_packages.txt)
+        done
+        # Files containing certain symbols (e.g. ":") will cause failure in actions/upload-artifact.
+        # Archiving *.deb files in a tarball to avoid issues with uploading.
+        tar cf artifacts/debs-${{ matrix.target_arch }}-${{ github.sha }}.tar debs
+    - name: Checksums for built *.deb files
+      if: always()
+      run: |
+        find debs -type f -name "*.deb" -exec sha256sum "{}" \; | sort -k2
+    - name: Store *.deb files
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: debs-${{ matrix.target_arch }}-${{ github.sha }}
+        path: ./artifacts
+    - name: Upload to temporary release.
+      if: github.event_name != 'pull_request'
+      run: | 
+          for i in ./artifacts/*;do
+            gh release upload -R https://github.com/termux-user-repository/tur "0.1" $i
+            echo "$i  uploaded"
+          done
+
+  trigeer:
+    runs-on: ubuntu-22.04
+    if: github.event_name != 'pull_request'
+    needs: finished-build
+    steps:
+    - name: Trigger workflow in dists repository
+      env:
+        GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+        EVENT: "from_tur"
+        ORG: "termux-user-repository"
+        REPO: "dists"
+      run: |
+        curl -d "{\"event_type\": \"${EVENT}\"}" -H "Content-Type: application/json" -H "Authorization: token ${GITHUB_TOKEN}" -H "Accept: application/vnd.github.everest-preview+json" "https://api.github.com/repos/${ORG}/${REPO}/dispatches"

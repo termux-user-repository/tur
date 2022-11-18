@@ -1,0 +1,10 @@
+--- a/content/gpu/BUILD.gn
++++ b/content/gpu/BUILD.gn
+@@ -139,6 +139,6 @@
+   # Use DRI on desktop Linux builds.
+   if (current_cpu != "s390x" && current_cpu != "ppc64" && is_linux &&
+       !is_castos) {
+-    configs += [ "//build/config/linux/dri" ]
++    # configs += [ "//build/config/linux/dri" ]
+   }
+ }

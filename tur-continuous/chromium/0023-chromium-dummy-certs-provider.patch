@@ -1,0 +1,72 @@
+--- a/net/cert/cert_verify_proc.cc
++++ b/net/cert/cert_verify_proc.cc
+@@ -52,7 +52,7 @@
+ #include "third_party/boringssl/src/include/openssl/pool.h"
+ #include "url/url_canon.h"
+ 
+-#if BUILDFLAG(IS_FUCHSIA) || BUILDFLAG(USE_NSS_CERTS) || BUILDFLAG(IS_MAC)
++#if BUILDFLAG(IS_FUCHSIA) || BUILDFLAG(USE_NSS_CERTS) || BUILDFLAG(IS_MAC) || defined(__TERMUX__)
+ #include "net/cert/cert_verify_proc_builtin.h"
+ #endif
+ 
+@@ -529,7 +529,7 @@
+ }
+ #endif
+ 
+-#if BUILDFLAG(IS_FUCHSIA) || BUILDFLAG(USE_NSS_CERTS) || BUILDFLAG(IS_MAC)
++#if BUILDFLAG(IS_FUCHSIA) || BUILDFLAG(USE_NSS_CERTS) || BUILDFLAG(IS_MAC) || defined(__TERMUX__)
+ // static
+ scoped_refptr<CertVerifyProc> CertVerifyProc::CreateBuiltinVerifyProc(
+     scoped_refptr<CertNetFetcher> cert_net_fetcher) {
+--- a/net/cert/cert_verify_proc.h
++++ b/net/cert/cert_verify_proc.h
+@@ -87,7 +87,7 @@
+       scoped_refptr<CertNetFetcher> cert_net_fetcher);
+ #endif
+ 
+-#if BUILDFLAG(IS_FUCHSIA) || BUILDFLAG(USE_NSS_CERTS) || BUILDFLAG(IS_MAC)
++#if BUILDFLAG(IS_FUCHSIA) || BUILDFLAG(USE_NSS_CERTS) || BUILDFLAG(IS_MAC) || defined(__TERMUX__)
+   // Creates and returns a CertVerifyProcBuiltin using the SSL SystemTrustStore.
+   static scoped_refptr<CertVerifyProc> CreateBuiltinVerifyProc(
+       scoped_refptr<CertNetFetcher> cert_net_fetcher);
+--- a/net/cert/test_root_certs.cc
++++ b/net/cert/test_root_certs.cc
+@@ -12,6 +12,10 @@
+ #include "net/cert/x509_util.h"
+ #include "third_party/boringssl/src/include/openssl/pool.h"
+ 
++#ifdef __TERMUX__
++#include "./test_root_certs_builtin.cc"
++#endif
++
+ namespace net {
+ 
+ namespace {
+--- a/net/cert/internal/system_trust_store.cc
++++ b/net/cert/internal/system_trust_store.cc
+@@ -44,7 +44,7 @@
+ #include "net/base/features.h"
+ #include "net/cert/internal/trust_store_mac.h"
+ #include "net/cert/x509_util_apple.h"
+-#elif BUILDFLAG(IS_FUCHSIA)
++#elif BUILDFLAG(IS_FUCHSIA) || defined(__TERMUX__)
+ #include "base/lazy_instance.h"
+ #include "third_party/boringssl/src/include/openssl/pool.h"
+ #elif BUILDFLAG(IS_WIN)
+@@ -361,11 +361,15 @@
+   }
+ }
+ 
+-#elif BUILDFLAG(IS_FUCHSIA)
++#elif BUILDFLAG(IS_FUCHSIA) || defined(__TERMUX__)
+ 
+ namespace {
+ 
++#ifndef __TERMUX__
+ constexpr char kRootCertsFileFuchsia[] = "/config/ssl/cert.pem";
++#else
++constexpr char kRootCertsFileFuchsia[] = "@TERMUX_PREFIX@/etc/tls/cert.pem";
++#endif
+ 
+ class FuchsiaSystemCerts {
+  public:

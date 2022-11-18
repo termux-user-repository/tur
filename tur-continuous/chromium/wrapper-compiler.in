@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Do not know why host_toolchain will append target_sysroot as param.
+# But anyway, we could ignore it manually.
+args=""
+for arg in "$@"; do
+    if [[ ! "$arg" = "--sysroot"* ]]; then
+        args+=" $arg"
+    fi
+done
+command "@COMPILER@" $args

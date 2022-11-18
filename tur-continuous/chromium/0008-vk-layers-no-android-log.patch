@@ -1,0 +1,19 @@
+--- a/third_party/vulkan-deps/vulkan-validation-layers/src/layers/vk_layer_logging.h
++++ b/third_party/vulkan-deps/vulkan-validation-layers/src/layers/vk_layer_logging.h
+@@ -61,8 +61,16 @@
+ #endif
+ 
+ #if defined __ANDROID__
++#if !defined(__TERMUX__)
+ #include <android/log.h>
+ #define LOGCONSOLE(...) ((void)__android_log_print(ANDROID_LOG_INFO, "VALIDATION", __VA_ARGS__))
++#else
++#define LOGCONSOLE(...)      \
++    {                        \
++        printf(__VA_ARGS__); \
++        printf("\n");        \
++    }
++#endif
+ static const char DECORATE_UNUSED *kForceDefaultCallbackKey = "debug.vvl.forcelayerlog";
+ #else
+ #define LOGCONSOLE(...)      \
