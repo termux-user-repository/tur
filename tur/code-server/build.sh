@@ -3,7 +3,7 @@ TERMUX_PKG_DESCRIPTION="Run VS Code on any machine anywhere and access it in the
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION=4.8.3
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_REVISION=2
 TERMUX_PKG_SRCURL=https://github.com/coder/code-server.git
 TERMUX_PKG_DEPENDS="libsecret, nodejs-lts, ripgrep"
 TERMUX_PKG_BUILD_IN_SRC=true
@@ -12,6 +12,13 @@ TERMUX_PKG_NO_STATICSPLIT=true
 TERMUX_PKG_BLACKLISTED_ARCHES="i686"
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_UPDATE_TAG_TYPE="latest-release-tag"
+
+termux_step_post_get_source() {
+	for f in $(cat ./patches/series); do
+		echo "Applying patch: $(basename $f)"
+		patch -d . -p1 < "./patches/$f";
+	done
+}
 
 termux_step_host_build() {
 	export VERSION=$TERMUX_PKG_VERSION
