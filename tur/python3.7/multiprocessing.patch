@@ -1,0 +1,35 @@
+diff -uNr Python-3.9.13/Lib/multiprocessing/heap.py Python-3.9.13.mod/Lib/multiprocessing/heap.py
+--- Python-3.9.13/Lib/multiprocessing/heap.py     2022-05-17 19:12:56.000000000 +0800
++++ Python-3.9.13.mod/Lib/multiprocessing/heap.py 2022-07-05 11:30:43.134657200 +0800
+@@ -70,7 +70,7 @@
+         """
+ 
+         if sys.platform == 'linux':
+-            _dir_candidates = ['/dev/shm']
++            _dir_candidates = []
+         else:
+             _dir_candidates = []
+ 
+diff -uNr Python-3.9.13/Modules/_multiprocessing/multiprocessing.c Python-3.9.13.mod/Modules/_multiprocessing/multiprocessing.c
+--- Python-3.9.13/Modules/_multiprocessing/multiprocessing.c	2022-05-17 19:12:56.000000000 +0800
++++ Python-3.9.13.mod/Modules/_multiprocessing/multiprocessing.c	2022-07-05 11:31:01.456088500 +0800
+@@ -128,7 +128,7 @@
+     {"recv", multiprocessing_recv, METH_VARARGS, ""},
+     {"send", multiprocessing_send, METH_VARARGS, ""},
+ #endif
+-#if !defined(POSIX_SEMAPHORES_NOT_ENABLED) && !defined(__ANDROID__)
++#if !defined(POSIX_SEMAPHORES_NOT_ENABLED)
+     {"sem_unlink", _PyMp_sem_unlink, METH_VARARGS, ""},
+ #endif
+     {NULL}
+diff -uNr Python-3.7.15/setup.py Python-3.7.15.mod/setup.py
+--- Python-3.7.15/setup.py     2022-10-10 20:34:53.000000000 +0800
++++ Python-3.7.15.mod/setup.py 2022-11-22 14:53:27.344669600 +0800
+@@ -1642,6 +1642,7 @@
+                 multiprocessing_srcs.append('_multiprocessing/semaphore.c')
+ 
+         exts.append ( Extension('_multiprocessing', multiprocessing_srcs,
++                                libraries=["android-posix-semaphore"],
+                                 define_macros=list(macros.items()),
+                                 include_dirs=["Modules/_multiprocessing"]))
+         # End multiprocessing
