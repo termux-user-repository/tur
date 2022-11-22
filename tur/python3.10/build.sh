@@ -1,5 +1,5 @@
 TERMUX_PKG_HOMEPAGE=https://python.org/
-TERMUX_PKG_DESCRIPTION="Python programming language intended to enable clear programs (version 3.9)"
+TERMUX_PKG_DESCRIPTION="Python programming language intended to enable clear programs (version 3.10)"
 TERMUX_PKG_LICENSE="PythonPL"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 _MAJOR_VERSION=3.10
