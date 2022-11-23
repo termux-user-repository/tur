@@ -8,6 +8,7 @@ TERMUX_PKG_DEPENDS="libc++, libopenblas, python, python-numpy"
 TERMUX_PKG_BUILD_DEPENDS="python-numpy-static"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_AUTO_UPDATE=true
+TERMUX_PKG_UPDATE_TAG_TYPE="latest-release-tag"
 
 # Tests will hang on arm and will failed with `Segmentation fault` on i686.
 # See https://github.com/termux-user-repository/tur/pull/21#issue-1295483266.
