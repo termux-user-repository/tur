@@ -3,9 +3,11 @@ TERMUX_PKG_DESCRIPTION="Collection of Fortran77 subroutines designed to solve la
 TERMUX_PKG_LICENSE="BSD"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION=3.8.0
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://github.com/opencollab/arpack-ng/archive/refs/tags/${TERMUX_PKG_VERSION}.tar.gz
 TERMUX_PKG_SHA256=ada5aeb3878874383307239c9235b716a8a170c6d096a6625bfd529844df003d
-TERMUX_PKG_DEPENDS="openblas"
+TERMUX_PKG_DEPENDS="libopenblas"
+TERMUX_PKG_BLACKLISTED_ARCHES="x86_64"
 
 source $TERMUX_SCRIPTDIR/common-files/setup_toolchain_gcc.sh
 
