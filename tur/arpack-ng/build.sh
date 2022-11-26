@@ -7,6 +7,7 @@ TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://github.com/opencollab/arpack-ng/archive/refs/tags/${TERMUX_PKG_VERSION}.tar.gz
 TERMUX_PKG_SHA256=ada5aeb3878874383307239c9235b716a8a170c6d096a6625bfd529844df003d
 TERMUX_PKG_DEPENDS="libopenblas"
+TERMUX_PKG_BLACKLISTED_ARCHES="x86_64"
 
 source $TERMUX_SCRIPTDIR/common-files/setup_toolchain_gcc.sh
 
