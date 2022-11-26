@@ -9,6 +9,7 @@ TERMUX_PKG_DEPENDS="libopenblas, libgmp, libmpfr"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_FORCE_CMAKE=true
 TERMUX_PKG_EXTRA_MAKE_ARGS="BLAS=-lopenblas LAPACK="
+TERMUX_PKG_BLACKLISTED_ARCHES="x86_64"
 
 source $TERMUX_SCRIPTDIR/common-files/setup_toolchain_gcc.sh
 
