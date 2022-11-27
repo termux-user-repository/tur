@@ -44,16 +44,21 @@ termux_step_pre_configure() {
         test $NDK_ARCH == 'i686' && NDK_ARCH='i386'
 	if [ $NDK_ARCH == 'arm' ]; then
 		NDK_TRIPLET="${NDK_ARCH}-linux-androideabi"
+		GCC_TRIPLET="${NDK_ARCH}-linux-androideabi"
+	elif [ $NDK_ARCH == 'i386' ]; then
+		NDK_TRIPLET="${NDK_ARCH}-linux-android"
+		GCC_TRIPLET="i686-linux-android"
 	else
 		NDK_TRIPLET="${NDK_ARCH}-linux-android"
+		GCC_TRIPLET="${NDK_ARCH}-linux-android"
 	fi
 	
         # clang 13+ requires libunwind on Android.
         cp "$TERMUX_STANDALONE_TOOLCHAIN/lib64/clang/14.0.6/lib/linux/$NDK_ARCH/libunwind.a" \
 	   "$TERMUX_PKG_BUILDDIR" || exit 1
-	cp "$GCC_STANDALONE_TOOLCHAIN/lib/gcc/$NDK_TRIPLET/"11.*/libgcc.a \
+	cp "$GCC_STANDALONE_TOOLCHAIN/lib/gcc/$GCC_TRIPLET/"11.*/libgcc.a \
 	   "$TERMUX_PKG_BUILDDIR" || exit 1
-	cp "$GCC_STANDALONE_TOOLCHAIN/$NDK_TRIPLET/"lib*/libgfortran.a \
+	cp "$GCC_STANDALONE_TOOLCHAIN/$GCC_TRIPLET/"lib*/libgfortran.a \
 	   "$TERMUX_PKG_BUILDDIR" || exit 1
 	export LIBS="-landroid-glob $TERMUX_PKG_BUILDDIR/libunwind.a $TERMUX_PKG_BUILDDIR/libgfortran.a $TERMUX_PKG_BUILDDIR/libgcc.a"
 }
