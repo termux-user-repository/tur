@@ -1,11 +1,11 @@
 TERMUX_PKG_HOMEPAGE=https://python.org/
-TERMUX_PKG_DESCRIPTION="Python programming language intended to enable clear programs (version 3.10)"
+TERMUX_PKG_DESCRIPTION="Python programming language intended to enable clear programs (version 3.7)"
 TERMUX_PKG_LICENSE="PythonPL"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-_MAJOR_VERSION=3.10
-TERMUX_PKG_VERSION=${_MAJOR_VERSION}.8
+_MAJOR_VERSION=3.7
+TERMUX_PKG_VERSION=${_MAJOR_VERSION}.15
 TERMUX_PKG_SRCURL=https://www.python.org/ftp/python/${TERMUX_PKG_VERSION}/Python-${TERMUX_PKG_VERSION}.tar.xz
-TERMUX_PKG_SHA256=6a30ecde59c47048013eb5a658c9b5dec277203d2793667f578df7671f7f03f3
+TERMUX_PKG_SHA256=5911475a07ac2b53d746e88a0716af6d2b4734941919136ea0d33fb9c75b9714
 TERMUX_PKG_DEPENDS="gdbm, libandroid-posix-semaphore, libandroid-support, libbz2, libcrypt, libffi, liblzma, libsqlite, ncurses, ncurses-ui-libs, openssl, readline, zlib"
 TERMUX_PKG_RECOMMENDS="clang, make, pkg-config"
 TERMUX_PKG_SUGGESTS="python${_MAJOR_VERSION}-tkinter"
@@ -64,8 +64,8 @@ termux_step_pre_configure() {
 
 termux_step_make_install() {
 	make altinstall
-	ln -sfr $TERMUX_PREFIX/bin/python3.10 $TERMUX_PREFIX/bin/python
-	ln -sfr $TERMUX_PREFIX/bin/python3.10 $TERMUX_PREFIX/bin/python3
+	ln -sfr $TERMUX_PREFIX/bin/python3.7 $TERMUX_PREFIX/bin/python
+	ln -sfr $TERMUX_PREFIX/bin/python3.7 $TERMUX_PREFIX/bin/python3
 }
 
 termux_step_post_massage() {

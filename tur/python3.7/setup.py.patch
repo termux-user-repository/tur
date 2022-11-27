@@ -1,0 +1,13 @@
+diff -u -r ../Python-3.5.0/setup.py ./setup.py
+--- ../Python-3.5.0/setup.py	2015-09-13 07:41:26.000000000 -0400
++++ ./setup.py	2015-11-07 17:31:45.332321322 -0500
+@@ -661,7 +663,8 @@
+
+         # Lance Ellinghaus's syslog module
+         # syslog daemon interface
+-        exts.append( Extension('syslog', ['syslogmodule.c']) )
++        # Termux: Add 'log' android library since we use android logging:
++        exts.append( Extension('syslog', ['syslogmodule.c'], libraries=['log']) )
+ 
+         #
+         # Here ends the simple stuff.  From here on, modules need certain
