@@ -66,7 +66,13 @@ termux_step_pre_configure() {
 	   "$TERMUX_PKG_BUILDDIR" || exit 1
 	cp "$GCC_STANDALONE_TOOLCHAIN/$GCC_TRIPLET/"lib*/libgfortran.a \
 	   "$TERMUX_PKG_BUILDDIR" || exit 1
-	export LIBS="-landroid-glob $TERMUX_PKG_BUILDDIR/libunwind.a $TERMUX_PKG_BUILDDIR/libgfortran.a $TERMUX_PKG_BUILDDIR/libgcc.a"
+	LIBQUADMATH=
+	if [ $TERMUX_ARCH == 'i686' -o $TERMUX_ARCH == 'x86_64' ]; then
+		cp "$GCC_STANDALONE_TOOLCHAIN/$GCC_TRIPLET/"lib*/libquadmath.a \
+		   "$TERMUX_PKG_BUILDDIR" || exit 1
+		LIBQUADMATH="$TERMUX_PKG_BUILDDIR/libquadmath.a"
+	fi
+	export LIBS="-landroid-glob -L$TERMUX_PKG_BUILDDIR $TERMUX_PKG_BUILDDIR/libunwind.a $TERMUX_PKG_BUILDDIR/libgfortran.a $LIBQUADMATH $TERMUX_PKG_BUILDDIR/libgcc.a"
 
 	## This is to allow the build script find the `moc` on cross-build host
 	# for Qt-GUI
