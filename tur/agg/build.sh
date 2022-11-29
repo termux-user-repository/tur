@@ -11,9 +11,9 @@ TERMUX_PKG_AUTO_UPDATE=true
 
 termux_step_make() {
 	termux_setup_rust
-	cargo build --jobs $TERMUX_MAKE_PROCESSES --release
+	cargo build --jobs $TERMUX_MAKE_PROCESSES --release --target $CARGO_TARGET_NAME
 }
 
 termux_step_make_install() {
-	mv $TERMUX_PKG_SRCDIR/target/release/agg "${TERMUX_PREFIX}/bin/agg"
+	mv $TERMUX_PKG_SRCDIR/target/${CARGO_TARGET_NAME}/release/agg "${TERMUX_PREFIX}/bin/agg"
 }
