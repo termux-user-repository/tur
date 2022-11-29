@@ -1,0 +1,12 @@
+diff -ruN octave-7.3.0.orig/run-octave.in octave-7.3.0/run-octave.in
+--- octave-7.3.0.orig/run-octave.in	2022-11-03 03:19:56.000000000 +0900
++++ octave-7.3.0/run-octave.in	2022-11-18 18:03:37.000000000 +0900
+@@ -127,7 +127,7 @@
+     ## Is there a better way to do this so that we don't fill /tmp
+     ## with junk files?  Using /dev/null won't work because asan
+     ## appends the process ID to the file name.
+-    ASAN_OPTIONS="leak_check_at_exit=0:log_path=/tmp/oct-asan-log:verbosity=0"
++    ASAN_OPTIONS="leak_check_at_exit=0:log_path=@TERMUX_PREFIX@/tmp/oct-asan-log:verbosity=0"
+   else
+     ASAN_OPTIONS="$ADDRESS_SANITIZER_OPTIONS"
+   fi

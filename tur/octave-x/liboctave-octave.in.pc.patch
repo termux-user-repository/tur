@@ -1,0 +1,11 @@
+diff -ruN octave-7.3.0.orig/liboctave/octave.in.pc octave-7.3.0/liboctave/octave.in.pc
+--- octave-7.3.0.orig/liboctave/octave.in.pc	2022-11-03 03:19:56.000000000 +0900
++++ octave-7.3.0/liboctave/octave.in.pc	2022-11-18 18:03:37.000000000 +0900
+@@ -4,6 +4,6 @@
+ Version: @PACKAGE_VERSION@
+ Requires:
+ Requires.private:
+-Libs: -L@octlibdir@ @LIBOCTAVE@
++Libs: -L@octlibdir@ -Wl,-rpath,@octlibdir@ @LIBOCTAVE@
+ Libs.private: @LIBOCTAVE_LINK_DEPS@
+ Cflags: -I@octincludedir@/..

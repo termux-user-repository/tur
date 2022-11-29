@@ -1,0 +1,12 @@
+diff -ruN octave-7.3.0.orig/libinterp/corefcn/sysdep.cc octave-7.3.0/libinterp/corefcn/sysdep.cc
+--- octave-7.3.0.orig/libinterp/corefcn/sysdep.cc	2022-11-03 03:19:56.000000000 +0900
++++ octave-7.3.0/libinterp/corefcn/sysdep.cc	2022-11-18 18:03:37.000000000 +0900
+@@ -796,7 +796,7 @@
+ 
+ #else
+ 
+-    return "/tmp";
++    return "@TERMUX_PREFIX@/tmp";
+ 
+ #endif
+   }

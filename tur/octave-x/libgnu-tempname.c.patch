@@ -1,0 +1,23 @@
+diff -ruN octave-7.3.0.orig/libgnu/tempname.c octave-7.3.0/libgnu/tempname.c
+--- octave-7.3.0.orig/libgnu/tempname.c	2022-11-03 03:19:56.000000000 +0900
++++ octave-7.3.0/libgnu/tempname.c	2022-11-18 18:03:37.000000000 +0900
+@@ -28,7 +28,7 @@
+ 
+ #include <stdio.h>
+ #ifndef P_tmpdir
+-# define P_tmpdir "/tmp"
++# define P_tmpdir "@TERMUX_PREFIX@/tmp"
+ #endif
+ #ifndef TMP_MAX
+ # define TMP_MAX 238328
+@@ -141,8 +141,8 @@
+     {
+       if (direxists (P_tmpdir))
+         dir = P_tmpdir;
+-      else if (strcmp (P_tmpdir, "/tmp") != 0 && direxists ("/tmp"))
+-        dir = "/tmp";
++      else if (strcmp (P_tmpdir, "@TERMUX_PREFIX@/tmp") != 0 && direxists ("@TERMUX_PREFIX@/tmp"))
++        dir = "@TERMUX_PREFIX@/tmp";
+       else
+         {
+           __set_errno (ENOENT);

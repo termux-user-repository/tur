@@ -1,0 +1,23 @@
+diff -ruN octave-7.3.0.orig/libgnu/tmpdir.c octave-7.3.0/libgnu/tmpdir.c
+--- octave-7.3.0.orig/libgnu/tmpdir.c	2022-11-03 03:19:56.000000000 +0900
++++ octave-7.3.0/libgnu/tmpdir.c	2022-11-18 18:03:37.000000000 +0900
+@@ -36,7 +36,7 @@
+ # ifdef _P_tmpdir /* native Windows */
+ #  define P_tmpdir _P_tmpdir
+ # else
+-#  define P_tmpdir "/tmp"
++#  define P_tmpdir "@TERMUX_PREFIX@/tmp"
+ # endif
+ #endif
+ 
+@@ -136,8 +136,8 @@
+ #endif
+       if (direxists (P_tmpdir))
+         dir = P_tmpdir;
+-      else if (strcmp (P_tmpdir, "/tmp") != 0 && direxists ("/tmp"))
+-        dir = "/tmp";
++      else if (strcmp (P_tmpdir, "@TERMUX_PREFIX@/tmp") != 0 && direxists ("@TERMUX_PREFIX@/tmp"))
++        dir = "@TERMUX_PREFIX@/tmp";
+       else
+         {
+           __set_errno (ENOENT);

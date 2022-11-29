@@ -1,0 +1,15 @@
+--- octave-7.3.0/configure.ac.orig	2022-11-03 03:19:56.000000000 +0900
++++ octave-7.3.0/configure.ac	2022-11-16 15:17:17.000000000 +0900
+@@ -782,6 +782,12 @@
+   AC_MSG_ERROR([BLAS and LAPACK libraries are required])
+ fi
+ 
++if ac_fn_f77_try_run "$LINENO"; then :
++  ax_blas_integer_size=8
++else
++  ax_blas_integer_size=4
++fi
++
+ case $ax_blas_integer_size in
+   4)
+     HAVE_64_BIT_BLAS=no
