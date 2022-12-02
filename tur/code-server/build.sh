@@ -3,9 +3,9 @@ TERMUX_PKG_DESCRIPTION="Run VS Code on any machine anywhere and access it in the
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION=4.8.3
-TERMUX_PKG_REVISION=2
+TERMUX_PKG_REVISION=3
 TERMUX_PKG_SRCURL=https://github.com/coder/code-server.git
-TERMUX_PKG_DEPENDS="libsecret, nodejs-lts, ripgrep"
+TERMUX_PKG_DEPENDS="libsecret, nodejs-16, ripgrep"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_HOSTBUILD=true
 TERMUX_PKG_NO_STATICSPLIT=true
@@ -71,7 +71,7 @@ termux_step_make_install() {
 	cp -Rf ./release-standalone/* $TERMUX_PREFIX/lib/code-server/
 
 	# Replace nodejs
-	ln -sf $TERMUX_PREFIX/bin/node $TERMUX_PREFIX/lib/code-server/lib/node
+	ln -sf $TERMUX_PREFIX/opt/nodejs-16/bin/node $TERMUX_PREFIX/lib/code-server/lib/node
 
 	# Replace ripgrep
 	ln -sf $TERMUX_PREFIX/bin/rg $TERMUX_PREFIX/lib/code-server/lib/vscode/node_modules/@vscode/ripgrep/bin/rg
