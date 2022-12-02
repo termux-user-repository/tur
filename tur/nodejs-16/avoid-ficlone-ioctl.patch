@@ -1,0 +1,19 @@
+diff '--color=auto' -uNr node-v16.14.2.orig/deps/uv/src/unix/fs.c node-v16.14.2/deps/uv/src/unix/fs.c
+--- node-v16.14.2.orig/deps/uv/src/unix/fs.c	2022-03-18 15:06:20.191091189 +0530
++++ node-v16.14.2/deps/uv/src/unix/fs.c	2022-03-18 15:07:35.021091161 +0530
+@@ -1339,6 +1339,7 @@
+ #endif  /* !__linux__ */
+   }
+ 
++#ifndef __ANDROID__
+ #ifdef FICLONE
+   if (req->flags & UV_FS_COPYFILE_FICLONE ||
+       req->flags & UV_FS_COPYFILE_FICLONE_FORCE) {
+@@ -1359,6 +1360,7 @@
+     goto out;
+   }
+ #endif
++#endif
+ 
+   bytes_to_send = src_statsbuf.st_size;
+   in_offset = 0;
