@@ -1,3 +1,14 @@
+--- a/net/cert/cert_verifier.cc
++++ b/net/cert/cert_verifier.cc
+@@ -78,7 +78,7 @@
+ std::unique_ptr<CertVerifier> CertVerifier::CreateDefaultWithoutCaching(
+     scoped_refptr<CertNetFetcher> cert_net_fetcher) {
+   scoped_refptr<CertVerifyProc> verify_proc;
+-#if BUILDFLAG(IS_FUCHSIA) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
++#if BUILDFLAG(IS_FUCHSIA) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS) || defined(__TERMUX__)
+   verify_proc =
+       CertVerifyProc::CreateBuiltinVerifyProc(std::move(cert_net_fetcher));
+ #elif BUILDFLAG(BUILTIN_CERT_VERIFIER_FEATURE_SUPPORTED)
 --- a/net/cert/cert_verify_proc.cc
 +++ b/net/cert/cert_verify_proc.cc
 @@ -52,7 +52,7 @@
@@ -35,9 +46,9 @@
  #include "net/cert/x509_util.h"
  #include "third_party/boringssl/src/include/openssl/pool.h"
  
-+#ifdef __TERMUX__
-+#include "./test_root_certs_builtin.cc"
-+#endif
++ #ifndef BUILDFLAG(USE_NSS_CERTS)
++ #include "./test_root_certs_builtin.cc"
++ #endif
 +
  namespace net {
  
