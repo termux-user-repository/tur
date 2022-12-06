@@ -40,19 +40,6 @@
    // Creates and returns a CertVerifyProcBuiltin using the SSL SystemTrustStore.
    static scoped_refptr<CertVerifyProc> CreateBuiltinVerifyProc(
        scoped_refptr<CertNetFetcher> cert_net_fetcher);
---- a/net/cert/test_root_certs.cc
-+++ b/net/cert/test_root_certs.cc
-@@ -12,6 +12,10 @@
- #include "net/cert/x509_util.h"
- #include "third_party/boringssl/src/include/openssl/pool.h"
- 
-+ #ifndef BUILDFLAG(USE_NSS_CERTS)
-+ #include "./test_root_certs_builtin.cc"
-+ #endif
-+
- namespace net {
- 
- namespace {
 --- a/net/cert/internal/system_trust_store.cc
 +++ b/net/cert/internal/system_trust_store.cc
 @@ -44,7 +44,7 @@
