@@ -412,7 +412,7 @@ jobs:
 
   build-4:
     runs-on: ubuntu-22.04
-    needs: build-2
+    needs: build-3
     env:
       ANDROID_HOME: "/opt/termux/android-sdk"
       NDK: "/opt/termux/android-ndk"
