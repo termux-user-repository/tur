@@ -1,0 +1,25 @@
+--- a/build/gn_run_binary.py
++++ b/build/gn_run_binary.py
+@@ -24,7 +24,21 @@
+ # The rest of the arguments are passed directly to the executable.
+ args = [path] + sys.argv[2:]
+ 
+-ret = subprocess.call(args)
++# Modified by Termux: When building for termux, this wrapper will
++# be used to run the binary which is built for host machine, using
++# the rootfs provided by Google, so we need to set LD_LIBRARY_PATH
++# to let it run successfully.
++envs = os.environ.copy()
++if "./clang_x86_v8_arm/" in path or "./clang_x86/" in path:
++  base_sysroot = os.path.join(os.path.dirname(__file__), "linux", "debian_bullseye_i386-sysroot")
++  candidates = [base_sysroot + "/usr/lib/i386-linux-gnu"]
++  envs["LD_LIBRARY_PATH"] = ":".join(candidates)
++elif "./host/" in path or "./clang_x64_v8_arm64/" in path or "./clang_x64/" in path:
++  base_sysroot = os.path.join(os.path.dirname(__file__), "linux", "debian_bullseye_amd64-sysroot")
++  candidates = [base_sysroot + "/usr/lib/x86_64-linux-gnu"]
++  envs["LD_LIBRARY_PATH"] = ":".join(candidates)
++
++ret = subprocess.call(args, env=envs)
+ if ret != 0:
+   if ret <= -100:
+     # Windows error codes such as 0xC0000005 and 0xC0000409 are much easier to
