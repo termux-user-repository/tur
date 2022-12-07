@@ -4,6 +4,7 @@ TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="Chongyun Lee <uchkks@protonmail.com>"
 _CHROMIUM_VERSION=107.0.5304.107
 TERMUX_PKG_VERSION=$_CHROMIUM_VERSION
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=(https://commondatastorage.googleapis.com/chromium-browser-official/chromium-$_CHROMIUM_VERSION.tar.xz)
 TERMUX_PKG_SHA256=(49d96b1247690b5ecc061d91fdb203eaef38c6d6e1bb60ca4472eaa99bba1a3e)
 TERMUX_PKG_DEPENDS="atk, cups, dbus, fontconfig, freetype, gtk3, krb5, libc++, libdrm, libxkbcommon, libminizip, libnss, libwayland, libjpeg-turbo, libpng, libx11, mesa-chromium, openssl, pango, qt5-qtbase, vulkan-loader-android, zlib"
