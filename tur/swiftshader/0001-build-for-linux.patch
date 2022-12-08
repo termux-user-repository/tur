@@ -1,0 +1,12 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -30,8 +30,7 @@
+ if(CMAKE_SYSTEM_NAME MATCHES "Linux")
+     set(LINUX TRUE)
+ elseif(CMAKE_SYSTEM_NAME MATCHES "Android")
+-    set(ANDROID TRUE)
+-    set(CMAKE_CXX_FLAGS "-DANDROID_NDK_BUILD")
++    set(LINUX TRUE)
+ elseif(WIN32)
+ elseif(APPLE)
+ elseif(FUCHSIA)
