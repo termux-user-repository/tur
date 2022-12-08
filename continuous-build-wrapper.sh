@@ -35,7 +35,7 @@
 
 
 : "${TUR_CONTINUOUS_FLAG:=false}"
-: "${TUR_CONTINUOUS_TIMEOUT:=240m}"
+: "${TUR_CONTINUOUS_TIMEOUT:=200m}"
 
 # Get the builder docker image if necessary.
 ./scripts/run-docker.sh bash -c "exit 0"
