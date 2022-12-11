@@ -37,6 +37,11 @@
 : "${TUR_CONTINUOUS_FLAG:=false}"
 : "${TUR_CONTINUOUS_TIMEOUT:=200m}"
 
+# XXX: For the CI, we always pass the packages as the last param.
+TUR_CONTINUOUS_PACKAGE="${@: -1}"
+
+echo "==> Package to be built: $TUR_CONTINUOUS_PACKAGE"
+
 # Get the builder docker image if necessary.
 ./scripts/run-docker.sh bash -c "exit 0"
 
@@ -83,10 +88,12 @@ elif [[ $EXIT_CODE == 124 ]]; then # https://www.gnu.org/software/coreutils/manu
 	echo "==> Generating the build status..."
 	df -h
 	# XXX: This will create a pretty large file, hope that Github Action has enough space.
-	# XXX: I think the build status is just the `build`, `src` and `tmp` folder. `cache`
-	# XXX: often contains the source tar ball and will not be modified.
-	# TODO: Parse the package name from command line.
-	time ./scripts/run-docker.sh bash -c 'sudo tar -I zstd --remove-files -cf ./build-status/tur-continuous-status.tar.zst /home/builder/.termux-build/chromium/{build,src,tmp}'
+	# XXX: I think the build status is just the `build` folder. If this package performs
+	# XXX: an in-source building, please move the origin `src` folder to `build` folder
+	# XXX: and use symlinks to provide `src` folder. Folder like `src`, `cache`, or `tmp`
+	# XXX: often contains the source files or scripts and will not be modified during 
+	# XXX: the building process.
+	time ./scripts/run-docker.sh bash -c 'sudo tar -I zstd --remove-files -cf ./build-status/tur-continuous-status.tar.zst /home/builder/.termux-build/'"$TUR_CONTINUOUS_PACKAGE"'/build'
 	echo "==> Successfully generate build status."
 	# Create the deps file if the package is built the first time.
 	if [ "$TUR_CONTINUOUS_FLAG" = "false" ]; then
