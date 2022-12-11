@@ -1,0 +1,37 @@
+--- a/ui/ozone/platform/wayland/host/wayland_connection.cc
++++ b/ui/ozone/platform/wayland/host/wayland_connection.cc
+@@ -139,14 +139,22 @@
+   // them anyway.  Use RTLD_GLOBAL to add the symbols to the global namespace.
+   auto dlopen_flags = RTLD_NOW | RTLD_GLOBAL;
+   if (void* libwayland_client =
++#ifndef __TERMUX__
+           dlopen("libwayland-client.so.0", dlopen_flags)) {
++#else
++          dlopen("libwayland-client.so", dlopen_flags)) {
++#endif
+     third_party_wayland::InitializeLibwaylandclient(libwayland_client);
+   } else {
+     LOG(ERROR) << "Failed to load wayland client libraries.";
+     return false;
+   }
+ 
++#ifndef __TERMUX__
+   if (void* libwayland_egl = dlopen("libwayland-egl.so.1", dlopen_flags))
++#else
++  if (void* libwayland_egl = dlopen("libwayland-egl.so", dlopen_flags))
++#endif
+     third_party_wayland::InitializeLibwaylandegl(libwayland_egl);
+ 
+   // TODO(crbug.com/1081784): consider handling this in more flexible way.
+@@ -155,7 +162,11 @@
+   // while libwayland-client was present.  To handle that gracefully, chrome can
+   // fall back to the generic Ozone behaviour.
+   if (void* libwayland_cursor =
++#ifndef __TERMUX__
+           dlopen("libwayland-cursor.so.0", dlopen_flags)) {
++#else
++          dlopen("libwayland-cursor.so", dlopen_flags)) {
++#endif
+     third_party_wayland::InitializeLibwaylandcursor(libwayland_cursor);
+   } else {
+     LOG(ERROR) << "Failed to load libwayland-cursor.so.0.";

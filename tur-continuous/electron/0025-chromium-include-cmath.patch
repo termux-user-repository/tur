@@ -1,0 +1,14 @@
+To solve error like
+../../extensions/renderer/bindings/argument_spec.cc:411:11: error: no member named 'isnan' in namespace 'std'; did you mean simply 'isnan'?
+
+--- a/extensions/renderer/bindings/argument_spec.cc
++++ b/extensions/renderer/bindings/argument_spec.cc
+@@ -16,6 +16,8 @@
+ #include "gin/data_object_builder.h"
+ #include "gin/dictionary.h"
+ 
++#include <cmath>
++
+ namespace extensions {
+ 
+ namespace {

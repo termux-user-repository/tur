@@ -1,0 +1,16 @@
+--- a/build/config/compiler/BUILD.gn
++++ b/build/config/compiler/BUILD.gn
+@@ -1531,13 +1531,6 @@
+           "-Wno-bitfield-constant-conversion",
+         ]
+       }
+-
+-      if (!is_nacl) {
+-        cflags += [
+-          # TODO(crbug.com/1343975) Evaluate and possibly enable.
+-          "-Wno-deprecated-builtins",
+-        ]
+-      }
+     }
+   }
+ }

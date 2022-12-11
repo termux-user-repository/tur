@@ -1,0 +1,46 @@
+There is no valid `std::atomic_flag` on Android NDK libc++.
+--- a/base/allocator/dispatcher/dispatcher.cc
++++ b/base/allocator/dispatcher/dispatcher.cc
+@@ -252,7 +252,8 @@
+ struct Dispatcher::Impl {
+   void Initialize(const internal::DispatchData& dispatch_data) {
+ #if DCHECK_IS_ON()
+-    DCHECK(!is_initialized_check_flag_.test_and_set());
++    DCHECK(!(is_initialized_check_flag_.exchange(true)));
++    // DCHECK(!is_initialized_check_flag_.test_and_set());
+ #endif
+ 
+     dispatch_data_ = dispatch_data;
+@@ -262,8 +263,10 @@
+   void Reset() {
+ #if DCHECK_IS_ON()
+     DCHECK([&]() {
+-      auto const was_set = is_initialized_check_flag_.test();
+-      is_initialized_check_flag_.clear();
++      auto const was_set = (is_initialized_check_flag_.load() == true);
++      is_initialized_check_flag_.store(false);
++      // auto const was_set = is_initialized_check_flag_.test();
++      // is_initialized_check_flag_.clear();
+       return was_set;
+     }());
+ #endif
+@@ -313,12 +316,13 @@
+   internal::DispatchData dispatch_data_;
+ #if DCHECK_IS_ON()
+   // Indicator if the dispatcher has been initialized before.
+-#if !defined(__cpp_lib_atomic_value_initialization) || \
+-    __cpp_lib_atomic_value_initialization < 201911L
+-  std::atomic_flag is_initialized_check_flag_ = ATOMIC_FLAG_INIT;
+-#else
+-  std::atomic_flag is_initialized_check_flag_;
+-#endif
++  std::atomic<bool> is_initialized_check_flag_;
++// #if !defined(__cpp_lib_atomic_value_initialization) || \
++//     __cpp_lib_atomic_value_initialization < 201911L
++//   std::atomic_flag is_initialized_check_flag_ = ATOMIC_FLAG_INIT;
++// #else
++//   std::atomic_flag is_initialized_check_flag_;
++// #endif
+ #endif
+ };
+ 
