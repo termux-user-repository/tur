@@ -1,17 +1,3 @@
---- a/ui/gfx/x/xlib_support.cc
-+++ b/ui/gfx/x/xlib_support.cc
-@@ -41,7 +41,11 @@
-   CHECK(xlib_loader->Load("libX11.so.6"));
- 
-   auto* xlib_xcb_loader = GetXlibXcbLoader();
-+#ifndef __TERMUX__
-   CHECK(xlib_xcb_loader->Load("libX11-xcb.so.1"));
-+#else
-+  CHECK(xlib_xcb_loader->Load("libX11-xcb.so"));
-+#endif
- 
-   CHECK(xlib_loader->XInitThreads());
- 
 --- a/ui/ozone/platform/wayland/host/wayland_connection.cc
 +++ b/ui/ozone/platform/wayland/host/wayland_connection.cc
 @@ -139,14 +139,22 @@

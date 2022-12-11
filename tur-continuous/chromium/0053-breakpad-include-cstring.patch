@@ -1,0 +1,12 @@
+To solve error like
+../../third_party/breakpad/breakpad/src/common/dwarf/elf_reader.cc:200:10: error: no member named 'strcmp' in namespace 'std'; did you mean simply 'strcmp'?
+--- a/third_party/breakpad/breakpad/src/common/dwarf/elf_reader.cc
++++ b/third_party/breakpad/breakpad/src/common/dwarf/elf_reader.cc
+@@ -39,6 +39,7 @@
+ #include <unistd.h>
+ 
+ #include <algorithm>
++#include <cstring>
+ #include <map>
+ #include <string>
+ #include <vector>
