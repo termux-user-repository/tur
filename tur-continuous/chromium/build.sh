@@ -4,31 +4,20 @@ TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="Chongyun Lee <uchkks@protonmail.com>"
 _CHROMIUM_VERSION=107.0.5304.107
 TERMUX_PKG_VERSION=$_CHROMIUM_VERSION
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_REVISION=2
 TERMUX_PKG_SRCURL=(https://commondatastorage.googleapis.com/chromium-browser-official/chromium-$_CHROMIUM_VERSION.tar.xz)
 TERMUX_PKG_SHA256=(49d96b1247690b5ecc061d91fdb203eaef38c6d6e1bb60ca4472eaa99bba1a3e)
-TERMUX_PKG_DEPENDS="atk, cups, dbus, fontconfig, freetype, gtk3, krb5, libc++, libdrm, libxkbcommon, libminizip, libnss, libwayland, libjpeg-turbo, libpng, libx11, mesa-chromium, openssl, pango, qt5-qtbase, vulkan-loader-android, zlib"
+TERMUX_PKG_DEPENDS="atk, cups, dbus, gtk3, krb5, libc++, libxkbcommon, libminizip, libnss, libwayland, libx11, mesa-chromium, openssl, pango, pulseaudio, libdrm, libjpeg-turbo, libpng, libwebp, libflac, fontconfig, freetype, zlib, libxml2, libxslt, libopus, libre2, libsnappy"
 # TODO: Split chromium-common and chromium-headless
 # TERMUX_PKG_DEPENDS+=", chromium-common"
 # TERMUX_PKG_SUGGESTS="chromium-headless, chromium-driver"
-TERMUX_PKG_BUILD_DEPENDS="vulkan-headers, qt5-qtbase-cross-tools"
-TERMUX_PKG_BUILD_IN_SRC=true
+TERMUX_PKG_SUGGESTS="qt5-qtbase"
+TERMUX_PKG_BUILD_DEPENDS="qt5-qtbase, qt5-qtbase-cross-tools"
 # Chromium doesn't support i686 on Linux.
 TERMUX_PKG_BLACKLISTED_ARCHES="i686"
 
-SYSTEM_LIBRARIES="
-libdrm
-libjpeg
-libpng
-fontconfig
-freetype
-zlib
-"
-
-# TERMUX_PKG_DEPENDS+=", harfbuzz, libdav1d"
-# `harfbuzz-ng` and `dav1d` cannot be used as system libraries because
-# Google-provided rootfs doesn't have these libraries. Maybe we should
-# construct our own rootfs later.
+SYSTEM_LIBRARIES="    libdrm  libjpeg        libpng  libwebp  flac     fontconfig  freetype  zlib  libxml   libxslt  opus     re2     snappy   "
+# TERMUX_PKG_DEPENDS="libdrm, libjpeg-turbo, libpng, libwebp, libflac, fontconfig, freetype, zlib, libxml2, libxslt, libopus, libre2, libsnappy"
 
 termux_step_post_get_source() {
 	local _lib
@@ -49,9 +38,14 @@ termux_step_post_get_source() {
 	python3 build/linux/unbundle/replace_gn_files.py --system-libraries \
 		$SYSTEM_LIBRARIES
 	python3 third_party/libaddressinput/chromium/tools/update-strings.py
+
+	# allow system dependencies in "official builds"
+	sed -i 's/OFFICIAL_BUILD/GOOGLE_CHROME_BUILD/' \
+		tools/generate_shim_headers/generate_shim_headers.py
 }
 
 termux_step_configure() {
+	cd $TERMUX_PKG_SRCDIR
 	termux_setup_gn
 	termux_setup_ninja
 	termux_setup_nodejs
@@ -138,17 +132,27 @@ termux_step_configure() {
 	touch $_common_args_file
 
 	echo "
+# Set google key to disable the warning slogan
+# Please DO NOT USE THIS KEY OUTSIDE OF TUR!
+google_api_key = \"$_google_api_key\"
+google_default_client_id = \"$_google_default_client_id\"
+google_default_client_secret = \"$_google_default_client_secret\"
+# Do official build to decrease file size
+is_official_build = true
+is_debug = false
+symbol_level = 0
+# Use our custom toolchain
 use_sysroot = true
 target_cpu = \"$_TARGET_CPU\"
 target_rpath = \"$TERMUX_PREFIX/lib\"
 target_sysroot = \"$TERMUX_PKG_TMPDIR/sysroot\"
 custom_toolchain = \"//build/toolchain/linux/unbundle:default\"
-is_debug = false
 clang_base_path = \"$TERMUX_STANDALONE_TOOLCHAIN\"
 clang_use_chrome_plugins = false
 dcheck_always_on = false
 chrome_pgo_phase = 0
 treat_warnings_as_errors = false
+# Use system libraries as much as possible
 use_system_freetype = true
 use_system_libdrm = true
 use_system_libffi = true
@@ -159,11 +163,28 @@ use_custom_libcxx = false
 use_allocator_shim = false
 use_allocator = \"none\"
 use_nss_certs = true
-is_official_build = false
 use_udev = false
-google_api_key = \"$_google_api_key\"
-google_default_client_id = \"$_google_default_client_id\"
-google_default_client_secret = \"$_google_default_client_secret\"
+use_ozone = true
+ozone_auto_platforms = false
+ozone_platform = \"x11\"
+ozone_platform_x11 = true
+ozone_platform_wayland = true
+ozone_platform_headless = true
+angle_enable_vulkan = true
+angle_enable_swiftshader = true
+# Use Chrome-branded ffmpeg for more codecs
+is_component_ffmpeg = true
+ffmpeg_branding = \"Chrome\"
+proprietary_codecs = true
+use_gnome_keyring = false
+use_qt = true
+use_libpci = false
+use_alsa = false
+use_pulseaudio = true
+rtc_use_pipewire = false
+use_vaapi_x11 = false
+# See comments below
+enable_nacl = false
 " > $_common_args_file
 
 	# For aarch64, remove the `libatomic.a` in `NDK Toolchain` for x86_64
@@ -190,9 +211,6 @@ google_default_client_secret = \"$_google_default_client_secret\"
 		if [ -f "$_invalid_atomic" ]; then
 			mv $_invalid_atomic{,.backup}
 		fi
-		# FIXME: Disable nacl on arm due to the following error. Need to figure out why this happens.
-		# FIXME: ninja: error: '../../native_client/toolchain/linux_x86/pnacl_newlib/bin/arm-nacl-objcopy', needed by 'nacl_irt_arm.nexe', missing and no known rule to make it
-		echo "enable_nacl = false" >> $_common_args_file
 	fi
 
 	# When building for x64, these variables must be set to tell
@@ -220,46 +238,21 @@ google_default_client_secret = \"$_google_default_client_secret\"
 
 		echo "host_toolchain = \"//build/toolchain/linux/unbundle:host\"" >> $_common_args_file
 		echo "v8_snapshot_toolchain = \"//build/toolchain/linux/unbundle:host\"" >> $_common_args_file
-		# FIXME: Disable nacl on x86_64 due to the error above.
-		echo "enable_nacl = false" >> $_common_args_file
 	fi
 
-	# Headless Chromium
-	# mkdir -p out/Headless
-	# rm -f out/Headless/args.gn
-	# echo "import(\"//build/args/headless.gn\")" > out/Headless/args.gn
-	# cat $_common_args_file >> out/Headless/args.gn
-	# gn gen out/Headless --export-compile-commands || bash
-
 	# Chromium Binary
-	mkdir -p out/Release
-	rm -f out/Release/args.gn
-	cat $_common_args_file >> out/Release/args.gn
-	echo "
-use_ozone = true
-ozone_auto_platforms = false
-ozone_platform = \"x11\"
-ozone_platform_x11 = true
-ozone_platform_wayland = true
-ozone_platform_headless = true
-angle_enable_vulkan = true
-angle_enable_swiftshader = true
-use_gnome_keyring = false
-use_qt = true
-use_libpci = false
-use_alsa = false
-use_pulseaudio = false
-rtc_use_pipewire = false
-use_vaapi_x11 = false
-" >> out/Release/args.gn
-	gn gen out/Release --export-compile-commands
+	mkdir -p $TERMUX_PKG_BUILDDIR/out/Release
+	cat $_common_args_file > $TERMUX_PKG_BUILDDIR/out/Release/args.gn
+	gn gen $TERMUX_PKG_BUILDDIR/out/Release --export-compile-commands || bash
 }
 
 termux_step_make() {
+	cd $TERMUX_PKG_BUILDDIR
 	ninja -C out/Release chromedriver chrome chrome_crashpad_handler headless_shell || bash
 }
 
 termux_step_make_install() {
+	cd $TERMUX_PKG_BUILDDIR
 	mkdir -p $TERMUX_PREFIX/lib/chromium
 
 	local normal_files=(
@@ -302,6 +295,12 @@ termux_step_make_install() {
 		libvk_swiftshader.so
 		libVkLayer_khronos_validation.so
 		vk_swiftshader_icd.json
+
+		# FFmpeg
+		libffmpeg.so
+
+		# Qt
+		libqt5_shim.so
 	)
 
 	cp "${normal_files[@]/#/out/Release/}" "$TERMUX_PREFIX/lib/chromium/"
@@ -311,7 +310,11 @@ termux_step_make_install() {
 	cp -Rf out/Release/MEIPreload $TERMUX_PREFIX/lib/chromium/
 	cp -Rf out/Release/resources $TERMUX_PREFIX/lib/chromium/
 
-	ln -sfr $TERMUX_PREFIX/lib/chromium/chrome $TERMUX_PREFIX/bin/
+	sed "s|@TERMUX_PREFIX@|$TERMUX_PREFIX|g" \
+		$TERMUX_PKG_BUILDER_DIR/chromium-launcher.sh.in > $TERMUX_PREFIX/lib/chromium/chromium-launcher.sh
+	chmod +x $TERMUX_PREFIX/lib/chromium/chromium-launcher.sh
+
+	ln -sfr $TERMUX_PREFIX/lib/chromium/chromium-launcher.sh $TERMUX_PREFIX/bin/chromium-browser
 	ln -sfr $TERMUX_PREFIX/lib/chromium/chromedriver $TERMUX_PREFIX/bin/
 	ln -sfr $TERMUX_PREFIX/lib/chromium/headless_shell $TERMUX_PREFIX/bin/
 }
@@ -333,13 +336,45 @@ termux_step_post_make_install() {
 }
 
 # TODO:
-# (1) Split packages
-# (2) Use system libraries as much as possible
-# (3) Enable ffmpeg
+# (2) Split packages
 # (4) Enable Sandbox (AFAIK this is impossible)
 # (5) Package man pages
-# (6) Enable pulseaudio
 # (7) Use libreolv-wrapper
 # (8) Refator the GN files (Add a variant is_termux in the configure files)
-# (9) Figure out what packages in vulkan and mesa are actually needed
-# (10) Figure out why nacl cannot be enabled
+
+# ######################### About system libraries ############################
+# We only pick up a few libraries to let chromium link against. Others may
+# contains 
+# FYI, all the available libraries and whether they can be used for linking
+# are listed below.
+#
+# Name in Chromium | libdrm libjpeg       libpng libwebp fontconfig libxslt
+# Name in Termux   | libdrm libjpeg-turbo libpng libwebp fontconfig libxslt
+#
+# Name in Chromium | freetype libxml  opus    re2    snappy    flac    zlib
+# Name in Termux   | freetype libxml2 libopus libre2 libsnappy libflac zlib
+#
+# These libraries cannot be used as system libraries, because Chromium-provided
+# debian rootfs doesn't have them (or their headers). Maybe we should construct
+# our own rootfs later.
+# Name in Chromium | harfbuzz-ng  dav1d ffmpeg libaom libjxl libvpx libevent double-conversion jsoncpp
+# Name in Termux   | harfbuzz  libdav1d ffmpeg libaom libjxl libvpx libevent double-conversion jsoncpp
+#
+# These libraries cannot be used due to configuation errors like
+# `error: '/usr/bin/brotli', needed by 'clang_x64/brotli', missing and no known rule to make it`/
+# Name in Chromium | brotli    icu
+# Name in Termux   | brotli libicu
+#
+# These libraries cannot be used because they don't exist in Termux.
+# Name in Chromium | absl* crc32c, libavif, libXNVCtrl, libyuv, openh264, libSPIRV-Tools
+#
+# TODO: link against system ffmpeg
+# #############################################################################
+
+# ######################### About Native Client ###############################
+# When set `enable_nacl = true`, the following error occurs.
+# ninja: error: 'native_client/toolchain/linux_x86/pnacl_newlib/bin/arm-nacl-objcopy', needed by 'nacl_irt_arm.nexe', missing and no known rule to make it.
+# If we want to enable NaCi, maybe we should build the toolchain of NaCl too.
+# But I don't think this is necessary. NaCl existing or not will take little 
+# influence on Chromium. So I'd like to disable NaCl.
+# #############################################################################
