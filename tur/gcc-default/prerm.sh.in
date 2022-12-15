@@ -16,7 +16,7 @@ rm -fv @TERMUX_PREFIX@/bin/gfortran
 
 if [ "$CLANG_INSTALLED" = "true" ]; then
 	for tool in cc c++ cpp gcc g++ $TERMUX_PLATFORM-gcc $TERMUX_PLATFORM-g++ $TERMUX_PLATFORM-cpp; do
-		mv -v @TERMUX_PREFIX@/share/@TERMUX_PKG_NAME@/$tool @TERMUX_PREFIX@/bin/$tool
+		mv -fv @TERMUX_PREFIX@/share/@TERMUX_PKG_NAME@/$tool @TERMUX_PREFIX@/bin/$tool
 	done
 else
 	for tool in cc c++ cpp gcc g++ $TERMUX_PLATFORM-gcc $TERMUX_PLATFORM-g++ $TERMUX_PLATFORM-cpp; do
