@@ -1,0 +1,13 @@
+--- a/src/buildtools/config/linking.pri
++++ b/src/buildtools/config/linking.pri
+@@ -54,6 +54,10 @@
+     }
+ }
+ 
++contains(QT_ARCH, "i386") {
++    QMAKE_LFLAGS += -Wl,-z,notext
++}
++
+ LIBS_PRIVATE += $$NINJA_LIB_DIRS $$NINJA_LIBS
+ # GN's LFLAGS doesn't always work across all the Linux configurations we support.
+ # The Windows and macOS ones from GN does provide a few useful flags however
