@@ -4,6 +4,7 @@ TERMUX_PKG_DESCRIPTION="Dynamic programming language with a focus on simplicity 
 TERMUX_PKG_LICENSE="BSD 2-Clause"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION=2.7.6
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://cache.ruby-lang.org/pub/ruby/${TERMUX_PKG_VERSION:0:3}/ruby-${TERMUX_PKG_VERSION}.tar.xz
 TERMUX_PKG_SHA256=54dcd3044726c4ab75a9d4604720501442b229a3aed6a55fe909567da8807f24
 # libbffi is used by the fiddle extension module:
@@ -86,6 +87,7 @@ termux_step_make_install() {
 	perl -p -i -e 's/^.*CONFIG\["MKDIR_P"\].*$/  CONFIG["MKDIR_P"] = "mkdir -p"/' $RBCONFIG
 	perl -p -i -e 's/^.*CONFIG\["EGREP"\].*$/  CONFIG["EGREP"] = "grep -E"/' $RBCONFIG
 	perl -p -i -e 's/^.*CONFIG\["GREP"\].*$/  CONFIG["GREP"] = "grep"/' $RBCONFIG
+	perl -p -i -e 's|^.*CONFIG\["bindir"\] = .*$|  CONFIG["bindir"] = \"'"$TERMUX_PREFIX"'\"|' $RBCONFIG
 
 	for i in bundle bundler erb gem irb racc racc2y rake rdoc ruby y2racc ; do
 		ln -sr $TERMUX_PREFIX/opt/ruby-2/bin/$i-2 $TERMUX_PREFIX/bin/$i-2
