@@ -4,10 +4,10 @@ TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="Chongyun Lee <uchkks@protonmail.com>"
 _CHROMIUM_VERSION=107.0.5304.107
 TERMUX_PKG_VERSION=$_CHROMIUM_VERSION
-TERMUX_PKG_REVISION=2
+TERMUX_PKG_REVISION=3
 TERMUX_PKG_SRCURL=(https://commondatastorage.googleapis.com/chromium-browser-official/chromium-$_CHROMIUM_VERSION.tar.xz)
 TERMUX_PKG_SHA256=(49d96b1247690b5ecc061d91fdb203eaef38c6d6e1bb60ca4472eaa99bba1a3e)
-TERMUX_PKG_DEPENDS="atk, cups, dbus, gtk3, krb5, libc++, libxkbcommon, libminizip, libnss, libwayland, libx11, mesa-chromium, openssl, pango, pulseaudio, libdrm, libjpeg-turbo, libpng, libwebp, libflac, fontconfig, freetype, zlib, libxml2, libxslt, libopus, libre2, libsnappy"
+TERMUX_PKG_DEPENDS="atk, cups, dbus, gtk3, krb5, libc++, libxkbcommon, libminizip, libnss, libwayland, libx11, mesa, openssl, pango, pulseaudio, libdrm, libjpeg-turbo, libpng, libwebp, libflac, fontconfig, freetype, zlib, libxml2, libxslt, libopus, libre2, libsnappy"
 # TODO: Split chromium-common and chromium-headless
 # TERMUX_PKG_DEPENDS+=", chromium-common"
 # TERMUX_PKG_SUGGESTS="chromium-headless, chromium-driver"
@@ -108,17 +108,12 @@ termux_step_configure() {
 	cp -Rf $TERMUX_PREFIX/include/* usr/include
 	cp -Rf $TERMUX_PREFIX/lib/* usr/lib
 	ln -sf /data ./data
-	# Use mesa's EGL
-	rm -r usr/include/EGL
-	cp -R $TERMUX_PREFIX/opt/mesa-chromium/* usr/
 	# This is needed to build crashpad
 	rm -rf $TERMUX_PREFIX/include/spawn.h
 	# This is needed to build cups
 	cp -Rf $TERMUX_PREFIX/bin/cups-config usr/bin/
 	chmod +x usr/bin/cups-config
 	popd
-
-	export LDFLAGS="-Wl,-rpath=$TERMUX_PREFIX/opt/mesa-chromium/lib $LDFLAGS"
 
 	local _TARGET_CPU="$TERMUX_ARCH"
 	if [ "$TERMUX_ARCH" = "aarch64" ]; then
