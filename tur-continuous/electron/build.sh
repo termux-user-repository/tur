@@ -3,9 +3,9 @@ TERMUX_PKG_DESCRIPTION="Build cross-platform desktop apps with JavaScript, HTML,
 TERMUX_PKG_LICENSE="MIT, BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="Chongyun Lee <uchkks@protonmail.com>"
 TERMUX_PKG_VERSION=21.3.3
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_REVISION=2
 TERMUX_PKG_SRCURL=https://github.com/electron/electron.git
-TERMUX_PKG_DEPENDS="atk, cups, dbus, fontconfig, freetype, gtk3, krb5, libc++, libffi, libxkbcommon, libnss, libwayland, libx11, mesa-chromium, openssl, pango, pulseaudio"
+TERMUX_PKG_DEPENDS="atk, cups, dbus, fontconfig, freetype, gtk3, krb5, libc++, libffi, libxkbcommon, libnss, libwayland, libx11, mesa, openssl, pango, pulseaudio"
 TERMUX_PKG_BUILD_DEPENDS="libnotify"
 # Chromium doesn't support i686 on Linux.
 TERMUX_PKG_BLACKLISTED_ARCHES="i686"
@@ -116,15 +116,10 @@ termux_step_configure() {
 	cp -Rf $TERMUX_PREFIX/include/* usr/include
 	cp -Rf $TERMUX_PREFIX/lib/* usr/lib
 	ln -sf /data ./data
-	# Use mesa's EGL
-	rm -r usr/include/EGL
-	cp -R $TERMUX_PREFIX/opt/mesa-chromium/* usr/
 	# This is needed to build cups
 	cp -Rf $TERMUX_PREFIX/bin/cups-config usr/bin/
 	chmod +x usr/bin/cups-config
 	popd
-
-	export LDFLAGS="-Wl,-rpath=$TERMUX_PREFIX/opt/mesa-chromium/lib $LDFLAGS"
 
 	local _TARGET_CPU="$TERMUX_ARCH"
 	if [ "$TERMUX_ARCH" = "aarch64" ]; then
