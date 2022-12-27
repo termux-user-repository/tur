@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Use search (`pkg search <name>`) to check whether package is already available. If package does not exist in our repositories, fill the form below to request it.
+        After installing `tur-repo`, use search (`pkg search <name>`) to check whether package is already available. If package does not exist in our repositories, fill the form below to request it.
 
   - type: input
     attributes:
