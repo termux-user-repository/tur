@@ -29,7 +29,7 @@ body:
     attributes:
       label: Packaging policy acknowledgement
       options:
-        - label: I understand [Tur Package Policy](https://github.com/termux-user-repository/tur/wiki/TUR-package-policy).
+        - label: I understand [Tur Package Policy](https://github.com/termux-user-repository/tur/wiki/TUR-package-policy.).
           required: true
 
   - type: textarea
