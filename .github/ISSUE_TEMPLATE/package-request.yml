@@ -1,0 +1,41 @@
+name: "Package Request"
+description: "Request a new package."
+title: "[Package]: "
+labels: ["package request"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use search (`pkg search <name>`) to check whether package is already available. If package does not exist in our repositories, fill the form below to request it.
+
+  - type: input
+    attributes:
+      label: Name
+    validations:
+      required: true
+
+  - type: input
+    attributes:
+      label: Home page URL
+
+  - type: input
+    attributes:
+      label: Source code URL
+      placeholder: Link to Git or source archive
+    validations:
+      required: true
+
+  - type: checkboxes
+    attributes:
+      label: Packaging policy acknowledgement
+      options:
+        - label: I understand [Tur Package Policy](https://github.com/termux-user-repository/tur/wiki/TUR-package-policy).
+          required: true
+
+  - type: textarea
+    attributes:
+      label: Additional information
+      description: |
+        Have you tried to compile it on device? If it did not work then provide the error you ran into. Otherwise please share build steps and any patches that you had to apply.
+
+        Does your package have special device requirements such as root permissions, custom kernel or even additional hardware? If yes, then list all details here.
