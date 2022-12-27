@@ -1,7 +1,7 @@
 name: "Package Request"
 description: "Request a new package."
 title: "[Package]: "
-labels: ["package request"]
+labels: ["Package request"]
 body:
   - type: markdown
     attributes:
