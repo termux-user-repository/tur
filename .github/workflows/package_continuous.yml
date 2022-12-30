@@ -192,9 +192,6 @@ jobs:
         if [ ! -z "$packages" ]; then
           ./continuous-build-wrapper.sh ./build-package.sh -I -a ${{ matrix.target_arch }} $packages
         fi
-    - name: Waiting for debugger
-      if: ${{ failure() }}
-      uses: mxschmitt/action-tmate@v3
     - name: Generate build status and build deps
       run: |
         tar cf build-status/${{ matrix.target_arch }}-${{ github.sha }}.tar ./*.txt ./debs ./artifacts ./output
@@ -264,9 +261,6 @@ jobs:
         if [ ! -z "$packages" ]; then
           ./continuous-build-wrapper.sh ./build-package.sh -I -a ${{ matrix.target_arch }} $packages
         fi
-    - name: Waiting for debugger
-      if: ${{ failure() }}
-      uses: mxschmitt/action-tmate@v3
     - name: Generate build status
       run: |
         tar cf build-status/${{ matrix.target_arch }}-${{ github.sha }}.tar ./*.txt ./debs ./artifacts ./output
@@ -331,9 +325,6 @@ jobs:
         if [ ! -z "$packages" ]; then
           ./continuous-build-wrapper.sh ./build-package.sh -I -a ${{ matrix.target_arch }} $packages
         fi
-    - name: Waiting for debugger
-      if: ${{ failure() }}
-      uses: mxschmitt/action-tmate@v3
     - name: Generate build status
       run: |
         tar cf build-status/${{ matrix.target_arch }}-${{ github.sha }}.tar ./*.txt ./debs ./artifacts ./output
@@ -398,9 +389,6 @@ jobs:
         if [ ! -z "$packages" ]; then
           ./continuous-build-wrapper.sh ./build-package.sh -I -a ${{ matrix.target_arch }} $packages
         fi
-    - name: Waiting for debugger
-      if: ${{ failure() }}
-      uses: mxschmitt/action-tmate@v3
     - name: Generate build status
       run: |
         tar cf build-status/${{ matrix.target_arch }}-${{ github.sha }}.tar ./*.txt ./debs ./artifacts ./output
@@ -465,9 +453,6 @@ jobs:
         if [ ! -z "$packages" ]; then
           ./continuous-build-wrapper.sh ./build-package.sh -I -a ${{ matrix.target_arch }} $packages
         fi
-    - name: Waiting for debugger
-      if: ${{ failure() }}
-      uses: mxschmitt/action-tmate@v3
     - name: Generate build status
       run: |
         tar cf build-status/${{ matrix.target_arch }}-${{ github.sha }}.tar ./*.txt ./debs ./artifacts ./output
@@ -532,9 +517,6 @@ jobs:
         if [ ! -z "$packages" ]; then
           ./continuous-build-wrapper.sh ./build-package.sh -I -a ${{ matrix.target_arch }} $packages
         fi
-    - name: Waiting for debugger
-      if: ${{ failure() }}
-      uses: mxschmitt/action-tmate@v3
     - name: Generate build status
       run: |
         tar cf build-status/${{ matrix.target_arch }}-${{ github.sha }}.tar ./*.txt ./debs ./artifacts ./output
@@ -599,9 +581,6 @@ jobs:
         if [ ! -z "$packages" ]; then
           ./continuous-build-wrapper.sh ./build-package.sh -I -a ${{ matrix.target_arch }} $packages
         fi
-    - name: Waiting for debugger
-      if: ${{ failure() }}
-      uses: mxschmitt/action-tmate@v3
     - name: Generate build status
       run: |
         tar cf build-status/${{ matrix.target_arch }}-${{ github.sha }}.tar ./*.txt ./debs ./artifacts ./output
@@ -666,9 +645,6 @@ jobs:
         if [ ! -z "$packages" ]; then
           ./continuous-build-wrapper.sh ./build-package.sh -I -a ${{ matrix.target_arch }} $packages
         fi
-    - name: Waiting for debugger
-      if: ${{ failure() }}
-      uses: mxschmitt/action-tmate@v3
     - name: Generate build status
       run: |
         tar cf build-status/${{ matrix.target_arch }}-${{ github.sha }}.tar ./*.txt ./debs ./artifacts ./output
@@ -718,9 +694,6 @@ jobs:
           echo "[ERROR]: Need more time to build!"
           exit 1
         fi
-    - name: Waiting for debugger
-      if: ${{ failure() }}
-      uses: mxschmitt/action-tmate@v3
     - name: Generate build artifacts
       if: always()
       run: |
