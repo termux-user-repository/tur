@@ -2,11 +2,10 @@ TERMUX_PKG_HOMEPAGE=https://www.chromium.org/Home
 TERMUX_PKG_DESCRIPTION="Chromium web browser"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="Chongyun Lee <uchkks@protonmail.com>"
-_CHROMIUM_VERSION=107.0.5304.107
+_CHROMIUM_VERSION=108.0.5359.125
 TERMUX_PKG_VERSION=$_CHROMIUM_VERSION
-TERMUX_PKG_REVISION=3
 TERMUX_PKG_SRCURL=(https://commondatastorage.googleapis.com/chromium-browser-official/chromium-$_CHROMIUM_VERSION.tar.xz)
-TERMUX_PKG_SHA256=(49d96b1247690b5ecc061d91fdb203eaef38c6d6e1bb60ca4472eaa99bba1a3e)
+TERMUX_PKG_SHA256=(16e26bef292f99efbb72559990f6383f1d39cb20bfa38450fbcd6c7cf88b0a59)
 TERMUX_PKG_DEPENDS="atk, cups, dbus, gtk3, krb5, libc++, libxkbcommon, libminizip, libnss, libwayland, libx11, mesa, openssl, pango, pulseaudio, libdrm, libjpeg-turbo, libpng, libwebp, libflac, fontconfig, freetype, zlib, libxml2, libxslt, libopus, libre2, libsnappy"
 # TODO: Split chromium-common and chromium-headless
 # TERMUX_PKG_DEPENDS+=", chromium-common"
@@ -312,6 +311,40 @@ termux_step_make_install() {
 	ln -sfr $TERMUX_PREFIX/lib/chromium/chromium-launcher.sh $TERMUX_PREFIX/bin/chromium-browser
 	ln -sfr $TERMUX_PREFIX/lib/chromium/chromedriver $TERMUX_PREFIX/bin/
 	ln -sfr $TERMUX_PREFIX/lib/chromium/headless_shell $TERMUX_PREFIX/bin/
+
+	# Install man pages and desktop files
+	install -Dm644 $TERMUX_PKG_SRCDIR/chrome/app/resources/manpage.1.in \
+		"$TERMUX_PREFIX/share/man/man1/chromium.1"
+	install -Dm644 $TERMUX_PKG_SRCDIR/chrome/installer/linux/common/desktop.template \
+		"$TERMUX_PREFIX/share/applications/chromium.desktop"
+	sed -i \
+		-e 's/@@MENUNAME@@/Chromium/g' \
+		-e 's/@@PACKAGE@@/chromium/g' \
+		-e 's/@@USR_BIN_SYMLINK_NAME@@/chromium-browser/g' \
+		-e "s|Exec=/usr/bin|Exec=$TERMUX_PREFIX/bin|g" \
+		"$TERMUX_PREFIX/share/applications/chromium.desktop" \
+		"$TERMUX_PREFIX/share/man/man1/chromium.1"
+
+	# Install logos
+	for size in 24 48 64 128 256; do
+		install -Dm644 "$TERMUX_PKG_SRCDIR/chrome/app/theme/chromium/product_logo_$size.png" \
+			"$TERMUX_PREFIX/share/icons/hicolor/${size}x${size}/apps/chromium.png"
+	done
+
+	for size in 16 32; do
+		install -Dm644 "$TERMUX_PKG_SRCDIR/chrome/app/theme/default_100_percent/chromium/product_logo_$size.png" \
+			"$TERMUX_PREFIX/share/icons/hicolor/${size}x${size}/apps/chromium.png"
+	done
+
+	# Install AppStream metadata file
+	install -Dm644 $TERMUX_PKG_SRCDIR/chrome/installer/linux/common/chromium-browser/chromium-browser.appdata.xml \
+		"$TERMUX_PREFIX/share/metainfo/chromium.appdata.xml"
+	sed -ni \
+		-e 's/chromium-browser\.desktop/chromium.desktop/' \
+		-e '/<update_contact>/d' \
+		-e '/<p>/N;/<p>\n.*\(We invite\|Chromium supports Vorbis\)/,/<\/p>/d' \
+		-e '/^<?xml/,$p' \
+		"$TERMUX_PREFIX/share/metainfo/chromium.appdata.xml"
 }
 
 termux_step_post_make_install() {
@@ -332,10 +365,6 @@ termux_step_post_make_install() {
 
 # TODO:
 # (2) Split packages
-# (4) Enable Sandbox (AFAIK this is impossible)
-# (5) Package man pages
-# (7) Use libreolv-wrapper
-# (8) Refator the GN files (Add a variant is_termux in the configure files)
 
 # ######################### About system libraries ############################
 # We only pick up a few libraries to let chromium link against. Others may
@@ -372,4 +401,11 @@ termux_step_post_make_install() {
 # If we want to enable NaCi, maybe we should build the toolchain of NaCl too.
 # But I don't think this is necessary. NaCl existing or not will take little 
 # influence on Chromium. So I'd like to disable NaCl.
+# #############################################################################
+
+# ############################ About Sandbox ##################################
+# First, setuid-sandbox is never usable on Termux, beacuse setuid syscall is
+# disabled by Android's SELinux. Second, lots of patches are needed to let
+# seccomp-bpf sandbox work properly on Android. I've tried many times but I
+# can't make it. If your are willing to work on this, feel free to submit a PR.
 # #############################################################################
