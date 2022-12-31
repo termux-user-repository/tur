@@ -3,7 +3,7 @@ TERMUX_PKG_DESCRIPTION="Build cross-platform desktop apps with JavaScript, HTML,
 TERMUX_PKG_LICENSE="MIT, BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="Chongyun Lee <uchkks@protonmail.com>"
 TERMUX_PKG_VERSION=21.3.3
-TERMUX_PKG_REVISION=2
+TERMUX_PKG_REVISION=3
 TERMUX_PKG_SRCURL=https://github.com/electron/electron.git
 TERMUX_PKG_DEPENDS="atk, cups, dbus, fontconfig, freetype, gtk3, krb5, libc++, libffi, libxkbcommon, libnss, libwayland, libx11, mesa, openssl, pango, pulseaudio"
 TERMUX_PKG_BUILD_DEPENDS="libnotify"
@@ -283,13 +283,8 @@ termux_step_make_install() {
 	cp -Rf out/Release/locales $TERMUX_PREFIX/lib/electron/
 	cp -Rf out/Release/resources $TERMUX_PREFIX/lib/electron/
 
-	cat << EOF > $TERMUX_PREFIX/bin/electron
-#!$TERMUX_PREFIX/bin/env sh
-
-exec $TERMUX_PREFIX/lib/electron/electron "\$@" --no-sandbox
-
-EOF
-	chmod +x $TERMUX_PREFIX/bin/electron
+	chmod +x $TERMUX_PREFIX/lib/electron/electron
+	ln -sfr $TERMUX_PREFIX/lib/electron/electron $TERMUX_PREFIX/bin/electron
 
 	# Install LICENSE file
 	mkdir -p $TERMUX_PREFIX/share/doc/electron
