@@ -35,10 +35,7 @@ if [ $(id -u) -eq 0 ] && [ $(stat -c %u -L ${XDG_CONFIG_HOME:-${HOME}}) -eq 0 ];
 		${CHROMIUM_FLAGS}"
 fi
 
-# No matter what, pass `--no-sandbox`
-CHROMIUM_FLAGS="${CHROMIUM_FLAGS} --no-sandbox"
-
 # Set the .desktop file name
-# export CHROME_DESKTOP="chromium.desktop"
+export CHROME_DESKTOP="chromium.desktop"
 
 exec "$PROGDIR/chrome" --extra-plugin-dir=@TERMUX_PREFIX@/lib/nsbrowser/plugins ${CHROMIUM_FLAGS} "$@"

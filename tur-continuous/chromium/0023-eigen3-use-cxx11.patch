@@ -1,0 +1,22 @@
+--- a/third_party/eigen3/src/Eigen/src/Core/util/Macros.h
++++ b/third_party/eigen3/src/Eigen/src/Core/util/Macros.h
+@@ -647,6 +647,7 @@
+ #define EIGEN_CPLUSPLUS 0
+ #endif
+ 
++#ifndef __ANDROID__
+ // The macro EIGEN_COMP_CXXVER defines the c++ version expected by the compiler.
+ // For instance, if compiling with gcc and -std=c++17, then EIGEN_COMP_CXXVER
+ // is defined to 17.
+@@ -661,6 +662,11 @@
+ #else
+   #define EIGEN_COMP_CXXVER 03
+ #endif
++#else
++// On Android, NDK's libcxx doesn't have full support for C++17 and higher,
++// so always use to C++14.
++#define EIGEN_COMP_CXXVER 14
++#endif
+ 
+ 
+ // The macros EIGEN_HAS_CXX?? defines a rough estimate of available c++ features

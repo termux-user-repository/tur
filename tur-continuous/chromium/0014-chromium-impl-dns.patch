@@ -43,22 +43,18 @@ diff -uNr a/net/dns/dns_reloader.h b/net/dns/dns_reloader.h
  namespace net {
  
  // Call on the network thread before calling DnsReloaderMaybeReload() anywhere.
-diff -uNr a/net/dns/host_resolver_manager.cc b/net/dns/host_resolver_manager.cc
---- a/net/dns/host_resolver_manager.cc	2022-11-09 09:28:47.029899600 +0800
-+++ b/net/dns/host_resolver_manager.cc	2022-11-13 00:53:36.508056665 +0800
-@@ -3133,7 +3133,7 @@
-   if (system_dns_config_notifier_)
-     system_dns_config_notifier_->AddObserver(this);
+--- a/net/dns/host_resolver_system_task.cc	2022-12-14 01:28:26.229861500 +0000
++++ b/net/dns/host_resolver_system_task.cc	2022-12-30 16:55:04.659958063 +0000
+@@ -311,7 +311,7 @@
+ 
+ void EnsureSystemHostResolverCallReady() {
  #if BUILDFLAG(IS_POSIX) && !BUILDFLAG(IS_APPLE) && !BUILDFLAG(IS_OPENBSD) && \
 -    !BUILDFLAG(IS_ANDROID)
 +    !BUILDFLAG(IS_ANDROID) && !defined(__TERMUX__)
    EnsureDnsReloaderInit();
- #endif
- 
-diff -uNr a/net/dns/host_resolver_proc.cc b/net/dns/host_resolver_proc.cc
---- a/net/dns/host_resolver_proc.cc	2022-11-09 09:28:47.033900000 +0800
-+++ b/net/dns/host_resolver_proc.cc	2022-11-13 00:53:10.248056318 +0800
-@@ -193,7 +193,7 @@
+ #elif BUILDFLAG(IS_WIN)
+   EnsureWinsockInit();
+@@ -397,7 +397,7 @@
                                                  base::BlockingType::WILL_BLOCK);
  
  #if BUILDFLAG(IS_POSIX) && \
