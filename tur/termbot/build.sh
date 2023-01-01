@@ -5,7 +5,7 @@ TERMUX_PKG_MAINTAINER="@termux-user-repository"
 _COMMIT=0f4b10382ccf9fe9a72c4021dda4fc78fb318738
 _COMMIT_DATE=2022.09.02
 TERMUX_PKG_VERSION=${_COMMIT_DATE//./}
-TERMUX_PKG_SRCURL=https://github.com/polyzium/termbot.git
+TERMUX_PKG_SRCURL=git+https://github.com/polyzium/termbot
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_GIT_BRANCH="master"
 
