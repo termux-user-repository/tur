@@ -1,0 +1,12 @@
+diff -uNr go-cqhttp-1.0.0-rc4/go.mod go-cqhttp-1.0.0-rc4.mod/go.mod
+--- go-cqhttp-1.0.0-rc4/go.mod	2023-01-01 21:25:38.000000000 +0800
++++ go-cqhttp-1.0.0-rc4.mod/go.mod	2023-01-02 20:02:43.044689721 +0800
+@@ -24,7 +24,7 @@
+ 	golang.org/x/sys v0.2.0
+ 	golang.org/x/term v0.2.0
+ 	golang.org/x/time v0.2.0
+-	gopkg.ilharper.com/x/isatty v1.1.0
++	gopkg.ilharper.com/x/isatty v1.1.1
+ 	gopkg.in/yaml.v3 v3.0.1
+ )
+ 
