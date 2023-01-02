@@ -1,9 +1,10 @@
 TERMUX_PKG_HOMEPAGE=https://python.org/
-TERMUX_PKG_DESCRIPTION="Python programming language intended to enable clear programs (version 3.8)"
+_MAJOR_VERSION=3.8
+TERMUX_PKG_DESCRIPTION="Python programming language intended to enable clear programs (version $_MAJOR_VERSION)"
 TERMUX_PKG_LICENSE="PythonPL"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-_MAJOR_VERSION=3.8
 TERMUX_PKG_VERSION=${_MAJOR_VERSION}.16
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://www.python.org/ftp/python/${TERMUX_PKG_VERSION}/Python-${TERMUX_PKG_VERSION}.tar.xz
 TERMUX_PKG_SHA256=d85dbb3774132473d8081dcb158f34a10ccad7a90b96c7e50ea4bb61f5ce4562
 TERMUX_PKG_DEPENDS="gdbm, libandroid-posix-semaphore, libandroid-support, libbz2, libcrypt, libffi, liblzma, libsqlite, ncurses, ncurses-ui-libs, openssl, readline, zlib"
@@ -42,8 +43,21 @@ lib/python${_MAJOR_VERSION}/*/test
 lib/python${_MAJOR_VERSION}/*/tests
 "
 
+TERMUX_PKG_EXTRA_HOSTBUILD_CONFIGURE_ARGS="
+--prefix=$TERMUX_PREFIX/opt/python$_MAJOR_VERSION/cross
+"
+
+termux_step_host_build() {
+	$TERMUX_PKG_SRCDIR/configure $TERMUX_PKG_EXTRA_HOSTBUILD_CONFIGURE_ARGS
+	make -j $TERMUX_MAKE_PROCESSES
+	make altinstall
+}
+
 termux_step_pre_configure() {
-	export PATH="$TERMUX_PKG_HOSTBUILD_DIR:$PATH"
+	# Remove this marker all the time.
+	rm -rf $TERMUX_HOSTBUILD_MARKER
+
+	export PATH="$TERMUX_PREFIX/opt/python$_MAJOR_VERSION/cross/bin:$PATH"
 	# -O3 gains some additional performance on at least aarch64.
 	CFLAGS="${CFLAGS/-Oz/-O3}"
 	# Needed when building with clang, as setup.py only probes
@@ -59,13 +73,15 @@ termux_step_pre_configure() {
 		#    Fatal: you must define __ANDROID_API__
 		# if __ANDROID_API__ is not defined.
 		CPPFLAGS+=" -D__ANDROID_API__=$(getprop ro.build.version.sdk)"
+	else
+		TERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" --with-build-python=python$_MAJOR_VERSION"
 	fi
 }
 
 termux_step_make_install() {
 	make altinstall
-	ln -sfr $TERMUX_PREFIX/bin/python3.8 $TERMUX_PREFIX/bin/python
-	ln -sfr $TERMUX_PREFIX/bin/python3.8 $TERMUX_PREFIX/bin/python3
+	ln -sfr $TERMUX_PREFIX/bin/python$_MAJOR_VERSION $TERMUX_PREFIX/bin/python
+	ln -sfr $TERMUX_PREFIX/bin/python$_MAJOR_VERSION $TERMUX_PREFIX/bin/python3
 }
 
 termux_step_post_massage() {
