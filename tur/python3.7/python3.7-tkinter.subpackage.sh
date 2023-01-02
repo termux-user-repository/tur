@@ -1,4 +1,4 @@
-TERMUX_SUBPKG_DESCRIPTION="Tkinter support for Python 3.7"
+TERMUX_SUBPKG_DESCRIPTION="Tkinter support for Python $_MAJOR_VERSION"
 TERMUX_SUBPKG_DEPENDS="tk"
 TERMUX_SUBPKG_INCLUDE="
 bin/idle*
