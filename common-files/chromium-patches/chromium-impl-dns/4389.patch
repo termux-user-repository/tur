@@ -1,0 +1,98 @@
+--- a/net/dns/dns_config_service_posix.cc
++++ b/net/dns/dns_config_service_posix.cc
+@@ -52,7 +52,7 @@
+     FILE_PATH_LITERAL("/system/etc/hosts");
+ #else
+ const base::FilePath::CharType kFilePathHosts[] =
+-    FILE_PATH_LITERAL("/etc/hosts");
++    FILE_PATH_LITERAL("@TERMUX_PREFIX@/etc/hosts");
+ #endif
+ 
+ #if defined(OS_IOS)
+@@ -101,7 +101,7 @@
+ #else  // !defined(OS_IOS) && !defined(OS_ANDROID) && !defined(OS_MAC)
+ 
+ #ifndef _PATH_RESCONF  // Normally defined in <resolv.h>
+-#define _PATH_RESCONF "/etc/resolv.conf"
++#define _PATH_RESCONF "@TERMUX_PREFIX@/etc/resolv.conf"
+ #endif
+ 
+ const base::FilePath::CharType kFilePathConfig[] =
+@@ -147,7 +147,7 @@
+   base::ScopedBlockingCall scoped_blocking_call(FROM_HERE,
+                                                 base::BlockingType::MAY_BLOCK);
+   dns_config->unhandled_options = false;
+-#if !defined(OS_ANDROID)
++#if !defined(OS_ANDROID) && !defined(__TERMUX__)
+   bool success = false;
+ // TODO(fuchsia): Use res_ninit() when it's implemented on Fuchsia.
+ #if defined(OS_OPENBSD) || defined(OS_FUCHSIA)
+@@ -176,6 +176,16 @@
+   // Override |fallback_period| value to match default setting on Windows.
+   dns_config->fallback_period = kDnsDefaultFallbackPeriod;
+   return success;
++#elif defined(__TERMUX__)
++  dns_config->nameservers.clear();
++  IPAddress termux_dns_address;
++  bool parsed_termux = termux_dns_address.AssignFromIPLiteral("8.8.8.8");
++  if (parsed_termux) {
++    IPEndPoint termux_dns(termux_dns_address, dns_protocol::kDefaultPort);
++    dns_config->nameservers.push_back(termux_dns);
++  }
++  dns_config->fallback_period = kDnsDefaultFallbackPeriod;
++  return true;
+ #else  // defined(OS_ANDROID)
+   dns_config->nameservers.clear();
+ 
+@@ -341,7 +351,7 @@
+   config_reader_ = base::MakeRefCounted<ConfigReader>(this);
+ }
+ 
+-#if !defined(OS_ANDROID)
++#if !defined(OS_ANDROID) && !defined(__TERMUX__)
+ bool ConvertResStateToDnsConfig(const struct __res_state& res,
+                                 DnsConfig* dns_config) {
+   DCHECK(dns_config);
+--- a/net/dns/dns_reloader.cc
++++ b/net/dns/dns_reloader.cc
+@@ -5,7 +5,7 @@
+ #include "net/dns/dns_reloader.h"
+
+ #if defined(OS_POSIX) && !defined(OS_APPLE) && !defined(OS_OPENBSD) && \
+-    !defined(OS_ANDROID) && !defined(OS_FUCHSIA)
++    !defined(OS_ANDROID) && !defined(OS_FUCHSIA) && !defined(__TERMUX__)
+
+ #include <resolv.h>
+
+--- a/net/dns/dns_reloader.h
++++ b/net/dns/dns_reloader.h
+@@ -7,7 +7,7 @@
+
+ #include "build/build_config.h"
+
+-#if defined(OS_POSIX) && !defined(OS_APPLE) && !defined(OS_OPENBSD)
++#if defined(OS_POSIX) && !defined(OS_APPLE) && !defined(OS_OPENBSD) && !defined(__TERMUX__)
+ namespace net {
+
+ // Call on the network thread before calling DnsReloaderMaybeReload() anywhere.
+--- a/net/dns/host_resolver_proc.cc
++++ b/net/dns/host_resolver_proc.cc
+@@ -160,7 +160,7 @@
+                                                 base::BlockingType::WILL_BLOCK);
+
+ #if defined(OS_POSIX) && !defined(OS_APPLE) && !defined(OS_OPENBSD) && \
+-    !defined(OS_ANDROID) && !defined(OS_FUCHSIA)
++    !defined(OS_ANDROID) && !defined(OS_FUCHSIA) && !defined(__TERMUX__)
+   DnsReloaderMaybeReload();
+ #endif
+   base::Optional<AddressInfo> ai;
+--- a/net/dns/host_resolver_manager.cc
++++ b/net/dns/host_resolver_manager.cc
+@@ -2779,7 +2779,7 @@
+   if (system_dns_config_notifier_)
+     system_dns_config_notifier_->AddObserver(this);
+ #if defined(OS_POSIX) && !defined(OS_APPLE) && !defined(OS_OPENBSD) && \
+-    !defined(OS_ANDROID)
++    !defined(OS_ANDROID) && !defined(__TERMUX__)
+   EnsureDnsReloaderInit();
+ #endif

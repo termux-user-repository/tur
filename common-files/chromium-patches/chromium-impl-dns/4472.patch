@@ -1,0 +1,99 @@
+--- a/net/dns/dns_reloader.cc
++++ b/net/dns/dns_reloader.cc
+@@ -5,7 +5,7 @@
+ #include "net/dns/dns_reloader.h"
+
+ #if defined(OS_POSIX) && !defined(OS_APPLE) && !defined(OS_OPENBSD) && \
+-    !defined(OS_ANDROID) && !defined(OS_FUCHSIA)
++    !defined(OS_ANDROID) && !defined(OS_FUCHSIA) && !defined(__TERMUX__)
+
+ #include <resolv.h>
+
+--- a/net/dns/dns_reloader.h
++++ b/net/dns/dns_reloader.h
+@@ -7,7 +7,7 @@
+
+ #include "build/build_config.h"
+
+-#if defined(OS_POSIX) && !defined(OS_APPLE) && !defined(OS_OPENBSD)
++#if defined(OS_POSIX) && !defined(OS_APPLE) && !defined(OS_OPENBSD) && !defined(__TERMUX__)
+ namespace net {
+
+ // Call on the network thread before calling DnsReloaderMaybeReload() anywhere.
+--- a/net/dns/host_resolver_proc.cc
++++ b/net/dns/host_resolver_proc.cc
+@@ -160,7 +160,7 @@
+                                                 base::BlockingType::WILL_BLOCK);
+
+ #if defined(OS_POSIX) && !defined(OS_APPLE) && !defined(OS_OPENBSD) && \
+-    !defined(OS_ANDROID) && !defined(OS_FUCHSIA)
++    !defined(OS_ANDROID) && !defined(OS_FUCHSIA) && !defined(__TERMUX__)
+   DnsReloaderMaybeReload();
+ #endif
+   base::Optional<AddressInfo> ai;
+--- a/net/dns/host_resolver_manager.cc
++++ b/net/dns/host_resolver_manager.cc
+@@ -2779,7 +2779,7 @@
+   if (system_dns_config_notifier_)
+     system_dns_config_notifier_->AddObserver(this);
+ #if defined(OS_POSIX) && !defined(OS_APPLE) && !defined(OS_OPENBSD) && \
+-    !defined(OS_ANDROID)
++    !defined(OS_ANDROID) && !defined(__TERMUX__)
+   EnsureDnsReloaderInit();
+ #endif
+
+--- a/net/dns/dns_config_service_linux.cc
++++ b/net/dns/dns_config_service_linux.cc
+@@ -2,6 +2,8 @@
+ // Use of this source code is governed by a BSD-style license that can be
+ // found in the LICENSE file.
+ 
++#include <sys/cdefs.h>
++
+ #include "net/dns/dns_config_service_linux.h"
+ 
+ #include <netdb.h>
+@@ -35,6 +37,19 @@
+ #include "net/dns/nsswitch_reader.h"
+ #include "net/dns/serial_worker.h"
+ 
++#ifdef __TERMUX__
++
++namespace net {
++
++// static
++std::unique_ptr<DnsConfigService> DnsConfigService::CreateSystemService() {
++  return nullptr;
++}
++
++}  // namespace net
++
++#else
++
+ namespace net {
+ 
+ namespace internal {
+@@ -542,3 +557,5 @@
+ }
+ 
+ }  // namespace net
++
++#endif
+--- a/net/dns/dns_config_service_linux.h
++++ b/net/dns/dns_config_service_linux.h
+@@ -17,6 +17,8 @@
+ #include "net/dns/dns_config_service.h"
+ #include "net/dns/nsswitch_reader.h"
+ 
++#ifndef __TERMUX__
++
+ namespace net {
+ 
+ // Use DnsConfigService::CreateSystemService to use it outside of tests.
+@@ -88,4 +90,6 @@
+ 
+ }  // namespace net
+ 
++#endif
++
+ #endif  // NET_DNS_DNS_CONFIG_SERVICE_LINUX_H_

@@ -1,0 +1,121 @@
+Origin: https://gitlab.alpinelinux.org/alpine/aports/-/blob/master/community/chromium/no-execinfo.patch
+
+this can be linked to, but is entirely useless
+--- ./base/debug/stack_trace_posix.cc
++++ ./base/debug/stack_trace_posix.cc
+@@ -27,7 +27,7 @@
+ #if !defined(USE_SYMBOLIZE)
+ #include <cxxabi.h>
+ #endif
+-#if !defined(__UCLIBC__) && !defined(_AIX)
++#if defined(__GLIBC__) && !defined(_AIX)
+ #include <execinfo.h>
+ #endif
+ 
+@@ -89,7 +89,7 @@
+   // Note: code in this function is NOT async-signal safe (std::string uses
+   // malloc internally).
+ 
+-#if !defined(__UCLIBC__) && !defined(_AIX)
++#if defined(__GLIBC__) && !defined(_AIX)
+   std::string::size_type search_from = 0;
+   while (search_from < text->size()) {
+     // Look for the start of a mangled symbol, from search_from.
+@@ -136,7 +136,7 @@
+   virtual ~BacktraceOutputHandler() = default;
+ };
+ 
+-#if !defined(__UCLIBC__) && !defined(_AIX)
++#if defined(__GLIBC__) && !defined(_AIX)
+ void OutputPointer(void* pointer, BacktraceOutputHandler* handler) {
+   // This should be more than enough to store a 64-bit number in hex:
+   // 16 hex digits + 1 for null-terminator.
+@@ -839,7 +839,7 @@
+   // NOTE: This code MUST be async-signal safe (it's used by in-process
+   // stack dumping signal handler). NO malloc or stdio is allowed here.
+ 
+-#if !defined(__UCLIBC__) && !defined(_AIX)
++#if defined(__GLIBC__) && !defined(_AIX)
+   // Though the backtrace API man page does not list any possible negative
+   // return values, we take no chance.
+   return base::saturated_cast<size_t>(backtrace(trace, count));
+@@ -852,13 +852,13 @@
+ // NOTE: This code MUST be async-signal safe (it's used by in-process
+ // stack dumping signal handler). NO malloc or stdio is allowed here.
+ 
+-#if !defined(__UCLIBC__) && !defined(_AIX)
++#if defined(__GLIBC__) && !defined(_AIX)
+   PrintBacktraceOutputHandler handler;
+   ProcessBacktrace(trace_, count_, prefix_string, &handler);
+ #endif
+ }
+ 
+-#if !defined(__UCLIBC__) && !defined(_AIX)
++#if defined(__GLIBC__) && !defined(_AIX)
+ void StackTrace::OutputToStreamWithPrefix(std::ostream* os,
+                                           const char* prefix_string) const {
+   StreamBacktraceOutputHandler handler(os);
+--- ./v8/src/codegen/external-reference-table.cc.orig
++++ ./v8/src/codegen/external-reference-table.cc
+@@ -11,7 +11,9 @@
+
+ #if defined(DEBUG) && defined(V8_OS_LINUX) && !defined(V8_OS_ANDROID)
+ #define SYMBOLIZE_FUNCTION
++#if defined(__GLIBC__)
+ #include <execinfo.h>
++#endif
+
+ #include <vector>
+
+@@ -96,7 +98,7 @@
+ }
+
+ const char* ExternalReferenceTable::ResolveSymbol(void* address) {
+-#ifdef SYMBOLIZE_FUNCTION
++#if defined(SYMBOLIZE_FUNCTION) && defined(__GLIBC__)
+   char** names = backtrace_symbols(&address, 1);
+   const char* name = names[0];
+   // The array of names is malloc'ed. However, each name string is static
+--- a/third_party/swiftshader/third_party/llvm-subzero/build/Linux/include/llvm/Config/config.h
++++ b/third_party/swiftshader/third_party/llvm-subzero/build/Linux/include/llvm/Config/config.h
+@@ -58,7 +58,7 @@
+ #define HAVE_ERRNO_H 1
+ 
+ /* Define to 1 if you have the <execinfo.h> header file. */
+-#define HAVE_EXECINFO_H 1
++/* #define HAVE_EXECINFO_H 1 */
+ 
+ /* Define to 1 if you have the <fcntl.h> header file. */
+ #define HAVE_FCNTL_H 1
+--- a/base/debug/stack_trace.cc
++++ b/base/debug/stack_trace.cc
+@@ -251,7 +253,9 @@
+ }
+ 
+ void StackTrace::OutputToStream(std::ostream* os) const {
++#if defined(__GLIBC__) && !defined(_AIX)
+   OutputToStreamWithPrefix(os, nullptr);
++#endif
+ }
+ 
+ std::string StackTrace::ToString() const {
+@@ -281,7 +281,7 @@
+ }
+ std::string StackTrace::ToStringWithPrefix(const char* prefix_string) const {
+   std::stringstream stream;
+-#if !defined(__UCLIBC__) && !defined(_AIX)
++#if defined(__GLIBC__) && !defined(_AIX)
+   OutputToStreamWithPrefix(&stream, prefix_string);
+ #endif
+   return stream.str();
+--- ./v8/src/base/debug/stack_trace_posix.cc
++++ ./v8/src/base/debug/stack_trace_posix.cc
+@@ -25,7 +25,7 @@
+ #include <string>
+ #include <vector>
+ 
+-#if V8_LIBC_GLIBC || V8_LIBC_BSD || V8_LIBC_UCLIBC || V8_OS_SOLARIS
++#if (V8_LIBC_GLIBC || V8_LIBC_BSD || V8_LIBC_UCLIBC || V8_OS_SOLARIS) && !defined(__ANDROID__)
+ #define HAVE_EXECINFO_H 1
+ #endif
+ 

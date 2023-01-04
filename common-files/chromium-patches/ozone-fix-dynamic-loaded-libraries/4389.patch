@@ -1,0 +1,24 @@
+--- a/ui/ozone/platform/wayland/host/wayland_connection.cc
++++ b/ui/ozone/platform/wayland/host/wayland_connection.cc
+@@ -83,13 +83,21 @@
+   // them anyway.  Use RTLD_GLOBAL to add the symbols to the global namespace.
+   auto dlopen_flags = RTLD_NOW | RTLD_GLOBAL;
+   if (void* libwayland_client =
++#ifndef __TERMUX__
+           dlopen("libwayland-client.so.0", dlopen_flags)) {
++#else
++          dlopen("libwayland-client.so", dlopen_flags)) {
++#endif
+     third_party_wayland::InitializeLibwaylandclient(libwayland_client);
+   } else {
+     LOG(ERROR) << "Failed to load wayland client libraries.";
+     return false;
+   }
++#ifndef __TERMUX__
+   if (void* libwayland_egl = dlopen("libwayland-egl.so.1", dlopen_flags))
++#else
++  if (void* libwayland_egl = dlopen("libwayland-egl.so", dlopen_flags))
++#endif
+     third_party_wayland::InitializeLibwaylandegl(libwayland_egl);
+ #endif
+ 

@@ -1,0 +1,18 @@
+--- a/build/config/compiler/BUILD.gn
++++ b/build/config/compiler/BUILD.gn
+@@ -1705,6 +1705,15 @@
+         "-Wno-misleading-indentation",
+       ]
+     }
++    if (!is_nacl) {
++      cflags += [
++        # Disabled for similar reasons as -Wunused-variable.
++        "-Wno-unused-but-set-variable",
++
++        # TODO(https://crbug.com/1202159): Clean up and enable.
++        "-Wno-misleading-indentation",
++      ]
++    }
+   }
+ 
+   configs = [ ":default_warnings" ]

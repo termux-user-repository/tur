@@ -2,6 +2,7 @@ TERMUX_PKG_HOMEPAGE=https://github.com/electron/electron
 TERMUX_PKG_DESCRIPTION="Build cross-platform desktop apps with JavaScript, HTML, and CSS"
 TERMUX_PKG_LICENSE="MIT, BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="Chongyun Lee <uchkks@protonmail.com>"
+_CHROMIUM_VERSION=106.0.5249.199
 TERMUX_PKG_VERSION=21.3.3
 TERMUX_PKG_REVISION=3
 TERMUX_PKG_SRCURL=git+https://github.com/electron/electron
@@ -25,6 +26,7 @@ termux_step_get_source() {
 				(sed "s|@TERMUX_PREFIX@|$TERMUX_PREFIX|g" "$f" | patch -f --silent -R -p1 -d "$TERMUX_PKG_SRCDIR") || true
 			done
 			shopt -u nullglob
+			python $TERMUX_SCRIPTDIR/common-files/apply-chromium-patches.py -C "$TERMUX_PKG_SRCDIR" -R -v $_CHROMIUM_VERSION || bash
 			return
 		fi
 	fi
@@ -59,6 +61,7 @@ termux_step_get_source() {
 
 termux_step_post_get_source() {
 	echo "$TERMUX_PKG_VERSION" > $TERMUX_PKG_SRCDIR/electron/ELECTRON_VERSION
+	python $TERMUX_SCRIPTDIR/common-files/apply-chromium-patches.py -v $_CHROMIUM_VERSION
 }
 
 termux_step_configure() {

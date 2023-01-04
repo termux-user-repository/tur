@@ -1,0 +1,15 @@
+--- a/third_party/swiftshader/src/WSI/XcbSurfaceKHR.cpp
++++ b/third_party/swiftshader/src/WSI/XcbSurfaceKHR.cpp
+@@ -72,8 +72,11 @@
+ 			{
+ 				return std::make_unique<LibXcbExports>(RTLD_DEFAULT);
+ 			}
+-
++#ifndef __TERMUX__
+ 			if(auto lib = loadLibrary("libxcb.so.1"))
++#else
++			if(auto lib = loadLibrary("libxcb.so"))
++#endif
+ 			{
+ 				return std::make_unique<LibXcbExports>(lib);
+ 			}

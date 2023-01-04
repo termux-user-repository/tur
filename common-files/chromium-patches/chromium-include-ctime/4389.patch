@@ -1,0 +1,11 @@
+--- a/ui/accessibility/ax_tree_serializer.h
++++ b/ui/accessibility/ax_tree_serializer.h
+@@ -23,6 +23,8 @@
+ #include "ui/accessibility/ax_tree_source.h"
+ #include "ui/accessibility/ax_tree_update.h"
+ 
++#include <ctime>
++
+ namespace ui {
+ 
+ struct ClientTreeNode;
