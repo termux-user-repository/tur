@@ -1,0 +1,30 @@
+Only search packages from TUR repository when auto-updating.
+--- a/scripts/bin/update-packages
++++ b/scripts/bin/update-packages
+@@ -189,7 +189,7 @@
+ echo "INFO: Running update for: $*"
+ 
+ if [[ "$1" == "@all" ]]; then
+-	for repo_dir in $(jq --raw-output 'keys | .[]' "${TERMUX_SCRIPTDIR}/repo.json"); do
++	for repo_dir in "tur"; do
+ 		for pkg_dir in "${repo_dir}"/*; do
+ 			! _should_update "${pkg_dir}" && continue # Skip if not needed.
+ 			# Update all its dependencies first.
+@@ -206,7 +206,7 @@
+ else
+ 	for pkg in "$@"; do
+ 		if [ ! -d "${pkg}" ]; then # If only package name is given, try to find it's directory.
+-			for repo_dir in $(jq --raw-output 'keys | .[]' "${TERMUX_SCRIPTDIR}/repo.json"); do
++			for repo_dir in "tur"; do
+ 				if [ -d "${repo_dir}/${pkg}" ]; then
+ 					pkg="${repo_dir}/${pkg}"
+ 					break
+@@ -231,7 +231,7 @@
+ 	local body
+ 
+ 	if [[ "${assignee:-termuxbot2}" == "termuxbot2" ]]; then
+-		assignee="MrAdityaAlok" # Assign myself if termuxbot2 is the actor.
++		assignee="licy183" # Assign licy183 if termuxbot2 is the actor.
+ 	fi
+ 
+ 	body="$(
