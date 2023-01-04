@@ -42,7 +42,7 @@ _setup_standalone_toolchain_ndk_r17c() {
 	cd $TOOLCHAIN_DIR/sysroot
 
 	# Apply patches
-	for f in $TERMUX_SCRIPTDIR/common-files/ndk-patches-r17c/*.patch; do
+	for f in $TERMUX_SCRIPTDIR/common-files/ndk-patches/r17c/*.patch; do
 		echo "Applying ndk-patch: $(basename $f)"
 		sed "s%\@TERMUX_PREFIX\@%${TERMUX_PREFIX}%g" "$f" | \
 			sed "s%\@TERMUX_HOME\@%${TERMUX_ANDROID_HOME}%g" | \
