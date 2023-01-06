@@ -24,17 +24,3 @@
        if (is_fuchsia) {
          # TODO(https://bugs.chromium.org/p/fuchsia/issues/detail?id=77383)
          cflags += [ "-Wno-deprecated-copy" ]
-@@ -1555,13 +1538,6 @@
-       if (enable_wmax_tokens) {
-         cflags += [ "-Wmax-tokens" ]
-       }
--
--      if (!is_nacl) {
--        cflags += [
--          # TODO(crbug.com/1343975) Evaluate and possibly enable.
--          "-Wno-deprecated-builtins",
--        ]
--      }
-     }
-   }
- }
