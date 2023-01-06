@@ -1,0 +1,11 @@
+--- a/third_party/blink/common/fenced_frame/fenced_frame_utils.cc
++++ b/third_party/blink/common/fenced_frame/fenced_frame_utils.cc
+@@ -7,6 +7,8 @@
+ #include "base/guid.h"
+ #include "base/strings/string_util.h"
+ 
++#include <cstring>
++
+ namespace blink {
+ 
+ bool IsValidFencedFrameURL(GURL url) {

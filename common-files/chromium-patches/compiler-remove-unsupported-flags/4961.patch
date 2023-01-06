@@ -1,0 +1,40 @@
+--- a/build/config/compiler/BUILD.gn
++++ b/build/config/compiler/BUILD.gn
+@@ -1530,23 +1530,6 @@
+         "-Wno-ignored-pragma-optimize",
+       ]
+ 
+-      if (!is_nacl) {
+-        # TODO(https://crbug.com/1300731) Clean up and enable.
+-        cflags += [ "-Wno-unqualified-std-cast-call" ]
+-
+-        # TODO(https://crbug.com/1314867): Clean up and enable.
+-        cflags += [ "-Wno-deprecated-non-prototype" ]
+-      }
+-
+-      if (!is_nacl && !(is_chromeos ||
+-                        default_toolchain == "//build/toolchain/cros:target")) {
+-        # TODO(https://crbug.com/1316298): Re-enable once test failure is figured out
+-        cflags += [
+-          "-Xclang",
+-          "-no-opaque-pointers",
+-        ]
+-      }
+-
+       if (is_fuchsia) {
+         # TODO(https://bugs.chromium.org/p/fuchsia/issues/detail?id=77383)
+         cflags += [ "-Wno-deprecated-copy" ]
+@@ -1555,13 +1538,6 @@
+       if (enable_wmax_tokens) {
+         cflags += [ "-Wmax-tokens" ]
+       }
+-
+-      if (!is_nacl) {
+-        cflags += [
+-          # TODO(crbug.com/1343975) Evaluate and possibly enable.
+-          "-Wno-deprecated-builtins",
+-        ]
+-      }
+     }
+   }
+ }

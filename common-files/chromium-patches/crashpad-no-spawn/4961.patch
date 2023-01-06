@@ -1,0 +1,47 @@
+--- a/third_party/crashpad/crashpad/util/posix/fork_and_spawn.cc
++++ b/third_party/crashpad/crashpad/util/posix/fork_and_spawn.cc
+ #include "util/posix/fork_and_spawn.h"
+ 
+ #include <errno.h>
++#ifndef __TERMUX__
+ #include <spawn.h>
++#endif
+ #include <stdlib.h>
+ #include <string.h>
+ #include <sys/wait.h>
+@@ -167,6 +169,27 @@
+     char* const* envp_for_spawn =
+         envp ? const_cast<char* const*>(envp_c.data()) : environ;
+ 
++#if defined(__ANDROID__) && __ANDROID_API__ < 28
++    pid = fork();
++    if (pid < 0) {
++      PLOG(FATAL) << "fork";
++    }
++
++    if (pid > 0) {
++      // Child process.
++
++      // _exit() instead of exit(), because fork() was called.
++      _exit(EXIT_SUCCESS);
++    }
++
++    // Grandchild process.
++
++    CloseMultipleNowOrOnExec(STDERR_FILENO + 1, preserve_fd);
++
++    auto execve_fp = use_path ? execvpe : execve;
++    execve_fp(argv_for_spawn[0], argv_for_spawn, envp_for_spawn);
++    PLOG(FATAL) << (use_path ? "execvpe" : "execve");
++#else
+ #if BUILDFLAG(IS_APPLE)
+     PosixSpawnAttr attr;
+     attr.SetFlags(POSIX_SPAWN_CLOEXEC_DEFAULT);
+@@ -198,6 +221,7 @@
+ 
+     // _exit() instead of exit(), because fork() was called.
+     _exit(EXIT_SUCCESS);
++#endif
+   }
+ 
+   // waitpid() for the child, so that it does not become a zombie process. The

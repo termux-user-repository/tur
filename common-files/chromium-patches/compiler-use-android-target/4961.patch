@@ -1,0 +1,31 @@
+--- a/build/config/compiler/BUILD.gn
++++ b/build/config/compiler/BUILD.gn
+@@ -905,8 +905,8 @@
+       }
+     } else if (current_cpu == "arm") {
+       if (is_clang && !is_android && !is_nacl) {
+-        cflags += [ "--target=arm-linux-gnueabihf" ]
+-        ldflags += [ "--target=arm-linux-gnueabihf" ]
++        cflags += [ "--target=armv7a-linux-android24" ]
++        ldflags += [ "--target=armv7a-linux-android24" ]
+       }
+       if (!is_nacl) {
+         cflags += [
+@@ -919,13 +919,13 @@
+       }
+     } else if (current_cpu == "arm64") {
+       if (is_clang && !is_android && !is_nacl && !is_fuchsia) {
+-        cflags += [ "--target=aarch64-linux-gnu" ]
+-        ldflags += [ "--target=aarch64-linux-gnu" ]
++        cflags += [ "--target=aarch64-linux-android24" ]
++        ldflags += [ "--target=aarch64-linux-android24" ]
+       }
+-      if (is_android) {
++      # if (is_android) {
+         # Outline atomics crash on Exynos 9810. http://crbug.com/1272795
+         cflags += [ "-mno-outline-atomics" ]
+-      }
++      # }
+     } else if (current_cpu == "mipsel" && !is_nacl) {
+       ldflags += [ "-Wl,--hash-style=sysv" ]
+       if (custom_toolchain == "") {
