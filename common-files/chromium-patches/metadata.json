@@ -9,6 +9,10 @@
   "blink-impl-wtf-stacksize/5249.patch": {
     "start": 4961
   },
+  "blink-include-cstring/4961.patch": {
+    "start": 4961,
+    "end": 4961
+  },
   "breakpad-include-cstring/5249.patch": {
     "start": 4961
   },
