@@ -1,0 +1,11 @@
+--- a/package.json
++++ b/package.json
+@@ -75,7 +75,7 @@
+     "keytar": "7.9.0",
+     "minimist": "^1.2.6",
+     "native-is-elevated": "0.4.3",
+-    "native-keymap": "3.3.2",
++    "native-keymap": "file:./node-native-keymap-src",
+     "native-watchdog": "1.4.1",
+     "node-pty": "0.11.0-beta11",
+     "spdlog": "^0.13.0",
