@@ -10,13 +10,13 @@ import os
 import subprocess
 
 PATCHES_DIR = os.path.join(os.path.dirname(__file__), "chromium-patches")
-MATADATA_FILE = os.path.join(PATCHES_DIR, "metadata.json")
+METADATA_FILE = os.path.join(PATCHES_DIR, "metadata.json")
 
 logger = logging.getLogger(__name__)
 
 class MetadataRangeConflictError(Exception):
   def __init__(self, a, b):
-    msg = (f"Conlict is detected between {a.path} and {b.path}. " +
+    msg = (f"Conflict is detected between {a.path} and {b.path}. " +
                        f"{a.desc()}, but {b.desc()}.")
     super().__init__(msg)
 
@@ -24,7 +24,7 @@ class MetadataRangeGapError(Exception):
   def __init__(self, k, a, b):
     super().__init__(f"Gap is detected in {k}. {a.desc()}, but {b.desc()}.")
 
-class MeatadataRange:
+class MetadataRange:
   def __init__(self, path, start, end):
     self.path = path
     self.start = start
@@ -46,9 +46,9 @@ class MeatadataRange:
     return f"`{self.path}` has range [{self.start}, {self.end}]"
 
   def __repr__(self):
-    return f"MeatadataRange(path={repr(self.path)}, start={self.start}, end={self.end})"
+    return f"MetadataRange(path={repr(self.path)}, start={self.start}, end={self.end})"
 
-class UniqueMeatadataRangeHeapQueue:
+class UniqueMetadataRangeHeapQueue:
   def __init__(self):
     self._queue = []
 
@@ -66,11 +66,11 @@ class UniqueMeatadataRangeHeapQueue:
 
 class MetadataChecker:
   def __init__(self):
-    self._ranges = defaultdict(UniqueMeatadataRangeHeapQueue)
+    self._ranges = defaultdict(UniqueMetadataRangeHeapQueue)
   
   def set_range(self, path, start, end):
     name, _ = path.split("/")
-    r = MeatadataRange(path, start, end)
+    r = MetadataRange(path, start, end)
     self._ranges[name].push(r)
 
   def ranges_check(self):
@@ -139,7 +139,7 @@ def execute(args, p):
   is_dry_run_mode = args.dry_run
   _, _, build_v, patch_v = parse_chromium_version(args.CHROMIUM_VERSION, p)
   logger.debug("Got chromium version %s", args.CHROMIUM_VERSION)
-  metadata = parse_metadata(MATADATA_FILE)
+  metadata = parse_metadata(METADATA_FILE)
   for patch_path, patch_info in metadata.items():
     excluded = patch_info.get("excluded", [])
     start_v = patch_info.get("start", 0)
