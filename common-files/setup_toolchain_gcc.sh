@@ -26,6 +26,7 @@ _setup_toolchain_gcc_envs() {
 			CCTERMUX_HOST_PLATFORM=armv7a-linux-androideabi$TERMUX_PKG_API_LEVEL
 		fi
 		LDFLAGS+=" -Wl,-rpath=$TERMUX_PREFIX/lib"
+		LDFLAGS+=" -Wl,-rpath-link=$TERMUX_PREFIX/lib"
 	else
 		export CC_FOR_BUILD=$CC
 		# Some build scripts use environment variable 'PKG_CONFIG', so
