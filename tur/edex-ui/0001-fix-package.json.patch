@@ -1,0 +1,30 @@
+--- a/package.json
++++ b/package.json
+@@ -44,7 +44,7 @@
+     "appId": "com.edex.ui",
+     "productName": "eDEX-UI",
+     "publish": "github",
+-    "asar": true,
++    "asar": false,
+     "compression": "normal",
+     "copyright": "Copyright © 2017-2021 Gabriel 'Squared' SAILLARD <gabriel@saillard.dev> (https://gaby.dev)",
+     "directories": {
+@@ -54,16 +54,14 @@
+     "forceCodeSigning": false,
+     "npmRebuild": true,
+     "artifactName": "eDEX-UI-${os}-${arch}.${ext}",
++    "electronDist": "@TERMUX_PREFIX@/tmp/custom-electron-dist",
+     "linux": {
+       "target": [
+-        "AppImage"
++        "dir"
+       ],
+       "category": "System",
+       "icon": "media/linuxIcons"
+     },
+-    "appImage": {
+-      "artifactName": "eDEX-UI-Linux-${arch}.AppImage"
+-    },
+     "mac": {
+       "target": [
+         {
