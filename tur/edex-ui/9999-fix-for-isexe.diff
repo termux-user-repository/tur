@@ -1,0 +1,15 @@
+--- resources/app/node_modules/isexe/mode.js.orig
++++ resources/app/node_modules/isexe/mode.js
+@@ -32,10 +32,8 @@
+   var o = parseInt('001', 8)
+   var ug = u | g
+ 
+-  var ret = (mod & o) ||
+-    (mod & g) && gid === myGid ||
+-    (mod & u) && uid === myUid ||
+-    (mod & ug) && myUid === 0
++  // Do not check uid/gid on Termux.
++  var ret = (mod & o) || (mod & g) || (mod & u) || (mod & ug)
+ 
+   return ret
+ }
