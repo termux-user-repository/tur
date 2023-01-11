@@ -137,6 +137,7 @@ def parse_metadata(filepath):
 def execute(args, p):
   is_revert_mode = args.revert
   is_dry_run_mode = args.dry_run
+  is_electron_skipped_mode = args.electron
   _, _, build_v, patch_v = parse_chromium_version(args.CHROMIUM_VERSION, p)
   logger.debug("Got chromium version %s", args.CHROMIUM_VERSION)
   metadata = parse_metadata(METADATA_FILE)
@@ -144,8 +145,12 @@ def execute(args, p):
     excluded = patch_info.get("excluded", [])
     start_v = patch_info.get("start", 0)
     end_v = patch_info.get("end", float("+inf"))
+    is_electron_broken = patch_info.get("electron_broken", False)
     if f"{build_v}.{patch_v}" in excluded:
       logger.info(f"Skip patch {patch_path} for {build_v}.{patch_v}.")
+      continue
+    if is_electron_skipped_mode and is_electron_broken:
+      logger.info(f"Skip patch {patch_path} for electron.")
       continue
     if start_v <= build_v <= end_v:
       ope_func = revert_patch if is_revert_mode else apply_patch
@@ -178,6 +183,13 @@ def main():
     dest="dry_run",
     default=False,
     help="Set to dry-run mode.",
+  )
+  p.add_argument(
+    "--electron",
+    action="store_true",
+    dest="electron",
+    default=False,
+    help="Whether to skip electron-broken patches.",
   )
   p.add_argument(
     "-C",

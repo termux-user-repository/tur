@@ -215,6 +215,7 @@
   },
   "gtk-fix-dynamic-loaded-libraries/5359.patch": {
     "start": 5250,
+    "electron_broken": true,
     "excluded": [
       "5359.62"
     ]
