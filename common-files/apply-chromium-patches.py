@@ -149,10 +149,10 @@ def execute(args, p):
     if f"{build_v}.{patch_v}" in excluded:
       logger.info(f"Skip patch {patch_path} for {build_v}.{patch_v}.")
       continue
-    if is_electron_skipped_mode and is_electron_broken:
-      logger.info(f"Skip patch {patch_path} for electron.")
-      continue
     if start_v <= build_v <= end_v:
+      if is_electron_skipped_mode and is_electron_broken:
+        logger.info(f"Skip patch {patch_path} for electron.")
+        continue
       ope_func = revert_patch if is_revert_mode else apply_patch
       ope_str = "revert" if is_revert_mode else "apply"
       logger.info("%sing %s...", ope_str.capitalize(), patch_path)
