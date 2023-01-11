@@ -25,7 +25,7 @@ termux_step_get_source() {
 				(sed "s|@TERMUX_PREFIX@|$TERMUX_PREFIX|g" "$f" | patch -f --silent -R -p1 -d "$TERMUX_PKG_SRCDIR") || true
 			done
 			shopt -u nullglob
-			python $TERMUX_SCRIPTDIR/common-files/apply-chromium-patches.py -C "$TERMUX_PKG_SRCDIR" -R -v $_CHROMIUM_VERSION || bash
+			python $TERMUX_SCRIPTDIR/common-files/apply-chromium-patches.py --electron -C "$TERMUX_PKG_SRCDIR" -R -v $_CHROMIUM_VERSION || bash
 			return
 		fi
 	fi
@@ -61,7 +61,7 @@ termux_step_get_source() {
 
 termux_step_post_get_source() {
 	echo "$TERMUX_PKG_VERSION" > $TERMUX_PKG_SRCDIR/electron/ELECTRON_VERSION
-	python $TERMUX_SCRIPTDIR/common-files/apply-chromium-patches.py -v $_CHROMIUM_VERSION
+	python $TERMUX_SCRIPTDIR/common-files/apply-chromium-patches.py --electron -v $_CHROMIUM_VERSION
 }
 
 termux_step_configure() {
