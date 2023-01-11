@@ -209,12 +209,8 @@
     "start": 4472,
     "end": 4960
   },
-  "gtk-fix-dynamic-loaded-libraries/5249.patch": {
-    "start": 4961,
-    "end": 5249
-  },
   "gtk-fix-dynamic-loaded-libraries/5359.patch": {
-    "start": 5250,
+    "start": 4961,
     "electron_broken": true
   },
   "harfbuzz-remove-unused-vars/4389.patch": {
