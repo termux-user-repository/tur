@@ -144,7 +144,10 @@ def execute(args, p):
     excluded = patch_info.get("excluded", [])
     start_v = patch_info.get("start", 0)
     end_v = patch_info.get("end", float("+inf"))
-    if f"{build_v}.{patch_v}" not in excluded and start_v <= build_v <= end_v:
+    if f"{build_v}.{patch_v}" in excluded:
+      logger.info(f"Skip patch {patch_path} for {build_v}.{patch_v}.")
+      continue
+    if start_v <= build_v <= end_v:
       ope_func = revert_patch if is_revert_mode else apply_patch
       ope_str = "revert" if is_revert_mode else "apply"
       logger.info("%sing %s...", ope_str.capitalize(), patch_path)

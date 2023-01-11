@@ -214,7 +214,10 @@
     "end": 5249
   },
   "gtk-fix-dynamic-loaded-libraries/5359.patch": {
-    "start": 5250
+    "start": 5250,
+    "excluded": [
+      "5359.62"
+    ]
   },
   "harfbuzz-remove-unused-vars/4389.patch": {
     "start": 4389,
