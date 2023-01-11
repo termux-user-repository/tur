@@ -284,8 +284,12 @@ termux_step_make_install() {
 	chmod +x $TERMUX_PREFIX/lib/$TERMUX_PKG_NAME/electron
 
 	# Install LICENSE file
+	cp out/Release/LICENSE{,S.chromium.html} $TERMUX_PREFIX/lib/$TERMUX_PKG_NAME/
+}
+
+termux_step_install_license() {
 	mkdir -p $TERMUX_PREFIX/share/doc/$TERMUX_PKG_NAME
-	cp out/Release/LICENSE{,S.chromium.html} $TERMUX_PREFIX/share/doc/$TERMUX_PKG_NAME
+	cp out/Release/LICENSE{,S.chromium.html} $TERMUX_PREFIX/share/doc/$TERMUX_PKG_NAME/
 }
 
 termux_step_post_make_install() {

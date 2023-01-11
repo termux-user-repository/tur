@@ -30,17 +30,3 @@ gcc_toolchain("@V8_TOOLCHAIN_NAME@") {
     sysroot = "@V8_SYSROOT@"
   }
 }
-# gcc_toolchain("target") {
-#   cc = "@TARGET_CC@"
-#   cxx = "@TARGET_CXX@"
-#   ld = "@TARGET_LD@"
-#   ar = "@TARGET_AR@"
-#   nm = "@TARGET_NM@"
-#   toolchain_args = {
-#     current_os = "linux"
-#     current_cpu = "@TARGET_CPU@"
-#     is_clang = @TARGET_IS_CLANG@
-#     use_gold = @TARGET_USE_GOLD@
-#     sysroot = "@TARGET_SYSROOT@"
-#   }
-# }
