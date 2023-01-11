@@ -2,8 +2,8 @@ TERMUX_PKG_HOMEPAGE=https://github.com/electron/electron
 TERMUX_PKG_DESCRIPTION="Build cross-platform desktop apps with JavaScript, HTML, and CSS"
 TERMUX_PKG_LICENSE="MIT, BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="Chongyun Lee <uchkks@protonmail.com>"
-_CHROMIUM_VERSION=108.0.5359.62
-TERMUX_PKG_VERSION=22.0.0
+_CHROMIUM_VERSION=106.0.5249.199
+TERMUX_PKG_VERSION=21.3.3
 TERMUX_PKG_SRCURL=git+https://github.com/electron/electron
 TERMUX_PKG_DEPENDS="electron-deps"
 TERMUX_PKG_BUILD_DEPENDS="libnotify, libffi-static"
@@ -285,6 +285,12 @@ termux_step_make_install() {
 
 	# Install LICENSE file
 	cp out/Release/LICENSE{,S.chromium.html} $TERMUX_PREFIX/lib/$TERMUX_PKG_NAME/
+
+	# Install as the default electron
+	ln -sfr $TERMUX_PREFIX/lib/$TERMUX_PKG_NAME/electron $TERMUX_PREFIX/bin/electron
+	if [ "$TERMUX_PKG_NAME" != "electron" ]; then
+		ln -sfr $TERMUX_PREFIX/lib/$TERMUX_PKG_NAME $TERMUX_PREFIX/lib/electron
+	fi
 }
 
 termux_step_install_license() {
