@@ -2,10 +2,10 @@ TERMUX_PKG_HOMEPAGE=https://www.chromium.org/Home
 TERMUX_PKG_DESCRIPTION="Chromium web browser"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="Chongyun Lee <uchkks@protonmail.com>"
-_CHROMIUM_VERSION=108.0.5359.125
+_CHROMIUM_VERSION=109.0.5414.74
 TERMUX_PKG_VERSION=$_CHROMIUM_VERSION
 TERMUX_PKG_SRCURL=(https://commondatastorage.googleapis.com/chromium-browser-official/chromium-$_CHROMIUM_VERSION.tar.xz)
-TERMUX_PKG_SHA256=(16e26bef292f99efbb72559990f6383f1d39cb20bfa38450fbcd6c7cf88b0a59)
+TERMUX_PKG_SHA256=(eded233c26ab631be325ad49cb306c338513b6a6528197d42653e66187548e5d)
 TERMUX_PKG_DEPENDS="atk, cups, dbus, gtk3, krb5, libc++, libxkbcommon, libminizip, libnss, libwayland, libx11, mesa, openssl, pango, pulseaudio, libdrm, libjpeg-turbo, libpng, libwebp, libflac, fontconfig, freetype, zlib, libxml2, libxslt, libopus, libre2, libsnappy"
 # TODO: Split chromium-common and chromium-headless
 # TERMUX_PKG_DEPENDS+=", chromium-common"
@@ -60,11 +60,15 @@ termux_step_configure() {
 	eval "$(base64 -d < $TERMUX_PKG_BUILDER_DIR/google-api-keys.base64enc)"
 
 	# Remove termux's dummy pkg-config
-	local _host_pkg_config="$(cat $(command -v pkg-config) | grep exec | awk '{print $2}')"
+	local _target_pkg_config=$(command -v pkg-config)
+	local _host_pkg_config="$(cat $_target_pkg_config | grep exec | awk '{print $2}')"
 	rm -rf $TERMUX_PKG_TMPDIR/host-pkg-config-bin
 	mkdir -p $TERMUX_PKG_TMPDIR/host-pkg-config-bin
-	ln -s $_host_pkg_config $TERMUX_PKG_TMPDIR/host-pkg-config-bin
+	ln -s $_host_pkg_config $TERMUX_PKG_TMPDIR/host-pkg-config-bin/pkg-config
 	export PATH="$TERMUX_PKG_TMPDIR/host-pkg-config-bin:$PATH"
+
+	# For qt build
+	export PATH="$TERMUX_PREFIX/opt/qt/cross/bin:$PATH"
 
 	env -i PATH="$PATH" sudo apt update
 	env -i PATH="$PATH" sudo apt install libdrm-dev libjpeg-turbo8-dev libpng-dev fontconfig libfontconfig-dev libfontconfig1-dev libfreetype6-dev zlib1g-dev libcups2-dev libxkbcommon-dev libglib2.0-dev -yq
@@ -72,28 +76,25 @@ termux_step_configure() {
 
 	# Install amd64 rootfs
 	build/linux/sysroot_scripts/install-sysroot.py --arch=amd64
+	local _amd64_sysroot_path="$(pwd)/build/linux/$(ls build/linux | grep 'amd64-sysroot')"
 
 	# Link to system tools required by the build
 	mkdir -p third_party/node/linux/node-linux-x64/bin
 	ln -sf $(command -v node) third_party/node/linux/node-linux-x64/bin/
 	ln -sf $(command -v java) third_party/jdk/current/bin/
 
-	_DUMMY_FILES=()
-
 	# Dummy librt.so
 	# Why not dummy a librt.a? Some of the binaries reference symbols only exists in Android
 	# for some reason, such as the `chrome_crashpad_handler`, which needs to link with 
 	# libprotobuf_lite.a, but it is hard to remove the usage of `android/log.h` in protobuf.
 	echo "INPUT(-llog -liconv -landroid-shmem)" > "$TERMUX_PREFIX/lib/librt.so"
-	_DUMMY_FILES+=("$TERMUX_PREFIX/lib/librt.so")
 
-	# Dummy libpthread.a
+	# Dummy libpthread.a and libresolv.a
 	echo '!<arch>' > "$TERMUX_PREFIX/lib/libpthread.a"
-	_DUMMY_FILES+=("$TERMUX_PREFIX/lib/libpthread.a")
-
-	# Dummy libresolv.a
 	echo '!<arch>' > "$TERMUX_PREFIX/lib/libresolv.a"
-	_DUMMY_FILES+=("$TERMUX_PREFIX/lib/libresolv.a")
+
+	# Symlink libffi.a to libffi_pic.a
+	ln -sfr $TERMUX_PREFIX/lib/libffi.a $TERMUX_PREFIX/lib/libffi_pic.a
 
 	# Merge sysroots
 	rm -rf $TERMUX_PKG_TMPDIR/sysroot
@@ -116,11 +117,27 @@ termux_step_configure() {
 	chmod +x usr/bin/cups-config
 	popd
 
-	local _TARGET_CPU="$TERMUX_ARCH"
+	# Construct args
+	local _target_cpu _v8_current_cpu _v8_sysroot_path
+	local _v8_toolchain_name _target_sysroot="$TERMUX_PKG_TMPDIR/sysroot"
 	if [ "$TERMUX_ARCH" = "aarch64" ]; then
-		_TARGET_CPU="arm64"
+		_target_cpu="arm64"
+		_v8_current_cpu="x64"
+		_v8_sysroot_path="$_amd64_sysroot_path"
+		_v8_toolchain_name="clang_x64_v8_arm64"
+	elif [ "$TERMUX_ARCH" = "arm" ]; then
+		# Install i386 rootfs
+		build/linux/sysroot_scripts/install-sysroot.py --arch=i386
+		local _i386_sysroot_path="$(pwd)/build/linux/$(ls build/linux | grep 'i386-sysroot')"
+		_target_cpu="arm"
+		_v8_current_cpu="x86"
+		_v8_sysroot_path="$_i386_sysroot_path"
+		_v8_toolchain_name="clang_x86_v8_arm"
 	elif [ "$TERMUX_ARCH" = "x86_64" ]; then
-		_TARGET_CPU="x64"
+		_target_cpu="x64"
+		_v8_current_cpu="x64"
+		_v8_sysroot_path="$_amd64_sysroot_path"
+		_v8_toolchain_name="clang_x64"
 	fi
 
 	local _common_args_file=$TERMUX_PKG_TMPDIR/common-args-file
@@ -138,12 +155,14 @@ is_official_build = true
 is_debug = false
 symbol_level = 0
 # Use our custom toolchain
-use_sysroot = true
-target_cpu = \"$_TARGET_CPU\"
+use_sysroot = false
+target_cpu = \"$_target_cpu\"
 target_rpath = \"$TERMUX_PREFIX/lib\"
-target_sysroot = \"$TERMUX_PKG_TMPDIR/sysroot\"
-custom_toolchain = \"//build/toolchain/linux/unbundle:default\"
+target_sysroot = \"$_target_sysroot\"
 clang_base_path = \"$TERMUX_STANDALONE_TOOLCHAIN\"
+custom_toolchain = \"//build/toolchain/linux/unbundle:default\"
+host_toolchain = \"$TERMUX_PKG_CACHEDIR/custom-toolchain:host\"
+v8_snapshot_toolchain = \"$TERMUX_PKG_CACHEDIR/custom-toolchain:$_v8_toolchain_name\"
 clang_use_chrome_plugins = false
 dcheck_always_on = false
 chrome_pgo_phase = 0
@@ -157,7 +176,9 @@ use_system_libpng = true
 use_system_zlib = true
 use_custom_libcxx = false
 use_allocator_shim = false
-use_allocator = \"none\"
+use_partition_alloc_as_malloc = false
+enable_backup_ref_ptr_support = false
+enable_mte_checked_ptr_support = false
 use_nss_certs = true
 use_udev = false
 use_ozone = true
@@ -181,62 +202,42 @@ rtc_use_pipewire = false
 use_vaapi_x11 = false
 # See comments below
 enable_nacl = false
+# Host compiler (clang-13) doesn't support LTO well
+is_cfi = false
+use_cfi_icall = false
+use_thin_lto = false
 " > $_common_args_file
 
-	# For aarch64, remove the `libatomic.a` in `NDK Toolchain` for x86_64
-	if [ "$TERMUX_ARCH" = "aarch64" ]; then
-		# When generating the v8 snapshot, GN will try to use `clang-14` from the ndk
-		# toolchain, and then `lld` will fail because of the linkage with an *invalid*
-		# `libatomic.a` which is located at `lib64/clang/x.y.z/lib/linux/x86_64`.
-		local _clang_version="$($TERMUX_STANDALONE_TOOLCHAIN/bin/clang --version | head -n 1 | sed 's/.*version \([0-9]*.[0-9]*.[0-9]*\) .*/\1/g')"
-		local _invalid_atomic="$TERMUX_STANDALONE_TOOLCHAIN/lib64/clang/$_clang_version/lib/linux/x86_64/libatomic.a"
-		if [ -f "$_invalid_atomic" ]; then
-			mv $_invalid_atomic{,.backup}
-		fi
-	fi
-
-	# For arm, remove the `libatomic.a` in `NDK Toolchain` for i686
 	if [ "$TERMUX_ARCH" = "arm" ]; then
 		echo "arm_arch = \"armv7-a\"" >> $_common_args_file
 		echo "arm_float_abi = \"softfp\"" >> $_common_args_file
-		# Install i386 rootfs
-		build/linux/sysroot_scripts/install-sysroot.py --arch=i386
-		# Remove the *invalid* `libatomic.a`
-		local _clang_version="$($TERMUX_STANDALONE_TOOLCHAIN/bin/clang --version | head -n 1 | sed 's/.*version \([0-9]*.[0-9]*.[0-9]*\) .*/\1/g')"
-		local _invalid_atomic="$TERMUX_STANDALONE_TOOLCHAIN/lib64/clang/$_clang_version/lib/linux/i386/libatomic.a"
-		if [ -f "$_invalid_atomic" ]; then
-			mv $_invalid_atomic{,.backup}
-		fi
 	fi
 
-	# When building for x64, these variables must be set to tell
-	# GN that we are at cross-compiling.
-	if [ "$TERMUX_ARCH" = "x86_64" ]; then
-		mkdir -p $TERMUX_PKG_TMPDIR/host-toolchain
-		local _sysroot_path="$(pwd)/build/linux/$(ls build/linux | grep 'amd64-sysroot')"
-		pushd $TERMUX_PKG_TMPDIR/host-toolchain
-		sed "s|@COMPILER@|$(command -v clang-13)|" $TERMUX_PKG_BUILDER_DIR/wrapper-compiler.in |
-			sed "s|@NEW_SYSROOT@|$_sysroot_path|;s|@TERMUX_PREFIX@|$TERMUX_PREFIX|" > ./wrapper_cc
-		sed "s|@COMPILER@|$(command -v clang++-13)|" $TERMUX_PKG_BUILDER_DIR/wrapper-compiler.in |
-			sed "s|@NEW_SYSROOT@|$_sysroot_path|;s|@TERMUX_PREFIX@|$TERMUX_PREFIX|" > ./wrapper_cxx
-		chmod +x ./wrapper_cc ./wrapper_cxx
-		popd
+	# Use custom toolchain
+	mkdir -p $TERMUX_PKG_CACHEDIR/custom-toolchain
+	cp -f $TERMUX_PKG_BUILDER_DIR/toolchain.gn.in $TERMUX_PKG_CACHEDIR/custom-toolchain/BUILD.gn
+	sed -i "s|@HOST_CC@|$(command -v clang-13)|g
+			s|@HOST_CXX@|$(command -v clang++-13)|g
+			s|@HOST_LD@|$(command -v clang++-13)|g
+			s|@HOST_AR@|$(command -v llvm-ar)|g
+			s|@HOST_NM@|$(command -v llvm-nm)|g
+			s|@HOST_IS_CLANG@|true|g
+			s|@HOST_USE_GOLD@|false|g
+			s|@HOST_SYSROOT@|$_amd64_sysroot_path|g
+			" $TERMUX_PKG_CACHEDIR/custom-toolchain/BUILD.gn
+	sed -i "s|@V8_CC@|$(command -v clang-13)|g
+			s|@V8_CXX@|$(command -v clang++-13)|g
+			s|@V8_LD@|$(command -v clang++-13)|g
+			s|@V8_AR@|$(command -v llvm-ar)|g
+			s|@V8_NM@|$(command -v llvm-nm)|g
+			s|@V8_TOOLCHAIN_NAME@|$_v8_toolchain_name|g
+			s|@V8_CURRENT_CPU@|$_v8_current_cpu|g
+			s|@V8_V8_CURRENT_CPU@|$_target_cpu|g
+			s|@V8_IS_CLANG@|true|g
+			s|@V8_USE_GOLD@|false|g
+			s|@V8_SYSROOT@|$_v8_sysroot_path|g
+			" $TERMUX_PKG_CACHEDIR/custom-toolchain/BUILD.gn
 
-		export BUILD_CC=$TERMUX_PKG_TMPDIR/host-toolchain/wrapper_cc
-		export BUILD_CXX=$TERMUX_PKG_TMPDIR/host-toolchain/wrapper_cxx
-		export BUILD_AR=$(command -v llvm-ar)
-		export BUILD_NM=$(command -v llvm-nm)
-
-		export BUILD_CFLAGS="--target=x86_64-linux-gnu"
-		export BUILD_CPPFLAGS=""
-		export BUILD_CXXFLAGS="--target=x86_64-linux-gnu"
-		export BUILD_LDFLAGS="--target=x86_64-linux-gnu"
-
-		echo "host_toolchain = \"//build/toolchain/linux/unbundle:host\"" >> $_common_args_file
-		echo "v8_snapshot_toolchain = \"//build/toolchain/linux/unbundle:host\"" >> $_common_args_file
-	fi
-
-	# Chromium Binary
 	mkdir -p $TERMUX_PKG_BUILDDIR/out/Release
 	cat $_common_args_file > $TERMUX_PKG_BUILDDIR/out/Release/args.gn
 	gn gen $TERMUX_PKG_BUILDDIR/out/Release --export-compile-commands || bash
@@ -351,18 +352,7 @@ termux_step_make_install() {
 
 termux_step_post_make_install() {
 	# Remove the dummy files
-	rm "${_DUMMY_FILES[@]}"
-	unset _DUMMY_FILES
-
-	# Recover the toolchain
-	for _arch in i386 x86_64; do
-		local _clang_version="$($TERMUX_STANDALONE_TOOLCHAIN/bin/clang --version | head -n 1 | sed 's/.*version \([0-9]*.[0-9]*.[0-9]*\) .*/\1/g')"
-		local _invalid_atomic="$TERMUX_STANDALONE_TOOLCHAIN/lib64/clang/$_clang_version/lib/linux/$_arch/libatomic.a"
-		if [ -f "$_invalid_atomic.backup" ]; then
-			mv $_invalid_atomic{.backup,}
-		fi
-	done
-	unset _arch
+	rm $TERMUX_PREFIX/lib/lib{{pthread,resolv,ffi_pic}.a,rt.so}
 }
 
 # TODO:
