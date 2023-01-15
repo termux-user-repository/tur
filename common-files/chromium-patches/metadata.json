@@ -14,7 +14,8 @@
     "end": 4961
   },
   "breakpad-include-cstring/5249.patch": {
-    "start": 4961
+    "start": 4961,
+    "end": 5413
   },
   "breakpad-no-elf_prstatus/4389.patch": {
     "start": 4389
@@ -27,8 +28,7 @@
     "end": 4960
   },
   "chromium-disable-shm/5249.patch": {
-    "start": 4961,
-    "end": 5359
+    "start": 4961
   },
   "chromium-extensions-map/5359.patch": {
     "start": 5359
@@ -120,11 +120,18 @@
     "start": 5359
   },
   "chromium-statfs-type/5249.patch": {
-    "start": 4961
+    "start": 4961,
+    "end": 5413
+  },
+  "chromium-statfs-type/5414.patch": {
+    "start": 5414
   },
   "compiler-no-unused-but-set-variable/4389.patch": {
     "start": 4389,
     "end": 4472
+  },
+  "compiler-remove-gsimple-template-names/5414.patch": {
+    "start": 5414
   },
   "compiler-remove-unsupported-flags/4961.patch": {
     "start": 4961,
@@ -146,7 +153,11 @@
     "end": 5248
   },
   "compiler-use-android-target/5249.patch": {
-    "start": 5249
+    "start": 5249,
+    "end": 5413
+  },
+  "compiler-use-android-target/5414.patch": {
+    "start": 5414
   },
   "cpuinfo-android-arm/5249.patch": {
     "start": 5249
@@ -276,7 +287,8 @@
     "start": 4961
   },
   "tflite-use-system-zlib/5359.patch": {
-    "start": 5359
+    "start": 5359,
+    "end": 5413
   },
   "unity-fix-dynamic-loaded-libraries/4389.patch": {
     "start": 4389
@@ -285,13 +297,23 @@
     "start": 4389
   },
   "v8-fix-trap-handler/5249.patch": {
-    "start": 4961
+    "start": 4961,
+    "end": 5413
+  },
+  "v8-fix-trap-handler/5414.patch": {
+    "start": 5414
+  },
+  "v8-reimpl-page-allocator/5414.patch": {
+    "start": 5414
   },
   "vk-layers-no-android-log/5359.patch": {
     "start": 5359
   },
   "wayland-memfd_create/5359.patch": {
     "start": 5359
+  },
+  "webrtc_overrides-include-vector/5414.patch": {
+    "start": 5414
   },
   "weston-fix-dynamic-loaded-libraries/5249.patch": {
     "start": 4961
