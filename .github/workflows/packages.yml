@@ -22,9 +22,11 @@ on:
     - master
     paths:
     - 'tur/**'
+    - 'tur-multilib/**'
   pull_request:
     paths:
     - 'tur/**'
+    - 'tur-multilib/**'
   workflow_dispatch:
     inputs:
       packages:
