@@ -23,10 +23,12 @@ on:
     paths:
     - 'tur/**'
     - 'tur-multilib/**'
+    - 'tur-hacking/**'
   pull_request:
     paths:
     - 'tur/**'
     - 'tur-multilib/**'
+    - 'tur-hacking/**'
   workflow_dispatch:
     inputs:
       packages:
