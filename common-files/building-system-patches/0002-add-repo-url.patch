@@ -28,7 +28,7 @@ Add apt repo urls of tur repository to download dependencies.
 +	tur
 +	tur-on-device
 +	tur-continuous
-+	tur-continuous
++	tur-multilib
  )
  
  # Allow to override setup.
