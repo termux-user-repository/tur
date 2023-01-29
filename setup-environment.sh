@@ -29,6 +29,7 @@ mv ./termux-packages/{ndk-patches,packages,x11-packages,root-packages,scripts,bu
 shopt -s nullglob
 _patch=
 for _patch in ./common-files/building-system-patches/*.patch; do
+	echo "Applying patch: $_patch"
 	patch --silent -p1 < $_patch
 done
 unset _patch

@@ -1,10 +1,11 @@
 Add apt repo urls of tur repository to download dependencies.
 --- a/scripts/properties.sh
 +++ b/scripts/properties.sh
-@@ -47,18 +47,27 @@
+@@ -47,18 +47,30 @@
  	https://packages-cf.termux.dev/apt/termux-main
  	https://packages-cf.termux.dev/apt/termux-root
  	https://packages-cf.termux.dev/apt/termux-x11
++	https://tur.kcubeterm.com
 +	https://tur.kcubeterm.com
 +	https://tur.kcubeterm.com
 +	https://tur.kcubeterm.com
@@ -17,6 +18,7 @@ Add apt repo urls of tur repository to download dependencies.
 +	tur-packages
 +	tur-packages
 +	tur-packages
++	tur-packages
  )
  
  TERMUX_REPO_COMPONENT=(
@@ -25,6 +27,7 @@ Add apt repo urls of tur repository to download dependencies.
  	main
 +	tur
 +	tur-on-device
++	tur-continuous
 +	tur-continuous
  )
  
