@@ -1,8 +1,8 @@
 This patch is based on the setup-scripts from its-pointless repo. It reverts
 some changes that makes the NDK headers support clang only.
 diff -uNr a/bits/ioctl.h b/bits/ioctl.h
---- a/bits/ioctl.h	2022-08-06 14:48:47.524999800 +0800
-+++ b/bits/ioctl.h	2022-08-06 15:51:08.476122900 +0800
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/bits/ioctl.h	2022-08-06 14:48:47.524999800 +0800
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/bits/ioctl.h	2022-08-06 15:51:08.476122900 +0800
 @@ -55,7 +55,8 @@
   * - defining BIONIC_IOCTL_NO_SIGNEDNESS_OVERLOAD, which will make the
   *   overloading go away.
@@ -14,8 +14,8 @@ diff -uNr a/bits/ioctl.h b/bits/ioctl.h
  int ioctl(int __fd, unsigned __request, ...) __overloadable __enable_if(1, "") __RENAME(ioctl);
  #endif
 diff -uNr a/bits/stdatomic.h b/bits/stdatomic.h
---- a/bits/stdatomic.h	2022-08-06 14:48:47.472671200 +0800
-+++ b/bits/stdatomic.h	2022-08-06 16:35:43.342368000 +0800
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/bits/stdatomic.h	2022-08-06 14:48:47.472671200 +0800
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/bits/stdatomic.h	2022-08-06 16:35:43.342368000 +0800
 @@ -41,7 +41,7 @@
   */
  
@@ -275,8 +275,8 @@ diff -uNr a/bits/stdatomic.h b/bits/stdatomic.h
  }
 +#endif /* !_KERNEL */
 diff -uNr a/complex.h b/complex.h
---- a/complex.h	2022-08-06 14:48:52.639751200 +0800
-+++ b/complex.h	2022-08-06 15:55:58.240936500 +0800
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/complex.h	2022-08-06 14:48:52.639751200 +0800
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/complex.h	2022-08-06 15:55:58.240936500 +0800
 @@ -44,9 +44,15 @@
  #define	I		_Complex_I
  
@@ -294,8 +294,8 @@ diff -uNr a/complex.h b/complex.h
  
  __BEGIN_DECLS
 diff -uNr a/malloc.h b/malloc.h
---- a/malloc.h	2022-08-06 14:48:48.739114400 +0800
-+++ b/malloc.h	2022-08-06 16:00:29.648086400 +0800
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/malloc.h	2022-08-06 14:48:48.739114400 +0800
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/malloc.h	2022-08-06 16:00:29.648086400 +0800
 @@ -31,7 +31,11 @@
  
  __BEGIN_DECLS
@@ -309,8 +309,8 @@ diff -uNr a/malloc.h b/malloc.h
  /**
   * [malloc(3)](http://man7.org/linux/man-pages/man3/malloc.3.html) allocates
 diff -uNr a/stdatomic.h b/stdatomic.h
---- a/stdatomic.h	2022-08-06 14:48:49.278954700 +0800
-+++ b/stdatomic.h	2022-08-06 16:32:05.634401300 +0800
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/stdatomic.h	2022-08-06 14:48:49.278954700 +0800
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/stdatomic.h	2022-08-06 16:32:05.634401300 +0800
 @@ -32,8 +32,12 @@
  
  #include <sys/cdefs.h>
@@ -327,8 +327,8 @@ diff -uNr a/stdatomic.h b/stdatomic.h
  # endif
  #endif
 diff -uNr a/string.h b/string.h
---- a/string.h
-+++ b/string.h
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/string.h
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/string.h
 @@ -188,7 +188,7 @@
  #endif
 
@@ -339,8 +339,8 @@ diff -uNr a/string.h b/string.h
   * Use two enable_ifs so these overloads don't conflict with + are preferred over libcxx's. This can
   * be reduced to 1 after libcxx recognizes that we have const-correct overloads.
 diff -uNr a/sys/mman.h b/sys/mman.h
---- a/sys/mman.h	2022-08-06 14:48:49.466955000 +0800
-+++ b/sys/mman.h	2022-08-06 16:38:31.091859400 +0800
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/sys/mman.h	2022-08-06 14:48:49.466955000 +0800
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/sys/mman.h	2022-08-06 16:38:31.091859400 +0800
 @@ -50,7 +50,14 @@
   * and returns `MAP_FAILED` and sets `errno` on failure.
   */

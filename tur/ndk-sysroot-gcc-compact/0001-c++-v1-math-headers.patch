@@ -1,6 +1,6 @@
 This patch is one of the `ndk-sysroot` from termux main repo.
---- a/c++/v1/cmath
-+++ b/c++/v1/cmath
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/cmath
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/cmath
 @@ -301,7 +301,7 @@
  */
  
@@ -10,8 +10,8 @@ This patch is one of the `ndk-sysroot` from termux main repo.
  #include "version"
  #include <type_traits>
  
---- a/c++/v1/math.h
-+++ b/c++/v1/math.h
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/math.h
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/math.h
 @@ -300,7 +300,7 @@
  #define _LIBCPP_STDLIB_INCLUDE_NEXT
  #include <stdlib.h>

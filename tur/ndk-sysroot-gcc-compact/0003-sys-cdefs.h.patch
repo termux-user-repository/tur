@@ -1,8 +1,8 @@
 This patch is based on the setup-scripts from its-pointless repo. It defines
 some builtin functions which is available in clang but not available in gcc.
 diff -uNr a/sys/cdefs.h b/sys/cdefs.h
---- a/sys/cdefs.h	2022-08-06 14:48:49.633955200 +0800
-+++ b/sys/cdefs.h	2022-08-06 15:10:18.821676800 +0800
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/sys/cdefs.h	2022-08-06 14:48:49.633955200 +0800
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/sys/cdefs.h	2022-08-06 15:10:18.821676800 +0800
 @@ -42,6 +42,28 @@
   */
  #define __BIONIC__ 1

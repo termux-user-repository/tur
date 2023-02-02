@@ -3,8 +3,8 @@ attribute is not available in GCC.
 
 [1]: https://github.com/its-pointless/gcc_termux/issues/141
 [2]: https://android.googlesource.com/platform/bionic/+/bfb6bae9fb5ef42e4f9ae2847f30f41938c04900
---- a/android/versioning.h
-+++ b/android/versioning.h
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/android/versioning.h
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/android/versioning.h
 @@ -18,7 +18,7 @@
  
  // The `annotate` attribute always pulls the annotated (inline) function into the object files, thus
