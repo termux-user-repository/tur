@@ -11,7 +11,7 @@
   },
   "blink-include-cstring/4961.patch": {
     "start": 4961,
-    "end": 4961
+    "end": 5005
   },
   "breakpad-include-cstring/5249.patch": {
     "start": 4961,
