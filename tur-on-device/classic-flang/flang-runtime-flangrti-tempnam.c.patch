@@ -1,0 +1,12 @@
+diff -uNr a/runtime/flangrti/tempnam.c b/runtime/flangrti/tempnam.c
+--- a/runtime/flangrti/tempnam.c
++++ b/runtime/flangrti/tempnam.c
+@@ -64,7 +64,7 @@
+ static char *
+ gentmp(char *dir, char *pfx)
+ {
+-  extern long getpid(void);
++  extern pid_t getpid(void);
+   extern long time(void *);
+   char *buf;
+   char *p, *q;
