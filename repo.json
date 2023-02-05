@@ -1,6 +1,7 @@
 {
     "packages": { "name" : "termux-main", "distribution" : "stable" },
     "tur":      { "name" : "tur",         "distribution" : "stable" },
+    "tur-on-device":  { "name": "tur-on-device",   "distribution" : "unstable" },
     "tur-hacking":    { "name" : "tur-hacking",    "distribution" : "hacking" },
     "tur-continuous": { "name" : "tur-continuous", "distribution" : "continuous" },
     "tur-multilib":   { "name" : "tur-multilib",   "distribution" : "multilib" },
