@@ -2,6 +2,9 @@
   "angle-no-android-jni/4389.patch": {
     "start": 4389
   },
+  "blink-fix-narrowing/5511.patch": {
+    "start": 5511
+  },
   "blink-impl-wtf-stacksize/4389.patch": {
     "start": 4389,
     "end": 4960
@@ -229,14 +232,19 @@
     "end": 4472
   },
   "minigbm-no-android-log/5359.patch": {
-    "start": 5359
+    "start": 5359,
+    "end": 5510
+  },
+  "minigbm-no-android-log/5511.patch": {
+    "start": 5511
   },
   "ozone-fix-dynamic-loaded-libraries/4389.patch": {
     "start": 4389,
     "end": 4471
   },
   "ozone-fix-dynamic-loaded-libraries/4472.patch": {
-    "start": 4472
+    "start": 4472,
+    "end": 5510
   },
   "perfetto-no-android-jni/5359.patch": {
     "start": 5359
@@ -307,13 +315,18 @@
     "start": 5414
   },
   "vk-layers-no-android-log/5359.patch": {
-    "start": 5359
+    "start": 5359,
+    "end": 5510
+  },
+  "vk-layers-no-android-log/5511.patch": {
+    "start": 5511
   },
   "wayland-memfd_create/5359.patch": {
     "start": 5359
   },
   "webrtc_overrides-include-vector/5414.patch": {
-    "start": 5414
+    "start": 5414,
+    "end": 5510
   },
   "weston-fix-dynamic-loaded-libraries/5249.patch": {
     "start": 4961
