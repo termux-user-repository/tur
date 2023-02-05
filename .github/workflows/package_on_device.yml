@@ -1,4 +1,20 @@
 # Based on https://github.com/termux/termux-packages/blob/595969f581655e8cbf65182cf84bd5ffb2cf7b89/.github/workflows/packages.yml
+##
+##  Copyright 2020 Termux
+##
+##  Licensed under the Apache License, Version 2.0 (the "License");
+##  you may not use this file except in compliance with the License.
+##  You may obtain a copy of the License at
+##
+##    http://www.apache.org/licenses/LICENSE-2.0
+##
+##  Unless required by applicable law or agreed to in writing, software
+##  distributed under the License is distributed on an "AS IS" BASIS,
+##  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+##  See the License for the specific language governing permissions and
+##  limitations under the License.
+##
+
 name: Packages-TUR-on-Device
 
 on:
@@ -24,29 +40,13 @@ jobs:
         target_arch: [i686, x86_64]
       fail-fast: false
     steps:
-    - name: Clone tur-on-device
+    - name: Clone repository
       uses: actions/checkout@v3
       with:
         fetch-depth: 1000
         path: ${{ github.workspace }}
-    - name: Clone tur
-      uses: actions/checkout@v3
-      with:
-        repository: termux-user-repository/tur
-        fetch-depth: 1
-        path: ${{ github.workspace }}/tur-repo
-    - name: Clone termux-packages
-      uses: actions/checkout@v3
-      with:
-        repository: termux/termux-packages
-        fetch-depth: 1
-        path: ${{ github.workspace }}/main-repo
     - name: Merge repos
-      run: |
-        cp -rn ./main-repo/* ./
-        rm -rf ./main-repo
-        cp -rn ./tur-repo/* ./
-        rm -rf ./tur-repo
+      run: ./setup-environment.sh
     - name: Gather build summary
       run: |
         if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
@@ -173,7 +173,7 @@ jobs:
       env:
         ARCH: ${{ matrix.target_arch }}
       run: |
-        ./scripts/build-termux-docker.sh login ./scripts/setup-termux.sh
+        ./common-files/build-termux-docker.sh login ./scripts/setup-termux.sh
         docker system prune -a -f
         declare -a packages
         for repo_path in $(jq --raw-output 'keys | .[]' repo.json); do
@@ -184,7 +184,7 @@ jobs:
         done
         sudo chown -R 1000:1000 $(pwd)
         if [ ! -z "$packages" ]; then
-          ./scripts/build-termux-docker.sh login ./build-package.sh -I $packages
+          ./common-files/build-termux-docker.sh login ./build-package.sh -I $packages
         fi
     - name: Generate build artifacts
       if: always()
@@ -226,29 +226,13 @@ jobs:
         target_arch: [arm, aarch64]
       fail-fast: false
     steps:
-    - name: Clone tur-on-device
+    - name: Clone repository
       uses: actions/checkout@v3
       with:
         fetch-depth: 1000
         path: ${{ github.workspace }}
-    - name: Clone tur
-      uses: actions/checkout@v3
-      with:
-        repository: termux-user-repository/tur
-        fetch-depth: 1
-        path: ${{ github.workspace }}/tur-repo
-    - name: Clone termux-packages
-      uses: actions/checkout@v3
-      with:
-        repository: termux/termux-packages
-        fetch-depth: 1
-        path: ${{ github.workspace }}/main-repo
     - name: Merge repos
-      run: |
-        cp -rn ./main-repo/* ./
-        rm -rf ./main-repo
-        cp -rn ./tur-repo/* ./
-        rm -rf ./tur-repo
+      run: ./setup-environment.sh
     - name: Gather build summary
       run: |
         if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
@@ -366,7 +350,7 @@ jobs:
       env:
         ARCH: ${{ matrix.target_arch }}
       run: |
-        ./scripts/build-termux-docker.sh login ./scripts/setup-termux.sh
+        ./common-files/build-termux-docker.sh login ./scripts/setup-termux.sh
         declare -a packages
         for repo_path in $(jq --raw-output 'keys | .[]' repo.json); do
           repo=$(jq --raw-output '.["'${repo_path}'"].name' repo.json)
@@ -376,7 +360,7 @@ jobs:
         done
         sudo chown -R 1000:1000 $(pwd)
         if [ ! -z "$packages" ]; then
-          ./scripts/build-termux-docker.sh login ./build-package.sh -I $packages
+          ./common-files/build-termux-docker.sh login ./build-package.sh -I $packages
         fi
     - name: Waiting for debugger
       if: ${{ failure() }}
@@ -385,7 +369,7 @@ jobs:
       env:
         ARCH: ${{ matrix.target_arch }}
       if: always()
-      run: ./scripts/clean-termux-docker.sh
+      run: ./common-files/clean-termux-docker.sh
     - name: Generate build artifacts
       if: always()
       run: |
