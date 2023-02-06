@@ -362,9 +362,6 @@ jobs:
         if [ ! -z "$packages" ]; then
           ./common-files/build-termux-docker.sh login ./build-package.sh -I $packages
         fi
-    - name: Waiting for debugger
-      if: ${{ failure() }}
-      uses: mxschmitt/action-tmate@v3
     - name: Clean up docker containers
       env:
         ARCH: ${{ matrix.target_arch }}
