@@ -1,0 +1,12 @@
+diff -uNr a/runtime/libpgmath/lib/common/fltfenv.c b/runtime/libpgmath/lib/common/fltfenv.c
+--- a/runtime/libpgmath/lib/common/fltfenv.c
++++ b/runtime/libpgmath/lib/common/fltfenv.c
+@@ -573,7 +573,7 @@
+   return feupdateenv(env);
+ }
+
+-#if     defined(TARGET_LINUX_ARM)
++#if     defined(TARGET_LINUX_ARM) && !defined(__ANDROID__)
+
+ /*
+  * ARM aarch64.
