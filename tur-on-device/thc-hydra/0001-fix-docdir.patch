@@ -1,0 +1,11 @@
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -9,7 +9,7 @@
+ LIBS=-lm
+ DESTDIR ?=
+ BINDIR = /bin
+-MANDIR = /man/man1/
++MANDIR = /share/man/man1/
+ DATADIR = /etc
+ PIXDIR = /share/pixmaps
+ APPDIR = /share/applications
