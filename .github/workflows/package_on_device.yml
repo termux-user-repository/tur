@@ -20,7 +20,7 @@ name: Packages-TUR-on-Device
 on:
   push:
     branches:
-    - main
+    - master
     paths:
     - 'tur-on-device/**'
   pull_request:
