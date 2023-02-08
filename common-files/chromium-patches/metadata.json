@@ -308,6 +308,9 @@
   "unrar-no-lutimes/4389.patch": {
     "start": 4389
   },
+  "v8-do-not-use-builtin-mul/5481.patch": {
+    "start": 5481
+  },
   "v8-fix-trap-handler/5249.patch": {
     "start": 4961,
     "end": 5413
