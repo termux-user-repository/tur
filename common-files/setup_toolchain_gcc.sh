@@ -189,12 +189,12 @@ _setup_standalone_toolchain_current_ndk_newer_gcc() {
 		rm -rf $TERMUX_PKG_TMPDIR/gcc-$GCC_VERSION-$TERMUX_ARCH
 		mkdir -p $GCC_STANDALONE_TOOLCHAIN_TMP/sysroot/usr/include $GCC_STANDALONE_TOOLCHAIN_TMP/sysroot/usr/lib
 		cp -R $TERMUX_STANDALONE_TOOLCHAIN/sysroot/usr/include/* $GCC_STANDALONE_TOOLCHAIN_TMP/sysroot/usr/include
-		for f in $(find "$TERMUX_SCRIPTDIR/tur/ndk-sysroot-gcc-compact/" -maxdepth 1 -type f -name *.diff | sort); do
+		for f in $(find "$TERMUX_SCRIPTDIR/tur/ndk-sysroot-gcc-compact/" -maxdepth 1 -type f -name *.patch | sort); do
 			echo "Applying patch: $(basename $f)"
-			patch -d "$GCC_STANDALONE_TOOLCHAIN_TMP/sysroot/usr/include/" -p1 < "$f";
+			patch -d "$GCC_STANDALONE_TOOLCHAIN_TMP/sysroot/usr/include/" -p8 < "$f";
 		done
 		# Revert the math header patch
-		patch -d "$GCC_STANDALONE_TOOLCHAIN_TMP/sysroot/usr/include/" -p1 -R < "$TERMUX_SCRIPTDIR/tur/ndk-sysroot-gcc-compact/0001-c++-v1-math-headers.diff"
+		patch -d "$GCC_STANDALONE_TOOLCHAIN_TMP/sysroot/usr/include/" -p8 -R < "$TERMUX_SCRIPTDIR/tur/ndk-sysroot-gcc-compact/0001-c++-v1-math-headers.patch"
 		cp -R $TERMUX_STANDALONE_TOOLCHAIN/sysroot/usr/lib/$TERMUX_HOST_PLATFORM/$TERMUX_PKG_API_LEVEL/* \
 			$GCC_STANDALONE_TOOLCHAIN_TMP/sysroot/usr/lib/
 		# Use libc++_shared as libstdc++
