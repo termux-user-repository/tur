@@ -1,0 +1,24 @@
+diff -u -r ../php-7.2.3/ext/opcache/config.m4 ./ext/opcache/config.m4
+--- ../php-7.2.3/ext/opcache/config.m4	2018-02-27 16:33:06.000000000 +0000
++++ ./ext/opcache/config.m4	2018-03-10 23:38:51.259947633 +0000
+@@ -147,7 +147,9 @@
+ }
+ ],dnl
+     AC_DEFINE(HAVE_SHM_MMAP_ANON, 1, [Define if you have mmap(MAP_ANON) SHM support])
+-    msg=yes,msg=no,msg=no)
++    msg=yes,msg=no,
++    AC_DEFINE(HAVE_SHM_MMAP_ANON, 1, [Define if you have mmap(MAP_ANON) SHM support])
++    msg=yes)
+   AC_MSG_RESULT([$msg])
+ 
+   AC_MSG_CHECKING(for mmap() using /dev/zero shared memory support)
+@@ -417,6 +433,9 @@
+ 	Optimizer/zend_dump.c,
+ 	shared,,-DZEND_ENABLE_STATIC_TSRMLS_CACHE=1,,yes)
+ 
++  OPCACHE_SHARED_LIBADD=-lpcre
++  PHP_SUBST(OPCACHE_SHARED_LIBADD)
++
+   PHP_ADD_BUILD_DIR([$ext_builddir/Optimizer], 1)
+   PHP_ADD_EXTENSION_DEP(opcache, pcre)a
+ fi
