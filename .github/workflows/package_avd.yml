@@ -1,0 +1,260 @@
+# Based on https://github.com/termux/termux-packages/blob/595969f581655e8cbf65182cf84bd5ffb2cf7b89/.github/workflows/packages.yml
+##
+##  Copyright 2020 Termux
+##
+##  Licensed under the Apache License, Version 2.0 (the "License");
+##  you may not use this file except in compliance with the License.
+##  You may obtain a copy of the License at
+##
+##    http://www.apache.org/licenses/LICENSE-2.0
+##
+##  Unless required by applicable law or agreed to in writing, software
+##  distributed under the License is distributed on an "AS IS" BASIS,
+##  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+##  See the License for the specific language governing permissions and
+##  limitations under the License.
+##
+
+name: Packages-TUR-AVD
+
+on:
+  push:
+    branches:
+    - tur-avd
+    paths:
+    - 'tur-avd/**'
+  pull_request:
+    paths:
+    - 'tur-avd/**'
+  workflow_dispatch:
+    inputs:
+      packages:
+        description: "A space-separated names of packages selected for rebuilding"
+        required: true
+
+jobs:
+  build:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        target_arch:
+          # Disabled for aarch64 due to arm64-v8a emulator cannot start.
+          # - {"TERMUX_ARCH": "aarch64", "EMU_ARCH": "arm64-v8a"}
+          - {"TERMUX_ARCH": "arm",     "EMU_ARCH": "armeabi-v7a"}
+          - {"TERMUX_ARCH": "i686",    "EMU_ARCH": "x86"}
+          - {"TERMUX_ARCH": "x86_64",  "EMU_ARCH": "x86_64"}
+      fail-fast: false
+    steps:
+    - name: Clone repository
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 1000
+        path: ${{ github.workspace }}
+    - name: Install basic tools
+      run: brew install coreutils
+    - name: Merge repos
+      run: ./setup-environment.sh
+    - name: Gather build summary
+      run: |
+        if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+          BASE_COMMIT=$(jq --raw-output .pull_request.base.sha "$GITHUB_EVENT_PATH")
+          OLD_COMMIT=$(jq --raw-output .commits[0].id "$GITHUB_EVENT_PATH")
+          HEAD_COMMIT=$(jq --raw-output .commits[-1].id "$GITHUB_EVENT_PATH")
+          if [ "$BASE_COMMIT" = "null" ]; then
+            if [ "$OLD_COMMIT" = "$HEAD_COMMIT" ]; then
+              # Single-commit push.
+              echo "Processing commit: ${HEAD_COMMIT}"
+              CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r "${HEAD_COMMIT}")
+            else
+              # Multi-commit push.
+              OLD_COMMIT="${OLD_COMMIT}~1"
+              echo "Processing commit range: ${OLD_COMMIT}..${HEAD_COMMIT}"
+              CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r "${OLD_COMMIT}" "${HEAD_COMMIT}")
+            fi
+          else
+            # Pull requests.
+            echo "Processing pull request #$(jq --raw-output .pull_request.number "$GITHUB_EVENT_PATH"): ${BASE_COMMIT}..HEAD"
+            CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r "${BASE_COMMIT}" "HEAD")
+          fi
+        fi
+        mkdir -p ./artifacts ./debs
+        touch ./debs/.placeholder
+        echo "File changed: ${CHANGED_FILES}"
+        if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+          for repo_path in $(jq --raw-output 'keys | .[]' repo.json); do
+            repo=$(jq --raw-output '.["'${repo_path}'"].name' repo.json)
+            echo "Processing on repo: ${repo}"
+            # Parse changed files and identify new packages and deleted packages.
+            # Create lists of those packages that will be passed to upload job for
+            # further processing.
+            for file in $(echo "${CHANGED_FILES}"); do
+              echo "File path: ${file}"
+              if ! [[ $file == ${repo_path}/* ]]; then
+                # This file does not belong to a package, so ignore it
+                continue
+              fi
+              if [[ $file =~ ^${repo_path}/([.a-z0-9+-]*)/([.a-z0-9+-]*).subpackage.sh$ ]]; then
+                # A subpackage was modified, check if it was deleted or just updated
+                pkg=${BASH_REMATCH[1]}
+                subpkg=${BASH_REMATCH[2]}
+                if [ ! -f "${repo_path}/${pkg}/${subpkg}.subpackage.sh" ]; then
+                  echo "$subpkg" >> ./deleted_${repo}_packages.txt
+                fi
+              elif [[ $file =~ ^${repo_path}/([.a-z0-9+-]*)/.*$ ]]; then
+                # package, check if it was deleted or updated
+                pkg=${BASH_REMATCH[1]}
+                if [ -d "${repo_path}/${pkg}" ]; then
+                  echo "$pkg" >> ./built_${repo}_packages.txt
+                  # If there are subpackages we want to create a list of those
+                  # as well
+                  for file in $(find "${repo_path}/${pkg}/" -maxdepth 1 -type f -name \*.subpackage.sh | sort); do
+                    echo "$(basename "${file%%.subpackage.sh}")" >> ./built_${repo}_subpackages.txt
+                  done
+                else
+                  echo "$pkg" >> ./deleted_${repo}_packages
+                fi
+              fi
+            done
+          done
+        else
+          for pkg in ${{ github.event.inputs.packages }}; do
+            repo_paths=$(jq --raw-output 'keys | .[]' repo.json)
+            found=false
+            for repo_path in $repo_paths; do
+              repo=$(jq --raw-output '.["'${repo_path}'"].name' repo.json)
+              if [ -d "${repo_path}/${pkg}" ]; then
+                found=true
+                echo "$pkg" >> ./built_${repo}_packages.txt
+                for subpkg in $(find "${repo_path}/${pkg}/" -maxdepth 1 -type f -name \*.subpackage.sh | sort); do
+                  echo "$(basename "${subpkg%%.subpackage.sh}")" >> ./built_${repo}_subpackages.txt
+                done
+              fi
+            done
+            if [ "$found" != true ]; then
+              echo "Package '${pkg}' not found in any of the repo"
+              exit 1
+            fi
+          done
+        fi
+        for repo in $(jq --raw-output '.[].name' repo.json); do
+          # Fix so that lists do not contain duplicates
+          if [ -f ./built_${repo}_packages.txt ]; then
+            uniq ./built_${repo}_packages.txt > ./built_${repo}_packages.txt.tmp
+            mv ./built_${repo}_packages.txt.tmp ./built_${repo}_packages.txt
+            echo "./built_${repo}_packages.txt: "
+            cat ./built_${repo}_packages.txt
+          fi
+          if [ -f ./built_${repo}_subpackages.txt ]; then
+            uniq ./built_${repo}_subpackages.txt > ./built_${repo}_subpackages.txt.tmp
+            mv ./built_${repo}_subpackages.txt.tmp ./built_${repo}_subpackages.txt
+            echo "./built_${repo}_subpackages.txt: "
+            cat ./built_${repo}_subpackages.txt
+          fi
+          if [ -f ./deleted_${repo}_packages.txt ]; then
+            uniq ./deleted_${repo}_packages.txt > ./deleted_${repo}_packages.txt.tmp
+            mv ./deleted_${repo}_packages.txt.tmp ./deleted_${repo}_packages.txt
+          fi
+        done
+    - name: Lint packages
+      run: |
+        declare -a package_recipes
+        for repo_path in $(jq --raw-output 'keys | .[]' repo.json); do
+          repo=$(jq --raw-output '.["'${repo_path}'"].name' repo.json)
+          if [ -f ./built_${repo}_packages.txt ]; then
+            package_recipes="$package_recipes $(cat ./built_${repo}_packages.txt | repo_path=${repo_path} awk '{print ENVIRON["repo_path"]"/"$1"/build.sh"}')"
+          fi
+        done
+        if [ ! -z "$package_recipes" ]; then
+          ./scripts/lint-packages.sh $package_recipes
+        fi
+
+    # TODO: Generate AVD Snapshot for caching
+    # - name: Check AVD Cache
+    #   uses: actions/cache@v3
+    #   id: avd-cache
+    #   with:
+    #     path: |
+    #       ~/.android/avd/*
+    #       ~/.android/adb*
+    #     key: avd-24-${{ matrix.build_env.MAJOR_VERSION }}
+
+    # - name: Create AVD and Generate Snapshot for Caching
+    #   if: steps.avd-cache.outputs.cache-hit != 'true'
+    #   uses: reactivecircus/android-emulator-runner@v2
+    #   with:
+    #     api-level: 24
+    #     force-avd-creation: false
+    #     emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+    #     disable-animations: false
+    #     script: echo "Generated AVD snapshot for caching."
+
+    - name: Build packages
+      uses: licy183/android-emulator-runner@v2.27.0.1
+      with:
+        arch: ${{ matrix.target_arch.EMU_ARCH }}
+        api-level: 24
+        force-avd-creation: false
+        emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+        disable-animations: true
+        script: env TERMUX_ARCH=${{ matrix.target_arch.TERMUX_ARCH }} ./common-files/action-avd-step-build-packages.sh
+    - name: Generate build artifacts
+      if: always()
+      run: |
+        for repo in $(jq --raw-output '.[].name' repo.json); do
+          # Put package lists into directory with *.deb files so they will be transferred to
+          # upload job.
+          test -f ./built_${repo}_packages.txt && mv ./built_${repo}_packages.txt ./debs/
+          test -f ./built_${repo}_subpackages.txt && cat ./built_${repo}_subpackages.txt >> ./debs/built_${repo}_packages.txt \
+            && rm ./built_${repo}_subpackages.txt
+          test -f ./deleted_${repo}_packages.txt && mv ./deleted_${repo}_packages.txt ./debs/
+          # Move only debs from built_packages into debs/ folder before
+          # creating an archive.
+          while read -r pkg; do
+            # Match both $pkg.deb and $pkg-static.deb.
+            find output \( -name "$pkg_*.deb" -o -name "$pkg-static_*.deb" \) -type f -print0 | xargs -0r mv -t debs/
+          done < <(cat ./debs/built_${repo}_packages.txt)
+        done
+        # Files containing certain symbols (e.g. ":") will cause failure in actions/upload-artifact.
+        # Archiving *.deb files in a tarball to avoid issues with uploading.
+        tar cf artifacts/debs-${{ matrix.target_arch.TERMUX_ARCH }}-${{ github.sha }}.tar debs
+        rm -rf output
+    - name: Checksums for built *.deb files
+      if: always()
+      run: |
+        find debs -type f -name "*.deb" -exec sha256sum "{}" \; | sort -k2
+    - name: Store *.deb files
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: debs-${{ matrix.target_arch.TERMUX_ARCH }}-${{ github.sha }}
+        path: ./artifacts
+
+  upload:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - name: Clone repository
+      uses: actions/checkout@v3
+    - name: Get *.deb files
+      uses: actions/download-artifact@v3
+      with:
+        path: ./
+    - name: Upload to a temporary release
+      env:
+       GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+      run: |
+        GITHUB_SHA=${{ github.sha }}
+        # for archive in debs-*/debs-{aarch64,arm,i686,x86_64}-${{ github.sha }}.tar; do
+        for archive in debs-*/debs-{arm,i686,x86_64}-${{ github.sha }}.tar; do
+          gh release upload -R https://github.com/termux-user-repository/tur "0.1" $archive
+          echo "$archive  uploaded"
+        done
+    - name: Trigger workflow in dists repository
+      env:
+        GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+        EVENT: "from_tur"
+        ORG: "termux-user-repository"
+        REPO: "dists"
+      run: |
+        curl -d "{\"event_type\": \"${EVENT}\"}" -H "Content-Type: application/json" -H "Authorization: token ${GITHUB_TOKEN}" -H "Accept: application/vnd.github.everest-preview+json" "https://api.github.com/repos/${ORG}/${REPO}/dispatches"

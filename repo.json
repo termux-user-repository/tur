@@ -17,6 +17,12 @@
     "component": "tur-on-device",
     "url": "https://tur.kcubeterm.com"
   },
+  "tur-avd": {
+    "name": "tur-avd",
+    "distribution": "tur-packages",
+    "component": "tur-avd",
+    "url": "https://tur.kcubeterm.com"
+  },
   "tur-hacking": {
     "name": "tur-hacking",
     "distribution": "tur-packages",
