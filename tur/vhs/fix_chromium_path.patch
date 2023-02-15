@@ -1,0 +1,12 @@
+diff '--color=auto' -uNr vhs-0.2.0/vhs.go vhs-0.2.0.mod/vhs.go
+--- vhs-0.2.0/vhs.go	2022-11-22 06:47:49.000000000 +0530
++++ vhs-0.2.0.mod/vhs.go	2023-02-15 12:59:27.245918396 +0530
+@@ -87,7 +87,7 @@
+ 	go tty.Run() //nolint:errcheck
+ 
+ 	opts := DefaultVHSOptions()
+-	path, _ := launcher.LookPath()
++	path := "@TERMUX_PREFIX@/bin/chromium-browser"
+ 	u := launcher.New().Leakless(false).Bin(path).MustLaunch()
+ 	browser := rod.New().ControlURL(u).MustConnect()
+ 	page := browser.MustPage(fmt.Sprintf("http://localhost:%d", port))
