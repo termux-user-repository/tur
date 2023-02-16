@@ -2,7 +2,7 @@ TERMUX_PKG_HOMEPAGE=https://github.com/coder/code-server
 TERMUX_PKG_DESCRIPTION="Run VS Code on any machine anywhere and access it in the browser"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="4.9.1"
+TERMUX_PKG_VERSION="4.10.0"
 TERMUX_PKG_SRCURL=git+https://github.com/coder/code-server
 TERMUX_PKG_DEPENDS="libsecret, nodejs-16, ripgrep"
 TERMUX_PKG_BUILD_IN_SRC=true
@@ -19,12 +19,27 @@ termux_step_post_get_source() {
 	done
 }
 
+_setup_nodejs_16() {
+	local NODEJS_VERSION=16.19.0
+	local NODEJS_FOLDER=${TERMUX_PKG_CACHEDIR}/build-tools/nodejs-${NODEJS_VERSION}
+
+	if [ ! -x "$NODEJS_FOLDER/bin/node" ]; then
+		mkdir -p "$NODEJS_FOLDER"
+		local NODEJS_TAR_FILE=$TERMUX_PKG_TMPDIR/nodejs-$NODEJS_VERSION.tar.xz
+		termux_download https://nodejs.org/dist/v${NODEJS_VERSION}/node-v${NODEJS_VERSION}-linux-x64.tar.xz \
+			"$NODEJS_TAR_FILE" \
+			c88b52497ab38a3ddf526e5b46a41270320409109c3f74171b241132984fd08f
+		tar -xf "$NODEJS_TAR_FILE" -C "$NODEJS_FOLDER" --strip-components=1
+	fi
+	export PATH=$NODEJS_FOLDER/bin:$PATH
+}
+
 termux_step_host_build() {
 	export VERSION=$TERMUX_PKG_VERSION
 	mv $TERMUX_PREFIX/bin $TERMUX_PREFIX/bin.bp
 	env -i PATH="$PATH" sudo apt update
 	env -i PATH="$PATH" sudo apt install -yq libxkbfile-dev libsecret-1-dev
-	termux_setup_nodejs
+	_setup_nodejs_16
 	npm install yarn
 	export PATH="$(npm bin):$PATH"
 	cp -Rf $TERMUX_PKG_SRCDIR ./
@@ -37,7 +52,7 @@ termux_step_host_build() {
 }
 
 termux_step_configure() {
-	termux_setup_nodejs
+	_setup_nodejs_16
 	export PATH="$TERMUX_PKG_HOSTBUILD_DIR/node_modules/.bin:$PATH"
 }
 
