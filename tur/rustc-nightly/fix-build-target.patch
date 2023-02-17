@@ -1,0 +1,15 @@
+--- a/src/bootstrap/cc_detect.rs
++++ b/src/bootstrap/cc_detect.rs
+@@ -232,10 +232,8 @@
+         triple.to_string()
+     };
+ 
+-    // API 19 is the earliest API level supported by NDK r25b but AArch64 and x86_64 support
+-    // begins at API level 21.
+-    let api_level =
+-        if triple.contains("aarch64") || triple.contains("x86_64") { "21" } else { "19" };
++    // Hardcode API level to 24 on Termux.
++    let api_level = "24";
+     let compiler = format!("{}{}-{}", triple_translated, api_level, compiler.clang());
+     ndk.join("bin").join(compiler)
+ }
