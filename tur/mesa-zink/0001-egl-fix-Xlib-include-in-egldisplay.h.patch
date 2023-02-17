@@ -1,7 +1,7 @@
-From 15b931bee7bfec40ec31054bb2ca0d9059fe7b95 Mon Sep 17 00:00:00 2001
+From 5fc9fc7e9f5d0675833691d17ed2fe02d5b9abcb Mon Sep 17 00:00:00 2001
 From: Simon Zeni <simon@bl4ckb0ne.ca>
 Date: Wed, 28 Sep 2022 06:15:26 -0400
-Subject: [PATCH 1/4] egl: fix Xlib include in egldisplay.h
+Subject: [PATCH 1/5] egl: fix Xlib include in egldisplay.h
 
 Signed-off-by: Simon Zeni <simon@bl4ckb0ne.ca>
 Reviewed-by: Eric Engestrom <eric@igalia.com>
@@ -11,7 +11,7 @@ Part-of: <https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/18848>
  1 file changed, 3 insertions(+)
 
 diff --git a/src/egl/main/egldisplay.h b/src/egl/main/egldisplay.h
-index 205466955f39..b99fddc526ca 100644
+index 0ee06a487c0..32a01510b78 100644
 --- a/src/egl/main/egldisplay.h
 +++ b/src/egl/main/egldisplay.h
 @@ -38,6 +38,9 @@
@@ -25,4 +25,5 @@ index 205466955f39..b99fddc526ca 100644
  #ifdef __cplusplus
  extern "C" {
 -- 
-GitLab
+2.34.1
+

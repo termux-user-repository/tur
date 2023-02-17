@@ -4,17 +4,18 @@ TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_LICENSE_FILE="docs/license.rst"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION=22.0.5
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://archive.mesa3d.org/mesa-${TERMUX_PKG_VERSION}.tar.xz
 TERMUX_PKG_SHA256=5ee2dc06eff19e19b2867f12eb0db0905c9691c07974f6253f2f1443df4c7a35
 TERMUX_PKG_DEPENDS="libandroid-shmem, libc++, libdrm, libexpat, libglvnd, libx11, libxext, libxfixes, libxshmfence, libxxf86vm, ncurses, vulkan-loader-android, xorg-xrandr, zlib, zstd"
 TERMUX_PKG_SUGGESTS="mesa-zink-dev"
-TERMUX_PKG_BUILD_DEPENDS="libllvm-11-static, libglvnd-dev, xorgproto, vulkan-headers"
+TERMUX_PKG_BUILD_DEPENDS="libllvm-static, libglvnd-dev, xorgproto, vulkan-headers"
 TERMUX_PKG_CONFLICTS="libmesa, ndk-sysroot (<< 23b-6), mesa"
 TERMUX_PKG_REPLACES="libmesa, mesa"
 TERMUX_PKG_PROVIDES="mesa"
 
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
---cmake-prefix-path $TERMUX_PREFIX/opt/libllvm-11;$TERMUX_PREFIX
+--cmake-prefix-path $TERMUX_PREFIX
 -Dcpp_rtti=false
 -Dgbm=enabled
 -Degl=enabled

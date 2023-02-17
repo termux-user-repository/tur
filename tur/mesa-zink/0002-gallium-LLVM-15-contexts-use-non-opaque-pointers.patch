@@ -1,0 +1,142 @@
+From eb9540d41b4008808e16cdac77d374150e474c84 Mon Sep 17 00:00:00 2001
+From: Mihai Preda <mhpreda@gmail.com>
+Date: Wed, 13 Jul 2022 14:33:39 +0300
+Subject: [PATCH 2/5] gallium: LLVM-15 contexts use non-opaque pointers
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+LLVM-15 enables opaque pointers by default. We temporarilly request
+non-opaque pointers while we migrate our code to support non-opaque pointers.
+
+This workaround needs to be removed before LLVM-16.
+
+See #6615
+
+Reviewed-by: Marek Olšák <marek.olsak@amd.com>
+Acked-by: Kai Wasserbäch <kai@dev.carbon-project.org>
+Part-of: <https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/17514>
+---
+ src/gallium/auxiliary/draw/draw_llvm.c        | 5 +++++
+ src/gallium/drivers/llvmpipe/lp_context.c     | 4 ++++
+ src/gallium/drivers/llvmpipe/lp_test_arit.c   | 3 +++
+ src/gallium/drivers/llvmpipe/lp_test_blend.c  | 3 +++
+ src/gallium/drivers/llvmpipe/lp_test_conv.c   | 3 +++
+ src/gallium/drivers/llvmpipe/lp_test_format.c | 6 ++++++
+ src/gallium/drivers/llvmpipe/lp_test_printf.c | 3 +++
+ 7 files changed, 27 insertions(+)
+
+diff --git a/src/gallium/auxiliary/draw/draw_llvm.c b/src/gallium/auxiliary/draw/draw_llvm.c
+index 483bf62b44c..7a3f02db69a 100644
+--- a/src/gallium/auxiliary/draw/draw_llvm.c
++++ b/src/gallium/auxiliary/draw/draw_llvm.c
+@@ -797,6 +797,11 @@ draw_llvm_create(struct draw_context *draw, LLVMContextRef context)
+    llvm->context = context;
+    if (!llvm->context) {
+       llvm->context = LLVMContextCreate();
++
++#if LLVM_VERSION_MAJOR >= 15
++      LLVMContextSetOpaquePointers(llvm->context, false);
++#endif
++
+       llvm->context_owned = true;
+    }
+    if (!llvm->context)
+diff --git a/src/gallium/drivers/llvmpipe/lp_context.c b/src/gallium/drivers/llvmpipe/lp_context.c
+index 35f3618e8d7..66dbe78361a 100644
+--- a/src/gallium/drivers/llvmpipe/lp_context.c
++++ b/src/gallium/drivers/llvmpipe/lp_context.c
+@@ -233,6 +233,10 @@ llvmpipe_create_context(struct pipe_screen *screen, void *priv,
+    if (!llvmpipe->context)
+       goto fail;
+ 
++#if LLVM_VERSION_MAJOR >= 15
++   LLVMContextSetOpaquePointers(llvmpipe->context, false);
++#endif
++
+    /*
+     * Create drawing context and plug our rendering stage into it.
+     */
+diff --git a/src/gallium/drivers/llvmpipe/lp_test_arit.c b/src/gallium/drivers/llvmpipe/lp_test_arit.c
+index 504d3c3aa96..c53f1027815 100644
+--- a/src/gallium/drivers/llvmpipe/lp_test_arit.c
++++ b/src/gallium/drivers/llvmpipe/lp_test_arit.c
+@@ -438,6 +438,9 @@ test_unary(unsigned verbose, FILE *fp, const struct unary_test_t *test, unsigned
+    }
+ 
+    context = LLVMContextCreate();
++#if LLVM_VERSION_MAJOR >= 15
++   LLVMContextSetOpaquePointers(context, false);
++#endif
+    gallivm = gallivm_create("test_module", context, NULL);
+ 
+    test_func = build_unary_test_func(gallivm, test, length, test_name);
+diff --git a/src/gallium/drivers/llvmpipe/lp_test_blend.c b/src/gallium/drivers/llvmpipe/lp_test_blend.c
+index a549b0a22ff..7805ec58d98 100644
+--- a/src/gallium/drivers/llvmpipe/lp_test_blend.c
++++ b/src/gallium/drivers/llvmpipe/lp_test_blend.c
+@@ -452,6 +452,9 @@ test_one(unsigned verbose,
+       dump_blend_type(stdout, blend, type);
+ 
+    context = LLVMContextCreate();
++#if LLVM_VERSION_MAJOR >= 15
++   LLVMContextSetOpaquePointers(context, false);
++#endif
+    gallivm = gallivm_create("test_module", context, NULL);
+ 
+    func = add_blend_test(gallivm, blend, type);
+diff --git a/src/gallium/drivers/llvmpipe/lp_test_conv.c b/src/gallium/drivers/llvmpipe/lp_test_conv.c
+index 43e051fbeeb..717a949ddc5 100644
+--- a/src/gallium/drivers/llvmpipe/lp_test_conv.c
++++ b/src/gallium/drivers/llvmpipe/lp_test_conv.c
+@@ -221,6 +221,9 @@ test_one(unsigned verbose,
+    }
+ 
+    context = LLVMContextCreate();
++#if LLVM_VERSION_MAJOR >= 15
++   LLVMContextSetOpaquePointers(context, false);
++#endif
+    gallivm = gallivm_create("test_module", context, NULL);
+ 
+    func = add_conv_test(gallivm, src_type, num_srcs, dst_type, num_dsts);
+diff --git a/src/gallium/drivers/llvmpipe/lp_test_format.c b/src/gallium/drivers/llvmpipe/lp_test_format.c
+index 38b3c48b294..8e16a673ec4 100644
+--- a/src/gallium/drivers/llvmpipe/lp_test_format.c
++++ b/src/gallium/drivers/llvmpipe/lp_test_format.c
+@@ -150,6 +150,9 @@ test_format_float(unsigned verbose, FILE *fp,
+    unsigned i, j, k, l;
+ 
+    context = LLVMContextCreate();
++#if LLVM_VERSION_MAJOR >= 15
++   LLVMContextSetOpaquePointers(context, false);
++#endif
+    gallivm = gallivm_create("test_module_float", context, NULL);
+ 
+    fetch = add_fetch_rgba_test(gallivm, verbose, desc,
+@@ -251,6 +254,9 @@ test_format_unorm8(unsigned verbose, FILE *fp,
+    unsigned i, j, k, l;
+ 
+    context = LLVMContextCreate();
++#if LLVM_VERSION_MAJOR >= 15
++   LLVMContextSetOpaquePointers(context, false);
++#endif
+    gallivm = gallivm_create("test_module_unorm8", context, NULL);
+ 
+    fetch = add_fetch_rgba_test(gallivm, verbose, desc,
+diff --git a/src/gallium/drivers/llvmpipe/lp_test_printf.c b/src/gallium/drivers/llvmpipe/lp_test_printf.c
+index 85ce1cda695..b3de9cb9e8b 100644
+--- a/src/gallium/drivers/llvmpipe/lp_test_printf.c
++++ b/src/gallium/drivers/llvmpipe/lp_test_printf.c
+@@ -96,6 +96,9 @@ test_printf(unsigned verbose, FILE *fp,
+    boolean success = TRUE;
+ 
+    context = LLVMContextCreate();
++#if LLVM_VERSION_MAJOR >= 15
++   LLVMContextSetOpaquePointers(context, false);
++#endif
+    gallivm = gallivm_create("test_module", context, NULL);
+ 
+    test = add_printf_test(gallivm);
+-- 
+2.34.1
+
