@@ -2,7 +2,7 @@ TERMUX_PKG_HOMEPAGE=https://scipy.org/
 TERMUX_PKG_DESCRIPTION="Fundamental algorithms for scientific computing in Python"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="1.10.0"
+TERMUX_PKG_VERSION="1.10.1"
 TERMUX_PKG_SRCURL=git+https://github.com/scipy/scipy
 TERMUX_PKG_DEPENDS="libc++, libopenblas, python, python-numpy"
 TERMUX_PKG_BUILD_DEPENDS="python-numpy-static"
@@ -33,7 +33,6 @@ termux_step_configure() {
 		termux_error_exit "Package '$TERMUX_PKG_NAME' is not available for on-device builds."
 	fi
 
-	_PYTHON_VERSION=$(. $TERMUX_SCRIPTDIR/packages/python/build.sh; echo $_MAJOR_VERSION)
 	_NUMPY_VERSION=$(. $TERMUX_SCRIPTDIR/packages/python-numpy/build.sh; echo $TERMUX_PKG_VERSION)
 
 	_setup_toolchain_ndk_gcc_11
@@ -41,34 +40,27 @@ termux_step_configure() {
 	# XXX: `python` from main repo is built by TERMUX_STANDALONE_TOOLCHAIN and its _sysconfigdata.py
 	# XXX: contains some FLAGS which is not supported by GNU Compiler Collections, such as '-Oz',  
 	# XXX: `-static-openmp`. So we need to modify the _sysconfigdata.py.
-	SYS_CONFIG_DATA_FILE="$(find $TERMUX_PREFIX/lib/python${_PYTHON_VERSION} -name "_sysconfigdata*.py")"
-	rm -rf  $TERMUX_PREFIX/lib/python${_PYTHON_VERSION}/__pycache__
+	SYS_CONFIG_DATA_FILE="$(find $TERMUX_PREFIX/lib/python${TERMUX_PYTHON_VERSION} -name "_sysconfigdata*.py")"
+	rm -rf  $TERMUX_PREFIX/lib/python${TERMUX_PYTHON_VERSION}/__pycache__
 	cp $SYS_CONFIG_DATA_FILE $TERMUX_PKG_TMPDIR/$(basename $SYS_CONFIG_DATA_FILE)
 	sed -E 's|-O[123sz]|-Os|g;s|-static-openmp||g' $TERMUX_PKG_TMPDIR/$(basename $SYS_CONFIG_DATA_FILE) |
 		sed "s|$TERMUX_HOST_PLATFORM-clang++|$TERMUX_HOST_PLATFORM-g++|g" |
 		sed "s|$TERMUX_HOST_PLATFORM-clang|$TERMUX_HOST_PLATFORM-gcc|g" > $SYS_CONFIG_DATA_FILE
 	rm $TERMUX_PKG_TMPDIR/$(basename $SYS_CONFIG_DATA_FILE)
 
-	termux_setup_python_crossenv
-	pushd $TERMUX_PYTHON_CROSSENV_SRCDIR
-	_CROSSENV_PREFIX=$TERMUX_PKG_BUILDDIR/python-crossenv-prefix
-	python${_PYTHON_VERSION} -m crossenv \
-		$TERMUX_PREFIX/bin/python${_PYTHON_VERSION} \
-		${_CROSSENV_PREFIX}
-	popd
-	. ${_CROSSENV_PREFIX}/bin/activate
+	termux_setup_python_pip
 
-	LDFLAGS+=" -Wl,--no-as-needed,-lpython${_PYTHON_VERSION}"
+	LDFLAGS+=" -Wl,--no-as-needed,-lpython${TERMUX_PYTHON_VERSION}"
 }
 
 termux_step_make() {
 	pip --no-cache-dir install wheel
 	build-pip install numpy==$_NUMPY_VERSION pybind11 Cython pythran wheel
 
-	DEVICE_SITE=$TERMUX_PREFIX/lib/python${_PYTHON_VERSION}/site-packages
+	DEVICE_SITE=$TERMUX_PREFIX/lib/python${TERMUX_PYTHON_VERSION}/site-packages
 
 	# From https://gist.github.com/benfogle/85e9d35e507a8b2d8d9dc2175a703c22
-	BUILD_SITE=${_CROSSENV_PREFIX}/build/lib/python${_PYTHON_VERSION}/site-packages
+	BUILD_SITE=${TERMUX_PYTHON_CROSSENV_PREFIX}/build/lib/python${TERMUX_PYTHON_VERSION}/site-packages
 	INI=$(find $BUILD_SITE -name 'npymath.ini')
 	LIBDIR=$(find $DEVICE_SITE -path '*/numpy/core/lib')
 	INCDIR=$(find $DEVICE_SITE -path '*/numpy/core/include')
@@ -113,7 +105,7 @@ termux_step_post_make_install() {
 	rm $TERMUX_PREFIX/lib/libnpyrandom.a
 	# Remove __pycache__ and _sysconfigdata.py
 	rm $SYS_CONFIG_DATA_FILE
-	rm -rf $TERMUX_PREFIX/lib/python${_PYTHON_VERSION}/__pycache__
+	rm -rf $TERMUX_PREFIX/lib/python${TERMUX_PYTHON_VERSION}/__pycache__
 }
 
 termux_step_create_debscripts() {
