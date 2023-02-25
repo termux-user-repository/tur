@@ -1,3 +1,5 @@
+Freedrenot with KGSL will never support WSI, so do not compile these files.
+
 --- a/src/freedreno/vulkan/meson.build
 +++ b/src/freedreno/vulkan/meson.build
 @@ -70,7 +70,7 @@
