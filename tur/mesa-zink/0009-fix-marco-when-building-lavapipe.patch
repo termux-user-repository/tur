@@ -1,0 +1,19 @@
+These macros should be defined to properly compile the lavapipe, but they don't.
+Upstream has replaced the macro `HAVE_PIPE_LOADER_*` with `HAVE_*`.
+
+--- ./src/gallium/frontends/lavapipe/meson.build
++++ ./src/gallium/frontends/lavapipe/meson.build
+@@ -49,6 +49,13 @@
+   lvp_deps += dep_wayland_client
+ endif
+ 
++if with_dri
++  lvp_flags += '-DHAVE_PIPE_LOADER_DRI'
++endif
++if with_gallium_drisw_kms
++  lvp_flags += '-DHAVE_PIPE_LOADER_KMS'
++endif
++
+ liblavapipe_st = static_library(
+   'lavapipe_st',
+   [liblvp_files, lvp_entrypoints, lvp_commands, sha1_h],

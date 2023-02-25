@@ -1,3 +1,5 @@
+We'd like to use the hardcoded configurations for mesa. Upstream has added an option `xmlconfig`.
+
 --- a/src/util/xmlconfig.h
 +++ b/src/util/xmlconfig.h
 @@ -39,7 +39,7 @@

@@ -1,3 +1,4 @@
+Origin: https://github.com/termux/termux-packages/commit/c44fec92d1e2b95d25aa3d2139326ec2c8ccc57b.patch
 --- src/src/vulkan/wsi/wsi_common_display.c	2023-02-09 00:05:36.000000000 +0300
 +++ src/src/vulkan/wsi/wsi_common_display.c.patch	2023-02-17 22:26:52.517688447 +0300
 @@ -167,6 +167,12 @@
