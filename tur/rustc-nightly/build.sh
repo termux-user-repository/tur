@@ -5,6 +5,7 @@ TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 _DATE="2023-02-10"
 TERMUX_PKG_VERSION="1.67.0-${_DATE//-/.}-nightly"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://static.rust-lang.org/dist/2023-02-10/rustc-nightly-src.tar.xz
 TERMUX_PKG_SHA256=259aaf0772f08347f840a8621841d2c496cc29ba5636fab9fcdab496942add1d
 TERMUX_PKG_RM_AFTER_INSTALL="bin/llvm-* bin/llc bin/opt"
@@ -80,6 +81,8 @@ termux_step_configure() {
 	export $ENV_NAME=$CC
 	export TARGET_CFLAGS="--target=$CCTERMUX_HOST_PLATFORM ${CFLAGS-} $CPPFLAGS"
 
+	export RUSTFLAGS="-C link-arg=-Wl,-rpath=$RUST_PREFIX/lib $RUSTFLAGS"
+
 	export X86_64_UNKNOWN_LINUX_GNU_OPENSSL_LIB_DIR=/usr/lib/x86_64-linux-gnu
 	export X86_64_UNKNOWN_LINUX_GNU_OPENSSL_INCLUDE_DIR=/usr/include
 	export PKG_CONFIG_ALLOW_CROSS=1
@@ -114,6 +117,7 @@ termux_step_post_massage() {
 	rm -f lib/libz.so.1
 	rm -f lib/liblzma.so.$LZMA_VERSION
 	rm -f lib/liblzma.a
+	rm -f lib/*.tmp
 }
 
 termux_step_create_debscripts() {
