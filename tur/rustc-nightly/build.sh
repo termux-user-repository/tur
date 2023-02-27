@@ -3,16 +3,14 @@ TERMUX_PKG_DESCRIPTION="Rust compiler and utilities (nightly version)"
 TERMUX_PKG_DEPENDS="libc++, clang, openssl, lld, zlib, libllvm"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-_DATE="2023-02-10"
-TERMUX_PKG_VERSION="1.67.0-${_DATE//-/.}-nightly"
-TERMUX_PKG_REVISION=1
-TERMUX_PKG_SRCURL=https://static.rust-lang.org/dist/2023-02-10/rustc-nightly-src.tar.xz
-TERMUX_PKG_SHA256=259aaf0772f08347f840a8621841d2c496cc29ba5636fab9fcdab496942add1d
+_DATE="2023-02-27"
+TERMUX_PKG_VERSION="1.67.1-${_DATE//-/.}-nightly"
+TERMUX_PKG_SRCURL=https://static.rust-lang.org/dist/$_DATE/rustc-nightly-src.tar.xz
+TERMUX_PKG_SHA256=ceb53d6a8cc18434efa3093e3debe5484dde8201dcba4fdbe83e83f32b8dad74
 TERMUX_PKG_RM_AFTER_INSTALL="bin/llvm-* bin/llc bin/opt"
 
 termux_step_pre_configure() {
 	termux_setup_cmake
-	termux_setup_rust
 
 	export RUST_LIBDIR=$TERMUX_PKG_BUILDDIR/_lib
 	mkdir -p $RUST_LIBDIR
@@ -58,6 +56,9 @@ termux_step_pre_configure() {
 
 
 termux_step_configure() {
+	env -i PATH="$PATH" sudo apt update
+	env -i PATH="$PATH" sudo apt install llvm-14 -yq
+
 	case $TERMUX_ARCH in
 	    "aarch64" ) CARGO_TARGET_NAME=aarch64-linux-android ;;
 	    "arm" ) CARGO_TARGET_NAME=armv7-linux-androideabi ;;
@@ -74,6 +75,7 @@ termux_step_configure() {
 		-e "s|@TERMUX_PREFIX@|$TERMUX_PREFIX|g" \
 		-e "s|@TERMUX_HOST_PLATFORM@|$TERMUX_HOST_PLATFORM|g" \
 		-e "s|@TERMUX_STANDALONE_TOOLCHAIN@|$TERMUX_STANDALONE_TOOLCHAIN|g" \
+		-e "s|@BUILD_LLVM_CONFIG@|$(command -v llvm-config-14)|g" \
 		-e "s|@RUST_TARGET_TRIPLE@|$CARGO_TARGET_NAME|g" > $TERMUX_PKG_BUILDDIR/config.toml
 
 	local ENV_NAME=CARGO_TARGET_${CARGO_TARGET_NAME^^}_LINKER
