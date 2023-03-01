@@ -2,6 +2,7 @@ TERMUX_PKG_HOMEPAGE=https://www.rust-lang.org
 TERMUX_PKG_DESCRIPTION="Rust compiler and utilities (nightly version)"
 TERMUX_PKG_DEPENDS="libc++, clang, openssl, lld, zlib, libllvm"
 TERMUX_PKG_LICENSE="MIT"
+TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_REVISION=2
 _DATE="2023-02-27"
 TERMUX_PKG_VERSION="1.67.1-${_DATE//-/.}-nightly"
