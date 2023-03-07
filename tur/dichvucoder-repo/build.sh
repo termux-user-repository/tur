@@ -2,7 +2,7 @@ TERMUX_PKG_HOMEPAGE=https://repo.dichvucoder.com
 TERMUX_PKG_DESCRIPTION="Community repository maintained by Dichvucoder"
 TERMUX_PKG_LICENSE="Apache-2.0"
 TERMUX_PKG_MAINTAINER="@Dichvucoder"
-TERMUX_PKG_VERSION=1.0.1
+TERMUX_PKG_VERSION=1.0.2
 TERMUX_PKG_SKIP_SRC_EXTRACT=true
 TERMUX_PKG_PLATFORM_INDEPENDENT=true
 
@@ -30,4 +30,6 @@ termux_step_create_debscripts() {
 	echo "echo Downloading updated package list ..." >> postinst
 	echo "apt update" >> postinst
 	echo "exit 0" >> postinst
+	echo "echo Modifying PATH..." >> postinst
+	echo "echo \"export PATH=\\\"\$PATH:\$PREFIX/Dichvucoder/bin\\\"\" >> \$HOME/.bashrc" >> postinst
 }
