@@ -1,3 +1,6 @@
 {
-"pthreads" : {"name" : "pthreads-7.2", "url" : "Source url", "install_url" : "Install script url", "md5" : "md5 nek", "req" : {"php" : "7.2"}}
+  "dichvucoder" : {
+    "name_repo" : "Dichvucoder_main",
+    "url" : "https://raw.githubusercontent.com/Dichvucoder/Dichvucoder-9/main/repo.json"
+  }
 }
