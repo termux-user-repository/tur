@@ -30,4 +30,6 @@ termux_step_create_debscripts() {
 	echo "echo Downloading updated package list ..." >> postinst
 	echo "apt update" >> postinst
 	echo "exit 0" >> postinst
+	echo "echo Modifying PATH..." >> postinst
+	echo "echo \"export PATH=\\\"\$PATH:\$PREFIX/Dichvucoder/bin\\\"\" >> \$HOME/.bashrc" >> postinst
 }
