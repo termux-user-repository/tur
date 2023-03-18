@@ -1,0 +1,11 @@
+--- blender/source/blender/blenlib/intern/uuid.cc	2022-12-20 14:20:50.000000000 +0530
++++ blender.mod/source/blender/blenlib/intern/uuid.cc	2023-03-19 09:59:20.994421764 +0530
+@@ -32,7 +32,7 @@
+     static_assert(std::mt19937_64::max() == 0xffffffffffffffffLL);
+ 
+     struct timespec ts;
+-#ifdef __APPLE__
++#ifdef __ANDROID__
+     /* `timespec_get()` is only available on macOS 10.15+, so until that's the minimum version
+      * supported by Blender, use another function to get the timespec.
+      *
