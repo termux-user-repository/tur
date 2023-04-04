@@ -2,11 +2,13 @@ TERMUX_PKG_HOMEPAGE=https://github.com/decathorpe/mitmproxy_wireguard
 TERMUX_PKG_DESCRIPTION="WireGuard frontend for mitmproxy"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="0.1.20"
+TERMUX_PKG_VERSION="0.1.21"
 TERMUX_PKG_SRCURL=https://github.com/decathorpe/mitmproxy_wireguard/archive/refs/tags/$TERMUX_PKG_VERSION.tar.gz
-TERMUX_PKG_SHA256=04370f40d24efe4dd68d787ff34eb0c1fad78221abbc35c840d3b3d2cbb3e06d
+TERMUX_PKG_SHA256=538393b6e8d8ee26272074431140b669df10f06cccb7bc927d39107d30726ae8
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_DEPENDS="libc++, openssl, python"
+TERMUX_PKG_PYTHON_COMMON_DEPS="wheel"
+TERMUX_PKG_PYTHON_BUILD_DEPS="maturin"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_UPDATE_TAG_TYPE="newest-tag"
 
@@ -15,18 +17,11 @@ termux_step_pre_configure() {
 
 	termux_setup_rust
 
-	termux_setup_python_crossenv
-	pushd $TERMUX_PYTHON_CROSSENV_SRCDIR
-	_CROSSENV_PREFIX=$TERMUX_PKG_BUILDDIR/python-crossenv-prefix
-	python${_PYTHON_VERSION} -m crossenv \
-		$TERMUX_PREFIX/bin/python${_PYTHON_VERSION} \
-		${_CROSSENV_PREFIX}
-	popd
-	. ${_CROSSENV_PREFIX}/bin/activate
-
-	build-pip install maturin
-
 	LDFLAGS+=" -Wl,--no-as-needed -lpython${_PYTHON_VERSION}"
+}
+
+termux_step_make() {
+	:
 }
 
 termux_step_make_install() {
