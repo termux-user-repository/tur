@@ -2,7 +2,7 @@ TERMUX_PKG_HOMEPAGE=https://github.com/microsoft/vscode
 TERMUX_PKG_DESCRIPTION="Visual Studio Code"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="1.76.2"
+TERMUX_PKG_VERSION="1.77.0"
 TERMUX_PKG_SRCURL=git+https://github.com/microsoft/vscode
 TERMUX_PKG_GIT_BRANCH="$TERMUX_PKG_VERSION"
 TERMUX_PKG_DEPENDS="electron-deps, libx11, libxkbfile, libsecret, ripgrep"
@@ -30,14 +30,20 @@ _setup_nodejs_16() {
 }
 
 termux_step_post_get_source() {
+	# Parse yarn.lock and get native-keymap verion
+	python3 -m venv $TERMUX_PKG_CACHEDIR/venv-dir
+	(. $TERMUX_PKG_CACHEDIR/venv-dir/bin/activate
+	python3 -m pip install pyarn
+	python3 $TERMUX_PKG_BUILDER_DIR/get-version-from-yarn-v1-lockfile.py native-keymap $TERMUX_PKG_SRCDIR/yarn.lock > $TERMUX_PKG_TMPDIR/_native_keymap_verion_info.json)
+
 	# Use custom node-native-keymap
-	local _native_keymap_verion="$(jq -r '.dependencies."native-keymap"' $TERMUX_PKG_SRCDIR/package.json)"
-	local _native_keymap_src_url="https://github.com/microsoft/node-native-keymap/archive/refs/tags/v$_native_keymap_verion.tar.gz"
-	local _native_keymap_sha256sum=2db7ee12cf77e76b66f429f7c6e22a9ab6c76a083452dcaa9f11891e410a3795
+	local _native_keymap_verion="$(jq -r '.version' $TERMUX_PKG_TMPDIR/_native_keymap_verion_info.json)"
+	local _native_keymap_src_url="$(jq -r '.url' $TERMUX_PKG_TMPDIR/_native_keymap_verion_info.json)"
+	local _native_keymap_sha256sum="SKIP_CHECKSUM"
 	local _native_keymap_path="$TERMUX_PKG_CACHEDIR/$(basename $_native_keymap_src_url)"
 	termux_download $_native_keymap_src_url $_native_keymap_path $_native_keymap_sha256sum
-	tar -xf $_native_keymap_path
-	mv node-native-keymap-$_native_keymap_verion node-native-keymap-src
+	mkdir -p $TERMUX_PKG_SRCDIR/node-native-keymap-src
+	tar -xf $_native_keymap_path -C $TERMUX_PKG_SRCDIR/node-native-keymap-src --strip-components=1
 }
 
 termux_step_host_build() {
