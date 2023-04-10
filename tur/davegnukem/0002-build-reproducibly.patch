@@ -1,0 +1,22 @@
+From a99a7290016d3cb49d3d765eeb7492ae9818f76b Mon Sep 17 00:00:00 2001
+From: Matteo Bini <matteobin@tiepi.it>
+Date: Wed, 22 Feb 2023 19:40:10 +0100
+Subject: [PATCH] Build reproducibly
+
+---
+ Makefile | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/Makefile b/Makefile
+index d85f9f1..f5258e2 100644
+--- a/Makefile
++++ b/Makefile
+@@ -32,7 +32,7 @@ CPPFLAGS = -DDATA_DIR=\"$(DATA_DIR)\" -DVERSION=\"'$(VERSION)'\"
+ 
+ CXX = g++
+ 
+-OBJ = $(shell find src -iname '*.cpp' -type f | sed 's/\.cpp$$/.o/')
++OBJ = $(shell find src -iname '*.cpp' -type f | sed 's/\.cpp$$/.o/' | sort)
+ 
+ # debug
+ #CXXFLAGS = -ggdb -DDEBUG -std=c++14 -Wall `sdl2-config --cflags` $(CPPFLAGS)
