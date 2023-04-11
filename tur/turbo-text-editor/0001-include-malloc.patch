@@ -1,0 +1,12 @@
+--- a/deps/tvision/include/tvision/compat/malloc/malloc.h
++++ b/deps/tvision/include/tvision/compat/malloc/malloc.h
+@@ -2,6 +2,9 @@
+ #define TVISION_COMPAT_MALLOC_H
+ 
+ #include <stdlib.h>
++#ifdef __ANDROID__
++#include_next <malloc.h>
++#endif
+ 
+ #if __has_include(<alloca.h>)
+ #include <alloca.h>
