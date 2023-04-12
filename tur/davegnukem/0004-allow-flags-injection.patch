@@ -1,0 +1,77 @@
+From 5e55f41486a72f1ff91f7bd7110f3ad44744470a Mon Sep 17 00:00:00 2001
+From: Matteo Bini <matteobin@tiepi.it>
+Date: Thu, 5 Jan 2023 19:07:14 +0100
+Subject: [PATCH] Change optimization option
+
+---
+ Makefile | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/Makefile b/Makefile
+index 5122873..173b9fd 100644
+--- a/Makefile
++++ b/Makefile
+@@ -35,7 +35,7 @@ OBJ = $(shell find src -iname '*.cpp' -type f | sed 's/\.cpp$$/.o/')
+ 
+ # debug
+ #CXXFLAGS = -ggdb -DDEBUG -std=c++14 -Wall `sdl2-config --cflags` $(CPPFLAGS)
+-CXXFLAGS = -O2 -std=c++14 -Wall `sdl2-config --cflags` $(CPPFLAGS)
++CXXFLAGS = -Os -std=c++14 -Wall `sdl2-config --cflags` $(CPPFLAGS)
+ 
+ all: options davegnukem
+ 
+From 412e590de761fcc903e4b2aa10618d85af1fb0cd Mon Sep 17 00:00:00 2001
+From: Matteo Bini <matteobin@tiepi.it>
+Date: Fri, 24 Feb 2023 12:49:49 +0100
+Subject: [PATCH] Allow flags injection and remove unused CXX var
+
+---
+ Makefile | 20 +++++++++-----------
+ 1 file changed, 9 insertions(+), 11 deletions(-)
+
+diff --git a/Makefile b/Makefile
+index f5258e2..be3e068 100644
+--- a/Makefile
++++ b/Makefile
+@@ -25,32 +25,30 @@ PREFIX   = /usr/local
+ BIN_DIR  = $(PREFIX)/games
+ DATA_DIR = $(PREFIX)/share/games/$(BIN)/# the trailing slash is required for paths in the source
+ 
+-LIBS    = `sdl2-config --libs` -lSDL2_mixer
+-LDFLAGS = $(LIBS)
++LIBS               = `@TERMUX_PREFIX@/bin/sdl2-config --libs` -lSDL2_mixer
++LDFLAGS_DAVEGNUKEM = $(LIBS) $(LDFLAGS)
+ 
+-CPPFLAGS = -DDATA_DIR=\"$(DATA_DIR)\" -DVERSION=\"'$(VERSION)'\"
+-
+-CXX = g++
++CPPFLAGS_DAVEGNUKEM = -DDATA_DIR=\"$(DATA_DIR)\" -DVERSION=\"'$(VERSION)'\" $(CPPFLAGS)
+ 
+ OBJ = $(shell find src -iname '*.cpp' -type f | sed 's/\.cpp$$/.o/' | sort)
+ 
+ # debug
+-#CXXFLAGS = -ggdb -DDEBUG -std=c++14 -Wall `sdl2-config --cflags` $(CPPFLAGS)
+-CXXFLAGS = -Os -std=c++14 -Wall `sdl2-config --cflags` $(CPPFLAGS)
++#CXXFLAGS_DAVEGNUKEM = -ggdb -DDEBUG -std=c++14 -Wall `@TERMUX_PREFIX@/bin/sdl2-config --cflags` $(CPPFLAGS_DAVEGNUKEM) $(CXXFLAGS)
++CXXFLAGS_DAVEGNUKEM = -Os -std=c++14 -Wall `@TERMUX_PREFIX@/bin/sdl2-config --cflags` $(CPPFLAGS_DAVEGNUKEM) $(CXXFLAGS)
+ 
+ all: options davegnukem
+ 
+ options:
+ 	@echo davegnukem build options:
+-	@echo "CXXFLAGS = $(CXXFLAGS)"
+-	@echo "LDFLAGS  = $(LDFLAGS)"
++	@echo "CXXFLAGS = $(CXXFLAGS_DAVEGNUKEM)"
++	@echo "LDFLAGS  = $(LDFLAGS_DAVEGNUKEM)"
+ 	@echo "CXX      = $(CXX)"
+ 
+ %.o: %.cpp
+-	$(CXX) $(CXXFLAGS) -c $< -o $@
++	$(CXX) $(CXXFLAGS_DAVEGNUKEM) -c $< -o $@
+ 
+ davegnukem: $(OBJ)
+-	$(CXX) -o $(BIN) $(OBJ) $(LDFLAGS)
++	$(CXX) -o $(BIN) $(OBJ) $(LDFLAGS_DAVEGNUKEM)
+ 
+ clean:
+ 	rm -f $(BIN) $(BIN)-$(V_NUM).tar.gz

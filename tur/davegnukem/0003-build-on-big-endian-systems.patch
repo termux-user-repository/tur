@@ -1,0 +1,22 @@
+From fb4e79758c4353d592bc3e22c4213b72f9d3229a Mon Sep 17 00:00:00 2001
+From: Matteo Bini <matteobin@tiepi.it>
+Date: Fri, 20 Jan 2023 16:11:40 +0100
+Subject: [PATCH] Build on big-endian systems
+
+---
+ src/sdl/djgraph.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/sdl/djgraph.cpp b/src/sdl/djgraph.cpp
+index 757879b..1c679f0 100644
+--- a/src/sdl/djgraph.cpp
++++ b/src/sdl/djgraph.cpp
+@@ -183,7 +183,7 @@ void djgFlip( djVisual * pVisDest, djVisual * pVisSrc, bool bScaleView )
+ 		//fixme this won't work bigendian
+ 		#if SDL_BYTEORDER==SDL_BIG_ENDIAN
+ 		// Not yet supported for big-endian platforms (dj2019-06)
+-		if (false)
++		if (false);
+ 		#else
+ 		if (g_nSimulatedGraphics>0) //'Simulate' CGA/EGA
+ 		{
