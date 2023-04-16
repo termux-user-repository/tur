@@ -2,7 +2,11 @@
 
 set -e
 
-TERMUX_ARCH="$(dpkg --print-architecture)"
+if [ "$TERMUX_MAIN_PACKAGE_FORMAT" = "debian" ]; then
+	TERMUX_ARCH="$(dpkg --print-architecture)"
+else
+	TERMUX_ARCH="$(pacman-conf Architecture)"
+fi
 TERMUX_PLATFORM="$TERMUX_ARCH-linux-android"
 test $TERMUX_ARCH = "arm" && TERMUX_PLATFORM="${TERMUX_PLATFORM}eabi"
 
