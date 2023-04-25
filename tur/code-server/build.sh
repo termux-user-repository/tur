@@ -3,8 +3,9 @@ TERMUX_PKG_DESCRIPTION="Run VS Code on any machine anywhere and access it in the
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="4.12.0"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=git+https://github.com/coder/code-server
-TERMUX_PKG_DEPENDS="libsecret, nodejs-16, ripgrep"
+TERMUX_PKG_DEPENDS="libandroid-spawn, libsecret, nodejs-16, ripgrep"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_HOSTBUILD=true
 TERMUX_PKG_NO_STATICSPLIT=true
@@ -20,7 +21,7 @@ termux_step_post_get_source() {
 }
 
 _setup_nodejs_16() {
-	local NODEJS_VERSION=16.19.0
+	local NODEJS_VERSION=16.20.0
 	local NODEJS_FOLDER=${TERMUX_PKG_CACHEDIR}/build-tools/nodejs-${NODEJS_VERSION}
 
 	if [ ! -x "$NODEJS_FOLDER/bin/node" ]; then
@@ -28,7 +29,7 @@ _setup_nodejs_16() {
 		local NODEJS_TAR_FILE=$TERMUX_PKG_TMPDIR/nodejs-$NODEJS_VERSION.tar.xz
 		termux_download https://nodejs.org/dist/v${NODEJS_VERSION}/node-v${NODEJS_VERSION}-linux-x64.tar.xz \
 			"$NODEJS_TAR_FILE" \
-			c88b52497ab38a3ddf526e5b46a41270320409109c3f74171b241132984fd08f
+			dff21020b555cc165a1ac36da7d4f6c810b35409c94e00afc51d5d370aae47ae
 		tar -xf "$NODEJS_TAR_FILE" -C "$NODEJS_FOLDER" --strip-components=1
 	fi
 	export PATH=$NODEJS_FOLDER/bin:$PATH
@@ -70,7 +71,11 @@ termux_step_make() {
 	else
 		termux_error_exit "Unsupported arch: $TERMUX_ARCH"
 	fi
-	
+
+	# Create a dummy librt.so
+	rm -f $TERMUX_PREFIX/lib/librt.{so,a}
+	echo "INPUT(-landroid-spawn)" >> $TERMUX_PREFIX/lib/librt.so
+
 	yarn release:standalone
 	mv $TERMUX_PREFIX/bin.bp $TERMUX_PREFIX/bin
 }
@@ -98,4 +103,7 @@ exec $TERMUX_PREFIX/lib/code-server/bin/code-server "\$@"
 
 EOF
 	chmod +x $TERMUX_PREFIX/bin/code-server
+
+	# Remove the dummy librt.so
+	rm -f $TERMUX_PREFIX/lib/librt.so
 }
