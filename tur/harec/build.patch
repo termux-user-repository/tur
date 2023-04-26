@@ -1,0 +1,65 @@
+diff --git a/config.sh b/config.sh
+index 55d73f1..8c1db0a 100644
+--- a/config.sh
++++ b/config.sh
+@@ -205,6 +205,21 @@ run_configure() {
+ 	fi
+ 	append_cflags -DDEFAULT_TARGET="\\\"$DEFAULT_TARGET\\\""
+ 
++	case "$DEFAULT_TARGET" in
++		x86_64)
++			QBE_TARGET=amd64_sysv
++			;;
++		aarch64)
++			QBE_TARGET=arm64
++			;;
++		riscv64)
++			QBE_TARGET=rv64
++			;;
++		*)
++			printf "Error: unsupported or unrecognized architecture %s\n" "$DEFAULT_TARGET"
++			;;
++	esac
++
+ 	printf "Checking for qbe... "
+ 	if $QBE -h > /dev/null 2>&1
+ 	then
+@@ -224,6 +239,7 @@ AR=$AR
+ QBE=$QBE
+ LIBS=$LIBS
+ PREFIX=${PREFIX:-/usr/local}
++QBE_TARGET=$QBE_TARGET
+ OUTDIR=${outdir}
+ SRCDIR=${srcdir}
+ BINDIR=${BINDIR:-\$(PREFIX)/bin}
+diff --git a/rt/Makefile b/rt/Makefile
+index 138a7be..82fc79a 100644
+--- a/rt/Makefile
++++ b/rt/Makefile
+@@ -13,8 +13,8 @@ libhart_srcs+=\
+ libhart.a: harec $(libhart_srcs) $(libhart_objs) $(rtstart)
+ 	@printf 'HAREC\t$@\n'
+ 	@mkdir -p $(HARECACHE)/rt
+-	@./harec -Nrt -t$(HARECACHE)/rt/rt.td -o $@.ssa $(libhart_srcs)
+-	@$(QBE) -o $@.s $@.ssa
++	@$(HOST_HAREC) -Nrt -t$(HARECACHE)/rt/rt.td -o $@.ssa $(libhart_srcs)
++	@$(QBE) -t $(QBE_TARGET) -o $@.s $@.ssa
+ 	@$(AS) -g -o $@.o $@.s
+ 	@$(AR) -csr $@ $@.o $(libhart_objs)
+ 	@rm $@.o $@.s $@.ssa
+diff --git a/rt/configure b/rt/configure
+index ce28c6b..de4d86c 100644
+--- a/rt/configure
++++ b/rt/configure
+@@ -2,8 +2,8 @@
+ all="$all rt"
+ 
+ rt() {
+-	arch=$(uname -m)
+-	case $(uname) in
++	arch=$DEFAULT_TARGET
++	case Linux in
+ 		Linux)
+ 			rtstart=rt/+linux/start+$arch.o
+ 			cat <<-EOF
+
