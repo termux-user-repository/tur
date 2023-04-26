@@ -1,0 +1,88 @@
+diff --git a/Makefile b/Makefile
+index 5fadadc..45f5691 100644
+--- a/Makefile
++++ b/Makefile
+@@ -1,31 +1,40 @@
+ .POSIX:
+ .SUFFIXES: .o .c
+ 
+-PREFIX = /usr/local
++PREFIX?= /usr/local
+ BINDIR = $(PREFIX)/bin
+-
+-COMMOBJ  = main.o util.o parse.o abi.o cfg.o mem.o ssa.o alias.o load.o \
+-           copy.o fold.o simpl.o live.o spill.o rega.o emit.o
+-AMD64OBJ = amd64/targ.o amd64/sysv.o amd64/isel.o amd64/emit.o
+-ARM64OBJ = arm64/targ.o arm64/abi.o arm64/isel.o arm64/emit.o
+-RV64OBJ  = rv64/targ.o rv64/abi.o rv64/isel.o rv64/emit.o
++OUTDIR?=.build
++
++COMMOBJ  = $(OUTDIR)/main.o $(OUTDIR)/util.o $(OUTDIR)/parse.o \
++           $(OUTDIR)/abi.o $(OUTDIR)/cfg.o $(OUTDIR)/mem.o \
++           $(OUTDIR)/ssa.o $(OUTDIR)/alias.o $(OUTDIR)/load.o \
++           $(OUTDIR)/copy.o $(OUTDIR)/fold.o $(OUTDIR)/simpl.o \
++           $(OUTDIR)/live.o $(OUTDIR)/spill.o $(OUTDIR)/rega.o \
++           $(OUTDIR)/emit.o
++AMD64OBJ = $(OUTDIR)/amd64/targ.o $(OUTDIR)/amd64/sysv.o \
++           $(OUTDIR)/amd64/isel.o $(OUTDIR)/amd64/emit.o
++ARM64OBJ = $(OUTDIR)/arm64/targ.o $(OUTDIR)/arm64/abi.o \
++           $(OUTDIR)/arm64/isel.o $(OUTDIR)/arm64/emit.o
++RV64OBJ  = $(OUTDIR)/rv64/targ.o $(OUTDIR)/rv64/abi.o \
++           $(OUTDIR)/rv64/isel.o $(OUTDIR)/rv64/emit.o
+ OBJ      = $(COMMOBJ) $(AMD64OBJ) $(ARM64OBJ) $(RV64OBJ)
+ 
+ SRCALL   = $(OBJ:.o=.c)
+ 
+ CFLAGS = $(CPPFLAGS) -Wall -Wextra -std=c99 -g -Wpedantic
+ 
+-qbe: $(OBJ)
++$(OUTDIR)/qbe: $(OBJ)
+ 	$(CC) $(LDFLAGS) $(OBJ) -o $@
+ 
+-.c.o:
++$(OUTDIR)/%.o: %.c
++	@mkdir -p "$$(dirname $@)"
+ 	$(CC) $(CFLAGS) -c $< -o $@
+ 
+ $(OBJ): all.h ops.h
+ $(AMD64OBJ): amd64/all.h
+ $(ARM64OBJ): arm64/all.h
+ $(RV64OBJ): rv64/all.h
+-main.o: config.h
++$(OUTDIR)/main.o: config.h
+ 
+ config.h:
+ 	@case `uname` in                               \
+@@ -54,26 +63,25 @@ config.h:
+ 		;;                                     \
+ 	esac > $@
+ 
+-install: qbe
++install: $(OUTDIR)/qbe
+ 	mkdir -p "$(DESTDIR)$(BINDIR)"
+-	install -m755 qbe "$(DESTDIR)$(BINDIR)/qbe"
++	install -m755 $(OUTDIR)/qbe "$(DESTDIR)$(BINDIR)/qbe"
+ 
+ uninstall:
+ 	rm -f "$(DESTDIR)$(BINDIR)/qbe"
+ 
+ clean:
+-	rm -f *.o */*.o qbe
++	rm -rf $(OUTDIR)
+ 
+ clean-gen: clean
+-	rm -f config.h
+ 
+-check: qbe
++check: $(OUTDIR)/qbe
+ 	tools/test.sh all
+ 
+-check-arm64: qbe
++check-arm64: $(OUTDIR)/qbe
+ 	TARGET=arm64 tools/test.sh all
+ 
+-check-rv64: qbe
++check-rv64: $(OUTDIR)/qbe
+ 	TARGET=rv64 tools/test.sh all
+ 
+ src:
