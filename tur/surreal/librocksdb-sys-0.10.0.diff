@@ -1,0 +1,13 @@
+--- a/util/compression.h
++++ b/util/compression.h
+@@ -33,9 +33,7 @@
+ #include <snappy.h>
+ #endif
+
+-#ifdef ZLIB
+-#include <zlib.h>
+-#endif
++#include "@TERMUX_PREFIX@/include/zlib.h"
+
+ #ifdef BZIP2
+ #include <bzlib.h>
