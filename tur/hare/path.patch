@@ -1,0 +1,65 @@
+diff --git a/mime/system.ha b/mime/system.ha
+index b3208963..2538c25d 100644
+--- a/mime/system.ha
++++ b/mime/system.ha
+@@ -10,7 +10,7 @@ use os;
+ use strings;
+ 
+ // Path to the system MIME database.
+-export def SYSTEM_DB: str = "/etc/mime.types";
++export def SYSTEM_DB: str = "@TERMUX_PREFIX@/etc/mime.types";
+ 
+ @init fn init() void = {
+ 	// Done in a separate function so we can discard errors here
+@@ -28,7 +28,7 @@ fn load_systemdb() (void | fs::error | io::error) = {
+ 		case let bytes: []u8 =>
+ 			yield match (strings::fromutf8(bytes)) {
+ 			case utf8::invalid =>
+-				fmt::errorln("Warning: /etc/mime.types contains invalid UTF-8")!;
++				fmt::errorln("Warning: @TERMUX_PREFIX@/etc/mime.types contains invalid UTF-8")!;
+ 				io::close(&strm)?;
+ 				io::close(file)?;
+ 				return;
+diff --git a/temp/+linux.ha b/temp/+linux.ha
+index fbde5bb0..3b2deea9 100644
+--- a/temp/+linux.ha
++++ b/temp/+linux.ha
+@@ -13,7 +13,7 @@ use os;
+ use path;
+ use strio;
+ 
+-fn get_tmpdir() str = os::tryenv("TMPDIR", "/tmp");
++fn get_tmpdir() str = os::tryenv("TMPDIR", "@TERMUX_PREFIX@/tmp");
+ 
+ // Creates an unnamed temporary file. The file may or may not have a name; not
+ // all systems support the creation of temporary inodes which are not linked to
+diff --git a/time/chrono/+linux.ha b/time/chrono/+linux.ha
+index cdafe82f..a0b1fb9b 100644
+--- a/time/chrono/+linux.ha
++++ b/time/chrono/+linux.ha
+@@ -2,4 +2,4 @@
+ // (c) 2022 Sebastian <sebastian@sebsite.pw>
+ 
+ def LOCALTIME_PATH: str = "/etc/localtime";
+-def ZONEINFO_PREFIX: str = "/usr/share/zoneinfo/";
++def ZONEINFO_PREFIX: str = "/system/usr/share/zoneinfo/";
+diff --git a/unix/hosts/+linux.ha b/unix/hosts/+linux.ha
+index 69220e9e..fd6f9847 100644
+--- a/unix/hosts/+linux.ha
++++ b/unix/hosts/+linux.ha
+@@ -1,4 +1,4 @@
+ // License: MPL-2.0
+ // (c) 2022 Sebastian <sebastian@sebsite.pw>
+ 
+-def PATH: str = "/etc/hosts";
++def PATH: str = "@TERMUX_PREFIX@/etc/hosts";
+diff --git a/unix/resolvconf/+linux.ha b/unix/resolvconf/+linux.ha
+index d96f585a..5d51af1e 100644
+--- a/unix/resolvconf/+linux.ha
++++ b/unix/resolvconf/+linux.ha
+@@ -1,4 +1,4 @@
+ // License: MPL-2.0
+ // (c) 2022 Sebastian <sebastian@sebsite.pw>
+ 
+-def PATH: str = "/etc/resolv.conf";
++def PATH: str = "@TERMUX_PREFIX@/etc/resolv.conf";

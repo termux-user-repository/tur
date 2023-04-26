@@ -1,0 +1,36 @@
+diff --git a/Makefile b/Makefile
+index 33b7887b..3414735c 100644
+--- a/Makefile
++++ b/Makefile
+@@ -10,7 +10,7 @@ all:
+ .SUFFIXES: .ha .ssa .s .o .scd .1
+ .ssa.s:
+ 	@printf 'QBE\t%s\n' "$@"
+-	@$(QBE) -o $@ $<
++	@$(QBE) $(QBEFLAGS) -o $@ $<
+ 
+ .s.o:
+ 	@printf 'AS\t%s\n' "$@"
+@@ -72,8 +72,8 @@ $(BINOUT)/hare-tests: $(TESTCACHE)/hare.o
+ $(BINOUT)/harec2: $(BINOUT)/hare $(harec_srcs)
+ 	@mkdir -p $(BINOUT)
+ 	@printf 'HARE\t%s\n' "$@"
+-	@env HAREPATH=. HAREC=$(HAREC) QBE=$(QBE) $(BINOUT)/hare build \
+-		$(HARE_DEFINES) -o $(BINOUT)/harec2 cmd/harec
++	@env HAREPATH=. HAREC=$(HAREC) QBE=$(QBE) $(HOST_HARE) build \
++		$(HARE_DEFINES) $(HAREBUILDFLAGS) -o $(BINOUT)/harec2 cmd/harec
+ 
+ # Prevent $(BINOUT)/hare from running builds in parallel, workaround for build
+ # driver bugs
+@@ -82,8 +82,8 @@ PARALLEL_HACK=$(BINOUT)/harec2
+ $(BINOUT)/haredoc: $(BINOUT)/hare $(haredoc_srcs) $(PARALLEL_HACK)
+ 	@mkdir -p $(BINOUT)
+ 	@printf 'HARE\t%s\n' "$@"
+-	@env HAREPATH=. HAREC=$(HAREC) QBE=$(QBE) $(BINOUT)/hare build \
+-		$(HARE_DEFINES) -o $(BINOUT)/haredoc ./cmd/haredoc
++	@env HAREPATH=. HAREC=$(HAREC) QBE=$(QBE) $(HOST_HARE) build \
++		$(HARE_DEFINES) $(HAREBUILDFLAGS) -o $(BINOUT)/haredoc ./cmd/haredoc
+ 
+ docs/html: $(BINOUT)/haredoc scripts/gen-docs.sh
+ 	BINOUT=$(BINOUT) $(SHELL) ./scripts/gen-docs.sh
+

@@ -1,0 +1,91 @@
+diff --git a/os/exec/exec+linux.ha b/os/exec/exec+linux.ha
+index e0e14ced..cd2a2816 100644
+--- a/os/exec/exec+linux.ha
++++ b/os/exec/exec+linux.ha
+@@ -6,6 +6,7 @@ use io;
+ use os;
+ use rt;
+ use strings;
++use strconv;
+ use unix;
+ 
+ export type platform_cmd = io::file;
+@@ -154,9 +155,9 @@ fn platform_exec(cmd: *command) error = {
+ 		os::chdir(cmd.dir)?;
+ 	};
+ 
+-	return errors::errno(rt::execveat(cmd.platform,
+-		"\0", argv: *[*]nullable *const char,
+-		envp: *[*]nullable *const char, rt::AT_EMPTY_PATH));
++	return errors::errno(rt::execve(
++		strings::concat("/proc/self/fd/", strconv::itos(cmd.platform)),
++		argv: *[*]nullable *const char, envp: *[*]nullable *const char));
+ };
+ 
+ fn platform_start(cmd: *command) (process | errors::error) = {
+diff --git a/rt/+linux/stat.ha b/rt/+linux/stat.ha
+index 693cee43..04c74b2a 100644
+--- a/rt/+linux/stat.ha
++++ b/rt/+linux/stat.ha
+@@ -21,7 +21,7 @@ fn fstatat_statx(
+ 	return;
+ };
+ 
+-export fn fstatat(
++fn fstatat_(
+ 	dirfd: int,
+ 	path: path,
+ 	statbuf: *st,
+@@ -48,6 +48,19 @@ export fn fstatat(
+ 	statbuf.ctime.tv_nsec = statxbuf.ctime.tv_nsec: i64;
+ };
+ 
++export fn fstatat(
++	dirfd: int,
++	path: path,
++	statbuf: *st,
++	flags: int,
++) (errno | void) = {
++	let path = kpath(path)?;
++	wrap_return(syscall4(SYS_newfstatat,
++		dirfd: u64, path: uintptr: u64,
++		statbuf: uintptr: u64, flags: u64,
++	))?;
++};
++
+ export fn stat(path: path, statbuf: *st) (errno | void) =
+ 	fstatat(AT_FDCWD, path, statbuf, 0);
+ 
+diff --git a/rt/+linux/syscalls.ha b/rt/+linux/syscalls.ha
+index f417cc1b..fa40e94a 100644
+--- a/rt/+linux/syscalls.ha
++++ b/rt/+linux/syscalls.ha
+@@ -371,25 +371,8 @@ export fn faccessat(
+ 	flags: int,
+ ) (bool | errno) = {
+ 	let path = kpath(path)?;
+-	match (wrap_return(syscall4(SYS_faccessat2, dirfd: u64,
+-			path: uintptr: u64, mode: u64, flags: u64))) {
+-	case let err: errno =>
+-		switch (err) {
+-		case EACCES =>
+-			return false;
+-		case ENOSYS =>
+-			if (flags == 0) {
+-				return faccessat1(dirfd, path, mode);
+-			} else {
+-				return err;
+-			};
+-		case =>
+-			return err;
+-		};
+-	case let n: u64 =>
+-		assert(n == 0);
+-		return true;
+-	};
++	assert(flags == 0);
++	return faccessat1(dirfd, path, mode);
+ };
+ 
+ export fn getdents64(dirfd: int, dirp: *void, count: size) (size | errno) = {
+
