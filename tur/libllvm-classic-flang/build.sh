@@ -1,21 +1,20 @@
 TERMUX_PKG_HOMEPAGE=https://github.com/flang-compiler/classic-flang-llvm-project/
-TERMUX_PKG_DESCRIPTION="Modular compiler and toolchain technologies library (Version 10, Classic Flang Fork)"
+TERMUX_PKG_DESCRIPTION="Modular compiler and toolchain technologies library (Version 15, Classic Flang Fork)"
 TERMUX_PKG_LICENSE="Apache-2.0"
 TERMUX_PKG_LICENSE_FILE="llvm/LICENSE.TXT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-_DATE=2022.05.23
+_DATE=2023.04.19
 TERMUX_PKG_VERSION=${_DATE//./}
-TERMUX_PKG_REVISION=4
-_LLVM_COMMIT=4a566ddfa4157ed1a24920ab7673ccc01c46fd99
+_LLVM_COMMIT=cd736e11b188a8f6ff14041abd818ad86f36b9bb
 TERMUX_PKG_SRCURL=https://github.com/flang-compiler/classic-flang-llvm-project/archive/${_LLVM_COMMIT}.zip
-TERMUX_PKG_SHA256=d390229b7ffa7b1db7b8bf2fe9352b597da801913df8d2dc2e65d27377433d2d
+TERMUX_PKG_SHA256=6a5caa2ccfabf9492443c31762900fc7c945201d43b3a705f31d56256091b109
 TERMUX_PKG_HOSTBUILD=true
 TERMUX_PKG_DEPENDS="binutils-is-llvm, libc++, ncurses, ndk-sysroot, libffi, zlib"
-TERMUX_PKG_SUGGESTS="libandroid-mathlib, classic-flang"
+TERMUX_PKG_SUGGESTS="libandroid-complex-math, classic-flang"
 # XXX: We may add this package later I suppose.
-TERMUX_PKG_PROVIDES="libllvm-10, clang-10, lld-10"
-TERMUX_PKG_REPLACES="libllvm-10, clang-10, lld-10"
-TERMUX_PKG_CONFLICTS="libllvm-10, clang-10, lld-10"
+TERMUX_PKG_PROVIDES="libllvm-15, clang-15, lld-15"
+TERMUX_PKG_REPLACES="libllvm-15, clang-15, lld-15"
+TERMUX_PKG_CONFLICTS="libllvm-15, clang-15, lld-15"
 
 _INSTALL_PREFIX_R="opt/classic-flang"
 _INSTALL_PREFIX="$TERMUX_PREFIX/$_INSTALL_PREFIX_R"
@@ -30,7 +29,7 @@ TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 -DLLVM_INCLUDE_TESTS=OFF
 -DCLANG_DEFAULT_RTLIB=compiler-rt
 -DCLANG_DEFAULT_CXX_STDLIB=libc++
--DCLANG_DEFAULT_LINKER=lld-10
+-DCLANG_DEFAULT_LINKER=lld-15
 -DCLANG_INCLUDE_TESTS=OFF
 -DCLANG_TOOL_C_INDEX_TEST_BUILD=OFF
 -DCOMPILER_RT_USE_BUILTINS_LIBRARY=ON
@@ -62,7 +61,9 @@ termux_step_host_build() {
 	termux_setup_cmake
 	termux_setup_ninja
 
-	cmake -G Ninja "-DLLVM_ENABLE_PROJECTS=clang" $TERMUX_PKG_SRCDIR/llvm
+	cmake -G Ninja "-DCMAKE_BUILD_TYPE=Release" \
+					"-DLLVM_ENABLE_PROJECTS=clang" \
+					$TERMUX_PKG_SRCDIR/llvm
 	ninja -j $TERMUX_MAKE_PROCESSES llvm-tblgen clang-tblgen
 }
 
@@ -99,9 +100,9 @@ termux_step_post_configure() {
 
 termux_step_post_make_install() {
 	ln -sfr $_INSTALL_PREFIX/bin/flang $TERMUX_PREFIX/bin/
-	ln -sfr $_INSTALL_PREFIX/bin/clang-10 $TERMUX_PREFIX/bin/
-	ln -sfr $_INSTALL_PREFIX/bin/lld $_INSTALL_PREFIX/bin/lld-10
-	ln -sfr $_INSTALL_PREFIX/bin/lld $TERMUX_PREFIX/bin/lld-10
-	ln -sfr $_INSTALL_PREFIX/bin/ld.lld $TERMUX_PREFIX/bin/ld.lld-10
-	ln -sfr $_INSTALL_PREFIX/lib/libLLVM-10.so $TERMUX_PREFIX/lib/
+	ln -sfr $_INSTALL_PREFIX/bin/clang-15 $TERMUX_PREFIX/bin/
+	ln -sfr $_INSTALL_PREFIX/bin/lld $_INSTALL_PREFIX/bin/lld-15
+	ln -sfr $_INSTALL_PREFIX/bin/lld $TERMUX_PREFIX/bin/lld-15
+	ln -sfr $_INSTALL_PREFIX/bin/ld.lld $TERMUX_PREFIX/bin/ld.lld-15
+	ln -sfr $_INSTALL_PREFIX/lib/libLLVM-15.so $TERMUX_PREFIX/lib/
 }
