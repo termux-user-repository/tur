@@ -3,9 +3,9 @@ TERMUX_PKG_DESCRIPTION="Python programming language intended to enable clear pro
 TERMUX_PKG_LICENSE="PythonPL"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 _MAJOR_VERSION=3.10
-TERMUX_PKG_VERSION=${_MAJOR_VERSION}.9
+TERMUX_PKG_VERSION=${_MAJOR_VERSION}.11
 TERMUX_PKG_SRCURL=https://www.python.org/ftp/python/${TERMUX_PKG_VERSION}/Python-${TERMUX_PKG_VERSION}.tar.xz
-TERMUX_PKG_SHA256=5ae03e308260164baba39921fdb4dbf8e6d03d8235a939d4582b33f0b5e46a83
+TERMUX_PKG_SHA256=3c3bc3048303721c904a03eb8326b631e921f11cc3be2988456a42f115daf04c
 TERMUX_PKG_DEPENDS="gdbm, libandroid-posix-semaphore, libandroid-support, libbz2, libcrypt, libffi, liblzma, libsqlite, ncurses, ncurses-ui-libs, openssl, readline, zlib"
 TERMUX_PKG_RECOMMENDS="clang, make, pkg-config"
 TERMUX_PKG_SUGGESTS="python${_MAJOR_VERSION}-tkinter"
@@ -42,8 +42,21 @@ lib/python${_MAJOR_VERSION}/*/test
 lib/python${_MAJOR_VERSION}/*/tests
 "
 
+TERMUX_PKG_EXTRA_HOSTBUILD_CONFIGURE_ARGS="
+--prefix=$TERMUX_PREFIX/opt/python$_MAJOR_VERSION/cross
+"
+
+termux_step_host_build() {
+	$TERMUX_PKG_SRCDIR/configure $TERMUX_PKG_EXTRA_HOSTBUILD_CONFIGURE_ARGS
+	make -j $TERMUX_MAKE_PROCESSES
+	make altinstall
+}
+
 termux_step_pre_configure() {
-	export PATH="$TERMUX_PKG_HOSTBUILD_DIR:$PATH"
+	# Remove this marker all the time.
+	rm -rf $TERMUX_HOSTBUILD_MARKER
+
+	export PATH="$TERMUX_PREFIX/opt/python$_MAJOR_VERSION/cross/bin:$PATH"
 	# -O3 gains some additional performance on at least aarch64.
 	CFLAGS="${CFLAGS/-Oz/-O3}"
 	# Needed when building with clang, as setup.py only probes
