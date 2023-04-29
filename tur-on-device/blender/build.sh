@@ -4,11 +4,11 @@ TERMUX_PKG_LICENSE="GPL-2.0"
 TERMUX_PKG_MAINTAINER="@T-Dynamos"
 BLENDER_MAJOR_VERSION=3 
 BLENDER_MINOR_VERSION=6
-BLENDER_VERSION_STAGE=alpha
-TERMUX_PKG_REVISION=2
-TERMUX_PKG_VERSION=${BLENDER_MAJOR_VERSION}.${BLENDER_MINOR_VERSION}-${BLENDER_VERSION_STAGE}
+_COMMIT=d145dfdae0104fbc88f113199fa843e744f30fa3
+_COMMIT_DATE=2023.04.29
+TERMUX_PKG_VERSION=${BLENDER_MAJOR_VERSION}.${BLENDER_MINOR_VERSION}-${_COMMIT:0:8}-${_COMMIT_DATE}
 TERMUX_PKG_SRCURL=git+https://github.com/blender/blender
-TERMUX_PKG_GIT_BRANCH=main
+TERMUX_PKG_GIT_BRANCH=main 
 
 # Blender does not support 32bit
 TERMUX_PKG_BLACKLISTED_ARCHES="arm, i686"
@@ -35,6 +35,17 @@ lib/python$TERMUX_PYTHON_VERSION/site-packages/pip/_vendor/distro/__pycache__/*
 bin/c*
 bin/normalizer
 "
+
+termux_step_post_get_source() {
+    git fetch --unshallow
+	git checkout $_COMMIT
+	local version="$(git log -1 --format=%cs | sed 's/-/./g')"
+	if [ "$version" != "$_COMMIT_DATE" ]; then
+		echo -n "ERROR: The specified version \"$TERMUX_PKG_VERSION\""
+		echo " is different from what is expected to be: \"$version\""
+		return 1
+	fi
+}
 
 termux_step_pre_configure(){
     # ld.lld: error: undefined symbol: backtrace
