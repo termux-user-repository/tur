@@ -1,6 +1,6 @@
 # Termux User Repository (TUR)
 
-Sounds like Archlinux User repository aka AUR ? TUR functioning mechanism is bit different. Instead of building packages in device that too in android is quite hectic work for user. 
+Sounds like Archlinux User repository aka AUR? TUR functioning mechanism is bit different. Instead of building packages in device that too in android is quite hectic work for user. 
 So TUR saves resources and time since user could install pre-compiled package. 
 
 ## Subscribe TUR
@@ -15,7 +15,7 @@ NOTE: TUR's apt repository is consist of many components. `tur`, `tur-on-device`
 ## Request
 *Request to all TUR users.*
 
-Please don't Discuss/Open issues about any of TUR packages in Termux Offical forum. TUR packages are not Termux official packages so any discussion just waste time of Termux maintainters. Users are free to discuss/open isuess here. 
+Please don't Discuss/Open issues about any of TUR packages in Termux Offical forum. TUR packages are not Termux official packages so any discussion just waste time of Termux maintainters. Users are free to discuss/open issues here. 
 
 ## Contribution
 
