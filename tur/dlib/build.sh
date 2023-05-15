@@ -2,10 +2,9 @@ TERMUX_PKG_HOMEPAGE=http://dlib.net/
 TERMUX_PKG_DESCRIPTION="a modern C++ toolkit containing machine learning algorithms and tools for creating complex software in C++ to solve real world problems"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION=19.24
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_VERSION=19.24.2
 TERMUX_PKG_SRCURL=https://github.com/davisking/dlib/archive/refs/tags/v$TERMUX_PKG_VERSION.tar.gz
-TERMUX_PKG_SHA256=3cc42e84c7b1bb926c6451a21ad1595f56c5b10be3a1d7aa2f3c716a25b7ae39
+TERMUX_PKG_SHA256=0f5c7e3de6316a513635052c5f0a16a84e1cef26a7d233bf00c21348462b6d6f
 TERMUX_PKG_DEPENDS="libx11, libxcb, libopenblas, python"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_AUTO_UPDATE=true
@@ -20,14 +19,7 @@ termux_step_pre_configure() {
 		termux_error_exit "Package '$TERMUX_PKG_NAME' is not available for on-device builds."
 	fi
 
-	termux_setup_python_crossenv
-	pushd $TERMUX_PYTHON_CROSSENV_SRCDIR
-	_CROSSENV_PREFIX=$TERMUX_PKG_BUILDDIR/python-crossenv-prefix
-	python${_PYTHON_VERSION} -m crossenv \
-		$TERMUX_PREFIX/bin/python${_PYTHON_VERSION} \
-		${_CROSSENV_PREFIX}
-	popd
-	. ${_CROSSENV_PREFIX}/bin/activate
+	termux_setup_python_pip
 
 	LDFLAGS+=" -lpython${_PYTHON_VERSION}"
 	build-pip install wheel
