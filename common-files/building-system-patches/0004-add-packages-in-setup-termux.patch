@@ -6,8 +6,8 @@ Add some dependencies required by TUR-on-Device.
  PACKAGES+=" zip"
  
 +# Tier 3: requirements for community repos.
-+PACKAGES+=" tur-repo"
-+PACKAGES+=" x11-repo"
++PACKAGES+=" tur-repo x11-repo"
++PACKAGES+=" ndk-multilib-native-stubs"
 +echo "" >> /system/etc/static-dns-hosts.txt
 +echo "# Community TUR Repo" >> /system/etc/static-dns-hosts.txt
 +echo "tur.kcubeterm.com" >> /system/etc/static-dns-hosts.txt
