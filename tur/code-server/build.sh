@@ -3,7 +3,7 @@ TERMUX_PKG_DESCRIPTION="Run VS Code on any machine anywhere and access it in the
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="4.12.0"
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_REVISION=2
 TERMUX_PKG_SRCURL=git+https://github.com/coder/code-server
 TERMUX_PKG_DEPENDS="libandroid-spawn, libsecret, nodejs-16, ripgrep"
 TERMUX_PKG_BUILD_IN_SRC=true
@@ -82,6 +82,9 @@ termux_step_make() {
 }
 
 termux_step_make_install() {
+	# Replace version
+	npm version --prefix release-standalone "$VERSION"
+
 	# Remove some pre-built binaries (currently nodejs and ripgrep) whose target is not Android
 	rm ./release-standalone/lib/node
 	rm ./release-standalone/lib/vscode/node_modules/@vscode/ripgrep/bin/rg
