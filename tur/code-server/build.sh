@@ -42,9 +42,8 @@ termux_step_host_build() {
 	env -i PATH="$PATH" sudo apt install -yq libxkbfile-dev libsecret-1-dev
 	_setup_nodejs_16
 	npm install yarn
-	export PATH="$(npm bin):$PATH"
-	cp -Rf $TERMUX_PKG_SRCDIR ./
-	cd src
+	export PATH="$TERMUX_PKG_HOSTBUILD_DIR/node_modules/.bin:$PATH"
+	cd $TERMUX_PKG_SRCDIR
 	yarn --frozen-lockfile
 	yarn build
 	yarn build:vscode
@@ -53,13 +52,15 @@ termux_step_host_build() {
 }
 
 termux_step_configure() {
+	# Remove this marker all the time
+	rm -rf $TERMUX_HOSTBUILD_MARKER
+
 	_setup_nodejs_16
 	export PATH="$TERMUX_PKG_HOSTBUILD_DIR/node_modules/.bin:$PATH"
 }
 
 termux_step_make() {
 	export VERSION=$TERMUX_PKG_VERSION
-	cp -Rf $TERMUX_PKG_HOSTBUILD_DIR/src/release ./
 	mv $TERMUX_PREFIX/bin $TERMUX_PREFIX/bin.bp
 
 	if [ $TERMUX_ARCH = "arm" ]; then
