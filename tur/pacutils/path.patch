@@ -31,7 +31,7 @@ index 61674bd..fffac40 100644
      NULL
    };
  
-@@ -599,7 +595,7 @@ void find_backups(alpm_handle_t *handle, alpm_list_t **backups) {
+@@ -595,10 +595,10 @@
  }
  
  void scan_filesystem(alpm_handle_t *handle, int backups, int orphans) {
@@ -39,4 +39,8 @@ index 61674bd..fffac40 100644
 +  char *base_dir = "@TERMUX_PREFIX@/etc/";
    alpm_list_t *orphans_found = NULL, *backups_found = NULL;
    if (backups > 1 || orphans) {
-     base_dir = "/";
+-    base_dir = "/";
++    base_dir = "@TERMUX_BASE_DIR@/";
+   } else {
+     find_backups(handle, &backups_found);
+   }
