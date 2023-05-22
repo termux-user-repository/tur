@@ -1,7 +1,7 @@
 Add some dependencies required by TUR-on-Device.
 --- a/scripts/setup-termux.sh
 +++ b/scripts/setup-termux.sh
-@@ -45,13 +45,27 @@
+@@ -45,13 +45,29 @@
  PACKAGES+=" xmlto"                      # Needed by git's manpage generation
  PACKAGES+=" zip"
  
@@ -13,6 +13,8 @@ Add some dependencies required by TUR-on-Device.
 +echo "tur.kcubeterm.com" >> /system/etc/static-dns-hosts.txt
 +echo "turdl.kcubeterm.com" >> /system/etc/static-dns-hosts.txt
 +echo "termux-user-repository.github.io"  >> /system/etc/static-dns-hosts.txt
++echo "crates.io"  >> /system/etc/static-dns-hosts.txt
++echo "static.crates.io"  >> /system/etc/static-dns-hosts.txt
 +
  # Definition of a package manager
  . $(dirname "$(realpath "$0")")/properties.sh
