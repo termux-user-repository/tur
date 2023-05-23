@@ -5,6 +5,7 @@ TERMUX_PKG_LICENSE_FILE="llvm/LICENSE.TXT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 _DATE=2023.04.19
 TERMUX_PKG_VERSION=${_DATE//./}
+
 _LLVM_COMMIT=cd736e11b188a8f6ff14041abd818ad86f36b9bb
 TERMUX_PKG_SRCURL=https://github.com/flang-compiler/classic-flang-llvm-project/archive/${_LLVM_COMMIT}.zip
 TERMUX_PKG_SHA256=6a5caa2ccfabf9492443c31762900fc7c945201d43b3a705f31d56256091b109
