@@ -1,6 +1,16 @@
 diff -uNr a/runtime/flangrti/tempnam.c b/runtime/flangrti/tempnam.c
 --- a/runtime/flangrti/tempnam.c
 +++ b/runtime/flangrti/tempnam.c
+@@ -11,7 +11,9 @@
+ 
+ /* This is really defined in stdio.h.  But we don't use the real stdio.h */
+ 
++#ifndef P_tmpdir
+ #define P_tmpdir "/tmp"
++#endif
+ 
+ extern unsigned long strlen(const char *);
+ /* FIXME: #include <stdlib.h> , may have to keep externs for Windows */
 @@ -64,7 +64,7 @@
  static char *
  gentmp(char *dir, char *pfx)

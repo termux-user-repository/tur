@@ -1,0 +1,18 @@
+--- a/runtime/libpgmath/lib/common/mth_intrinsics.h.orig
++++ b/runtime/libpgmath/lib/common/mth_intrinsics.h
+@@ -18,6 +18,15 @@
+ extern "C" {
+ #endif
+ 
++#if !defined(__cplusplus) && defined(__ANDROID__) && __ANDROID_API__ < 26
++double complex clog(double complex __x);
++float complex clogf(float complex __x);
++long double complex clogl(long double complex __x);
++double complex cpow(double complex __x, double complex __z);
++float complex cpowf(float complex __x, float complex __z);
++long double complex cpowl(long double complex __x, long double complex __z);
++#endif
++
+ /*
+  * Real.
+  */

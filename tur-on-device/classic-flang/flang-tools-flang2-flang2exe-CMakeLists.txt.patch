@@ -1,0 +1,11 @@
+--- a/tools/flang2/flang2exe/CMakeLists.txt.orig
++++ b/tools/flang2/flang2exe/CMakeLists.txt
+@@ -134,7 +134,7 @@
+   )
+ 
+ if (NOT MSVC)
+-  target_link_libraries(flang2 PRIVATE m)
++  target_link_libraries(flang2 PRIVATE m android-complex-math)
+ endif()
+ 
+ add_dependencies(flang2

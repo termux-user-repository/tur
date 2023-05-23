@@ -1,0 +1,15 @@
+--- a/lib/scutil/host-fp-folding.c.orig
++++ b/lib/scutil/host-fp-folding.c
+@@ -28,6 +28,12 @@
+ #include <mmintrin.h>
+ #endif
+ 
++#if defined(__ANDROID__) && __ANDROID_API__ < 26
++double complex cpow(double complex __x, double complex __z);
++float complex cpowf(float complex __x, float complex __z);
++long double complex cpowl(long double complex __x, long double complex __z);
++#endif
++
+ /*
+  *  Build-time sanity checks
+  */
