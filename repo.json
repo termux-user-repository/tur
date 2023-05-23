@@ -1,10 +1,50 @@
 {
-    "packages": { "name" : "termux-main", "distribution" : "stable" },
-    "tur":      { "name" : "tur",         "distribution" : "stable" },
-    "tur-on-device":  { "name": "tur-on-device",   "distribution" : "unstable" },
-    "tur-hacking":    { "name" : "tur-hacking",    "distribution" : "hacking" },
-    "tur-continuous": { "name" : "tur-continuous", "distribution" : "continuous" },
-    "tur-multilib":   { "name" : "tur-multilib",   "distribution" : "multilib" },
-    "root-packages":  { "name" : "termux-root",    "distribution" : "root" },
-    "x11-packages":   { "name" : "termux-x11",     "distribution" : "x11" }
+  "packages": {
+    "name": "termux-main",
+    "distribution": "stable",
+    "component": "main",
+    "url": "https://packages-cf.termux.dev/apt/termux-main"
+  },
+  "tur": {
+    "name": "tur",
+    "distribution": "tur-packages",
+    "component": "tur",
+    "url": "https://tur.kcubeterm.com"
+  },
+  "tur-on-device": {
+    "name": "tur-on-device",
+    "distribution": "tur-packages",
+    "component": "tur-on-device",
+    "url": "https://tur.kcubeterm.com"
+  },
+  "tur-hacking": {
+    "name": "tur-hacking",
+    "distribution": "tur-packages",
+    "component": "tur-hacking",
+    "url": "https://tur.kcubeterm.com"
+  },
+  "tur-continuous": {
+    "name": "tur-continuous",
+    "distribution": "tur-packages",
+    "component": "tur-continuous",
+    "url": "https://tur.kcubeterm.com"
+  },
+  "tur-multilib": {
+    "name": "tur-multilib",
+    "distribution": "tur-packages",
+    "component": "tur-multilib",
+    "url": "https://tur.kcubeterm.com"
+  },
+  "root-packages": {
+    "name": "termux-root",
+    "distribution": "root",
+    "component": "stable",
+    "url": "https://packages-cf.termux.dev/apt/termux-root"
+  },
+  "x11-packages": {
+    "name": "termux-x11",
+    "distribution": "x11",
+    "component": "main",
+    "url": "https://packages-cf.termux.dev/apt/termux-x11"
+  }
 }
