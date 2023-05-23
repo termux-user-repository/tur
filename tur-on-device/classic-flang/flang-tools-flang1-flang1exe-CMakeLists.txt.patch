@@ -1,0 +1,11 @@
+--- a/tools/flang1/flang1exe/CMakeLists.txt.orig
++++ b/tools/flang1/flang1exe/CMakeLists.txt
+@@ -161,7 +161,7 @@
+   )
+ 
+ if (NOT MSVC)
+-  target_link_libraries(flang1 PRIVATE m)
++  target_link_libraries(flang1 PRIVATE m android-complex-math)
+ endif()
+ 
+ # Install flang1 executable
