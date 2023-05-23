@@ -12,6 +12,11 @@ Once `tur-repo` successfully installed. TUR packages can be install with pkg or 
 
 NOTE: TUR's apt repository is consist of many components. `tur`, `tur-on-device` and `tur-continuous` are avaiable by default. If you want to subscribe other components in TUR, please add them manually.
 
+TUR also hosts a PyPI index and contains some prebuilt Python packages.
+```
+python -m pip install some_packages --extra-index-url https://termux-user-repository.github.io/pypi/
+```
+
 ## Request
 *Request to all TUR users.*
 
