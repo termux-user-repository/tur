@@ -37,3 +37,15 @@
  }
  
  ToolChain::RuntimeLibType Linux::GetDefaultRuntimeLibType() const {
+@@ -899,7 +899,11 @@
+ bool Linux::isPIEDefault(const llvm::opt::ArgList &Args) const {
+   // TODO: Remove the special treatment for Flang once its frontend driver can
+   // generate position independent code.
++#ifdef ENABLE_CLASSIC_FLANG
++  return true &&
++#else
+   return !getDriver().IsFlangMode() &&
++#endif
+          (CLANG_DEFAULT_PIE_ON_LINUX || getTriple().isAndroid() ||
+           getTriple().isMusl() || getSanitizerArgs(Args).requiresPIE());
+ }
