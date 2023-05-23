@@ -229,18 +229,27 @@ jobs:
       with:
         name: debs-${{ matrix.target_arch }}-${{ github.sha }}
         path: ./artifacts
-    - name: Upload to temporary release.
-      if: github.event_name != 'pull_request'
-      run: | 
-          for i in ./artifacts/*;do
-            gh release upload -R https://github.com/termux-user-repository/tur "0.1" $i
-            echo "$i  uploaded"
-          done
-  trigeer:
-    runs-on: ubuntu-22.04
+
+  upload:
     if: github.event_name != 'pull_request'
     needs: build
+    runs-on: ubuntu-latest
     steps:
+    - name: Clone repository
+      uses: actions/checkout@v3
+    - name: Get *.deb files
+      uses: actions/download-artifact@v3
+      with:
+        path: ./
+    - name: Upload to a temporary release
+      env:
+       GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+      run: |
+        GITHUB_SHA=${{ github.sha }}
+        for archive in debs-*/debs-{aarch64,arm,i686,x86_64}-${{ github.sha }}.tar; do
+          gh release upload -R https://github.com/termux-user-repository/tur "0.1" $archive
+          echo "$archive  uploaded"
+        done
     - name: Trigger workflow in dists repository
       env:
         GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
@@ -249,3 +258,4 @@ jobs:
         REPO: "dists"
       run: |
         curl -d "{\"event_type\": \"${EVENT}\"}" -H "Content-Type: application/json" -H "Authorization: token ${GITHUB_TOKEN}" -H "Accept: application/vnd.github.everest-preview+json" "https://api.github.com/repos/${ORG}/${REPO}/dispatches"
+
