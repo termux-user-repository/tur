@@ -5,7 +5,6 @@ TERMUX_PKG_MAINTAINER="@nacho00112"
 TERMUX_PKG_VERSION=1.1.1
 TERMUX_PKG_SRCURL=https://github.com/nacho00112/android-webdrivers/archive/refs/heads/main.zip
 TERMUX_PKG_SHA256=0c75217771b2d04b5a23a3e1103ccede229cac8ae251ca32e34f5efd1f68138d
-TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_BUILD_IN_SRC=true
 
 SELEDROID_APP_SHARED=$TERMUX_PREFIX/share/seledroid-app
