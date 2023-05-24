@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="Library providing functions for manipulating Unicode str
 TERMUX_PKG_LICENSE="LGPL-3.0, GPL-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION=1.1
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://mirrors.kernel.org/gnu/libunistring/libunistring-${TERMUX_PKG_VERSION}.tar.xz
 TERMUX_PKG_SHA256=827c1eb9cb6e7c738b171745dac0888aa58c5924df2e59239318383de0729b98
 TERMUX_PKG_DEPENDS="lib32-libandroid-support, lib32-libiconv"
@@ -19,6 +20,7 @@ am_cv_langinfo_codeset=yes
 "
 
 TERMUX_PKG_RM_AFTER_INSTALL="
+share/doc/libunistring
 share/info
 share/man
 "
