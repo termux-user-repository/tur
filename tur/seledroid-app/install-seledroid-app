@@ -1,0 +1,132 @@
+#!/data/data/com.termux/files/usr/bin/bash
+
+SHARED_SELEDROID_APP="$PREFIX/share/seledroid-app"
+SELEDROID_VERSION=$(cat $SHARED_SELEDROID_APP/VERSION)
+SELEDROID_APK="$SHARED_SELEDROID_APP/Chromium-$SELEDROID_VERSION.apk"
+install_seledroid_app_usage() {
+    echo "usage: install-seledroid-app [--help|-h|--version|-v]"
+    echo
+    echo "Installer of the SeleDroid APP from $SELEDROID_APK"
+    echo
+
+    echo "  --help,    -h    Print this help message and exit."
+    echo "  --version, -v    Print the SeleDroid APP version and exit."
+    exit
+}
+INSTALL_SELEDROID_APP_ARGS="$*"
+parse_install_seledroid_app_args(){
+    local ARGS="$INSTALL_SELEDROID_APP_ARGS"
+    if [ "$ARGS" ]; then
+        if [ "$ARGS" = "--help" ] || [ "$ARGS" = "-h" ]; then
+            install_seledroid_app_usage
+        else if [ "$ARGS" = "--version" ] || [ "$ARGS" = "-v" ]; then
+            echo $SELEDROID_VERSION
+            exit
+        else
+            echo "Invalid arguments \`$ARGS\`"
+            install_seledroid_app_usage
+        fi; fi
+    fi
+}
+
+log() {
+    echo "install-seledroid-app: $*"
+}
+
+printflog() {
+    printf "install-seledroid-app: $*"
+}
+
+internal_error() {
+    log "internal error:" $*
+    exit 1
+}
+
+get_user_confirmation(){
+    while true; do
+        local APK_SIZE=$(du $SELEDROID_APK --human-readable | cut -f1)
+        log "You are nearly to install the SeleDroid APP $SELEDROID_APK of $APK_SIZE""B"","
+        log "it is needed for use with python-seledroid and python-selenium-is-seledroid,"
+        log "you may need to enable the option \"Allow installation from unknown sources\" in your phone security settings,"
+        log "during the installation allow-external-apps will be enabled in ~/.termux/termux.properties,"
+        log "once the installation finish allow-external-apps will be restored to his original configuration,"
+        printflog "do you want to continue? type y (yes) or n (no): "
+        read install_seledroid
+        if [ "$install_seledroid" = y ]; then
+            break
+        else if [ "$install_seledroid" = n ]; then 
+            exit
+        else
+            log "The input must be y (yes) or n (no)"
+        fi; fi
+    done
+    echo
+}
+
+ALLOW_EXTERNAL_APPS_ENABLED=false
+termux_enable_allow_external_apps(){
+    log "Temporarily enabling allow-external-apps in ~/.termux/termux.properties..."
+    # saves the configuration to restore it later
+    ALLOW_EXTERNAL_APPS=$(cat ~/.termux/termux.properties | grep "^allow-external-apps *= *true")
+    if [ "$ALLOW_EXTERNAL_APPS" ]; then
+        log "original: allow-external-apps = true"
+    else
+        log "original: allow-external-apps = false"
+
+    fi
+    sed -i "s/^#* *allow-external-apps *=.*/allow-external-apps = true/g" ~/.termux/termux.properties
+    ALLOW_EXTERNAL_APPS_ENABLED=true
+}
+
+check_seledroid_installation(){
+    printf "install-seledroid-app: Checking if the SeleDroid APP is installed... "
+    if [ -d "/data/app/com.luanon.chromium-1" ]; then
+        echo yes
+        exit
+    else
+        echo no
+    fi
+}
+
+install_seledroid_apk() {
+    if [ ! -f "$SELEDROID_APK" ]; then
+        internal_error "can't find the Seledroid APP APK at $SELEDROID_APK"
+    fi
+    termux-open $SELEDROID_APK
+}
+
+wait_seledroid_installation() {
+    echo "install-seledroid-app: Waiting for the SeleDroid APP installation to continue... "
+    while true; do
+        if [ -d "/data/app/com.luanon.chromium-1" ]; then
+            break
+        fi 
+    done
+}
+
+termux_properties_restore(){
+    if [ $ALLOW_EXTERNAL_APPS_ENABLED = false ]; then
+        internal_error "termux_properties_restore called before termux_enable_allow_external_apps"
+    fi
+    echo "install-seledroid-app: Restoring original allow-external-apps configuration in ~/.termux/termux.properties... "
+    if [ ! "$ALLOW_EXTERNAL_APPS" ]; then
+        sed -i "s/^#* *allow-external-apps *=.*/# allow-external-apps = true/g" ~/.termux/termux.properties
+    fi
+}
+
+# DIVIDED INTO FUNCTION STEPS FOR READABILITY AND REUSABILITY
+
+parse_install_seledroid_app_args
+
+check_seledroid_installation
+
+get_user_confirmation
+
+termux_enable_allow_external_apps
+
+install_seledroid_apk
+
+wait_seledroid_installation
+
+termux_properties_restore
+
