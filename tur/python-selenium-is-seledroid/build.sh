@@ -8,7 +8,6 @@ TERMUX_PKG_VERSION=4.8.2
 TERMUX_PKG_REVISION=1
 TERMUX_PKG_DEPENDS="python, python-seledroid"
 TERMUX_PKG_SETUP_PYTHON=true
-TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_BUILD_IN_SRC=true
 
 termux_step_get_source() {
