@@ -32,7 +32,7 @@ _setup_multilib_toolchain() {
 
 	if [ "$TERMUX_ON_DEVICE_BUILD" = "false" ]; then
 		export CC_FOR_BUILD=gcc
-		export PKG_CONFIG=$TERMUX_STANDALONE_TOOLCHAIN/bin/pkg-config
+		export PKG_CONFIG=$TERMUX_PKG_TMPDIR/multilib-toolchain-bin/pkg-config
 		export PKGCONFIG=$PKG_CONFIG
 		LDFLAGS+=" -Wl,-rpath=$TERMUX_PREFIX/$TUR_MULTILIB_ARCH_TRIPLE/lib"
 	else
