@@ -36,6 +36,7 @@ TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 
 termux_step_pre_configure() {
 	termux_setup_cmake
+	termux_setup_meson
 
 	CPPFLAGS+=" -D__USE_GNU"
 	LDFLAGS+=" -landroid-shmem -ltinfo"
@@ -49,6 +50,9 @@ termux_step_pre_configure() {
 		chmod 0700 $_WRAPPER_BIN/cmake
 	fi
 	export PATH=$_WRAPPER_BIN:$PATH
+
+	# Revert this commit on meson as it breaks custom llvm
+	(cat $TERMUX_PKG_BUILDER_DIR/9999-meson-89146e84c9eab649d3847af101d61047cac45765.diff | patch -d $(dirname $TERMUX_MESON) -p1 -R) || true
 }
 
 termux_step_post_configure() {

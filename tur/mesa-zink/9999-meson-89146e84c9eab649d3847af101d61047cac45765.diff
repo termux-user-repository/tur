@@ -1,0 +1,457 @@
+From 89146e84c9eab649d3847af101d61047cac45765 Mon Sep 17 00:00:00 2001
+From: Konstantin <ria.freelander@gmail.com>
+Date: Fri, 15 Jul 2022 15:46:31 +0300
+Subject: [PATCH] cmake: allow dynamic linking with LLVM
+
+llvm-config is unsuitable for standard cross-compile,
+because we need to build llvm especially for it, which
+is not done is almost any distros, so, for example,
+standard bootstrap chroot will be unsuitable.
+
+This patch is trying to acheive feature parity between
+config-tool searching of LLVM and CMake-based one,
+which is arch-agnostic.
+
+Signed-off-by: Konstantin <ria.freelander@gmail.com>
+---
+ .../dependencies/data/CMakeListsLLVM.txt      | 150 +++++++++++++++---
+ mesonbuild/dependencies/dev.py                |  43 ++++-
+ test cases/frameworks/15 llvm/meson.build     | 120 +++++++++-----
+ .../frameworks/15 llvm/meson_options.txt      |   2 +-
+ test cases/frameworks/15 llvm/test.json       |   8 +-
+ 5 files changed, 250 insertions(+), 73 deletions(-)
+
+diff --git a/mesonbuild/dependencies/data/CMakeListsLLVM.txt b/mesonbuild/dependencies/data/CMakeListsLLVM.txt
+index da23189b7d3..f12dddc0ed5 100644
+--- a/mesonbuild/dependencies/data/CMakeListsLLVM.txt
++++ b/mesonbuild/dependencies/data/CMakeListsLLVM.txt
+@@ -1,8 +1,24 @@
++# fail noisily if attempt to use this file without setting:
++# cmake_minimum_required(VERSION ${CMAKE_VERSION})
++# project(... LANGUAGES ...)
++
++cmake_policy(SET CMP0000 NEW)
+ 
+ set(PACKAGE_FOUND FALSE)
+ 
++list(REMOVE_DUPLICATES LLVM_MESON_VERSIONS)
++
+ while(TRUE)
+-  find_package(LLVM REQUIRED CONFIG QUIET)
++  #Activate CMake version selection
++  foreach(i IN LISTS LLVM_MESON_VERSIONS)
++    find_package(LLVM ${i}
++      CONFIG
++      NAMES ${LLVM_MESON_PACKAGE_NAMES}
++      QUIET)
++    if(LLVM_FOUND)
++      break()
++    endif()
++  endforeach()
+ 
+   # ARCHS has to be set via the CMD interface
+   if(LLVM_FOUND OR "${ARCHS}" STREQUAL "")
+@@ -13,9 +29,70 @@ while(TRUE)
+   list(REMOVE_AT ARCHS 0)
+ endwhile()
+ 
++function(meson_llvm_cmake_dynamic_available mod out)
++  # Check if we can only compare LLVM_DYLIB_COMPONENTS, because
++  # we do not need complex component translation logic, if all
++  # is covered by one variable
++  if(mod IN_LIST LLVM_DYLIB_COMPONENTS)
++    set(${out} TRUE PARENT_SCOPE)
++    return()
++  elseif((NOT (mod IN_LIST LLVM_DYLIB_COMPONENTS))
++      AND (NOT("${LLVM_DYLIB_COMPONENTS}" STREQUAL "all")))
++    set(${out} FALSE PARENT_SCOPE)
++    return()
++  endif()
++
++  # Complex heurisic to filter all pseudo-components and skip invalid names
++  # LLVM_DYLIB_COMPONENTS will be 'all', because in other case we returned
++  # in previous check. 'all' is also handled there.
++  set(llvm_pseudo_components "native" "backend" "engine" "all-targets")
++  is_llvm_target_specifier(${mod} mod_spec INCLUDED_TARGETS)
++  string(TOUPPER "${LLVM_AVAILABLE_LIBS}" capitalized_libs)
++  string(TOUPPER "${LLVM_TARGETS_TO_BUILD}" capitalized_tgts)
++  if(mod_spec)
++    set(${out} TRUE PARENT_SCOPE)
++  elseif(mod IN_LIST capitalized_tgts)
++    set(${out} TRUE PARENT_SCOPE)
++  elseif(mod IN_LIST llvm_pseudo_components)
++    set(${out} TRUE PARENT_SCOPE)
++  elseif(LLVM${mod} IN_LIST capitalized_libs)
++    set(${out} TRUE PARENT_SCOPE)
++  else()
++    set(${out} FALSE PARENT_SCOPE)
++  endif()
++endfunction()
++
++function(is_static target ret)
++  if(TARGET ${target})
++    get_target_property(target_type ${target} TYPE)
++    if(target_type STREQUAL "STATIC_LIBRARY")
++      set(${ret} TRUE PARENT_SCOPE)
++      return()
++    endif()
++  endif()
++  set(${ret} FALSE PARENT_SCOPE)
++endfunction()
++
++# Concatenate LLVM_MESON_REQUIRED_MODULES and LLVM_MESON_OPTIONAL_MODULES
++set(LLVM_MESON_MODULES ${LLVM_MESON_REQUIRED_MODULES} ${LLVM_MESON_OPTIONAL_MODULES})
++
++
++# Check if LLVM exists in dynamic world
++# Initialization before modules checking
+ if(LLVM_FOUND)
+-  set(PACKAGE_FOUND TRUE)
++  if(LLVM_MESON_DYLIB AND TARGET LLVM)
++    set(PACKAGE_FOUND TRUE)
++  elseif(NOT LLVM_MESON_DYLIB)
++    # Use LLVMSupport to check if static targets exist
++    set(static_tg FALSE)
++    is_static(LLVMSupport static_tg)
++    if(static_tg)
++      set(PACKAGE_FOUND TRUE)
++    endif(static_tg)
++  endif()
++endif()
+ 
++if(PACKAGE_FOUND)
+   foreach(mod IN LISTS LLVM_MESON_MODULES)
+     # Reset variables
+     set(out_mods)
+@@ -25,23 +102,53 @@ if(LLVM_FOUND)
+     string(TOLOWER "${mod}" mod_L)
+     string(TOUPPER "${mod}" mod_U)
+ 
+-    # Get the mapped components
+-    llvm_map_components_to_libnames(out_mods ${mod} ${mod_L} ${mod_U})
+-    list(SORT              out_mods)
+-    list(REMOVE_DUPLICATES out_mods)
+-
+-    # Make sure that the modules exist
+-    foreach(i IN LISTS out_mods)
+-      if(TARGET ${i})
+-        list(APPEND real_mods ${i})
+-      endif()
+-    endforeach()
+-
+-    # Set the output variables
+-    set(MESON_LLVM_TARGETS_${mod} ${real_mods})
+-    foreach(i IN LISTS real_mods)
+-      set(MESON_TARGET_TO_LLVM_${i} ${mod})
+-    endforeach()
++    # Special case - "all-targets" pseudo target
++    # Just append all targets, if pseudo-target exists
++    if("${mod}" STREQUAL "all-targets")
++      set(mod_L  ${LLVM_TARGETS_TO_BUILD})
++      string(TOUPPER "${LLVM_TARGETS_TO_BUILD}" mod_U)
++    endif()
++
++    # Check if required module is linked is inside libLLVM.so.
++    # If not, skip this module
++    if(LLVM_MESON_DYLIB
++       AND DEFINED LLVM_DYLIB_COMPONENTS)
++        meson_llvm_cmake_dynamic_available(${mod} MOD_F)
++        meson_llvm_cmake_dynamic_available(${mod_L} MOD_L_F)
++        meson_llvm_cmake_dynamic_available(${mod_U} MOD_U_F)
++        if(MOD_F OR MOD_L_F OR MOD_U_F)
++          set(MESON_LLVM_TARGETS_${mod} LLVM)
++        endif()
++    elseif(LLVM_MESON_DYLIB AND (mod IN_LIST LLVM_MESON_REQUIRED_MODULES))
++      # Dynamic was requested, but no required variables set, we cannot continue
++      set(PACKAGE_FOUND FALSE)
++      break()
++    elseif(LLVM_MESON_DYLIB)
++      # Dynamic was requested, and we request optional modules only. Continue
++      continue()
++    else()
++      # CMake only do this for static components, and we
++      # replicate its behaviour
++      # Get the mapped components
++      llvm_map_components_to_libnames(out_mods ${mod} ${mod_L} ${mod_U})
++      list(SORT              out_mods)
++      list(REMOVE_DUPLICATES out_mods)
++
++      # Make sure that the modules exist
++      foreach(i IN LISTS out_mods)
++        set(static_tg FALSE)
++        is_static(${i} static_tg)
++        if(static_tg)
++          list(APPEND real_mods ${i})
++        endif()
++      endforeach()
++
++      # Set the output variables
++      set(MESON_LLVM_TARGETS_${mod} ${real_mods})
++      foreach(i IN LISTS real_mods)
++        set(MESON_TARGET_TO_LLVM_${i} ${mod})
++      endforeach()
++    endif()
+   endforeach()
+ 
+   # Check the following variables:
+@@ -62,7 +169,10 @@ if(LLVM_FOUND)
+   # LLVM_LIBRARIES
+   # LLVM_LIBS
+   set(libs)
+-  if(DEFINED LLVM_LIBRARIES)
++  #Hardcode LLVM, because we links with libLLVM.so when dynamic
++  if(LLVM_MESON_DYLIB)
++    get_target_property(libs LLVM IMPORTED_LOCATION)
++  elseif(DEFINED LLVM_LIBRARIES)
+     set(libs LLVM_LIBRARIES)
+   elseif(DEFINED LLVM_LIBS)
+     set(libs LLVM_LIBS)
+diff --git a/mesonbuild/dependencies/dev.py b/mesonbuild/dependencies/dev.py
+index de711e59ec9..a9b768b18d1 100644
+--- a/mesonbuild/dependencies/dev.py
++++ b/mesonbuild/dependencies/dev.py
+@@ -24,12 +24,13 @@
+ import shutil
+ import subprocess
+ import typing as T
++import functools
+ 
+ from mesonbuild.interpreterbase.decorators import FeatureDeprecated
+ 
+ from .. import mesonlib, mlog
+ from ..environment import get_llvm_tool_names
+-from ..mesonlib import version_compare, stringlistify, extract_as_list
++from ..mesonlib import version_compare, version_compare_many, search_version, stringlistify, extract_as_list
+ from .base import DependencyException, DependencyMethods, detect_compiler, strip_system_libdirs, SystemDependency, ExternalDependency, DependencyTypeName
+ from .cmake import CMakeDependency
+ from .configtool import ConfigToolDependency
+@@ -418,14 +419,15 @@ def __init__(self, name: str, env: 'Environment', kwargs: T.Dict[str, T.Any]) ->
+ 
+         super().__init__(name, env, kwargs, language='cpp', force_use_global_compilers=True)
+ 
+-        # Cmake will always create a statically linked binary, so don't use
+-        # cmake if dynamic is required
+-        if not self.static:
+-            self.is_found = False
+-            mlog.warning('Ignoring LLVM CMake dependency because dynamic was requested', fatal=False)
++        if self.traceparser is None:
+             return
+ 
+-        if self.traceparser is None:
++        if not self.is_found:
++            return
++
++        #CMake will return not found due to not defined LLVM_DYLIB_COMPONENTS
++        if not self.static and version_compare(self.version, '< 7.0') and self.llvm_modules:
++            mlog.warning('Before version 7.0 cmake does not export modules for dynamic linking, cannot check required modules')
+             return
+ 
+         # Extract extra include directories and definitions
+@@ -444,8 +446,33 @@ def _main_cmake_file(self) -> str:
+         # Use a custom CMakeLists.txt for LLVM
+         return 'CMakeListsLLVM.txt'
+ 
++    # Check version in CMake to return exact version as config tool (latest allowed)
++    # It is safe to add .0 to latest argument, it will discarded if we use search_version
++    def llvm_cmake_versions(self) -> T.List[str]:
++
++        def ver_from_suf(req: str) -> str:
++            return search_version(req.strip('-')+'.0')
++
++        def version_sorter(a: str, b: str) -> int:
++            if version_compare(a, "="+b):
++                return 0
++            if version_compare(a, "<"+b):
++                return 1
++            return -1
++
++        llvm_requested_versions = [ver_from_suf(x) for x in get_llvm_tool_names('') if version_compare(ver_from_suf(x), '>=0')]
++        if self.version_reqs:
++            llvm_requested_versions = [ver_from_suf(x) for x in get_llvm_tool_names('') if version_compare_many(ver_from_suf(x), self.version_reqs)]
++        # CMake sorting before 3.18 is incorrect, sort it here instead
++        return sorted(llvm_requested_versions, key=functools.cmp_to_key(version_sorter))
++
++    # Split required and optional modules to distinguish it in CMake
+     def _extra_cmake_opts(self) -> T.List[str]:
+-        return ['-DLLVM_MESON_MODULES={}'.format(';'.join(self.llvm_modules + self.llvm_opt_modules))]
++        return ['-DLLVM_MESON_REQUIRED_MODULES={}'.format(';'.join(self.llvm_modules)),
++                '-DLLVM_MESON_OPTIONAL_MODULES={}'.format(';'.join(self.llvm_opt_modules)),
++                '-DLLVM_MESON_PACKAGE_NAMES={}'.format(';'.join(get_llvm_tool_names(self.name))),
++                '-DLLVM_MESON_VERSIONS={}'.format(';'.join(self.llvm_cmake_versions())),
++                '-DLLVM_MESON_DYLIB={}'.format('OFF' if self.static else 'ON')]
+ 
+     def _map_module_list(self, modules: T.List[T.Tuple[str, bool]], components: T.List[T.Tuple[str, bool]]) -> T.List[T.Tuple[str, bool]]:
+         res = []
+diff --git a/test cases/frameworks/15 llvm/meson.build b/test cases/frameworks/15 llvm/meson.build
+index 3855fae33b3..c8485fb6856 100644
+--- a/test cases/frameworks/15 llvm/meson.build	
++++ b/test cases/frameworks/15 llvm/meson.build	
+@@ -2,50 +2,92 @@ project('llvmtest', ['c', 'cpp'], default_options : ['c_std=c99'])
+ 
+ method = get_option('method')
+ static = get_option('link-static')
+-d = dependency('llvm', required : false, method : method, static : static)
+-if not d.found()
+-  error('MESON_SKIP_TEST llvm not found.')
+-endif
+ 
+-d = dependency('llvm', modules : 'not-found', required : false, static : static, method : method)
+-assert(d.found() == false, 'not-found llvm module found')
++if(method == 'combination')
++  d = dependency('llvm', version : static ? '>0.1' : '>=7.0', required : false, static : static)
++  if not d.found()
++    error('MESON_SKIP_TEST llvm not found or llvm version is too low')
++  endif
++  llvm_ct_dep = dependency(
++    'llvm',
++    modules : ['bitwriter', 'asmprinter', 'executionengine', 'target',
++              'mcjit', 'nativecodegen', 'amdgpu', 'engine'],
++    required : false,
++    static : static,
++    method : 'config-tool',
++  )
++  llvm_cm_dep = dependency(
++    'llvm',
++    modules : ['bitwriter', 'asmprinter', 'executionengine', 'target',
++              'mcjit', 'nativecodegen', 'amdgpu', 'engine'],
++    required : false,
++    static : static,
++    method : 'cmake',
++  )
++  assert(llvm_ct_dep.found() == llvm_cm_dep.found(), 'config-tool and cmake results differ')
++  cm_version_major = llvm_cm_dep.version().split('.')[0].to_int()
++  cm_version_minor = llvm_cm_dep.version().split('.')[1].to_int()
++  ct_version_major = llvm_ct_dep.version().split('.')[0].to_int()
++  ct_version_minor = llvm_ct_dep.version().split('.')[1].to_int()
++  assert(cm_version_major == ct_version_major, 'config-tool and cmake returns different major versions')
++  assert(cm_version_minor == ct_version_minor, 'config-tool and cmake returns different minor versions')
++else
++  d = dependency('llvm', required : false, method : method, static : static)
++  if not d.found()
++    error('MESON_SKIP_TEST llvm not found.')
++  endif
+ 
+-d = dependency('llvm', version : '<0.1', required : false, static : static, method : method)
+-assert(d.found() == false, 'ancient llvm module found')
++  if(not static and method == 'cmake')
++    d = dependency('llvm', version : '>=7.0', required : false, static : static)
++    if not d.found()
++      error('MESON_SKIP_TEST llvm version is too low for cmake dynamic link.')
++    endif
++  endif
+ 
+-d = dependency('llvm', optional_modules : 'not-found', required : false, static : static, method : method)
+-assert(d.found() == true, 'optional module stopped llvm from being found.')
++  d = dependency('llvm', modules : 'not-found', required : false, static : static, method : method)
++  assert(d.found() == false, 'not-found llvm module found')
+ 
+-# Check we can apply a version constraint
+-d = dependency('llvm', version : ['< 500', '>=@0@'.format(d.version())], required: false, static : static, method : method)
+-assert(d.found() == true, 'Cannot set version constraints')
++  d = dependency('llvm', version : '<0.1', required : false, static : static, method : method)
++  assert(d.found() == false, 'ancient llvm module found')
+ 
+-dep_tinfo = dependency('tinfo', required : false)
+-if not dep_tinfo.found()
+-  cpp = meson.get_compiler('cpp')
+-  dep_tinfo = cpp.find_library('tinfo', required: false)
+-endif
++  d = dependency('llvm', optional_modules : 'not-found', required : false, static : static, method : method)
++  assert(d.found() == true, 'optional module stopped llvm from being found.')
+ 
+-llvm_dep = dependency(
+-  'llvm',
+-  modules : ['bitwriter', 'asmprinter', 'executionengine', 'target',
+-             'mcjit', 'nativecodegen', 'amdgpu'],
+-  required : false,
+-  static : static,
+-  method : method,
+-)
+-
+-if not llvm_dep.found()
+-  error('MESON_SKIP_TEST required llvm modules not found.')
+-endif
++  # Check we can apply a version constraint
++  d = dependency('llvm', version : ['< 500', '>=@0@'.format(d.version())], required: false, static : static, method : method)
++  assert(d.found() == true, 'Cannot set version constraints')
+ 
+-executable(
+-    'sum',
+-    'sum.c',
+-    dependencies : [
+-      llvm_dep, dep_tinfo,
+-      # zlib will be statically linked on windows
+-      dependency('zlib', required : host_machine.system() != 'windows'),
+-      meson.get_compiler('c').find_library('dl', required : false),
+-    ]
++  # Check if we have to get pseudo components
++  d = dependency('llvm', modules: ['all-targets','native','engine'], required: false, static : static, method : method)
++  assert(d.found() == true, 'Cannot find pseudo components')
++
++  dep_tinfo = dependency('tinfo', required : false)
++  if not dep_tinfo.found()
++    cpp = meson.get_compiler('cpp')
++    dep_tinfo = cpp.find_library('tinfo', required: false)
++  endif
++
++  llvm_dep = dependency(
++    'llvm',
++    modules : ['bitwriter', 'asmprinter', 'executionengine', 'target',
++              'mcjit', 'nativecodegen', 'amdgpu'],
++    required : false,
++    static : static,
++    method : method,
+   )
++
++  if not llvm_dep.found()
++    error('MESON_SKIP_TEST required llvm modules not found.')
++  endif
++
++  executable(
++      'sum',
++      'sum.c',
++      dependencies : [
++        llvm_dep, dep_tinfo,
++        # zlib will be statically linked on windows
++        dependency('zlib', required : host_machine.system() != 'windows'),
++        meson.get_compiler('c').find_library('dl', required : false),
++      ]
++    )
++endif
+diff --git a/test cases/frameworks/15 llvm/meson_options.txt b/test cases/frameworks/15 llvm/meson_options.txt
+index de3d172c40f..8730c484e1f 100644
+--- a/test cases/frameworks/15 llvm/meson_options.txt	
++++ b/test cases/frameworks/15 llvm/meson_options.txt	
+@@ -1,7 +1,7 @@
+ option(
+   'method',
+   type : 'combo',
+-  choices : ['config-tool', 'cmake']
++  choices : ['config-tool', 'cmake', 'combination']
+ )
+ option(
+   'link-static',
+diff --git a/test cases/frameworks/15 llvm/test.json b/test cases/frameworks/15 llvm/test.json
+index e70edd5ff21..b39844d7381 100644
+--- a/test cases/frameworks/15 llvm/test.json	
++++ b/test cases/frameworks/15 llvm/test.json	
+@@ -3,16 +3,14 @@
+     "options": {
+       "method": [
+         { "val": "config-tool", "skip_on_jobname": ["msys2-gcc"]},
+-        { "val": "cmake", "skip_on_jobname": ["msys2-gcc"] }
++        { "val": "cmake", "skip_on_jobname": ["msys2-gcc"] },
++        { "val": "combination", "skip_on_jobname": ["msys2-gcc"]}
+       ],
+       "link-static": [
+         { "val": true, "skip_on_jobname": ["opensuse"] },
+         { "val": false }
+       ]
+-    },
+-    "exclude": [
+-      { "method": "cmake", "link-static": false }
+-    ]
++    }
+   },
+   "skip_on_jobname": ["azure", "cygwin"]
+ }
