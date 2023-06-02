@@ -1,39 +1,5 @@
 TERMUX_SUBPKG_INCLUDE="
-bin/clang
-$_INSTALL_PREFIX_R/bin/analyze-build
-$_INSTALL_PREFIX_R/bin/c++
-$_INSTALL_PREFIX_R/bin/cc
-$_INSTALL_PREFIX_R/bin/*clang*
-$_INSTALL_PREFIX_R/bin/*cpp
-$_INSTALL_PREFIX_R/bin/diagtool
-$_INSTALL_PREFIX_R/bin/find-all-symbols
-$_INSTALL_PREFIX_R/bin/*g++
-$_INSTALL_PREFIX_R/bin/*gcc
-$_INSTALL_PREFIX_R/bin/git-clang-format
-$_INSTALL_PREFIX_R/bin/hmaptool
-$_INSTALL_PREFIX_R/bin/intercept-build
-$_INSTALL_PREFIX_R/bin/modularize
-$_INSTALL_PREFIX_R/bin/pp-trace
-$_INSTALL_PREFIX_R/bin/scan-*
-$_INSTALL_PREFIX_R/include/clang*
-$_INSTALL_PREFIX_R/include/omp*.h
-$_INSTALL_PREFIX_R/lib/clang/*/include/*.h
-$_INSTALL_PREFIX_R/lib/clang/*/include/*.modulemap
-$_INSTALL_PREFIX_R/lib/clang/*/include/cuda_wrappers/
-$_INSTALL_PREFIX_R/lib/clang/*/include/openmp_wrappers/
-$_INSTALL_PREFIX_R/lib/clang/*/include/ppc_wrappers/
-$_INSTALL_PREFIX_R/lib/cmake/clang
-$_INSTALL_PREFIX_R/lib/cmake/openmp
-$_INSTALL_PREFIX_R/lib/libclang*so
-$_INSTALL_PREFIX_R/lib/libear/
-$_INSTALL_PREFIX_R/lib/libomp.a
-$_INSTALL_PREFIX_R/lib/libscanbuild/
-$_INSTALL_PREFIX_R/libexec/
-$_INSTALL_PREFIX_R/share/clang
-$_INSTALL_PREFIX_R/share/man/man1/clang.1.gz
-$_INSTALL_PREFIX_R/share/man/man1/diagtool.1.gz
-$_INSTALL_PREFIX_R/share/man/man1/scan-*
-$_INSTALL_PREFIX_R/share/scan-*
+$_INSTALL_PREFIX_R/.placeholder-clang-16
 "
 TERMUX_SUBPKG_DESCRIPTION="C language frontend for LLVM"
-TERMUX_SUBPKG_DEPENDS="libcompiler-rt-16, lld-16, llvm-16, ndk-sysroot"
+TERMUX_SUBPKG_DEPENDS="libcompiler-rt-16, lld-16, llvm-16, ndk-sysroot, clang"
