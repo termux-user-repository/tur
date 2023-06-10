@@ -1,0 +1,29 @@
+diff -uNr hashcat-6.2.6/deps/unrar/ulinks.cpp hashcat-6.2.6.mod/deps/unrar/ulinks.cpp
+--- hashcat-6.2.6/deps/unrar/ulinks.cpp	2022-09-02 22:58:13.000000000 +0800
++++ hashcat-6.2.6.mod/deps/unrar/ulinks.cpp	2023-06-09 17:46:21.304997465 +0800
+@@ -22,14 +22,14 @@
+     }
+     return false;
+   }
+-#ifdef USE_LUTIMES
+-#ifdef UNIX_TIME_NS
++//#ifdef UNIX_TIME_NS
+   timespec times[2];
+   times[0].tv_sec=fta->GetUnix();
+   times[0].tv_nsec=fta->IsSet() ? long(fta->GetUnixNS()%1000000000) : UTIME_NOW;
+   times[1].tv_sec=ftm->GetUnix();
+   times[1].tv_nsec=ftm->IsSet() ? long(ftm->GetUnixNS()%1000000000) : UTIME_NOW;
+   utimensat(AT_FDCWD,LinkNameA,times,AT_SYMLINK_NOFOLLOW);
++/*
+ #else
+   struct timeval tv[2];
+   tv[0].tv_sec=fta->GetUnix();
+@@ -38,7 +38,7 @@
+   tv[1].tv_usec=long(ftm->GetUnixNS()%1000000000/1000);
+   lutimes(LinkNameA,tv);
+ #endif
+-#endif
++*/
+ 
+   return true;
+ }
