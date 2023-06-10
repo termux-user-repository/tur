@@ -1,0 +1,58 @@
+diff -uNr hashcat-6.2.6/src/Makefile hashcat-6.2.6.mod/src/Makefile
+--- hashcat-6.2.6/src/Makefile	2022-09-02 22:58:13.000000000 +0800
++++ hashcat-6.2.6.mod/src/Makefile	2023-06-10 13:56:11.705443712 +0800
+@@ -5,13 +5,13 @@
+ 
+ SHARED                  ?= 0
+ DEBUG                   := 0
+-PRODUCTION              := 1
++PRODUCTION              := 0
+ PRODUCTION_VERSION      := v6.2.6
+ ENABLE_CUBIN            ?= 1
+ ENABLE_BRAIN            ?= 1
+ ENABLE_UNRAR            ?= 1
+-USE_SYSTEM_LZMA         ?= 0
+-USE_SYSTEM_ZLIB         ?= 0
++USE_SYSTEM_LZMA         := 0
++USE_SYSTEM_ZLIB         := 0
+ USE_SYSTEM_OPENCL       ?= 0
+ USE_SYSTEM_XXHASH       ?= 0
+ ## do not change, requires some hacks
+@@ -59,8 +59,8 @@
+ ## Native compiler paths
+ ##
+ 
+-CC                      := gcc
+-CXX                     := g++
++CC                      ?= clang
++CXX                     ?= g++
+ AR                      := ar
+ FIND                    := find
+ INSTALL                 := install
+@@ -104,7 +104,7 @@
+ DESTDIR                 ?=
+ PREFIX                  ?= /usr/local
+ 
+-INSTALL_FOLDER          ?= $(PREFIX)/bin
++INSTALL_FOLDER          ?= $(PREFIX)/opt/hashcat/bin
+ SHARED_ROOT_FOLDER      ?= $(PREFIX)/share
+ SHARED_FOLDER           ?= $(SHARED_ROOT_FOLDER)/hashcat
+ DOCUMENT_FOLDER         ?= $(SHARED_ROOT_FOLDER)/doc/hashcat
+@@ -264,6 +264,8 @@
+ endif
+ endif
+ 
++CFLAGS                  += -I@TERMUX_PREFIX@/include
++CFLAGS                  += -I../deps/LZMA-SDK/C
+ CFLAGS                  += -pipe -Iinclude/ -IOpenCL/
+ 
+ # LZMA
+@@ -706,7 +708,7 @@
+ ## Compiler paths
+ ##
+ 
+-CC_LINUX                := gcc
++CC_LINUX                := clang
+ CXX_LINUX               := g++
+ CC_WIN                  := x86_64-w64-mingw32-gcc
+ CXX_WIN                 := x86_64-w64-mingw32-g++

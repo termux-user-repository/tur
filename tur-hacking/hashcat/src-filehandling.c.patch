@@ -1,0 +1,20 @@
+diff -uNr hashcat-6.2.6/src/filehandling.c hashcat-6.2.6.mod/src/filehandling.c
+--- hashcat-6.2.6/src/filehandling.c	2022-09-02 22:58:13.000000000 +0800
++++ hashcat-6.2.6.mod/src/filehandling.c	2023-06-10 13:44:52.585443971 +0800
+@@ -10,11 +10,11 @@
+ #include "shared.h"
+ #include "filehandling.h"
+ 
+-#include <Alloc.h>
+-#include <7zCrc.h>
+-#include <7zFile.h>
+-#include <Xz.h>
+-#include <XzCrc64.h>
++#include "../deps/LZMA-SDK/C/Alloc.h"
++#include "../deps/LZMA-SDK/C/7zCrc.h"
++#include "../deps/LZMA-SDK/C/7zFile.h"
++#include "../deps/LZMA-SDK/C/Xz.h"
++#include "../deps/LZMA-SDK/C/XzCrc64.h"
+ 
+ /* Maybe _LZMA_NO_SYSTEM_SIZE_T defined? */
+ #if defined (__clang__) || defined (__GNUC__)
