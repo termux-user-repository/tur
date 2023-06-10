@@ -1,0 +1,125 @@
+--- a/src/smartdns.c
++++ b/src/smartdns.c
+@@ -47,8 +47,8 @@
+ #include <ucontext.h>
+ 
+ #define MAX_KEY_LEN 64
+-#define SMARTDNS_PID_FILE "/run/smartdns.pid"
+-#define SMARTDNS_LEGACY_PID_FILE "/var/run/smartdns.pid"
++#define SMARTDNS_PID_FILE "@TERMUX_PREFIX@/var/run/smartdns.pid"
++#define SMARTDNS_LEGACY_PID_FILE "@TERMUX_PREFIX@/var/run/smartdns.pid"
+ #define TMP_BUFF_LEN_32 32
+ 
+ static int verbose_screen;
+--- a/src/dns_conf.h
++++ b/src/dns_conf.h
+@@ -57,13 +57,13 @@
+ #define DEFAULT_DNS_TLS_PORT 853
+ #define DEFAULT_DNS_HTTPS_PORT 443
+ #define DNS_MAX_CONF_CNAME_LEN 256
+-#define SMARTDNS_CONF_FILE "/etc/smartdns/smartdns.conf"
+-#define SMARTDNS_LOG_FILE "/var/log/smartdns/smartdns.log"
+-#define SMARTDNS_AUDIT_FILE "/var/log/smartdns/smartdns-audit.log"
+-#define SMARTDNS_CACHE_FILE "/var/cache/smartdns/smartdns.cache"
+-#define SMARTDNS_TMP_CACHE_FILE "/tmp/smartdns.cache"
+-#define SMARTDNS_DEBUG_DIR "/tmp/smartdns"
+-#define DNS_RESOLV_FILE "/etc/resolv.conf"
++#define SMARTDNS_CONF_FILE "@TERMUX_PREFIX@/etc/smartdns/smartdns.conf"
++#define SMARTDNS_LOG_FILE "@TERMUX_PREFIX@/var/log/smartdns/smartdns.log"
++#define SMARTDNS_AUDIT_FILE "@TERMUX_PREFIX@/var/log/smartdns/smartdns-audit.log"
++#define SMARTDNS_CACHE_FILE "@TERMUX_PREFIX@/var/cache/smartdns/smartdns.cache"
++#define SMARTDNS_TMP_CACHE_FILE "@TERMUX_PREFIX@/tmp/smartdns.cache"
++#define SMARTDNS_DEBUG_DIR "@TERMUX_PREFIX@/tmp/smartdns"
++#define DNS_RESOLV_FILE "@TERMUX_PREFIX@/etc/resolv.conf"
+ 
+ enum domain_rule {
+ 	DOMAIN_RULE_FLAGS = 0,
+--- a/src/dns_client.c
++++ b/src/dns_client.c
+@@ -937,8 +937,8 @@
+ 
+ 		const STACK_OF(X509_NAME) *cas = SSL_CTX_get_client_CA_list(ssl_ctx);
+ 		if (cas && sk_X509_NAME_num(cas) == 0) {
+-			cafile = "/etc/ssl/certs/ca-certificates.crt";
+-			capath = "/etc/ssl/certs";
++			cafile = "@TERMUX_PREFIX@/etc/ssl/certs/ca-certificates.crt";
++			capath = "@TERMUX_PREFIX@/etc/ssl/certs";
+ 			cert_path_set = 0;
+ 		}
+ 	}
+--- a/src/tlog.c
++++ b/src/tlog.c
+@@ -1726,7 +1726,7 @@
+     char *save_ptr = NULL;
+ 
+     if (env_path == NULL) {
+-        env_path = "/bin:/usr/bin:/usr/local/bin";
++        env_path = "@TERMUX_PREFIX@/bin:/system/bin";
+     }
+ 
+     copy_path = strdup(env_path);
+--- a/etc/smartdns/smartdns.conf
++++ b/etc/smartdns/smartdns.conf
+@@ -51,7 +51,7 @@
+ #    bind [::]:53
+ #    bind [::]:53@eth0
+ #    bind-tcp [::]:53
+-bind [::]:53
++bind [::]:8053
+ 
+ # tcp connection idle timeout
+ # tcp-idle-time [second]
+@@ -66,7 +66,7 @@
+ # cache-persist no
+ 
+ # cache persist file
+-# cache-file /tmp/smartdns.cache
++# cache-file @TERMUX_PREFIX@/tmp/smartdns.cache
+ 
+ # cache persist time
+ # cache-checkpoint-time [second]
+@@ -155,7 +155,7 @@
+ # log-num: number of logs, 0 means disable log
+ log-level info
+ 
+-# log-file /var/log/smartdns/smartdns.log
++# log-file @TERMUX_PREFIX@/var/log/smartdns/smartdns.log
+ # log-size 128k
+ # log-num 2
+ # log-file-mode [mode]: file mode of log file.
+@@ -165,22 +165,22 @@
+ # audit-enable yes
+ # audit-SOA [yes|no]: enable or disable log soa result.
+ # audit-size size of each audit file, support k,m,g
+-# audit-file /var/log/smartdns-audit.log
++# audit-file @TERMUX_PREFIX@/var/log/smartdns-audit.log
+ # audit-console [yes|no]: output audit log to console.
+ # audit-file-mode [mode]: file mode of audit file.
+ # audit-size 128k
+ # audit-num 2
+ 
+ # Support reading dnsmasq dhcp file to resolve local hostname
+-# dnsmasq-lease-file /var/lib/misc/dnsmasq.leases
++# dnsmasq-lease-file @TERMUX_PREFIX@/var/lib/misc/dnsmasq.leases
+ 
+ # certificate file
+ # ca-file [file]
+-# ca-file /etc/ssl/certs/ca-certificates.crt
++# ca-file @TERMUX_PREFIX@/etc/ssl/certs/ca-certificates.crt
+ 
+ # certificate path
+ # ca-path [path]
+-# ca-path /etc/ss/certs
++# ca-path @TERMUX_PREFIX@/etc/ss/certs
+ 
+ # remote udp dns server list
+ # server [IP]:[PORT]|URL [-blacklist-ip] [-whitelist-ip] [-check-edns] [-group [group] ...] [-exclude-default-group]
+@@ -310,7 +310,7 @@
+ #   [-f] -file [path/to/set]: file path of domain set
+ # 
+ # example:
+-# domain-set -name domain-list -type list -file /etc/smartdns/domain-list.conf
++# domain-set -name domain-list -type list -file @TERMUX_PREFIX@/etc/smartdns/domain-list.conf
+ # address /domain-set:domain-list/1.2.3.4
+ # nameserver /domain-set:domain-list/server-group
+ # ipset /domain-set:domain-list/ipset

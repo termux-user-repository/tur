@@ -1,0 +1,18 @@
+--- a/src/smartdns.c
++++ b/src/smartdns.c
+@@ -103,6 +103,7 @@
+ 
+ static int drop_root_privilege(void)
+ {
++#ifndef __ANDROID__
+ 	struct __user_cap_data_struct cap[2];
+ 	struct __user_cap_header_struct header;
+ #ifdef _LINUX_CAPABILITY_VERSION_3
+@@ -137,6 +138,7 @@
+ 	}
+ 
+ 	prctl(PR_SET_KEEPCAPS, 0, 0, 0, 0);
++#endif
+ 	return 0;
+ }
+ 

@@ -1,0 +1,12 @@
+--- a/Makefile
++++ b/Makefile
+@@ -39,9 +39,6 @@
+ 	$(RM) $(SMARTDNS_SYSTEMD)
+ 
+ install: SMARTDNS_BIN 
+-	install -v -m 0640 -D -t $(DESTDIR)$(SYSCONFDIR)/default etc/default/smartdns
+-	install -v -m 0755 -D -t $(DESTDIR)$(SYSCONFDIR)/init.d etc/init.d/smartdns
+ 	install -v -m 0640 -D -t $(DESTDIR)$(SYSCONFDIR)/smartdns etc/smartdns/smartdns.conf
+ 	install -v -m 0755 -D -t $(DESTDIR)$(SBINDIR) src/smartdns
+-	install -v -m 0644 -D -t $(DESTDIR)$(SYSTEMDSYSTEMUNITDIR) systemd/smartdns.service
+ 
