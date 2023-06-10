@@ -1,0 +1,17 @@
+diff -uNr hashcat-6.2.6/include/ext_lzma.h hashcat-6.2.6.mod/include/ext_lzma.h
+--- hashcat-6.2.6/include/ext_lzma.h	2022-09-02 22:58:13.000000000 +0800
++++ hashcat-6.2.6.mod/include/ext_lzma.h	2023-06-10 13:33:27.533099084 +0800
+@@ -6,10 +6,10 @@
+ #ifndef _EXT_LZMA_H
+ #define _EXT_LZMA_H
+ 
+-#include <LzmaDec.h>
+-#include <Lzma2Dec.h>
++#include "../deps/LZMA-SDK/C/LzmaDec.h"
++#include "../deps/LZMA-SDK/C/Lzma2Dec.h"
+ 
+-#include "minizip/unzip.h"
++#include "../deps/zlib/contrib/minizip/unzip.h"
+ 
+ int hc_lzma1_decompress (const unsigned char *in, SizeT *in_len, unsigned char *out, SizeT *out_len, const char *props);
+ int hc_lzma2_decompress (const unsigned char *in, SizeT *in_len, unsigned char *out, SizeT *out_len, const char *props);

@@ -1,0 +1,67 @@
+diff -uNr hashcat-6.2.6/deps/unrar/makefile hashcat-6.2.6.mod/deps/unrar/makefile
+--- hashcat-6.2.6/deps/unrar/makefile	2022-09-02 22:58:13.000000000 +0800
++++ hashcat-6.2.6.mod/deps/unrar/makefile	2023-06-09 17:51:21.024997351 +0800
+@@ -8,7 +8,6 @@
+ DEFINES=-D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -DRAR_SMP
+ STRIP=strip
+ AR=ar
+-LDFLAGS=-pthread
+ DESTDIR=/usr
+ 
+ # Linux using LCC
+diff -uNr hashcat-6.2.6/src/Makefile hashcat-6.2.6.mod/src/Makefile
+--- hashcat-6.2.6/src/Makefile	2022-09-02 22:58:13.000000000 +0800
++++ hashcat-6.2.6.mod/src/Makefile	2023-06-09 17:48:38.664997413 +0800
+@@ -309,10 +309,10 @@
+ CFLAGS_NATIVE           := $(CFLAGS)
+ CFLAGS_NATIVE           += -DWITH_HWMON
+ LFLAGS_NATIVE           := $(LFLAGS)
+-LFLAGS_NATIVE           += -lpthread
+ LFLAGS_NATIVE           += -ldl
+ LFLAGS_NATIVE           += -lrt
+ LFLAGS_NATIVE           += -lm
++LFLAGS_NATIVE           += -liconv
+ endif # Linux
+ 
+ ifeq ($(UNAME),FreeBSD)
+@@ -346,7 +346,6 @@
+ LFLAGS_NATIVE           += -framework Foundation
+ LFLAGS_NATIVE           += -framework IOKit
+ LFLAGS_NATIVE           += -framework Metal
+-LFLAGS_NATIVE           += -lpthread
+ LFLAGS_NATIVE           += -liconv
+ 
+ ifeq ($(IS_APPLE_SILICON),1)
+@@ -735,7 +734,7 @@
+ CFLAGS_CROSS_WIN        += -D__USE_MINGW_ANSI_STDIO=0
+ 
+ LFLAGS_CROSS_LINUX      := $(LFLAGS)
+-LFLAGS_CROSS_LINUX      += -lpthread
++# LFLAGS_CROSS_LINUX      += -lpthread
+ LFLAGS_CROSS_LINUX      += -ldl
+ LFLAGS_CROSS_LINUX      += -lm
+ LFLAGS_CROSS_WIN        := $(LFLAGS)
+diff -uNr hashcat-6.2.6/src/affinity.c hashcat-6.2.6.mod/src/affinity.c
+--- hashcat-6.2.6/src/affinity.c	2022-09-02 22:58:13.000000000 +0800
++++ hashcat-6.2.6.mod/src/affinity.c	2023-06-09 17:52:20.964997328 +0800
+@@ -8,7 +8,20 @@
+ #include "memory.h"
+ #include "event.h"
+ #include "affinity.h"
++#include <assert.h>
++#if defined(__BIONIC__)
++static inline int pthread_setaffinity_np(pthread_t thread, size_t cpusetsize,
++                                         cpu_set_t *cpuset) {
++  assert(pthread_equal(pthread_self(), thread));
++  return sched_setaffinity(0, cpusetsize, cpuset);
++}
+ 
++static inline int pthread_getaffinity_np(pthread_t thread, size_t cpusetsize,
++                                         cpu_set_t *cpuset) {
++  assert(pthread_equal(pthread_self(), thread));
++  return sched_getaffinity(0, cpusetsize, cpuset);
++}
++#endif
+ #if defined (__APPLE__)
+ static void CPU_ZERO (cpu_set_t *cs)
+ {
