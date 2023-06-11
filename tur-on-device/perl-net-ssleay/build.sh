@@ -10,5 +10,5 @@ TERMUX_PKG_DEPENDS="perl, openssl"
 TERMUX_PKG_BUILD_IN_SRC=true
 
 termux_step_configure() {
-	perl Makefile.PL PREFIX=$TERMUX_PREFIX
+	OPENSSL_PREFIX=$TERMUX_PREFIX perl Makefile.PL PREFIX=$TERMUX_PREFIX
 }
