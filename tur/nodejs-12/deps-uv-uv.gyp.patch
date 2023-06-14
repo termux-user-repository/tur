@@ -1,0 +1,21 @@
+diff -u -r ../node-v12.14.0/deps/uv/uv.gyp ./deps/uv/uv.gyp
+--- ../node-v12.14.0/deps/uv/uv.gyp	2019-12-17 07:05:03.000000000 +0000
++++ ./deps/uv/uv.gyp	2020-01-02 19:42:31.757217000 +0000
+@@ -40,7 +40,7 @@
+     {
+       'target_name': 'libuv',
+       'type': '<(uv_library)',
+-      'include_dirs': [
++      'include_dirs+': [
+         'include',
+         'src/',
+       ],
+@@ -55,7 +55,7 @@
+           '<@(shared_unix_defines)',
+           '<@(shared_zos_defines)',
+         ],
+-        'include_dirs': [ 'include' ],
++        'include_dirs+': [ 'include' ],
+         'conditions': [
+           ['OS == "linux"', {
+             'defines': [ '_POSIX_C_SOURCE=200112' ],
