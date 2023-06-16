@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://github.com/bloznelis/typioca
 TERMUX_PKG_DESCRIPTION="Cozy typing speed tester"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="2.3.1"
+TERMUX_PKG_VERSION="2.4.2"
 TERMUX_PKG_SRCURL=https://github.com/bloznelis/typioca/archive/refs/tags/${TERMUX_PKG_VERSION}.tar.gz
-TERMUX_PKG_SHA256=19713300a9f2feb6f28c689bfd298e6b0f7fdfe05439f538d11d62701b13d304
+TERMUX_PKG_SHA256=57246b9f13b8f4f34a93eed7b2ac3efa871dd49714f44b9b85bbc82c4700b9a2
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_BUILD_IN_SRC=true
 termux_step_pre_configure() {
