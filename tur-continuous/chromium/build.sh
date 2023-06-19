@@ -4,9 +4,10 @@ TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="Chongyun Lee <uchkks@protonmail.com>"
 _CHROMIUM_VERSION=110.0.5481.177
 TERMUX_PKG_VERSION=$_CHROMIUM_VERSION
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=(https://commondatastorage.googleapis.com/chromium-browser-official/chromium-$_CHROMIUM_VERSION.tar.xz)
 TERMUX_PKG_SHA256=(7b2f454d1195270a39f94a9ff6d8d68126be315e0da4e31c20f4ba9183a1c9b7)
-TERMUX_PKG_DEPENDS="atk, cups, dbus, gtk3, krb5, libc++, libxkbcommon, libminizip, libnss, libwayland, libx11, mesa, openssl, pango, pulseaudio, libdrm, libjpeg-turbo, libpng, libwebp, libflac, fontconfig, freetype, zlib, libxml2, libxslt, libopus, libre2, libsnappy"
+TERMUX_PKG_DEPENDS="atk, cups, dbus, gtk3, krb5, libc++, libxkbcommon, libminizip, libnss, libwayland, libx11, mesa, openssl, pango, pulseaudio, libdrm, libjpeg-turbo, libpng, libwebp, libflac, fontconfig, freetype, zlib, libxml2, libxslt, libopus, libsnappy"
 # TODO: Split chromium-common and chromium-headless
 # TERMUX_PKG_DEPENDS+=", chromium-common"
 # TERMUX_PKG_SUGGESTS="chromium-headless, chromium-driver"
@@ -15,8 +16,8 @@ TERMUX_PKG_BUILD_DEPENDS="qt5-qtbase, qt5-qtbase-cross-tools"
 # Chromium doesn't support i686 on Linux.
 TERMUX_PKG_BLACKLISTED_ARCHES="i686"
 
-SYSTEM_LIBRARIES="    libdrm  libjpeg        libpng  libwebp  flac     fontconfig  freetype  zlib  libxml   libxslt  opus     re2     snappy   "
-# TERMUX_PKG_DEPENDS="libdrm, libjpeg-turbo, libpng, libwebp, libflac, fontconfig, freetype, zlib, libxml2, libxslt, libopus, libre2, libsnappy"
+SYSTEM_LIBRARIES="    libdrm  libjpeg        libpng  libwebp  flac     fontconfig  freetype  zlib  libxml   libxslt  opus     snappy   "
+# TERMUX_PKG_DEPENDS="libdrm, libjpeg-turbo, libpng, libwebp, libflac, fontconfig, freetype, zlib, libxml2, libxslt, libopus, libsnappy"
 
 termux_step_post_get_source() {
 	python $TERMUX_SCRIPTDIR/common-files/apply-chromium-patches.py -v $_CHROMIUM_VERSION
@@ -216,18 +217,18 @@ use_thin_lto = false
 	# Use custom toolchain
 	mkdir -p $TERMUX_PKG_CACHEDIR/custom-toolchain
 	cp -f $TERMUX_PKG_BUILDER_DIR/toolchain.gn.in $TERMUX_PKG_CACHEDIR/custom-toolchain/BUILD.gn
-	sed -i "s|@HOST_CC@|$(command -v clang-13)|g
-			s|@HOST_CXX@|$(command -v clang++-13)|g
-			s|@HOST_LD@|$(command -v clang++-13)|g
+	sed -i "s|@HOST_CC@|/usr/bin/clang-14|g
+			s|@HOST_CXX@|/usr/bin/clang++-14|g
+			s|@HOST_LD@|/usr/bin/clang++-14|g
 			s|@HOST_AR@|$(command -v llvm-ar)|g
 			s|@HOST_NM@|$(command -v llvm-nm)|g
 			s|@HOST_IS_CLANG@|true|g
 			s|@HOST_USE_GOLD@|false|g
 			s|@HOST_SYSROOT@|$_amd64_sysroot_path|g
 			" $TERMUX_PKG_CACHEDIR/custom-toolchain/BUILD.gn
-	sed -i "s|@V8_CC@|$(command -v clang-13)|g
-			s|@V8_CXX@|$(command -v clang++-13)|g
-			s|@V8_LD@|$(command -v clang++-13)|g
+	sed -i "s|@V8_CC@|/usr/bin/clang-14|g
+			s|@V8_CXX@|/usr/bin/clang++-14|g
+			s|@V8_LD@|/usr/bin/clang++-14|g
 			s|@V8_AR@|$(command -v llvm-ar)|g
 			s|@V8_NM@|$(command -v llvm-nm)|g
 			s|@V8_TOOLCHAIN_NAME@|$_v8_toolchain_name|g
@@ -367,8 +368,8 @@ termux_step_post_make_install() {
 # Name in Chromium | libdrm libjpeg       libpng libwebp fontconfig libxslt
 # Name in Termux   | libdrm libjpeg-turbo libpng libwebp fontconfig libxslt
 #
-# Name in Chromium | freetype libxml  opus    re2    snappy    flac    zlib
-# Name in Termux   | freetype libxml2 libopus libre2 libsnappy libflac zlib
+# Name in Chromium | freetype libxml  opus    snappy    flac    zlib
+# Name in Termux   | freetype libxml2 libopus libsnappy libflac zlib
 #
 # These libraries cannot be used as system libraries, because Chromium-provided
 # debian rootfs doesn't have them (or their headers). Maybe we should construct
@@ -378,8 +379,8 @@ termux_step_post_make_install() {
 #
 # These libraries cannot be used due to configuation errors like
 # `error: '/usr/bin/brotli', needed by 'clang_x64/brotli', missing and no known rule to make it`/
-# Name in Chromium | brotli    icu
-# Name in Termux   | brotli libicu
+# Name in Chromium | brotli    icu    re2
+# Name in Termux   | brotli libicu libre2
 #
 # These libraries cannot be used because they don't exist in Termux.
 # Name in Chromium | absl* crc32c, libavif, libXNVCtrl, libyuv, openh264, libSPIRV-Tools
