@@ -1,0 +1,10 @@
+--- a/src/net/tcpip.h.orig
++++ b/src/net/tcpip.h
+@@ -34,7 +34,6 @@
+ #   include <string.h>
+ #   include <sys/time.h>
+ #   include <sys/ipc.h>
+-#   include <sys/shm.h>
+ #   include <sys/socket.h>
+ #   include <unistd.h>
+ #   ifdef HAVE_BSTRING_H
