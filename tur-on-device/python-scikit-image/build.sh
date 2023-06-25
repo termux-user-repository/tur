@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="Image processing in Python"
 TERMUX_PKG_LICENSE="BSD 2-Clause, BSD 3-Clause, MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="0.21.0"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://github.com/scikit-image/scikit-image/archive/refs/tags/v$TERMUX_PKG_VERSION.tar.gz
 TERMUX_PKG_SHA256=53a82a9dbd3ed608d2ad3876269a271a7e922b12e228388eac996b508aadd652
 TERMUX_PKG_AUTO_UPDATE=true
@@ -15,6 +16,7 @@ TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_RM_AFTER_INSTALL="
 lib/python${TERMUX_PYTHON_VERSION}/__pycache__
 lib/python${TERMUX_PYTHON_VERSION}/site-packages/pip
+lib/python${TERMUX_PYTHON_VERSION}/site-packages/numpy
 "
 
 termux_step_pre_configure() {
