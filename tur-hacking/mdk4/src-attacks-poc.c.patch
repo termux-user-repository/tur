@@ -1,0 +1,12 @@
+diff -uNr mdk4-c6a35994b2f0d87d79ce9a072b84a486775d8ee4/src/attacks/poc.c mdk4-c6a35994b2f0d87d79ce9a072b84a486775d8ee4.mod/src/attacks/poc.c
+--- mdk4-c6a35994b2f0d87d79ce9a072b84a486775d8ee4/src/attacks/poc.c	2022-04-30 19:36:41.000000000 +0800
++++ mdk4-c6a35994b2f0d87d79ce9a072b84a486775d8ee4.mod/src/attacks/poc.c	2023-06-28 13:34:44.648998204 +0800
+@@ -513,7 +513,7 @@
+ 	unsigned char s1, s2;
+ 
+ 	if(pascii == NULL || phex == NULL || len == 0)
+-		return;
++		return i;
+ 
+ 	str_len = strlen(pascii)/4;
+ 	if(str_len)

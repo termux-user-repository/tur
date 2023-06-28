@@ -1,0 +1,12 @@
+diff -uNr mdk4-c6a35994b2f0d87d79ce9a072b84a486775d8ee4/src/channelhopper.c mdk4-c6a35994b2f0d87d79ce9a072b84a486775d8ee4.mod/src/channelhopper.c
+--- mdk4-c6a35994b2f0d87d79ce9a072b84a486775d8ee4/src/channelhopper.c	2022-04-30 19:36:41.000000000 +0800
++++ mdk4-c6a35994b2f0d87d79ce9a072b84a486775d8ee4.mod/src/channelhopper.c	2023-06-28 12:53:01.588999158 +0800
+@@ -45,7 +45,7 @@
+ int chans_out [MAX_CHAN_COUNT] = {0};
+ 
+ pthread_t *hopper = NULL;
+-pthread_t chan_sniffer = NULL;
++pthread_t *chan_sniffer = NULL;
+ int hopper_useconds = 0;
+ volatile int sniff = 0;
+ pthread_mutex_t chan_thread_mutex;
