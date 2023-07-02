@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="Server-side, HTML-embedded scripting language"
 TERMUX_PKG_LICENSE="PHP-3.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION=7.2.34
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SHA256=409e11bc6a2c18707dfc44bc61c820ddfd81e17481470f3405ee7822d8379903
 TERMUX_PKG_SRCURL=https://secure.php.net/distributions/php-${TERMUX_PKG_VERSION}.tar.xz
 # Build native php for phar to build (see pear-Makefile.frag.patch):
@@ -59,6 +60,8 @@ termux_step_pre_configure() {
 	CPPFLAGS+=" -DGD_FLIP_HORINZONTAL=2"
 	CPPFLAGS+=" -DGD_FLIP_BOTH=3"
 	CPPFLAGS+=" -DU_DEFINE_FALSE_AND_TRUE=1"
+	CPPFLAGS+=" -Wno-implicit-function-declaration"
+	CPPFLAGS+=" -Wno-incompatible-function-pointer-types"
 
 	if [ "$TERMUX_ARCH" = "aarch64" ]; then
 		CFLAGS+=" -march=armv8-a+crc"
