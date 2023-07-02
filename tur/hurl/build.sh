@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="Hurl, run and test HTTP requests with plain text"
 TERMUX_PKG_LICENSE="Apache-2.0"
 TERMUX_PKG_MAINTAINER="@SunPodder"
 TERMUX_PKG_VERSION="4.0.0"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL="https://github.com/Orange-OpenSource/hurl/archive/refs/tags/${TERMUX_PKG_VERSION}.tar.gz"
 TERMUX_PKG_SHA256=43b5943b8135a0b2c0bb16897291e641f38e7e81aab17a18ee3d6eb5e1cd0d48
 TERMUX_PKG_AUTO_UPDATE=true
