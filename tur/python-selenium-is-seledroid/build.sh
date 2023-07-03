@@ -4,9 +4,8 @@ TERMUX_PKG_SKIP_SRC_EXTRACT=true
 # seledroid is unlicensed, the original selenium is Apache-2.0
 TERMUX_PKG_LICENSE="Unlicense"
 TERMUX_PKG_MAINTAINER="@nacho00112"
-TERMUX_PKG_VERSION=4.8.2
-TERMUX_PKG_REVISION=1
-TERMUX_PKG_DEPENDS="python, python-seledroid"
+TERMUX_PKG_VERSION=4.10.0
+TERMUX_PKG_DEPENDS="python-seledroid"
 TERMUX_PKG_SETUP_PYTHON=true
 TERMUX_PKG_BUILD_IN_SRC=true
 
