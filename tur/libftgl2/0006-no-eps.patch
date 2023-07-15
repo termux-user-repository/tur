@@ -1,0 +1,13 @@
+Index: ftgl-2.4.0/docs/Makefile.am
+===================================================================
+--- ftgl-2.4.0.orig/docs/Makefile.am
++++ ftgl-2.4.0/docs/Makefile.am
+@@ -26,7 +26,7 @@ endif
+ 	touch $@
+ 
+ html/doxygen.css: stamp-doxygen
+-stamp-doxygen: doxygen.cfg stamp-eps
++stamp-doxygen: doxygen.cfg
+ 	$(DOXYGEN) $^
+ 	for file in html/*html; do \
+ 	  $(SED) -e 's/%FTGL/FTGL/' < $$file > $$file.tmp; \
