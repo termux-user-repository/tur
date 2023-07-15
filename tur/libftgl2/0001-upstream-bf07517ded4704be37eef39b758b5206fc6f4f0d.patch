@@ -1,0 +1,11 @@
+--- a/docs/projects_using_ftgl.txt
++++ b/docs/projects_using_ftgl.txt
+@@ -154,7 +154,7 @@ Projects are listed in alphabetical order.
+   Duel (http://www.personal.rdg.ac.uk/~sir03me/play/code.html) is a small
+   overhead perspective spaceship game.
+ 
+-\subsection emptyclip EMAN2
++\subsection eman2 EMAN2
+ 
+   EMAN2 (http://blake.bcm.tmc.edu/eman/eman2/) is a suite of
+   scientific image processing tools aimed primarily at the

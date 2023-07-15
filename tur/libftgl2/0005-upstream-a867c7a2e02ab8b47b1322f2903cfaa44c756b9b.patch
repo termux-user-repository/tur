@@ -1,0 +1,106 @@
+--- a/demo/FTGLDemo.cpp
++++ b/demo/FTGLDemo.cpp
+@@ -528,6 +528,31 @@ void myinit(const char* file)
+ }
+ 
+ 
++/*
++ * Simple conversion from Unicode character to UTF-8 string.
++ * (In real code, you may want want to use a library such as ICU
++ * or newer C++ features instead, but this avoids additional dependencies.
++ * s must contain enough space for up to 4 bytes.
++ * Returns number of bytes written.
++ */
++int ToUTF8 (unsigned int c, char *s)
++{
++  char *t = s;
++  int n = 0;
++  if (c < 0x80)
++    *s++ = c;
++  else if (c < 0x800)
++    *s++ = c >> (n = 6) | 0xc0;
++  else if (c < 0x10000)
++    *s++ = c >> (n = 12) | 0xe0;
++  else
++    *s++ = c >> (n = 18) | 0xf0;
++  while (n)
++    *s++ = (c >> (n -= 6) & 0x3f) | 0x80;
++  return s - t;
++}
++
++
+ void parsekey(unsigned char key, int, int)
+ {
+     switch (key)
+@@ -573,14 +598,13 @@ void parsekey(unsigned char key, int, int)
+     default:
+         if(mode == INTERACTIVE)
+         {
+-            myString[0] = key;
+-            myString[1] = 0;
++            myString[ToUTF8 (key, myString)] = 0;
+         }
+         else
+         {
+-            myString[carat] = key;
+-            myString[carat + 1] = 0;
+-            carat = carat > 2000 ? 2000 : carat + 1;
++            int r = ToUTF8 (key, myString + carat) + carat;
++            myString[r] = 0;
++            carat = r > 2000 ? 2000 : r;
+         }
+         break;
+     }
+--- a/demo/FTGLMFontDemo.cpp
++++ b/demo/FTGLMFontDemo.cpp
+@@ -484,6 +484,31 @@ void myinit(int numFontFiles)
+ }
+ 
+ 
++/*
++ * Simple conversion from Unicode character to UTF-8 string.
++ * (In real code, you may want want to use a library such as ICU
++ * or newer C++ features instead, but this avoids additional dependencies.
++ * s must contain enough space for up to 4 bytes.
++ * Returns number of bytes written.
++ */
++int ToUTF8 (unsigned int c, char *s)
++{
++  char *t = s;
++  int n = 0;
++  if (c < 0x80)
++    *s++ = c;
++  else if (c < 0x800)
++    *s++ = c >> (n = 6) | 0xc0;
++  else if (c < 0x10000)
++    *s++ = c >> (n = 12) | 0xe0;
++  else
++    *s++ = c >> (n = 18) | 0xf0;
++  while (n)
++    *s++ = (c >> (n -= 6) & 0x3f) | 0x80;
++  return s - t;
++}
++
++
+ void parsekey(unsigned char key, int, int)
+ {
+     switch (key)
+@@ -529,14 +554,13 @@ void parsekey(unsigned char key, int, int)
+     default:
+         if(mode == INTERACTIVE)
+         {
+-            myString[0] = key;
+-            myString[1] = 0;
++            myString[ToUTF8 (key, myString)] = 0;
+         }
+         else
+         {
+-            myString[carat] = key;
+-            myString[carat + 1] = 0;
+-            carat = carat > 2000 ? 2000 : carat + 1;
++            int r = ToUTF8 (key, myString + carat) + carat;
++            myString[r] = 0;
++            carat = r > 2000 ? 2000 : r;
+         }
+         break;
+     }
