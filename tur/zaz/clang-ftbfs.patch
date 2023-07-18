@@ -1,0 +1,38 @@
+From: Alexander <sanek23994@gmail.com>
+Date: Tue, 29 Mar 2016 00:33:05 +0200
+Subject: clang ftbfs
+
+Fix FTBFS with clang compiler.
+
+Bug: https://bugs.debian.org/753340
+---
+ src/mixer.cpp | 2 +-
+ src/mixer.h   | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/mixer.cpp b/src/mixer.cpp
+index b6af4d6..acb8c21 100644
+--- a/src/mixer.cpp
++++ b/src/mixer.cpp
+@@ -23,7 +23,7 @@
+ 
+ namespace Scenes
+ {
+-Mixer::Mixer(MixerMode mmode = Realtime)
++Mixer::Mixer(MixerMode mmode)
+         : mode(mmode), isPlaying(false)
+ {
+     mut_disposeList = SDL_CreateMutex();
+diff --git a/src/mixer.h b/src/mixer.h
+index f1a636d..f6dd33c 100644
+--- a/src/mixer.h
++++ b/src/mixer.h
+@@ -46,7 +46,7 @@ private:
+     bool audioHWInitialized;
+ 
+ public:
+-    Mixer(MixerMode mmode);
++    Mixer(MixerMode mmode = Realtime);
+     ~Mixer();
+     void Play();
+     void Pause();
