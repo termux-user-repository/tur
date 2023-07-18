@@ -1,0 +1,26 @@
+--- a/src/scene.cpp
++++ b/src/scene.cpp
+@@ -365,14 +365,17 @@
+         }
+     }
+ 
+-    if (mmotion)
+-    {
+-        if (logicInputFrame == 0)
+-            rmx = rmy = 0;
++    // Set the ev.relmouse* members even if the mouse hasn't moved.
++    // Shooting causing a move based on those values, even if playing
++    // with the keyboard only.
++    if (logicInputFrame == 0)
++        rmx = rmy = 0;
+ 
+-        ev.relmouseX = rmx;
+-        ev.relmouseY = rmy;
++    ev.relmouseX = rmx;
++    ev.relmouseY = rmy;
+ 
++    if (mmotion)
++    {
+         ev.mouseX = (double)mmx / (double)surface->w;
+         ev.mouseY = (double)mmy / (double)surface->h;
+ 

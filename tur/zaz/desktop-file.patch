@@ -1,0 +1,24 @@
+From: Markus Koschany <apo@debian.org>
+Date: Tue, 29 Mar 2016 01:07:01 +0200
+Subject: desktop file
+
+Forwarded: no
+---
+ extra/zaz.desktop | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/extra/zaz.desktop b/extra/zaz.desktop
+index 55bcdb6..06a229b 100755
+--- a/extra/zaz.desktop
++++ b/extra/zaz.desktop
+@@ -5,8 +5,9 @@ Name=Zaz
+ Comment=Zaz ain't Z***
+ Comment[ru]=Zaz не клон Z***
+ Comment[tr]=Top Yok Etme Oyunu
++Comment[de]=Zaz ist nicht Z***
+ TryExec=zaz
+ Exec=zaz
+ Categories=Game;LogicGame;
+ Icon=zaz
+-MimeType=
++Keywords=puzzle;logic;3D;
