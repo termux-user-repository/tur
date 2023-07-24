@@ -15,6 +15,7 @@ TERMUX_PKG_BLACKLISTED_ARCHES="arm, i686"
 
 TERMUX_PKG_DEPENDS="libpng, libtiff, python, python-pip, python-numpy, openexr, desktop-file-utils, potrace, shared-mime-info, hicolor-icon-theme, glew, openjpeg, freetype, ffmpeg, fftw, alembic, libsndfile, ptex, sdl2, libspnav, openal-soft, opencolorio, libblosc, sse2neon, libandroid-execinfo, brotli, libepoxy, openimageio, pybind11, openvdb, libraw, libpugixml"
 TERMUX_PKG_BUILD_DEPENDS="subversion"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_PYTHON_COMMON_DEPS="requests, zstandard, Cython"
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 -DPYTHON_LIBRARY=$TERMUX_PREFIX/lib/python$TERMUX_PYTHON_VERSION
