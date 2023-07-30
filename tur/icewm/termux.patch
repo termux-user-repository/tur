@@ -1,0 +1,163 @@
+diff -ur icewm/src/fdomenu.cc icewm-3.4.1/src/fdomenu.cc
+--- icewm/src/fdomenu.cc	2023-07-21 16:09:12.000000000 +0200
++++ icewm-3.4.1/src/fdomenu.cc	2023-07-30 20:38:29.955991061 +0200
+@@ -825,7 +825,7 @@
+     // system dirs, either from environment or from static locations
+     LPCSTR sysshare = getenv("XDG_DATA_DIRS");
+     if (!sysshare || !*sysshare)
+-        sysshare = "/usr/local/share:/usr/share";
++        sysshare = "@TERMUX_PREFIX@/share";
+ 
+     if (argc == 2 && checkSuffix(argv[1], "desktop")
+             && launch(argv[1], argv + 2, argc - 2)) {
+diff -ur icewm/src/globit.c icewm-3.4.1/src/globit.c
+--- icewm/src/globit.c	2023-07-21 16:09:12.000000000 +0200
++++ icewm-3.4.1/src/globit.c	2023-07-30 20:49:49.587937388 +0200
+@@ -49,7 +49,7 @@
+ /* helper functions */
+ 
+ #ifndef _PATH_DEFPATH
+-#define _PATH_DEFPATH "/bin:/usr/bin:/sbin:/usr/sbin"
++#define _PATH_DEFPATH "@TERMUX_PREFIX@/bin"
+ #endif
+ 
+ static char *
+diff -ur icewm/src/icehelp.cc icewm-3.4.1/src/icehelp.cc
+--- icewm/src/icehelp.cc	2023-07-21 16:09:12.000000000 +0200
++++ icewm-3.4.1/src/icehelp.cc	2023-07-30 20:52:02.249572129 +0200
+@@ -2227,30 +2227,30 @@
+ void FileView::openBrowser(mstring url) {
+     char* env = getenv("BROWSER");
+     mstring brow(nonempty(env) && !strchr(env, '/')
+-                 ? mstring("/usr/bin/") + env : env);
++                 ? mstring("@TERMUX_PREFIX@/bin/") + env : env);
+     if (brow != null && upath(brow).isExecutable()) {
+         run(brow, url);
+     }
+-    else if (upath("/usr/bin/xdg-open").isExecutable()) {
+-        run("/usr/bin/xdg-open", url);
++    else if (upath("@TERMUX_PREFIX@/bin/xdg-open").isExecutable()) {
++        run("@TERMUX_PREFIX@/bin/xdg-open", url);
+     }
+-    else if (upath("/usr/bin/gnome-open").isExecutable()) {
+-        run("/usr/bin/gnome-open", url);
++    else if (upath("@TERMUX_PREFIX@/bin/gnome-open").isExecutable()) {
++        run("@TERMUX_PREFIX@/bin/gnome-open", url);
+     }
+-    else if (upath("/usr/bin/kde-open").isExecutable()) {
+-        run("/usr/bin/kde-open", url);
++    else if (upath("@TERMUX_PREFIX@/bin/kde-open").isExecutable()) {
++        run("@TERMUX_PREFIX@/bin/kde-open", url);
+     }
+-    else if (upath("/usr/bin/gio").isExecutable()) {
+-        run("/usr/bin/gio", "open", url);
++    else if (upath("@TERMUX_PREFIX@/bin/gio").isExecutable()) {
++        run("@TERMUX_PREFIX@/bin/gio", "open", url);
+     }
+-    else if (upath("/usr/bin/python3").isExecutable()) {
+-        run("/usr/bin/python3", "-m", "webbrowser", url);
++    else if (upath("@TERMUX_PREFIX@/bin/python3").isExecutable()) {
++        run("@TERMUX_PREFIX@/bin/python3", "-m", "webbrowser", url);
+     }
+-    else if (upath("/usr/bin/python").isExecutable()) {
+-        run("/usr/bin/python", "-m", "webbrowser", url);
++    else if (upath("@TERMUX_PREFIX@/bin/python").isExecutable()) {
++        run("@TERMUX_PREFIX@/bin/python", "-m", "webbrowser", url);
+     }
+-    else if (upath("/usr/bin/sensible-browser").isExecutable()) {
+-        run("/usr/bin/sensible-browser", url);
++    else if (upath("@TERMUX_PREFIX@/bin/sensible-browser").isExecutable()) {
++        run("@TERMUX_PREFIX@/bin/sensible-browser", url);
+     }
+ }
+ 
+@@ -2371,7 +2371,7 @@
+             || gzip.isEmpty() || cat.isEmpty();
+     }
+     void init() {
+-        const char defp[] = "/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin";
++        const char defp[] = "@TERMUX_PREFIX@/bin";
+         const char *penv = getenv("PATH");
+         mstring mpth(penv ? penv : defp), mdir;
+         while (empty() && mpth.splitall(':', &mdir, &mpth)) {
+diff -ur icewm/src/icesm.cc icewm-3.4.1/src/icesm.cc
+--- icewm/src/icesm.cc	2023-07-21 16:09:12.000000000 +0200
++++ icewm-3.4.1/src/icesm.cc	2023-07-30 20:50:39.651045250 +0200
+@@ -364,8 +364,8 @@
+             wm_pid = -1;
+         }
+         else {
+-            static const char valgrind[] = "/usr/bin/valgrind";
+-            static const char catchsegv[] = "/usr/bin/catchsegv";
++            static const char valgrind[] = "@TERMUX_PREFIX@/bin/valgrind";
++            static const char catchsegv[] = "@TERMUX_PREFIX@/bin/catchsegv";
+             bool notify = true;
+             const int size = 24;
+             const char* args[size];
+diff -ur icewm/src/misc.cc icewm-3.4.1/src/misc.cc
+--- icewm/src/misc.cc	2023-07-21 16:09:12.000000000 +0200
++++ icewm-3.4.1/src/misc.cc	2023-07-30 20:52:58.228572934 +0200
+@@ -659,7 +659,7 @@
+ 
+ // get path of executable.
+ char* progpath() {
+-#ifdef __linux__
++#if defined(__linux__) && defined(_GNU_SOURCE) && !defined(__ANDROID__)
+     char* path = program_invocation_name;
+     bool fail = (isEmpty(path) || !isExeFile(path));
+     if (fail) {
+@@ -698,7 +698,7 @@
+     const int asize = Elvis(limit, 20);
+     void *array[asize];
+     const int count = backtrace(array, asize);
+-    const char tool[] = "/usr/bin/addr2line";
++    const char tool[] = "@TERMUX_PREFIX@/bin/addr2line";
+     char* prog = progpath();
+     char* path = prog ? prog : path_lookup("icewm");
+ 
+diff -ur icewm/src/strtest.cc icewm-3.4.1/src/strtest.cc
+--- icewm/src/strtest.cc	2023-07-21 16:09:12.000000000 +0200
++++ icewm-3.4.1/src/strtest.cc	2023-07-30 20:50:23.967324797 +0200
+@@ -575,13 +575,13 @@
+             }
+         }
+     }
+-    if (access("/usr/bin/printf", X_OK) == 0 &&
++    if (access("@TERMUX_PREFIX@/bin/printf", X_OK) == 0 &&
+         access("/bin/printf", X_OK) != 0)
+     {
+         char* print = path_lookup("printf");
+         assert("printf", print != nullptr);
+         if (print) {
+-            assert("printf", strcmp(print, "/usr/bin/printf") == 0);
++            assert("printf", strcmp(print, "@TERMUX_PREFIX@/bin/printf") == 0);
+             delete[] print;
+         }
+     }
+diff -ur icewm/src/testmenus.cc icewm-3.4.1/src/testmenus.cc
+--- icewm/src/testmenus.cc	2023-07-21 16:09:12.000000000 +0200
++++ icewm-3.4.1/src/testmenus.cc	2023-07-30 20:48:35.093263878 +0200
+@@ -89,7 +89,7 @@
+ };
+ 
+ int main(int argc, char **argv) {
+-    iconPath = "/usr/share/icons/crystalsvg/48x48/apps/:/usr/share/icons/Bluecurve/16x16/apps/:/usr/share/pixmap";
++    iconPath = "@TERMUX_PREFIX@/share/icons/crystalsvg/48x48/apps/:@TERMUX_PREFIX@/share/icons/Bluecurve/16x16/apps/:@TERMUX_PREFIX@/share/pixmap";
+     YLocale locale;
+     YXApplication xapp(&argc, &argv);
+ 
+diff -ur icewm/src/yprefs.h icewm-3.4.1/src/yprefs.h
+--- icewm/src/yprefs.h	2023-07-21 16:09:12.000000000 +0200
++++ icewm-3.4.1/src/yprefs.h	2023-07-30 20:52:50.648708268 +0200
+@@ -36,9 +36,11 @@
+ 
+ XSV(const char *, iconPath,
+                                                 "/usr/local/share/icons:"
+                                                 "/usr/local/share/pixmaps:"
+                                                 "/usr/share/icons:"
++                                                "@TERMUX_PREFIX@/share/icons:"
+                                                 "/usr/share/pixmaps:"
++                                                "@TERMUX_PREFIX@/share/pixmaps:"
+                                                 )
+ XSV(const char *, iconThemes,                   "*:-HighContrast")
+ XSV(const char *, themeName,                    CONFIG_DEFAULT_THEME)
