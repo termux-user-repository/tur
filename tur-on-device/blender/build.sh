@@ -2,10 +2,11 @@ TERMUX_PKG_HOMEPAGE=https://www.blender.org
 TERMUX_PKG_DESCRIPTION="A fully integrated 3D graphics creation suite"
 TERMUX_PKG_LICENSE="GPL-2.0"
 TERMUX_PKG_MAINTAINER="@T-Dynamos"
-BLENDER_MAJOR_VERSION=3 
-BLENDER_MINOR_VERSION=6
-_COMMIT=d145dfdae0104fbc88f113199fa843e744f30fa3
-_COMMIT_DATE=2023.04.29
+BLENDER_MAJOR_VERSION=4 
+BLENDER_MINOR_VERSION=0
+BLENDER_ADDONS_COMMIT=92dd274c0bf08ad4786e7dfe715dee327f3ee43f 
+_COMMIT=0d7b0045c6795ba5ebd73bc588cb808d85ed10da
+_COMMIT_DATE=2023.08.03
 TERMUX_PKG_VERSION=${BLENDER_MAJOR_VERSION}.${BLENDER_MINOR_VERSION}-${_COMMIT:0:8}-${_COMMIT_DATE}
 TERMUX_PKG_SRCURL=git+https://github.com/blender/blender
 TERMUX_PKG_GIT_BRANCH=main 
@@ -53,4 +54,11 @@ termux_step_pre_configure(){
     LDFLAGS+=" -landroid-execinfo"
     # Position independent executables are not supported on android
     sed -i "s/no-pie/pie/g" $TERMUX_PKG_SRCDIR/build_files/cmake/platform/platform_unix.cmake
+}
+
+termux_step_post_make_install() {
+    export MODIR=$TERMUX_PREFIX/share/blender/$BLENDER_MAJOR_VERSION.$BLENDER_MINOR_VERSION/scripts/modules
+    curl -L https://github.com/blender/blender-addons/archive/$BLENDER_ADDONS_COMMIT.tar.gz | tar xvz -C $MODIR/
+    cp -r $MODIR/blender-addons-$BLENDER_ADDONS_COMMIT/* $MODIR/
+    rm -rf $MODIR/blender-addons-$BLENDER_ADDONS_COMMIT
 }
