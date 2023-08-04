@@ -1,0 +1,22 @@
+--- a/chromium/src/components/viz/service/display_embedder/software_output_device_proxy.h
++++ b/chromium/src/components/viz/service/display_embedder/software_output_device_proxy.h
+@@ -64,7 +64,7 @@
+   SoftwareOutputDeviceProxy& operator=(const SoftwareOutputDeviceProxy&) = delete;
+ 
+   // SoftwareOutputDevice implementation.
+-  void OnSwapBuffers(SoftwareOutputDevice::SwapBuffersCallback swap_ack_callback, gfx::FrameData data) override;
++  void OnSwapBuffers(SoftwareOutputDevice::SwapBuffersCallback swap_ack_callback, gl::FrameData data) override;
+ 
+   // SoftwareOutputDeviceBase implementation.
+   void ResizeDelegated() override;
+--- a/chromium/src/components/viz/service/display_embedder/software_output_device_proxy.cc
++++ b/chromium/src/components/viz/service/display_embedder/software_output_device_proxy.cc
+@@ -73,7 +73,7 @@
+ 
+ void SoftwareOutputDeviceProxy::OnSwapBuffers(
+     SoftwareOutputDevice::SwapBuffersCallback swap_ack_callback,
+-    gfx::FrameData data) {
++    gl::FrameData data) {
+   DCHECK(swap_ack_callback_.is_null());
+ 
+   // We aren't waiting on DrawAck() and can immediately run the callback.
