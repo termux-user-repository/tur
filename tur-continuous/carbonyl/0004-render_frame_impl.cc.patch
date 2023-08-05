@@ -1,0 +1,11 @@
+--- a/chromium/src/content/renderer/render_frame_impl.cc
++++ b/chromium/src/content/renderer/render_frame_impl.cc
+@@ -2223,7 +2223,7 @@
+       auto* view = static_cast<blink::WebViewImpl*>(GetWebFrame()->View());
+       std::vector<carbonyl::mojom::TextDataPtr> data;
+ 
+-      view->MainFrameImpl()->GetFrame()->View()->GetPaintRecord().Playback(
++      view->MainFrameImpl()->GetFrame()->View()->GetPaintRecord()->Playback(
+         renderer->BeginPaint(width, height)
+       );
+ 
