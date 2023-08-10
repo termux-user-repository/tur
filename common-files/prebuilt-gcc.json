@@ -10,13 +10,13 @@
     }
   },
   "11": {
-    "version": "11.3.0",
-    "revision": "4",
+    "version": "11.4.0",
+    "revision": "0",
     "checksums": {
-      "aarch64": "4b6dc119de92a7ea68cc9a31623fe0140a5aaeb37cdfca0b5859003cfaab21be",
-      "arm": "d69dceffebd1d538cbc2732c35942eadf907aba80536fca484ea0eddafe3cfdc",
-      "i686": "6d2142563ef5d07127e9bb96a07c907f9a2fc4642f52e7cc82df2b1fb1ca77a5",
-      "x86_64": "cee65932bbc25bd1809e8c50bdfe1f30351dcfb8904b888672747478c573d235"
+      "aarch64": "0f0d4fcf62249d1ea699dd8d5330f3f8db2d119355b18d72342e1d5701dae5ca",
+      "arm": "57a4130ad50fc4fd228ce4bff0a8d35687fe47d1fb856d0c96e2c73e057fb118",
+      "i686": "0a1c6ad7c0df317569dee698718dbb58f57fef1efbc29f204312e66152a5ef3b",
+      "x86_64": "83e4364b05b331b58d7ee5d8fbbbdcbce26a340cddeea242e7babd6e169ebaad"
     }
   },
   "10": {
