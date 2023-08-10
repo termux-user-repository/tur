@@ -1,0 +1,76 @@
+In Termux, libc++_shared (renamed from libc++) should be used by default.
+diff -uNr a/gcc/cp/g++spec.cc b/gcc/cp/g++spec.cc
+--- a/gcc/cp/g++spec.cc
++++ b/gcc/cp/g++spec.cc
+@@ -41,14 +41,14 @@
+ #define MATH_LIBRARY_PROFILE MATH_LIBRARY
+ #endif
+ 
+-#ifndef LIBSTDCXX
+-#define LIBSTDCXX "stdc++"
++#ifndef LIBCXX_SHARED
++#define LIBCXX_SHARED "c++_shared"
+ #endif
+-#ifndef LIBSTDCXX_PROFILE
+-#define LIBSTDCXX_PROFILE LIBSTDCXX
++#ifndef LIBCXX_SHARED_PROFILE
++#define LIBCXX_SHARED_PROFILE LIBCXX_SHARED
+ #endif
+-#ifndef LIBSTDCXX_STATIC
+-#define LIBSTDCXX_STATIC NULL
++#ifndef LIBCXX_SHARED_STATIC
++#define LIBCXX_SHARED_STATIC NULL
+ #endif
+ 
+ #ifndef LIBCXX
+@@ -75,7 +75,7 @@
+    in c.opt.  */
+ enum stdcxxlib_kind
+ {
+-  USE_LIBSTDCXX = 1,
++  USE_LIBCXX_SHARED = 1,
+   USE_LIBCXX = 2
+ };
+ 
+@@ -97,7 +97,7 @@
+   int library = 0;
+ 
+   /* Which c++ runtime library to link.  */
+-  stdcxxlib_kind which_library = USE_LIBSTDCXX;
++  stdcxxlib_kind which_library = USE_LIBCXX_SHARED;
+ 
+   /* The number of arguments being added to what's in argv, other than
+      libraries.  We use this to track the number of times we've inserted
+@@ -375,12 +375,14 @@
+   /* Add `-lstdc++' if we haven't already done so.  */
+   if (library > 0)
+     {
++#if 0
+       if (need_experimental && which_library == USE_LIBSTDCXX)
+ 	{
+ 	  generate_option (OPT_l, "stdc++exp", 1, CL_DRIVER,
+ 			   &new_decoded_options[j++]);
+ 	  ++added_libraries;
+ 	}
++#endif
+ #ifdef HAVE_LD_STATIC_DYNAMIC
+       if (library > 1 && !static_link)
+ 	{
+@@ -406,14 +408,14 @@
+ 	}
+       else
+ 	generate_option (OPT_l,
+-			 saw_profile_flag ? LIBSTDCXX_PROFILE : LIBSTDCXX, 1,
++			 saw_profile_flag ? LIBCXX_SHARED_PROFILE : LIBCXX_SHARED, 1,
+ 			 CL_DRIVER, &new_decoded_options[j]);
+       added_libraries++;
+       j++;
+       /* Add target-dependent static library, if necessary.  */
+-      if ((static_link || library > 1) && LIBSTDCXX_STATIC != NULL)
++      if ((static_link || library > 1) && LIBCXX_SHARED_STATIC != NULL)
+ 	{
+-	  generate_option (OPT_l, LIBSTDCXX_STATIC, 1,
++	  generate_option (OPT_l, LIBCXX_SHARED_STATIC, 1,
+ 			   CL_DRIVER, &new_decoded_options[j]);
+ 	  added_libraries++;
+ 	  j++;
