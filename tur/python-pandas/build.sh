@@ -11,6 +11,7 @@ TERMUX_PKG_DEPENDS="libc++, python, python-numpy, python-pip"
 TERMUX_PKG_PYTHON_COMMON_DEPS="Cython, numpy, wheel, 'setuptools==63.2.0', versioneer"
 TERMUX_PKG_PYTHON_TARGET_DEPS="'python-dateutil>=2.8.2', 'pytz>=2020.1', 'tzdata>=2022.1'"
 TERMUX_PKG_BUILD_IN_SRC=true
+TERMUX_PKG_UPDATE_TAG_TYPE="latest-release-tag"
 
 termux_step_pre_configure() {
 	CFLAGS="-I$TERMUX_PYTHON_HOME/site-packages/numpy/core/include $CFLAGS"
