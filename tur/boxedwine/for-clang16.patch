@@ -1,0 +1,16 @@
+--- Boxedwine.orig/source/emulation/cpu/dynamic/dynamic_generic_base.h
++++ Boxedwine/source/emulation/cpu/dynamic/dynamic_generic_base.h
+@@ -1018,9 +1018,11 @@ void OPCALL firstDynamicOp(CPU* cpu, DecodedOp* op) {
+             }
+         }
+         U8* begin = (U8*)mem + memory->dynamicExecutableMemoryPos;
++        U8* outBuffer_ = outBuffer;
++        U32 outBufferPos_ = outBufferPos_;
+ 
+-        Platform::writeCodeToMemory(begin, outBufferPos, [begin, outBuffer, outBufferPos] {
+-            memcpy(begin, outBuffer, outBufferPos);
++        Platform::writeCodeToMemory(begin, outBufferPos, [begin, outBuffer_, outBufferPos_] {
++            memcpy(begin, outBuffer_, outBufferPos_);
+             });
+ 
+         memory->dynamicExecutableMemoryPos += outBufferPos;

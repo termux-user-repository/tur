@@ -1,0 +1,20 @@
+--- Boxedwine.orig/source/sdl/startupArgs.cpp	2023-01-10 04:01:17
++++ Boxedwine/source/sdl/startupArgs.cpp	2023-01-15 02:18:29
+@@ -447,7 +447,7 @@
+         U32 width = 0;
+         U32 height = 0;
+         if (KNativeSystem::getScreenDimensions(&width, &height)) {
+-#ifdef __ANDROID__
++#ifdef __ANDROID__UNUSED
+             this->screenCx = width / 2;
+             this->screenCy = height / 2;
+ #else
+@@ -740,7 +740,7 @@
+         }
+     }
+     if (!this->root.length()) {
+-#ifdef __ANDROID__
++#ifdef __ANDROID__UNUSED
+         this->root=SDL_AndroidGetExternalStoragePath();
+         this->root+="/root";
+ #else
