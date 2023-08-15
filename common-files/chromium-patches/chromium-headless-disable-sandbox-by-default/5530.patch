@@ -1,0 +1,14 @@
+--- a/headless/lib/headless_content_main_delegate.cc
++++ b/headless/lib/headless_content_main_delegate.cc
+@@ -176,6 +176,11 @@
+   if (!command_line->HasSwitch(::switches::kHeadless))
+     command_line->AppendSwitch(::switches::kHeadless);
+ 
++#ifdef __TERMUX__
++  // Always pass no sandbox on Termux.
++  command_line->AppendSwitch(sandbox::policy::switches::kNoSandbox);
++#endif
++
+ #if BUILDFLAG(IS_OZONE)
+   // The headless backend is automatically chosen for a headless build, but also
+   // adding it here allows us to run in a non-headless build too.

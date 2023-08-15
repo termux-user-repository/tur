@@ -1,0 +1,35 @@
+From 73c84b4af0d513f7d87a85583b403f40df508d1d Mon Sep 17 00:00:00 2001
+From: Stephan Hartmann <stha09@googlemail.com>
+Date: Fri, 13 Jan 2023 17:51:48 +0000
+Subject: [PATCH] libstdc++: fix incomplete type of class Group
+
+Destructor of std::unique_ptr in libstdc++ uses sizeof() which
+requires full definition of class Group for initialization of
+Section.
+
+Bug: 957519
+Change-Id: I1e021aa8f5b18066b4ec16eabda69f2b0909770d
+Reviewed-on: https://chromium-review.googlesource.com/c/chromium/src/+/4164899
+Reviewed-by: Tommy Li <tommycli@chromium.org>
+Reviewed-by: Moe Ahmadi <mahmadi@chromium.org>
+Commit-Queue: Stephan Hartmann <stha09@googlemail.com>
+Cr-Commit-Position: refs/heads/main@{#1092492}
+---
+ components/omnibox/browser/autocomplete_grouper_sections.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/components/omnibox/browser/autocomplete_grouper_sections.h b/components/omnibox/browser/autocomplete_grouper_sections.h
+index b0b865aab5e019..9f5dca11f5b4f5 100644
+--- a/components/omnibox/browser/autocomplete_grouper_sections.h
++++ b/components/omnibox/browser/autocomplete_grouper_sections.h
+@@ -8,9 +8,9 @@
+ #include <memory>
+ #include <vector>
+ 
++#include "components/omnibox/browser/autocomplete_grouper_groups.h"
+ #include "components/omnibox/browser/autocomplete_match.h"
+ 
+-class Group;
+ class Section;
+ using PGroups = std::vector<std::unique_ptr<Group>>;
+ using PSections = std::vector<std::unique_ptr<Section>>;

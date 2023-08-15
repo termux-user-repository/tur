@@ -1,0 +1,46 @@
+From 758ad0a60a0b07df75f5523508297d03b540fc8d Mon Sep 17 00:00:00 2001
+From: Jose Dapena Paz <jdapena@igalia.com>
+Date: Fri, 20 Jan 2023 22:50:43 +0000
+Subject: [PATCH] Do not load updater GN if it is disabled
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Recent changes to make chrome updater depend on systemd broke build
+on Linux systems without systemd, even if enable_updater is set to
+false.
+
+This change allows systems without systemd, but without building
+updater (as in some Yocto based builds as meta-chromium) to build
+successfully.
+
+Bug: 1409085
+Change-Id: Icb763fa728da7e6c2ec14133973bc762ebbc99d7
+Reviewed-on: https://chromium-review.googlesource.com/c/chromium/src/+/4183742
+Reviewed-by: Amy Huang <akhuang@google.com>
+Commit-Queue: José Dapena Paz <jdapena@igalia.com>
+Cr-Commit-Position: refs/heads/main@{#1095215}
+---
+ BUILD.gn | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/BUILD.gn b/BUILD.gn
+index 9f9e1e42eadf62..ea356bd6d25fe9 100644
+--- a/BUILD.gn
++++ b/BUILD.gn
+@@ -153,10 +153,11 @@ group("gn_all") {
+   }
+ 
+   if (!is_castos) {
+-    deps += [
+-      "//chrome/installer",
+-      "//chrome/updater",
+-    ]
++    deps += [ "//chrome/installer" ]
++  }
++
++  if (enable_updater) {
++    deps += [ "//chrome/updater" ]
+   }
+ 
+   if (enable_ppapi) {

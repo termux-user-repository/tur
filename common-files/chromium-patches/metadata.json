@@ -3,14 +3,16 @@
     "start": 4389
   },
   "blink-fix-narrowing/5511.patch": {
-    "start": 5481
+    "start": 5481,
+    "end": 5537
   },
   "blink-impl-wtf-stacksize/4389.patch": {
     "start": 4389,
     "end": 4960
   },
   "blink-impl-wtf-stacksize/5249.patch": {
-    "start": 4961
+    "start": 4961,
+    "end": 5544
   },
   "blink-include-cstring/4961.patch": {
     "start": 4961,
@@ -33,11 +35,19 @@
   "chromium-disable-shm/5249.patch": {
     "start": 4961
   },
+  "chromium-disable-systemd/5535.patch": {
+    "start": 5535,
+    "end": 5551
+  },
   "chromium-extensions-map/5359.patch": {
     "start": 5359
   },
   "chromium-fill-elf/4389.patch": {
     "start": 4389
+  },
+  "chromium-fix-incomplete-type-of-class-group/5500.patch": {
+    "start": 5495,
+    "end": 5537
   },
   "chromium-fix-type-for-inotify/5249.patch": {
     "start": 5249
@@ -47,7 +57,15 @@
     "end": 4472
   },
   "chromium-headless-disable-sandbox-by-default/5359.patch": {
-    "start": 5359
+    "start": 5359,
+    "end": 5529
+  },
+  "chromium-headless-disable-sandbox-by-default/5530.patch": {
+    "start": 5530,
+    "end": 5530
+  },
+  "chromium-headless-disable-sandbox-by-default/5563.patch": {
+    "start": 5531
   },
   "chromium-impl-dns/4389.patch": {
     "start": 4389,
@@ -97,13 +115,21 @@
     "end": 4960
   },
   "chromium-no-execinfo/5249.patch": {
-    "start": 4961
+    "start": 4961,
+    "end": 5562
+  },
+  "chromium-no-execinfo/5563.patch": {
+    "start": 5563
   },
   "chromium-no-futimes/4389.patch": {
     "start": 4389
   },
   "chromium-no-glibc-version/5359.patch": {
-    "start": 5359
+    "start": 5359,
+    "end": 5562
+  },
+  "chromium-no-glibc-version/5563.patch": {
+    "start": 5563
   },
   "chromium-no-priority-inheritance-locks/4389.patch": {
     "start": 4389,
@@ -131,7 +157,7 @@
   },
   "chromium-ui-use-fabsf/5481.patch": {
     "start": 5481,
-    "end": 5510
+    "end": 5487
   },
   "compiler-no-unused-but-set-variable/4389.patch": {
     "start": 4389,
