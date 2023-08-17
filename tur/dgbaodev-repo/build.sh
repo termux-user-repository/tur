@@ -10,6 +10,7 @@ termux_step_make_install() {
 	local _folder
 	for _folder in bin etc include lib lib64 libexec share tmp vars; do
 		mkdir -p $TERMUX_PREFIX/dichvucoder/$_folder
+		mkdir -p $TERMUX_PREFIX/dgbaodev/$_folder
 		touch $TERMUX_PREFIX/dichvucoder/$_folder/.placeholder
 		touch $TERMUX_PREFIX/dgbaodev/$_folder/.placeholder
 	done
