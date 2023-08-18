@@ -2,7 +2,7 @@ TERMUX_PKG_HOMEPAGE=https://scipy.org/
 TERMUX_PKG_DESCRIPTION="Fundamental algorithms for scientific computing in Python"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="1.11.1"
+TERMUX_PKG_VERSION="1.11.2"
 TERMUX_PKG_SRCURL=git+https://github.com/scipy/scipy
 TERMUX_PKG_DEPENDS="libc++, libopenblas, python, python-numpy"
 TERMUX_PKG_BUILD_DEPENDS="python-numpy-static"
@@ -27,6 +27,10 @@ bin/
 "
 
 source $TERMUX_SCRIPTDIR/common-files/setup_toolchain_gcc.sh
+
+termux_step_post_get_source() {
+	cp _setup.py setup.py
+}
 
 termux_step_configure() {
 	if $TERMUX_ON_DEVICE_BUILD; then
