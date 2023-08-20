@@ -1,0 +1,11 @@
+--- blender/intern/guardedalloc/intern/mallocn_intern.h	2023-08-20 15:41:24.566238698 +0530
++++ blender.mod/intern/guardedalloc/intern/mallocn_intern.h	2023-08-20 15:58:53.957870605 +0530
+@@ -54,7 +54,7 @@
+ 
+ #if defined(__linux__) || (defined(__FreeBSD_kernel__) && !defined(__FreeBSD__)) || defined(__GLIBC__)
+ #  include <malloc.h>
+-#  define HAVE_MALLOC_STATS
++#  define _HAVE_MALLOC_STATS
+ #elif defined(__FreeBSD__)
+ #  include <malloc_np.h>
+ #elif defined(__APPLE__)
