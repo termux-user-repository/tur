@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="Fundamental algorithms for scientific computing in Pytho
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="1.11.2"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=git+https://github.com/scipy/scipy
 TERMUX_PKG_DEPENDS="libc++, libopenblas, python, python-numpy"
 TERMUX_PKG_BUILD_DEPENDS="python-numpy-static"
@@ -59,7 +60,7 @@ termux_step_configure() {
 
 termux_step_make() {
 	pip --no-cache-dir install wheel
-	build-pip install numpy==$_NUMPY_VERSION pybind11 Cython pythran wheel
+	build-pip install numpy==$_NUMPY_VERSION pybind11 "Cython<3" pythran wheel
 
 	DEVICE_SITE=$TERMUX_PREFIX/lib/python${TERMUX_PYTHON_VERSION}/site-packages
 
