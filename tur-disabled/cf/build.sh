@@ -1,3 +1,4 @@
+# Origin repo: tur-hacking
 TERMUX_PKG_HOMEPAGE=https://wiki.teamssix.com/cf
 TERMUX_PKG_DESCRIPTION="Cloud Exploitation Framework"
 TERMUX_PKG_LICENSE="Apache-2.0"
@@ -17,7 +18,7 @@ termux_step_pre_configure() {
 }
 
 termux_step_make() {
-        cd $TERMUX_PKG_SRCDIR
+	cd $TERMUX_PKG_SRCDIR
 	go build -o cf
 }
 
