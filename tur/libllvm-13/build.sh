@@ -73,5 +73,5 @@ termux_step_post_configure() {
 }
 
 termux_step_post_make_install() {
-	ln -sfr $TERMUX_PREFIX/opt/libllvm-11/lib/libLLVM-13.so $TERMUX_PREFIX/lib/
+	ln -sfr $TERMUX_PREFIX/opt/libllvm-13/lib/libLLVM-13.so $TERMUX_PREFIX/lib/
 }
