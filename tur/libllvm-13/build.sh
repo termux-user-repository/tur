@@ -4,7 +4,7 @@ TERMUX_PKG_LICENSE="Apache-2.0"
 TERMUX_PKG_LICENSE_FILE="llvm/LICENSE.TXT"
 TERMUX_PKG_MAINTAINER="@vzYHutlL, @termux-user-repository"
 TERMUX_PKG_VERSION=13.0.1
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_REVISION=2
 TERMUX_PKG_SHA256=326335a830f2e32d06d0a36393b5455d17dc73e0bd1211065227ee014f92cbf8
 TERMUX_PKG_SRCURL=https://github.com/llvm/llvm-project/releases/download/llvmorg-$TERMUX_PKG_VERSION/llvm-project-$TERMUX_PKG_VERSION.src.tar.xz
 TERMUX_PKG_HOSTBUILD=true
@@ -73,5 +73,5 @@ termux_step_post_configure() {
 }
 
 termux_step_post_make_install() {
-	ln -sfr $TERMUX_PREFIX/opt/libllvm-11/lib/libLLVM-13.so $TERMUX_PREFIX/lib/
+	ln -sfr $TERMUX_PREFIX/opt/libllvm-13/lib/libLLVM-13.so $TERMUX_PREFIX/lib/
 }
