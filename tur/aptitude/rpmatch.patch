@@ -1,0 +1,48 @@
+diff -uNr a/src/cmdline/cmdline_prompt.cc b/src/cmdline/cmdline_prompt.cc
+--- a/src/cmdline/cmdline_prompt.cc	2020-05-21 12:32:38.000000000 +0900
++++ b/src/cmdline/cmdline_prompt.cc	2023-03-23 17:46:02.524530086 +0900
+@@ -490,6 +490,44 @@
+   return true;
+ }
+ 
++#include <langinfo.h>
++#include <stdlib.h>
++#include <regex.h>
++/* Match against one of the response patterns, compiling the pattern
++   first if necessary.  */
++static int
++rpmatch_try (const char *response,
++     const int tag, const int match, const int nomatch,
++     const char **lastp, regex_t *re)
++{
++  const char *pattern = nl_langinfo (tag);
++  if (pattern != *lastp)
++    {
++      /* The pattern has changed.  */
++      if (*lastp != NULL)
++        {
++          /* Free the old compiled pattern.  */
++          regfree (re);
++          *lastp = NULL;
++        }
++      /* Compile the pattern and cache it for future runs.  */
++      if (regcomp (re, pattern, REG_EXTENDED) != 0)
++        return -1;
++      *lastp = pattern;
++    }
++  /* Try the pattern.  */
++  return regexec (re, response, 0, NULL, 0) == 0 ? match : nomatch;
++}
++static int
++rpmatch (const char *response)
++{
++  /* We cache the response patterns and compiled regexps here.  */
++  static const char *yesexpr, *noexpr;
++  static regex_t yesre, nore;
++  return (rpmatch_try (response, YESEXPR, 1, 0, &yesexpr, &yesre) ?:
++	  rpmatch_try (response, NOEXPR, 0, -1, &noexpr, &nore));
++}
++
+ /** Checks for trust violations and displays a big fat warning if any exist.
+  *
+  *  \return true if everything is OK or the user overrode the warning.

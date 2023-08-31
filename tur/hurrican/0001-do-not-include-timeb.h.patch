@@ -1,0 +1,12 @@
+diff -ur Hurrican/src/Menu.cpp Hurrican-Mod/src/Menu.cpp
+--- a/Hurrican/src/Menu.cpp	2023-08-13 14:24:56.000000000 +0200
++++ b/Hurrican/src/Menu.cpp	2023-08-17 21:53:32.882025253 +0200
+@@ -13,7 +13,7 @@
+ // Include Dateien
+ // --------------------------------------------------------------------------------------
+ 
+-#if !defined(__AROS__) && !defined(__MORPHOS__) && !defined(__amigaos4__)
++#if !defined(__AROS__) && !defined(__MORPHOS__) && !defined(__amigaos4__) && !defined(__ANDROID__)
+ #include <sys/timeb.h>
+ #endif
+ #include <stdio.h>

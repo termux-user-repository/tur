@@ -1,0 +1,120 @@
+diff -uNr a/configure b/configure
+--- a/configure	2020-05-21 12:38:14.000000000 +0900
++++ b/configure	2023-03-23 18:32:58.204009137 +0900
+@@ -10631,7 +10631,7 @@
+ 
+ 
+ # Try to guess how to extend string traits
+-TRAITS_CLASS=""
++TRAITS_CLASS="char_traits"
+ 
+ { $as_echo "$as_me:${as_lineno-$LINENO}: checking for the name of the character traits template" >&5
+ $as_echo_n "checking for the name of the character traits template... " >&6; }
+diff -uNr a/src/aptitude.h b/src/aptitude.h
+--- a/src/aptitude.h	2020-05-21 12:32:38.000000000 +0900
++++ b/src/aptitude.h	2023-03-23 18:32:58.208009137 +0900
+@@ -29,6 +29,8 @@
+ #endif
+ 
+ # include <string.h>
++# include <gettext.h>
++# include <stdlib.h>
+ 
+ #if ENABLE_NLS
+ # include <libintl.h>
+diff -uNr a/src/generic/apt/matching/parse.h b/src/generic/apt/matching/parse.h
+--- a/src/generic/apt/matching/parse.h	2020-05-21 12:32:38.000000000 +0900
++++ b/src/generic/apt/matching/parse.h	2023-03-23 18:32:58.204009137 +0900
+@@ -22,6 +22,7 @@
+ #define PARSE_H
+ 
+ #include <cwidget/generic/util/ref_ptr.h>
++#include <vector>
+ 
+ /** \file parse.h */
+ 
+diff -uNr a/src/generic/views/download_progress.cc b/src/generic/views/download_progress.cc
+--- a/src/generic/views/download_progress.cc	2020-05-21 12:32:38.000000000 +0900
++++ b/src/generic/views/download_progress.cc	2023-03-23 18:32:58.208009137 +0900
+@@ -1,3 +1,4 @@
++#include <iostream>
+ // download_progress.cc
+ //
+ // Copyright (C) 2010 Daniel Burrows
+@@ -46,7 +47,7 @@
+ 
+     std::ostream &operator<<(std::ostream &out, const download_progress::file_progress &progress)
+     {
+-      out << "(current_size = "
++      std::cout << "(current_size = "
+           << progress.get_current_size()
+           << ", total_size = "
+           << progress.get_total_size()
+@@ -56,12 +57,12 @@
+           << progress.get_description()
+           << ", id = ";
+       if(progress.get_id())
+-        out << *progress.get_id();
++        std::cout << *progress.get_id();
+       else
+-        out << "(none)";
+-      out << ", mode = "
++        std::cout << "(none)";
++      std::cout << ", mode = "
+           << progress.get_mode();
+-      return out << ")";
++      return std::cout << ")";
+     }
+ 
+     bool download_progress::status::operator==(const status &other) const
+@@ -84,19 +85,19 @@
+ 
+       void operator()(const download_progress::file_progress &progress) const
+       {
+-        out << "progress:" << progress;
++        std::cout << "progress:" << progress;
+       }
+ 
+       void operator()(const std::string &msg) const
+       {
+-        out << "msg:\"" << msg << "\"";
++        std::cout << "msg:\"" << msg << "\"";
+       }
+     };
+ 
+     std::ostream &operator<<(std::ostream &out,
+                              const download_progress::status &status)
+     {
+-      out << "(download_rate = " << status.get_download_rate()
++      std::cout << "(download_rate = " << status.get_download_rate()
+           << ", fraction_complete = " << status.get_fraction_complete()
+           << ", time_remaining = " << status.get_time_remaining()
+           << ", active_downloads = [";
+@@ -110,11 +111,11 @@
+             = active_downloads.begin(); it != active_downloads.end(); ++it)
+         {
+           if(it != active_downloads.begin())
+-            out << ", ";
++            std::cout << ", ";
+           boost::apply_visitor(f, *it);
+         }
+ 
+-      return out << "]";
++      return std::cout << "]";
+     }
+   }
+ }
+diff -uNr a/src/ui.cc b/src/ui.cc
+--- a/src/ui.cc	2020-05-21 12:32:38.000000000 +0900
++++ b/src/ui.cc	2023-03-23 18:32:58.256009139 +0900
+@@ -694,8 +694,8 @@
+ 	{
+ 	  really_quit_active = true;
+ 	  prompt_yesno(_("Really quit Aptitude?"), false,
+-		       cw::util::arg(sigc::bind(ptr_fun(do_really_quit_answer), true)),
+-		       cw::util::arg(sigc::bind(ptr_fun(do_really_quit_answer), false)));
++		       cw::util::arg(sigc::bind(sigc::ptr_fun(do_really_quit_answer), true)),
++		       cw::util::arg(sigc::bind(sigc::ptr_fun(do_really_quit_answer), false)));
+ 	}
+     }
+   else
