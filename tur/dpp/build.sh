@@ -11,6 +11,7 @@ TERMUX_PKG_SHA256=bd39d24e01748ff4cc34ad7ca0faaa0f53542efd8843d4bcc75566a11f0f24
 
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 -DRUN_LDCONFIG=OFF
+-DAVX_TYPE=T_fallback
 "
 
 termux_step_pre_configure() {
