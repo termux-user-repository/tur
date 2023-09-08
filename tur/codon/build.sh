@@ -20,7 +20,7 @@ TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 # On ARM and i686, codon crashes:
 # JIT session error: Unsupported target machine architecture in ELF object codon-jitted-objectbuffer
 # Failure value returned from cantFail wrapped call
-TERMUX_BLACKLISTED_ARCHES="arm, i686"
+TERMUX_PKG_BLACKLISTED_ARCHES="arm, i686"
 
 termux_step_host_build() {
 	termux_setup_cmake
