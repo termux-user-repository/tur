@@ -1,0 +1,13 @@
+--- a/cmake/deps.cmake
++++ b/cmake/deps.cmake
+@@ -93,8 +93,8 @@
+ 
+ CPMAddPackage(
+     NAME openmp
+-    GITHUB_REPOSITORY "exaloop/openmp"
+-    GIT_TAG 11daa2021c590dc74a0e734b4783570b619d88c9
++    GITHUB_REPOSITORY "licy183/exaloop_openmp"
++    GIT_TAG termux-0.16.3
+     EXCLUDE_FROM_ALL YES
+     OPTIONS "CMAKE_BUILD_TYPE Release"
+             "OPENMP_ENABLE_LIBOMPTARGET OFF"
