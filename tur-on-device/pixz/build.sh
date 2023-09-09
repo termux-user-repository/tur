@@ -16,6 +16,10 @@ TERMUX_PKG_EXTRA_MAKE_ARGS="check"  ## run tests
 TERMUX_PKG_AUTO_UPDATE=true
 
 termux_step_pre_configure() {
+	if [ "${TERMUX_ON_DEVICE_BUILD}" = false ]; then
+		termux_error_exit "This package doesn't support cross-compiling."
+	fi
+
 	cd "${TERMUX_PKG_SRCDIR}"
 	## remove cppcheck from tests (errorout in v1.0.7, but it is
 	## upstream developer's duty to fix this anyway)

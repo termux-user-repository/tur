@@ -9,6 +9,12 @@ TERMUX_PKG_SHA256=0f502c1c10884a31699ac0d58d01d6cb4ca18ae59cf626b16d3327f7eb952c
 TERMUX_PKG_DEPENDS="perl, openssl"
 TERMUX_PKG_BUILD_IN_SRC=true
 
+termux_step_pre_configure() {
+	if [ "${TERMUX_ON_DEVICE_BUILD}" = false ]; then
+		termux_error_exit "This package doesn't support cross-compiling."
+	fi
+}
+
 termux_step_configure() {
 	OPENSSL_PREFIX=$TERMUX_PREFIX perl Makefile.PL PREFIX=$TERMUX_PREFIX
 }

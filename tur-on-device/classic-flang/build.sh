@@ -33,6 +33,10 @@ TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 "
 
 termux_step_pre_configure() {
+	if [ "${TERMUX_ON_DEVICE_BUILD}" = false ]; then
+		termux_error_exit "This package doesn't support cross-compiling."
+	fi
+
 	# Build libpgmath
 	pushd $TERMUX_PKG_SRCDIR/runtime/libpgmath
 	mkdir -p build && cd build

@@ -16,6 +16,10 @@ lib/python${TERMUX_PYTHON_VERSION}/site-packages/pip
 "
 
 termux_step_pre_configure() {
+	if [ "${TERMUX_ON_DEVICE_BUILD}" = false ]; then
+		termux_error_exit "This package doesn't support cross-compiling."
+	fi
+
 	LDFLAGS+=" -Wl,--no-as-needed -lpython${TERMUX_PYTHON_VERSION}"
 	TERMUX_PKG_SRCDIR+="/bindings/python"
 	TERMUX_PKG_BUILDDIR+="/bindings/python"

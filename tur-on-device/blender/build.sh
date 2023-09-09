@@ -50,6 +50,10 @@ termux_step_post_get_source() {
 }
 
 termux_step_pre_configure(){
+	if [ "${TERMUX_ON_DEVICE_BUILD}" = false ]; then
+		termux_error_exit "This package doesn't support cross-compiling."
+	fi
+
     # ld.lld: error: undefined symbol: backtrace
     LDFLAGS+=" -landroid-execinfo"
     # Position independent executables are not supported on android

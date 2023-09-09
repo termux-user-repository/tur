@@ -16,6 +16,10 @@ TERMUX_PKG_MAKE_INSTALL_TARGET="DESTDIR=/ install"
 ## Use a dummy DESTDIR to avoid installing uninstall.sh to PREFIX/bin.
 
 termux_step_configure() {
+	if [ "${TERMUX_ON_DEVICE_BUILD}" = false ]; then
+		termux_error_exit "This package doesn't support cross-compiling."
+	fi
+
 	make \
 		VAL_PREFIX=$TERMUX_PREFIX \
 		C_INCLUDE_PATH="$TERMUX_PREFIX/include" \
