@@ -31,6 +31,6 @@
 +  termux_disable_fdsan();
 +#endif
 +
-   printf("%s %s (c) 2022 by %s & %s - Please do not use in military or secret "
+   printf("%s %s (c) 2023 by %s & %s - Please do not use in military or secret "
           "service organizations, or for illegal purposes (this is non-binding, these *** ignore laws and ethics anyway).\n\n",
           PROGRAM, VERSION, AUTHOR, AUTHOR2);
