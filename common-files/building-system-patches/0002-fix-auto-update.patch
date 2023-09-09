@@ -6,7 +6,7 @@ Only search packages from TUR repository when auto-updating.
  
  if [[ "$1" == "@all" ]]; then
 -	for repo_dir in $(jq --raw-output 'del(.pkg_format) | keys | .[]' "${TERMUX_SCRIPTDIR}/repo.json"); do
-+	for repo_dir in "tur"; do
++	for repo_dir in "tur" "tur-on-device"; do
  		for pkg_dir in "${repo_dir}"/*; do
  			! _should_update "${pkg_dir}" && continue # Skip if not needed.
  			# Update all its dependencies first.
