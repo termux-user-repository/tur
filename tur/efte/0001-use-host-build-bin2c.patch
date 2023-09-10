@@ -1,0 +1,20 @@
+--- a/src/CMakeLists.txt.orig
++++ b/src/CMakeLists.txt
+@@ -145,7 +145,7 @@
+ ADD_LIBRARY( eftebase STATIC ${BASE_FTE_SOURCES} )
+ 
+ ADD_EXECUTABLE( bin2c bin2c.cpp )
+-GET_TARGET_PROPERTY( BIN2C_EXE bin2c LOCATION )
++# GET_TARGET_PROPERTY( BIN2C_EXE bin2c LOCATION )
+ 
+ # =====
+ #
+@@ -155,7 +155,7 @@
+ 
+ ADD_CUSTOM_COMMAND(
+   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/defcfg.h
+-  COMMAND ${BIN2C_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/simple.fte > ${CMAKE_CURRENT_BINARY_DIR}/defcfg.h
++  COMMAND bin2c ${CMAKE_CURRENT_SOURCE_DIR}/simple.fte > ${CMAKE_CURRENT_BINARY_DIR}/defcfg.h
+   DEPENDS bin2c simple.fte )
+ 
+ # =============================================================================
