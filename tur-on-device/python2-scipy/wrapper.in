@@ -1,0 +1,30 @@
+#!@TERMUX_PREFIX@/bin/env python
+import os
+import subprocess
+import sys
+import typing
+
+COMPLIER_PATH = "@COMPILER@"
+TERMUX_PREFIX = "@TERMUX_PREFIX@"
+
+def main(argv: typing.List[str]):
+    cwd = os.getcwd()
+    # Remove `-static-openmp` and append `-shared` if needed
+    argv_new = []
+    searched_shared = False
+    need_shared = False
+    for i, arg in enumerate(argv[1:]):
+        if arg != "-static-openmp":
+            argv_new.append(arg)
+        if arg == "-shared":
+            searched_shared = True
+        if arg == "-o":
+            if argv[i+2].endswith(".so"):
+                need_shared = True
+    if not searched_shared and need_shared:
+        argv_new = ["-shared"] + argv_new
+    args = [COMPLIER_PATH] + argv_new
+    subprocess.check_call(args, env=os.environ, cwd=cwd, text=True)
+
+if __name__ == '__main__':
+    main(sys.argv)
