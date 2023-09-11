@@ -1,0 +1,16 @@
+--- a/build/probe.pm
++++ b/build/probe.pm
+@@ -1008,6 +1008,13 @@
+ 
+ sub pthread_yield {
+     my ($config) = @_;
++
++    if ($config->{crossconf}) {
++        warn "Guessing :-(";
++        $config->{has_pthread_yield} = 0;
++        return;
++    }
++
+     return simple_compile_probe(config => $config,
+                                 probing => 'pthread_yield support',
+                                 key => 'has_pthread_yield',
