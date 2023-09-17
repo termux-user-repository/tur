@@ -153,7 +153,8 @@
     "end": 5413
   },
   "chromium-statfs-type/5414.patch": {
-    "start": 5414
+    "start": 5414,
+    "end": 5562
   },
   "chromium-ui-use-fabsf/5481.patch": {
     "start": 5481,
@@ -336,6 +337,9 @@
   },
   "v8-do-not-use-builtin-mul/5481.patch": {
     "start": 5481
+  },
+  "v8-fix-compress-pointer-offset/5546.patch": {
+    "start": 5546
   },
   "v8-fix-trap-handler/5249.patch": {
     "start": 4961,
