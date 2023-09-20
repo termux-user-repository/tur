@@ -14,9 +14,9 @@
 --- a/src/dns_conf.h
 +++ b/src/dns_conf.h
 @@ -57,13 +57,13 @@
- #define DEFAULT_DNS_TLS_PORT 853
- #define DEFAULT_DNS_HTTPS_PORT 443
- #define DNS_MAX_CONF_CNAME_LEN 256
+ #define MAX_QTYPE_NUM 65535
+ #define DNS_MAX_REPLY_IP_NUM 8
+ 
 -#define SMARTDNS_CONF_FILE "/etc/smartdns/smartdns.conf"
 -#define SMARTDNS_LOG_FILE "/var/log/smartdns/smartdns.log"
 -#define SMARTDNS_AUDIT_FILE "/var/log/smartdns/smartdns-audit.log"
