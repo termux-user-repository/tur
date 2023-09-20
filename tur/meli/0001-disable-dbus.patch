@@ -1,0 +1,11 @@
+--- a/meli/Cargo.toml
++++ b/meli/Cargo.toml
+@@ -70,7 +70,7 @@
+ tempfile = "3.3"
+ 
+ [features]
+-default = ["sqlite3", "notmuch", "regexp", "smtp", "dbus-notifications", "gpgme", "cli-docs", "jmap", "text-processing"]
++default = ["sqlite3", "notmuch", "regexp", "smtp", "gpgme", "cli-docs", "jmap", "text-processing"]
+ notmuch = ["melib/notmuch"]
+ jmap = ["melib/jmap"]
+ sqlite3 = ["melib/sqlite3"]
