@@ -80,7 +80,11 @@
     "end": 5358
   },
   "chromium-impl-dns/5359.patch": {
-    "start": 5359
+    "start": 5359,
+    "end": 5614
+  },
+  "chromium-impl-dns/5615.patch": {
+    "start": 5615
   },
   "chromium-impl-scoped-file/5249.patch": {
     "start": 4961
@@ -143,7 +147,11 @@
     "end": 4960
   },
   "chromium-no-set-process-title/5249.patch": {
-    "start": 4961
+    "start": 4961,
+    "end": 5614
+  },
+  "chromium-no-set-process-title/5615.patch": {
+    "start": 5615
   },
   "chromium-redefine-termios2/5359.patch": {
     "start": 5359
@@ -165,7 +173,11 @@
     "end": 4472
   },
   "compiler-remove-gsimple-template-names/5414.patch": {
-    "start": 5414
+    "start": 5414,
+    "end": 5614
+  },
+  "compiler-remove-gsimple-template-names/5615.patch": {
+    "start": 5615
   },
   "compiler-remove-unsupported-flags/4961.patch": {
     "start": 4961,
@@ -176,7 +188,11 @@
     "end": 5358
   },
   "compiler-remove-unsupported-flags/5359.patch": {
-    "start": 5359
+    "start": 5359,
+    "end": 5614
+  },
+  "compiler-remove-unsupported-flags/5615.patch": {
+    "start": 5615
   },
   "compiler-use-android-target/4389.patch": {
     "start": 4389,
