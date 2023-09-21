@@ -33,15 +33,15 @@
  #define USE_RES_NINIT
 --- a/net/dns/public/resolv_reader.cc
 +++ b/net/dns/public/resolv_reader.cc
-@@ -35,6 +35,8 @@
-   if (!(res.options & RES_INIT))
-     return absl::nullopt;
+@@ -32,6 +32,8 @@
+     const struct __res_state& res) {
+   std::vector<IPEndPoint> nameservers;
  
 +#ifndef __TERMUX__
 +
- #if BUILDFLAG(IS_APPLE) || BUILDFLAG(IS_FREEBSD)
-   union res_sockaddr_union addresses[MAXNS];
-   int nscount = res_getservers(const_cast<res_state>(&res), addresses, MAXNS);
+   if (!(res.options & RES_INIT))
+     return absl::nullopt;
+ 
 @@ -88,6 +90,12 @@
    }
  #endif

@@ -14,6 +14,9 @@
     "start": 4961,
     "end": 5544
   },
+  "blink-include-bitset/5615.patch": {
+    "start": 5615
+  },
   "blink-include-cstring/4961.patch": {
     "start": 4961,
     "end": 5005
