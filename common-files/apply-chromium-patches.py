@@ -95,25 +95,25 @@ def check_metadata(metadata_dict):
 def apply_patch(patch_file, dry_run):
   try:
     subprocess.check_call(
-      ["patch", "-s", "--dry-run", "-t", "-p1", "-i", patch_file],
+      ["patch", "-s", "--dry-run", "-p1", "-i", patch_file],
       stdin=subprocess.DEVNULL
     )
   except:
     return False
   if dry_run: return True
-  subprocess.check_call(["patch", "-s", "-p1", "-t", "-i", patch_file])
+  subprocess.check_call(["patch", "-s", "-p1", "-i", patch_file])
   return True
 
 def revert_patch(patch_file, dry_run):
   try:
     subprocess.check_call(
-      ["patch", "-s", "-R", "-f", "--dry-run", "-p1", "-i", patch_file],
+      ["patch", "-s", "-R", "--dry-run", "-p1", "-i", patch_file],
       stdin=subprocess.DEVNULL
     )
   except:
     return False
   if dry_run: return True
-  subprocess.check_call(["patch", "-s", "-R", "-f", "-p1", "-i", patch_file])
+  subprocess.check_call(["patch", "-s", "-R", "-p1", "-i", patch_file])
   return True
 
 def parse_chromium_version(version_str, p):
@@ -135,12 +135,13 @@ def parse_metadata(filepath):
     raise e
 
 def execute(args, p):
-  is_revert_mode = args.revert
   is_dry_run_mode = args.dry_run
   is_electron_skipped_mode = args.electron
   _, _, build_v, patch_v = parse_chromium_version(args.CHROMIUM_VERSION, p)
   logger.debug("Got chromium version %s", args.CHROMIUM_VERSION)
   metadata = parse_metadata(METADATA_FILE)
+  need_revert = False
+  applied_patches = []
   for patch_path, patch_info in metadata.items():
     excluded = patch_info.get("excluded", [])
     start_v = patch_info.get("start", 0)
@@ -153,14 +154,22 @@ def execute(args, p):
       if is_electron_skipped_mode and is_electron_broken:
         logger.info(f"Skip patch {patch_path} for electron.")
         continue
-      ope_func = revert_patch if is_revert_mode else apply_patch
-      ope_str = "revert" if is_revert_mode else "apply"
-      logger.info("%sing %s...", ope_str.capitalize(), patch_path)
-      if not ope_func(os.path.join(PATCHES_DIR, patch_path), is_dry_run_mode):
-        logger.error("Failed to %s %s: ignoring", ope_str, patch_path)
+      logger.info("Applying %s...", patch_path)
+      if not apply_patch(os.path.join(PATCHES_DIR, patch_path), is_dry_run_mode):
+        need_revert = True
+        logger.error("Failed to apply %s", patch_path)
+        break
+      else:
+        applied_patches.append(patch_path)
+  if need_revert:
+    logger.info("Reverting patches due to previous error...")
+    for patch_path in applied_patches[::-1]:
+      logger.info("Reverting %s...", patch_path)
+      revert_patch(os.path.join(PATCHES_DIR, patch_path), is_dry_run_mode)
+    exit(1)
 
 def main():
-  p = argparse.ArgumentParser(description="Apply/Revert patches for chromium based on versions.")
+  p = argparse.ArgumentParser(description="Apply patches for chromium based on versions.")
   p.add_argument(
     "-v",
     "--verbose",
@@ -168,14 +177,6 @@ def main():
     dest="verbose",
     default=0,
     help="Give more output. Option is additive",
-  )
-  p.add_argument(
-    "-R",
-    "--revert",
-    action="store_true",
-    dest="revert",
-    default=False,
-    help="Set to revert mode.",
   )
   p.add_argument(
     "--dry-run",
