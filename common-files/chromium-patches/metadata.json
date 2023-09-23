@@ -240,7 +240,11 @@
     "start": 5249
   },
   "crypt-fix-dynamic-loaded-libraries/4389.patch": {
-    "start": 4389
+    "start": 4389,
+    "end": 5671
+  },
+  "crypt-fix-dynamic-loaded-libraries/5672.patch": {
+    "start": 5672
   },
   "dav1d-no-get-affinity/5249.patch": {
     "start": 4961
@@ -378,7 +382,11 @@
     "end": 5480
   },
   "vk-layers-no-android-log/5511.patch": {
-    "start": 5481
+    "start": 5481,
+    "end": 5671
+  },
+  "vk-layers-no-android-log/5672.patch": {
+    "start": 5672
   },
   "wayland-memfd_create/5359.patch": {
     "start": 5359
