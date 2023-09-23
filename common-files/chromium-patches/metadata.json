@@ -1,4 +1,7 @@
 {
+  "angle-fix-atomic/5615.patch": {
+    "start": 5615
+  },
   "angle-no-android-jni/4389.patch": {
     "start": 4389
   },
