@@ -1,0 +1,752 @@
+https://github.com/chromium/chromium/commit/4928fbb26b8f7e2ecc5f7d83db337f394fa67a48
+--- a/components/version_info/version_info.h
++++ b/components/version_info/version_info.h
+@@ -9,6 +9,7 @@
+ 
+ #include "base/notreached.h"
+ #include "base/sanitizer_buildflags.h"
++#include "base/strings/string_piece.h"
+ #include "build/branding_buildflags.h"
+ #include "build/build_config.h"
+ #include "components/version_info/channel.h"
+@@ -27,19 +28,19 @@
+     const std::string& build_version);
+ 
+ // Returns the product name, e.g. "Chromium" or "Google Chrome".
+-constexpr std::string GetProductName() {
++constexpr base::StringPiece GetProductName() {
+   return PRODUCT_NAME;
+ }
+ 
+ // Returns the version number, e.g. "6.0.490.1".
+-constexpr std::string GetVersionNumber() {
++constexpr base::StringPiece GetVersionNumber() {
+   return PRODUCT_VERSION;
+ }
+ 
+ // Returns the product name and version information for the User-Agent header,
+ // in the format: Chrome/<major_version>.<minor_version>.<build>.<patch>.
+-constexpr std::string GetProductNameAndVersionForUserAgent() {
+-  return "Chrome/" + GetVersionNumber();
++constexpr base::StringPiece GetProductNameAndVersionForUserAgent() {
++  return "Chrome/" PRODUCT_VERSION;
+ }
+ 
+ // Returns the major component (aka the milestone) of the version as an int,
+@@ -53,7 +54,7 @@
+ const base::Version& GetVersion();
+ 
+ // Returns a version control specific identifier of this release.
+-constexpr std::string GetLastChange() {
++constexpr base::StringPiece GetLastChange() {
+   return LAST_CHANGE;
+ }
+ 
+@@ -65,7 +66,7 @@
+ }
+ 
+ // Returns the OS type, e.g. "Windows", "Linux", "FreeBSD", ...
+-constexpr std::string GetOSType() {
++constexpr base::StringPiece GetOSType() {
+ #if BUILDFLAG(IS_WIN)
+   return "Windows";
+ #elif BUILDFLAG(IS_IOS)
+@@ -97,7 +98,7 @@
+ 
+ // Returns a string equivalent of |channel|, independent of whether the build
+ // is branded or not and without any additional modifiers.
+-constexpr std::string GetChannelString(Channel channel) {
++constexpr base::StringPiece GetChannelString(Channel channel) {
+   switch (channel) {
+     case Channel::STABLE:
+       return "stable";
+@@ -114,7 +115,7 @@
+ }
+ 
+ // Returns a list of sanitizers enabled in this build.
+-constexpr std::string GetSanitizerList() {
++constexpr base::StringPiece GetSanitizerList() {
+   return ""
+ #if defined(ADDRESS_SANITIZER)
+          "address "
+--- a/chrome/browser/ui/autofill/risk_util.cc
++++ b/chrome/browser/ui/autofill/risk_util.cc
+@@ -4,6 +4,7 @@
+ 
+ #include "chrome/browser/ui/autofill/risk_util.h"
+ 
++#include <string>
+ #include <memory>
+ 
+ #include "base/base64.h"
+@@ -102,7 +101,7 @@
+ 
+   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
+   risk::GetFingerprint(obfuscated_gaia_id, window_bounds, web_contents,
+-                       version_info::GetVersionNumber(), charset,
++                       std::string(version_info::GetVersionNumber()), charset,
+                        accept_languages, install_time,
+                        g_browser_process->GetApplicationLocale(),
+                        embedder_support::GetUserAgent(),
+--- a/chrome/browser/extensions/api/identity/identity_get_auth_token_function.cc
++++ b/chrome/browser/extensions/api/identity/identity_get_auth_token_function.cc
+@@ -60,11 +60,11 @@
+ }
+ 
+ std::string GetOAuth2MintTokenFlowVersion() {
+-  return version_info::GetVersionNumber();
++  return std::string(version_info::GetVersionNumber());
+ }
+ 
+ std::string GetOAuth2MintTokenFlowChannel() {
+-  return version_info::GetChannelString(chrome::GetChannel());
++  return std::string(version_info::GetChannelString(chrome::GetChannel()));
+ }
+ 
+ void RecordFunctionResult(const IdentityGetAuthTokenError& error,
+--- a/chrome/browser/extensions/preinstalled_apps.cc
++++ b/chrome/browser/extensions/preinstalled_apps.cc
+@@ -89,7 +89,7 @@
+       // Pre-installed apps are only installed on profile creation or a new
+       // chrome download.
+       bool is_new_profile = profile_->WasCreatedByVersionOrLater(
+-          version_info::GetVersionNumber());
++          std::string(version_info::GetVersionNumber()));
+       if (is_new_profile && preinstalled_apps_enabled_) {
+         new_install_state = kAlreadyInstalledPreinstalledApps;
+         perform_new_installation_ = true;
+--- a/chrome/browser/extensions/chrome_extensions_browser_client.cc
++++ b/chrome/browser/extensions/chrome_extensions_browser_client.cc
+@@ -381,7 +381,7 @@
+     last_version = base::Version(last_version_str);
+   }
+ 
+-  std::string current_version_str = version_info::GetVersionNumber();
++  std::string current_version_str(version_info::GetVersionNumber());
+   const base::Version& current_version = version_info::GetVersion();
+   pref_service->SetString(pref_names::kLastChromeVersion, current_version_str);
+ 
+--- a/chrome/browser/media/router/providers/cast/chrome_cast_message_handler.cc
++++ b/chrome/browser/media/router/providers/cast/chrome_cast_message_handler.cc
+@@ -36,7 +36,8 @@
+       new cast_channel::CastMessageHandler(
+           cast_channel::CastSocketService::GetInstance(),
+           base::BindRepeating(&ParseJsonFromIoThread),
+-          embedder_support::GetUserAgent(), version_info::GetVersionNumber(),
++          embedder_support::GetUserAgent(),
++          std::string(version_info::GetVersionNumber()),
+           g_browser_process->GetApplicationLocale());
+   return instance;
+ }
+--- a/chrome/browser/media/router/discovery/dial/dial_service_impl.cc
++++ b/chrome/browser/media/router/discovery/dial/dial_service_impl.cc
+@@ -125,9 +125,9 @@
+       "USER-AGENT: %s/%s %s\r\n"
+       "\r\n",
+       kDialRequestAddress, kDialRequestPort, kDialMaxResponseDelaySecs,
+-      kDialSearchType, version_info::GetProductName().c_str(),
+-      version_info::GetVersionNumber().c_str(),
+-      version_info::GetOSType().c_str()));
++      kDialSearchType, version_info::GetProductName().data(),
++      version_info::GetVersionNumber().data(),
++      version_info::GetOSType().data()));
+   // 1500 is a good MTU value for most Ethernet LANs.
+   DCHECK_LE(request.size(), 1500U);
+   return request;
+--- a/chrome/browser/ui/webui/autofill_and_password_manager_internals/internals_ui_handler.cc
++++ b/chrome/browser/ui/webui/autofill_and_password_manager_internals/internals_ui_handler.cc
+@@ -37,13 +37,15 @@
+                           IDR_AUTOFILL_AND_PASSWORD_MANAGER_INTERNALS_JS);
+   source->SetDefaultResource(IDR_AUTOFILL_AND_PASSWORD_MANAGER_INTERNALS_HTML);
+   // Data strings:
+-  source->AddString(version_ui::kVersion, version_info::GetVersionNumber());
++  source->AddString(version_ui::kVersion,
++                    std::string(version_info::GetVersionNumber()));
+   source->AddString(version_ui::kOfficial, version_info::IsOfficialBuild()
+                                                ? "official"
+                                                : "Developer build");
+   source->AddString(version_ui::kVersionModifier,
+                     chrome::GetChannelName(chrome::WithExtendedStable(true)));
+-  source->AddString(version_ui::kCL, version_info::GetLastChange());
++  source->AddString(version_ui::kCL,
++                    std::string(version_info::GetLastChange()));
+   source->AddString(version_ui::kUserAgent, embedder_support::GetUserAgent());
+   source->AddString("app_locale", g_browser_process->GetApplicationLocale());
+ }
+--- a/chrome/browser/ui/webui/flags/flags_ui.cc
++++ b/chrome/browser/ui/webui/flags/flags_ui.cc
+@@ -70,7 +70,8 @@
+   source->OverrideContentSecurityPolicy(
+       network::mojom::CSPDirectiveName::TrustedTypes,
+       "trusted-types jstemplate;");
+-  source->AddString(flags_ui::kVersion, version_info::GetVersionNumber());
++  source->AddString(flags_ui::kVersion,
++                    std::string(version_info::GetVersionNumber()));
+ 
+ #if BUILDFLAG(IS_CHROMEOS_ASH)
+   if (!user_manager::UserManager::Get()->IsCurrentUserOwner() &&
+--- a/chrome/browser/ui/webui/version/version_ui.cc
++++ b/chrome/browser/ui/webui/version/version_ui.cc
+@@ -201,7 +201,7 @@
+ 
+   // Data strings.
+   html_source->AddString(version_ui::kVersion,
+-                         version_info::GetVersionNumber());
++                         std::string(version_info::GetVersionNumber()));
+ 
+   html_source->AddString(version_ui::kVersionModifier, GetProductModifier());
+ 
+@@ -217,7 +217,8 @@
+       base::i18n::MessageFormatter::FormatWithNumberedArgs(
+           l10n_util::GetStringUTF16(IDS_ABOUT_VERSION_COPYRIGHT),
+           base::Time::Now()));
+-  html_source->AddString(version_ui::kCL, version_info::GetLastChange());
++  html_source->AddString(version_ui::kCL,
++                         std::string(version_info::GetLastChange()));
+   html_source->AddString(version_ui::kUserAgent,
+                          embedder_support::GetUserAgent());
+   // Note that the executable path and profile path are retrieved asynchronously
+@@ -229,7 +230,8 @@
+ #if BUILDFLAG(IS_MAC)
+   html_source->AddString(version_ui::kOSType, base::mac::GetOSDisplayName());
+ #elif !BUILDFLAG(IS_CHROMEOS_ASH)
+-  html_source->AddString(version_ui::kOSType, version_info::GetOSType());
++  html_source->AddString(version_ui::kOSType,
++                         std::string(version_info::GetOSType()));
+ #endif  // BUILDFLAG(IS_MAC)
+ 
+ #if BUILDFLAG(IS_ANDROID)
+@@ -275,7 +277,7 @@
+ #endif  // BUILDFLAG(IS_WIN)
+ 
+   html_source->AddString(version_ui::kSanitizer,
+-                         version_info::GetSanitizerList());
++                         std::string(version_info::GetSanitizerList()));
+ }
+ 
+ #if !BUILDFLAG(IS_ANDROID)
+--- a/chrome/browser/ui/views/chrome_views_delegate.cc
++++ b/chrome/browser/ui/views/chrome_views_delegate.cc
+@@ -210,5 +210,5 @@
+ }
+ 
+ std::string ChromeViewsDelegate::GetApplicationName() {
+-  return version_info::GetProductName();
++  return std::string(version_info::GetProductName());
+ }
+--- a/components/policy/core/common/cloud/cloud_policy_util.cc
++++ b/components/policy/core/common/cloud/cloud_policy_util.cc
+@@ -155,7 +155,7 @@
+ }
+ 
+ std::string GetOSPlatform() {
+-  return version_info::GetOSType();
++  return std::string(version_info::GetOSType());
+ }
+ 
+ std::string GetOSArchitecture() {
+--- a/components/update_client/update_query_params.cc
++++ b/components/update_client/update_query_params.cc
+@@ -149,7 +149,7 @@
+ 
+ // static
+ std::string UpdateQueryParams::GetProdVersion() {
+-  return version_info::GetVersionNumber();
++  return std::string(version_info::GetVersionNumber());
+ }
+ 
+ // static
+--- a/components/autofill/core/browser/form_structure.cc
++++ b/components/autofill/core/browser/form_structure.cc
+@@ -11,6 +11,7 @@
+ #include <deque>
+ #include <map>
+ #include <memory>
++#include <string>
+ #include <unordered_map>
+ #include <unordered_set>
+ #include <utility>
+@@ -414,7 +415,7 @@
+   AutofillUploadContents upload;
+   upload.set_submission(observed_submission);
+   upload.set_client_version(
+-      version_info::GetProductNameAndVersionForUserAgent());
++      std::string(version_info::GetProductNameAndVersionForUserAgent()));
+   upload.set_form_signature(form_signature().value());
+   upload.set_autofill_used(form_was_autofilled);
+   upload.set_data_present(data_present);
+@@ -500,7 +501,7 @@
+        base::flat_map<FormGlobalId, FormSignature>(std::move(subforms))) {
+     uploads.emplace_back();
+     uploads.back().set_client_version(
+-        version_info::GetProductNameAndVersionForUserAgent());
++        std::string(version_info::GetProductNameAndVersionForUserAgent()));
+     uploads.back().set_form_signature(subform_signature.value());
+     uploads.back().set_autofill_used(form_was_autofilled);
+     uploads.back().set_data_present(data_present);
+@@ -521,7 +522,7 @@
+   queried_form_signatures->reserve(forms.size());
+ 
+   query->set_client_version(
+-      version_info::GetProductNameAndVersionForUserAgent());
++      std::string(version_info::GetProductNameAndVersionForUserAgent()));
+ 
+   // If a page contains repeated forms, detect that and encode only one form as
+   // the returned data would be the same for all the repeated forms.
+--- a/components/component_updater/configurator_impl.cc
++++ b/components/component_updater/configurator_impl.cc
+@@ -89,7 +89,7 @@
+ }
+ 
+ std::string ConfiguratorImpl::GetOSLongName() const {
+-  return version_info::GetOSType();
++  return std::string(version_info::GetOSType());
+ }
+ 
+ base::flat_map<std::string, std::string> ConfiguratorImpl::ExtraRequestParams()
+--- a/components/safe_browsing/core/browser/user_population.cc
++++ b/components/safe_browsing/core/browser/user_population.cc
+@@ -57,8 +57,8 @@
+       GetProfileManagementStatus(browser_policy_connector));
+ 
+   std::string user_agent =
+-      version_info::GetProductNameAndVersionForUserAgent() + "/" +
+-      version_info::GetOSType();
++      std::string(version_info::GetProductNameAndVersionForUserAgent())
++       + "/" + std::string(version_info::GetOSType());
+   population.set_user_agent(user_agent);
+ 
+   if (num_profiles)
+--- a/components/embedder_support/user_agent_utils.cc
++++ b/components/embedder_support/user_agent_utils.cc
+@@ -4,6 +4,7 @@
+ 
+ #include "components/embedder_support/user_agent_utils.h"
+ 
++#include <string>
+ #include <vector>
+ 
+ #include "base/command_line.h"
+@@ -233,8 +234,7 @@
+   if (ShouldForceMajorVersionToMinorPosition(options.force_major_to_minor))
+     return GetMajorInMinorVersionNumber();
+ 
+-  const std::string& version_str = version_info::GetVersionNumber();
+-  return version_str;
++  return std::string(version_info::GetVersionNumber());
+ }
+ 
+ const blink::UserAgentBrandList GetUserAgentBrandList(
+@@ -247,7 +247,7 @@
+   DCHECK(parse_result);
+   absl::optional<std::string> brand;
+ #if !BUILDFLAG(CHROMIUM_BRANDING)
+-  brand = version_info::GetProductName();
++  brand = std::string(version_info::GetProductName());
+ #endif
+   absl::optional<std::string> maybe_brand_override =
+       base::GetFieldTrialParamValueByFeature(features::kGreaseUACH,
+@@ -275,7 +275,7 @@
+     bool enable_updated_grease_by_policy) {
+   return GetUserAgentBrandList(version_info::GetMajorVersionNumber(),
+                                enable_updated_grease_by_policy,
+-                               version_info::GetVersionNumber(),
++                               std::string(version_info::GetVersionNumber()),
+                                blink::UserAgentBrandVersionType::kMajorVersion);
+ }
+ 
+@@ -293,7 +293,7 @@
+     bool enable_updated_grease_by_policy) {
+   return GetUserAgentBrandList(version_info::GetMajorVersionNumber(),
+                                enable_updated_grease_by_policy,
+-                               version_info::GetVersionNumber(),
++                               std::string(version_info::GetVersionNumber()),
+                                blink::UserAgentBrandVersionType::kFullVersion);
+ }
+ 
+@@ -363,7 +363,7 @@
+       return version_info::GetProductNameAndVersionForReducedUserAgent(
+           blink::features::kUserAgentFrozenBuildVersion.Get().data());
+     } else {
+-      return version_info::GetProductNameAndVersionForUserAgent();
++      return std::string(version_info::GetProductNameAndVersionForUserAgent());
+     }
+   }
+ }
+@@ -565,7 +565,7 @@
+   return "Chromium OS";
+ # endif
+ #else
+-  return version_info::GetOSType();
++  return std::string(version_info::GetOSType());
+ #endif
+ }
+ 
+--- a/components/enterprise/browser/reporting/browser_report_generator.cc
++++ b/components/enterprise/browser/reporting/browser_report_generator.cc
+@@ -4,6 +4,7 @@
+ 
+ #include "components/enterprise/browser/reporting/browser_report_generator.h"
+ 
++#include <string>
+ #include <utility>
+ 
+ #include "base/notreached.h"
+@@ -57,7 +58,7 @@
+ #endif  // BUILDFLAG(IS_CHROMEOS_ASH)
+ 
+   if (contains_version_and_channel) {
+-    report->set_browser_version(version_info::GetVersionNumber());
++    report->set_browser_version(std::string(version_info::GetVersionNumber()));
+     report->set_channel(policy::ConvertToProtoChannel(delegate_->GetChannel()));
+     if (delegate_->IsExtendedStableChannel())
+       report->set_is_extended_stable_channel(true);
+--- a/components/gcm_driver/gcm_desktop_utils.cc
++++ b/components/gcm_driver/gcm_desktop_utils.cc
+@@ -57,7 +57,7 @@
+ }
+ 
+ std::string GetVersion() {
+-  return version_info::GetVersionNumber();
++  return std::string(version_info::GetVersionNumber());
+ }
+ 
+ GCMClient::ChromeBuildInfo GetChromeBuildInfo(
+--- a/components/metrics/version_utils.cc
++++ b/components/metrics/version_utils.cc
+@@ -16,7 +16,7 @@
+ namespace metrics {
+ 
+ std::string GetVersionString() {
+-  std::string version = version_info::GetVersionNumber();
++  std::string version = std::string(version_info::GetVersionNumber());
+ #if defined(ARCH_CPU_64_BITS)
+   version += "-64";
+ #endif  // defined(ARCH_CPU_64_BITS)
+--- a/components/policy/core/browser/webui/json_generation.cc
++++ b/components/policy/core/browser/webui/json_generation.cc
+@@ -45,7 +45,7 @@
+   chrome_metadata.Set("application", params.application_name);
+ 
+   std::string version = base::StringPrintf(
+-      "%s (%s)%s %s%s", version_info::GetVersionNumber().c_str(),
++      "%s (%s)%s %s%s", version_info::GetVersionNumber().data(),
+       l10n_util::GetStringUTF8(version_info::IsOfficialBuild()
+                                    ? IDS_VERSION_UI_OFFICIAL
+                                    : IDS_VERSION_UI_UNOFFICIAL)
+--- a/components/policy/core/common/policy_logger.cc
++++ b/components/policy/core/common/policy_logger.cc
+@@ -60,7 +60,7 @@
+ // Constructs the URL for Chromium Code Search that points to the line of code
+ // that generated the log and the Chromium git revision hash.
+ std::string GetLineURL(const base::Location location) {
+-  std::string last_change = version_info::GetLastChange();
++  std::string last_change = std::string(version_info::GetLastChange());
+ 
+   // The substring separates the last change commit hash from the branch name on
+   // the '-'.
+--- a/components/safe_browsing/core/browser/db/v4_protocol_manager_util.cc
++++ b/components/safe_browsing/core/browser/db/v4_protocol_manager_util.cc
+@@ -81,7 +81,7 @@
+                                      bool disable_auto_update) {
+   return V4ProtocolConfig(client_name, disable_auto_update,
+                           google_apis::GetAPIKey(),
+-                          version_info::GetVersionNumber());
++                          std::string(version_info::GetVersionNumber()));
+ }
+ 
+ void SetSbV4UrlPrefixForTesting(const char* url_prefix) {
+--- a/components/security_interstitials/content/certificate_error_report.cc
++++ b/components/security_interstitials/content/certificate_error_report.cc
+@@ -508,8 +508,8 @@
+       chrome_browser_ssl::CertLoggerFeaturesInfo::ANDROID_AIA_FETCHING_ENABLED);
+ #endif
+ 
+-  cert_report_->set_chrome_version(version_info::GetVersionNumber());
+-  cert_report_->set_os_type(version_info::GetOSType());
++  cert_report_->set_chrome_version(std::string(version_info::GetVersionNumber()));
++  cert_report_->set_os_type(std::string(version_info::GetOSType()));
+   cert_report_->set_os_version(base::SysInfo::OperatingSystemVersion());
+   cert_report_->set_hardware_model_name(base::SysInfo::HardwareModelName());
+   cert_report_->set_os_architecture(
+--- a/components/sync/driver/sync_internals_util.cc
++++ b/components/sync/driver/sync_internals_util.cc
+@@ -230,9 +230,11 @@
+   } else {
+     version_modifier = " " + version_modifier;
+   }
+-  return version_info::GetProductName() + " " + version_info::GetOSType() +
+-         " " + version_info::GetVersionNumber() + " (" +
+-         version_info::GetLastChange() + ")" + version_modifier;
++  return std::string(version_info::GetProductName()) + 
++         " " + std::string(version_info::GetOSType()) +
++         " " + std::string(version_info::GetVersionNumber()) + 
++         " (" + std::string(version_info::GetLastChange()) + 
++         ")" + version_modifier;
+ }
+ 
+ std::string GetTimeStr(base::Time time,
+--- a/components/sync/base/sync_util.cc
++++ b/components/sync/base/sync_util.cc
+@@ -58,12 +58,12 @@
+   std::string user_agent;
+   user_agent = product + " ";
+   user_agent += system;
+-  user_agent += version_info::GetVersionNumber();
+-  user_agent += " (" + version_info::GetLastChange() + ")";
++  user_agent += std::string(version_info::GetVersionNumber());
++  user_agent += " (" + std::string(version_info::GetLastChange()) + ")";
+   if (!version_info::IsOfficialBuild()) {
+     user_agent += "-devel";
+   } else {
+-    user_agent += " channel(" + version_info::GetChannelString(channel) + ")";
++    user_agent += " channel(" + std::string(version_info::GetChannelString(channel)) + ")";
+   }
+   return user_agent;
+ }
+--- a/components/version_info/version_string.cc
++++ b/components/version_info/version_string.cc
+@@ -15,14 +15,14 @@
+ 
+ std::string GetVersionStringWithModifier(const std::string& modifier) {
+   std::string current_version;
+-  current_version += GetVersionNumber();
++  current_version += std::string(GetVersionNumber());
+ #if defined(USE_UNOFFICIAL_VERSION_NUMBER)
+   current_version += " (";
+   current_version += l10n_util::GetStringUTF8(IDS_VERSION_UI_UNOFFICIAL);
+   current_version += " ";
+-  current_version += GetLastChange();
++  current_version += std::string(GetLastChange());
+   current_version += " ";
+-  current_version += GetOSType();
++  current_version += std::string(GetOSType());
+   current_version += ")";
+ #endif  // USE_UNOFFICIAL_VERSION_NUMBER
+   if (!modifier.empty())
+--- a/services/network/sct_auditing/sct_auditing_cache.cc
++++ b/services/network/sct_auditing/sct_auditing_cache.cc
+@@ -134,7 +134,8 @@
+   }
+   RecordSCTAuditingReportDeduplicatedMetrics(false);
+ 
+-  report->set_user_agent(version_info::GetProductNameAndVersionForUserAgent());
++  report->set_user_agent(
++    std::string(version_info::GetProductNameAndVersionForUserAgent()));
+ 
+   // Add `cache_key` to the dedupe cache. The cache value is not used.
+   dedupe_cache_.Put(cache_key, true);
+--- a/chrome/app/chrome_main_delegate.cc
++++ b/chrome/app/chrome_main_delegate.cc
+@@ -391,15 +395,15 @@
+ bool HandleVersionSwitches(const base::CommandLine& command_line) {
+ #if !BUILDFLAG(IS_MAC)
+   if (command_line.HasSwitch(switches::kProductVersion)) {
+-    printf("%s\n", version_info::GetVersionNumber().c_str());
++    printf("%s\n", version_info::GetVersionNumber().data());
+     return true;
+   }
+ #endif
+ 
+   if (command_line.HasSwitch(switches::kVersion)) {
+-    printf("%s %s %s\n", version_info::GetProductName().c_str(),
+-           version_info::GetVersionNumber().c_str(),
+-           chrome::GetChannelName(chrome::WithExtendedStable(true)).c_str());
++    printf("%s %s %s\n", version_info::GetProductName().data(),
++           version_info::GetVersionNumber().data(),
++           chrome::GetChannelName(chrome::WithExtendedStable(true)).data());
+     return true;
+   }
+ 
+--- a/chrome/browser/update_client/chrome_update_query_params_delegate.cc
++++ b/chrome/browser/update_client/chrome_update_query_params_delegate.cc
+@@ -33,7 +33,7 @@
+   return base::StringPrintf(
+       "&prodchannel=%s&prodversion=%s&lang=%s",
+       chrome::GetChannelName(chrome::WithExtendedStable(true)).c_str(),
+-      version_info::GetVersionNumber().c_str(), GetLang());
++      version_info::GetVersionNumber().data(), GetLang());
+ }
+ 
+ // static
+--- a/chrome/browser/diagnostics/recon_diagnostics.cc
++++ b/chrome/browser/diagnostics/recon_diagnostics.cc
+@@ -297,7 +297,7 @@
+   VersionTest& operator=(const VersionTest&) = delete;
+ 
+   bool ExecuteImpl(DiagnosticsModel::Observer* observer) override {
+-    std::string current_version = version_info::GetVersionNumber();
++    std::string current_version(version_info::GetVersionNumber());
+     if (current_version.empty()) {
+       RecordFailure(DIAG_RECON_EMPTY_VERSION, "Empty Version");
+       return true;
+--- a/chrome/browser/enterprise/connectors/connectors_service.cc
++++ b/chrome/browser/enterprise/connectors/connectors_service.cc
+@@ -75,7 +75,7 @@
+   base::FilePath browser_id;
+   if (base::PathService::Get(base::DIR_EXE, &browser_id))
+     browser_proto->set_browser_id(browser_id.AsUTF8Unsafe());
+-  browser_proto->set_chrome_version(version_info::GetVersionNumber());
++  browser_proto->set_chrome_version(std::string(version_info::GetVersionNumber()));
+   if (include_device_info)
+     browser_proto->set_machine_user(policy::GetOSUsername());
+ }
+--- a/chrome/browser/enterprise/connectors/reporting/crash_reporting_context.cc
++++ b/chrome/browser/enterprise/connectors/reporting/crash_reporting_context.cc
+@@ -158,10 +158,10 @@
+   }
+   absl::optional<ReportingSettings> settings =
+       reporting_client->GetReportingSettings();
+-  const std::string version = version_info::GetVersionNumber();
+-  const std::string channel =
+-      version_info::GetChannelString(chrome::GetChannel());
+-  const std::string platform = version_info::GetOSType();
++  const std::string version(version_info::GetVersionNumber());
++  const std::string channel(
++      version_info::GetChannelString(chrome::GetChannel()));
++  const std::string platform(version_info::GetOSType());
+ 
+   int64_t latest_creation_time = -1;
+ 
+--- a/chrome/browser/enterprise/signals/context_info_fetcher.cc
++++ b/chrome/browser/enterprise/signals/context_info_fetcher.cc
+@@ -218,7 +218,7 @@
+       GetAnalysisConnectorProviders(enterprise_connectors::PRINT);
+   info.realtime_url_check_mode = GetRealtimeUrlCheckMode();
+   info.on_security_event_providers = GetOnSecurityEventProviders();
+-  info.browser_version = version_info::GetVersionNumber();
++  info.browser_version = std::string(version_info::GetVersionNumber());
+   info.site_isolation_enabled =
+       content::SiteIsolationPolicy::UseDedicatedProcessesForAllSites();
+   info.built_in_dns_client_enabled =
+--- a/chrome/browser/chrome_content_browser_client.cc
++++ b/chrome/browser/chrome_content_browser_client.cc
+@@ -6732,7 +6732,7 @@
+ }
+ 
+ std::string ChromeContentBrowserClient::GetProduct() {
+-  return version_info::GetProductNameAndVersionForUserAgent();
++  return std::string(version_info::GetProductNameAndVersionForUserAgent());
+ }
+ 
+ std::string ChromeContentBrowserClient::GetUserAgent() {
+--- a/chrome/browser/media/webrtc/webrtc_event_log_uploader.cc
++++ b/chrome/browser/media/webrtc/webrtc_event_log_uploader.cc
+@@ -266,7 +266,7 @@
+   net::AddMultipartValueForUpload("prod", kProduct, kBoundary, std::string(),
+                                   upload_data);
+   net::AddMultipartValueForUpload("ver",
+-                                  version_info::GetVersionNumber() + "-webrtc",
++                                  std::string(version_info::GetVersionNumber()) + "-webrtc",
+                                   kBoundary, std::string(), upload_data);
+   net::AddMultipartValueForUpload("guid", "0", kBoundary, std::string(),
+                                   upload_data);
+--- a/chrome/browser/media/webrtc/webrtc_log_uploader.cc
++++ b/chrome/browser/media/webrtc/webrtc_log_uploader.cc
+@@ -378,7 +378,7 @@
+   net::AddMultipartValueForUpload("prod", product, kWebrtcLogMultipartBoundary,
+                                   "", post_data);
+   net::AddMultipartValueForUpload("ver",
+-                                  version_info::GetVersionNumber() + "-webrtc",
++                                  std::string(version_info::GetVersionNumber()) + "-webrtc",
+                                   kWebrtcLogMultipartBoundary, "", post_data);
+   net::AddMultipartValueForUpload("guid", "0", kWebrtcLogMultipartBoundary, "",
+                                   post_data);
+--- a/chrome/browser/media/webrtc/webrtc_text_log_handler.cc
++++ b/chrome/browser/media/webrtc/webrtc_text_log_handler.cc
+@@ -460,7 +460,7 @@
+   }
+ 
+   // Chrome version
+-  LogToCircularBuffer("Chrome version: " + version_info::GetVersionNumber() +
++  LogToCircularBuffer("Chrome version: " + std::string(version_info::GetVersionNumber()) +
+                       " " +
+                       chrome::GetChannelName(chrome::WithExtendedStable(true)));
+ 
+--- a/chrome/browser/net/system_network_context_manager.cc
++++ b/chrome/browser/net/system_network_context_manager.cc
+@@ -748,7 +748,7 @@
+     if (!quic_user_agent_id.empty())
+       quic_user_agent_id.push_back(' ');
+     quic_user_agent_id.append(
+-        version_info::GetProductNameAndVersionForUserAgent());
++        std::string(version_info::GetProductNameAndVersionForUserAgent()));
+     quic_user_agent_id.push_back(' ');
+     quic_user_agent_id.append(
+         content::BuildOSCpuInfo(content::IncludeAndroidBuildNumber::Exclude,
+--- a/chrome/browser/permissions/chrome_permissions_client.cc
++++ b/chrome/browser/permissions/chrome_permissions_client.cc
+@@ -266,7 +266,7 @@
+   auto prompt_parameters =
+       permissions::PermissionHatsTriggerHelper::PromptParametersForHaTS(
+           request_type, action, prompt_disposition, prompt_disposition_reason,
+-          gesture_type, version_info::GetChannelString(chrome::GetChannel()),
++          gesture_type, std::string(version_info::GetChannelString(chrome::GetChannel())),
+           is_post_prompt ? permissions::kOnPromptResolved
+                          : permissions::kOnPromptAppearing,
+           prompt_display_duration);
+--- a/chrome/browser/policy/device_management_service_configuration.cc
++++ b/chrome/browser/policy/device_management_service_configuration.cc
+@@ -45,9 +45,9 @@
+ 
+ std::string DeviceManagementServiceConfiguration::GetAgentParameter() const {
+   return base::StringPrintf("%s %s(%s)",
+-                            version_info::GetProductName().c_str(),
+-                            version_info::GetVersionNumber().c_str(),
+-                            version_info::GetLastChange().c_str());
++                            version_info::GetProductName().data(),
++                            version_info::GetVersionNumber().data(),
++                            version_info::GetLastChange().data());
+ }
+ 
+ std::string DeviceManagementServiceConfiguration::GetPlatformParameter() const {
+--- a/chrome/browser/policy/policy_ui_utils.cc
++++ b/chrome/browser/policy/policy_ui_utils.cc
+@@ -54,7 +54,7 @@
+ #elif BUILDFLAG(IS_MAC)
+   os_name = base::mac::GetOSDisplayName();
+ #else
+-  os_name = version_info::GetOSType();
++  os_name = std::string(version_info::GetOSType());
+ #if BUILDFLAG(IS_WIN)
+   os_name = os_name.value() + " " + version_utils::win::GetFullWindowsVersion();
+ #elif BUILDFLAG(IS_ANDROID)
+--- a/chrome/browser/profiles/chrome_version_service.cc
++++ b/chrome/browser/profiles/chrome_version_service.cc
+@@ -33,7 +33,7 @@
+   // If this is a new profile set version to current version, otherwise
+   // (pre-existing profile), leave pref at default value (1.0.0.0) to
+   // avoid any first-run behavior.
+-  std::string version = version_info::GetVersionNumber();
++  std::string version(version_info::GetVersionNumber());
+   if (prefs->FindPreference(prefs::kProfileCreatedByVersion)->
+       IsDefaultValue() && is_new_profile) {
+     SetVersion(prefs, version);
+--- a/chrome/browser/search_engines/ui_thread_search_terms_data.cc
++++ b/chrome/browser/search_engines/ui_thread_search_terms_data.cc
+@@ -122,11 +122,11 @@
+ // in UIThreadSearchTermsData since SearchTermsData cannot depend on src/chrome
+ // as it is shared with iOS.
+ std::string UIThreadSearchTermsData::GoogleImageSearchSource() const {
+-  std::string version(version_info::GetProductName() + " " +
+-                      version_info::GetVersionNumber());
++  std::string version(std::string(version_info::GetProductName()) + " " +
++                      std::string(version_info::GetVersionNumber()));
+   if (version_info::IsOfficialBuild())
+     version += " (Official)";
+-  version += " " + version_info::GetOSType();
++  version += " " + std::string(version_info::GetOSType());
+   // Do not distinguish extended from regular stable in image search queries.
+   std::string modifier(
+       chrome::GetChannelName(chrome::WithExtendedStable(false)));
+--- a/chrome/browser/profile_resetter/resettable_settings_snapshot.cc
++++ b/chrome/browser/profile_resetter/resettable_settings_snapshot.cc
+@@ -244,7 +244,7 @@
+           g_browser_process->GetApplicationLocale());
+   AddPair(list, l10n_util::GetStringUTF16(IDS_VERSION_UI_USER_AGENT),
+           embedder_support::GetUserAgent());
+-  std::string version = version_info::GetVersionNumber();
++  std::string version(version_info::GetVersionNumber());
+   version += chrome::GetChannelName(chrome::WithExtendedStable(true));
+   AddPair(list,
+           l10n_util::GetStringUTF16(IDS_PRODUCT_NAME),

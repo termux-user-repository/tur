@@ -1,13 +1,25 @@
 {
+  "add-missing-typename/5672.patch": {
+    "start": 5672
+  },
   "angle-fix-atomic/5615.patch": {
     "start": 5615
+  },
+  "angle-fix-specialization/5672.patch": {
+    "start": 5672
   },
   "angle-no-android-jni/4389.patch": {
     "start": 4389
   },
+  "avoid-constexpr-std-string/5672.patch": {
+    "start": 5672
+  },
   "blink-fix-narrowing/5511.patch": {
     "start": 5481,
     "end": 5537
+  },
+  "blink-fix-structured-binding-declaration/5672.patch": {
+    "start": 5672
   },
   "blink-impl-wtf-stacksize/4389.patch": {
     "start": 4389,
@@ -359,6 +371,9 @@
     "start": 5359,
     "end": 5413
   },
+  "translate_ui_languages_manager-fix-include/5672.patch": {
+    "start": 5672
+  },
   "unity-fix-dynamic-loaded-libraries/4389.patch": {
     "start": 4389
   },
@@ -394,6 +409,9 @@
   },
   "wayland-memfd_create/5359.patch": {
     "start": 5359
+  },
+  "webauthn-variant/5672.patch": {
+    "start": 5672
   },
   "webrtc_overrides-include-vector/5414.patch": {
     "start": 5414,
