@@ -1,0 +1,52 @@
+Revert https://github.com/chromium/chromium/commit/360df2f564da16a6f7cd0d5e71dc7deb95e5ccc7
+
+--- a/components/feed/core/proto/BUILD.gn
++++ b/components/feed/core/proto/BUILD.gn
+@@ -22,6 +22,7 @@ proto_library("proto_v2") {
+     "v2/wire/capabilities_debug_data.proto",
+     "v2/wire/capability.proto",
+     "v2/wire/chrome_client_info.proto",
++    "v2/wire/chrome_feed_response_metadata.proto",
+     "v2/wire/chrome_fulfillment_info.proto",
+     "v2/wire/client_info.proto",
+     "v2/wire/client_user_profiles.proto",
+@@ -69,10 +68,6 @@ proto_library("proto_v2") {
+   ]
+ }
+ 
+-proto_library("proto_ios_shared_v2") {
+-  sources = [ "v2/wire/chrome_feed_response_metadata.proto" ]
+-}
+-
+ if (is_android) {
+   proto_java_library("proto_java_v2") {
+     proto_path = "../../../../"
+--- a/components/feed/core/v2/BUILD.gn
++++ b/components/feed/core/v2/BUILD.gn
+@@ -172,7 +172,6 @@ source_set("feed_core_v2") {
+     ":ios_shared",
+     "//base",
+     "//components/feed/core/common:feed_core_common",
+-    "//components/feed/core/proto:proto_ios_shared_v2",
+     "//components/feed/core/proto:proto_v2",
+   ]
+ }
+@@ -187,7 +188,7 @@ source_set("ios_shared") {
+   deps = [
+     "//base",
+     "//components/feed/core/common:feed_core_common",
+-    "//components/feed/core/proto:proto_ios_shared_v2",
++    "//components/feed/core/proto:proto_v2",
+     "//components/prefs",
+   ]
+ }
+--- a/components/feed/core/v2/public/ios/BUILD.gn
++++ b/components/feed/core/v2/public/ios/BUILD.gn
+@@ -25,6 +25,7 @@ source_set("feed_ios_unit_tests") {
+   deps = [
+     ":feed_ios_public",
+     "//base/test:test_support",
++    "//components/feed/core/v2:feed_core_v2",
+     "//components/prefs",
+     "//components/prefs:test_support",
+     "//testing/gmock",
