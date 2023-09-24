@@ -2,10 +2,10 @@ TERMUX_PKG_HOMEPAGE=https://www.chromium.org/Home
 TERMUX_PKG_DESCRIPTION="Chromium web browser"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="Chongyun Lee <uchkks@protonmail.com>"
-_CHROMIUM_VERSION=111.0.5563.64
+_CHROMIUM_VERSION=112.0.5615.49
 TERMUX_PKG_VERSION=$_CHROMIUM_VERSION
 TERMUX_PKG_SRCURL=(https://commondatastorage.googleapis.com/chromium-browser-official/chromium-$_CHROMIUM_VERSION.tar.xz)
-TERMUX_PKG_SHA256=(7d5ca0e2bdb22a97713e6bfce74c651006d71aa883056c8e2c2a148039fe4074)
+TERMUX_PKG_SHA256=(ddfd37373c1fa0f433a6ac11f0baa2b1f3fdfb9c7b5867e32a4300f2eb5aff41)
 TERMUX_PKG_DEPENDS="atk, cups, dbus, gtk3, krb5, libc++, libxkbcommon, libminizip, libnss, libwayland, libx11, mesa, openssl, pango, pulseaudio, libdrm, libjpeg-turbo, libpng, libwebp, libflac, fontconfig, freetype, zlib, libxml2, libxslt, libopus, libsnappy"
 # TODO: Split chromium-common and chromium-headless
 # TERMUX_PKG_DEPENDS+=", chromium-common"
@@ -213,6 +213,11 @@ use_thin_lto = false
 		echo "arm_float_abi = \"softfp\"" >> $_common_args_file
 	fi
 
+	# TODO: Generate v8_context_snapshot.bin for arm
+	if [ "$TERMUX_ARCH" = "arm" ]; then
+		echo "use_v8_context_snapshot = false" >> $_common_args_file
+	fi
+
 	# Use custom toolchain
 	mkdir -p $TERMUX_PKG_CACHEDIR/custom-toolchain
 	cp -f $TERMUX_PKG_BUILDER_DIR/toolchain.gn.in $TERMUX_PKG_CACHEDIR/custom-toolchain/BUILD.gn
@@ -269,7 +274,6 @@ termux_step_make_install() {
 
 		# V8 Snapshot data
 		snapshot_blob.bin
-		v8_context_snapshot.bin
 
 		# ICU Data
 		icudtl.dat
@@ -299,6 +303,10 @@ termux_step_make_install() {
 		# Qt
 		libqt5_shim.so
 	)
+
+	if [ "$TERMUX_ARCH" != "arm" ]; then
+		normal_files+=(v8_context_snapshot.bin)
+	fi
 
 	cp "${normal_files[@]/#/out/Release/}" "$TERMUX_PREFIX/lib/chromium/"
 
