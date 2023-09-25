@@ -1,7 +1,7 @@
 Add some dependencies required by TUR-on-Device.
 --- a/scripts/setup-termux.sh
 +++ b/scripts/setup-termux.sh
-@@ -45,13 +45,30 @@
+@@ -45,12 +45,30 @@
  PACKAGES+=" xmlto"                      # Needed by git's manpage generation
  PACKAGES+=" zip"
  
@@ -18,6 +18,7 @@ Add some dependencies required by TUR-on-Device.
 +echo "index.crates.io"  >> /system/etc/static-dns-hosts.txt
 +
  # Definition of a package manager
+ export TERMUX_SCRIPTDIR=$(dirname "$(realpath "$0")")/../
  . $(dirname "$(realpath "$0")")/properties.sh
  source "$TERMUX_PREFIX/bin/termux-setup-package-manager" || true
  
@@ -29,7 +30,5 @@ Add some dependencies required by TUR-on-Device.
 +	apt dist-upgrade -o Dpkg::Options::=--force-confnew -y
 +	sed -i "s/packages.termux.dev/packages-cf.termux.dev/g" /data/data/com.termux/files/usr/etc/apt/sources.list
  	apt update
--	apt dist-upgrade -y
+ 	apt dist-upgrade -y
  	apt install -y $PACKAGES
- elif [ "$TERMUX_APP_PACKAGE_MANAGER" = "pacman" ]; then
- 	pacman -Syu $PACKAGES --needed --noconfirm
