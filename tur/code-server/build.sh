@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://github.com/coder/code-server
 TERMUX_PKG_DESCRIPTION="Run VS Code on any machine anywhere and access it in the browser"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="4.16.1"
+TERMUX_PKG_VERSION="4.17.0"
 TERMUX_PKG_SRCURL=git+https://github.com/coder/code-server
-TERMUX_PKG_DEPENDS="libandroid-spawn, libsecret, nodejs-16, ripgrep"
+TERMUX_PKG_DEPENDS="libandroid-spawn, libsecret, krb5, nodejs-lts (<< 19), ripgrep"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_HOSTBUILD=true
 TERMUX_PKG_NO_STATICSPLIT=true
@@ -19,8 +19,8 @@ termux_step_post_get_source() {
 	done
 }
 
-_setup_nodejs_16() {
-	local NODEJS_VERSION=16.20.0
+_setup_nodejs_18() {
+	local NODEJS_VERSION=18.18.0
 	local NODEJS_FOLDER=${TERMUX_PKG_CACHEDIR}/build-tools/nodejs-${NODEJS_VERSION}
 
 	if [ ! -x "$NODEJS_FOLDER/bin/node" ]; then
@@ -28,7 +28,7 @@ _setup_nodejs_16() {
 		local NODEJS_TAR_FILE=$TERMUX_PKG_TMPDIR/nodejs-$NODEJS_VERSION.tar.xz
 		termux_download https://nodejs.org/dist/v${NODEJS_VERSION}/node-v${NODEJS_VERSION}-linux-x64.tar.xz \
 			"$NODEJS_TAR_FILE" \
-			dff21020b555cc165a1ac36da7d4f6c810b35409c94e00afc51d5d370aae47ae
+			3008408e9098f2462f7b1a0f6a48b8a46079beb1c92b6ec43b04713265c96978
 		tar -xf "$NODEJS_TAR_FILE" -C "$NODEJS_FOLDER" --strip-components=1
 	fi
 	export PATH=$NODEJS_FOLDER/bin:$PATH
@@ -38,12 +38,13 @@ termux_step_host_build() {
 	export VERSION=$TERMUX_PKG_VERSION
 	mv $TERMUX_PREFIX/bin $TERMUX_PREFIX/bin.bp
 	env -i PATH="$PATH" sudo apt update
-	env -i PATH="$PATH" sudo apt install -yq libxkbfile-dev libsecret-1-dev
-	_setup_nodejs_16
+	env -i PATH="$PATH" sudo apt install -yq libxkbfile-dev libsecret-1-dev libkrb5-dev
+	_setup_nodejs_18
 	npm install yarn
 	export PATH="$TERMUX_PKG_HOSTBUILD_DIR/node_modules/.bin:$PATH"
 	cd $TERMUX_PKG_SRCDIR
 	yarn --frozen-lockfile
+	yarn add ternary-stream
 	yarn build
 	yarn build:vscode
 	yarn release
@@ -54,7 +55,7 @@ termux_step_configure() {
 	# Remove this marker all the time
 	rm -rf $TERMUX_HOSTBUILD_MARKER
 
-	_setup_nodejs_16
+	_setup_nodejs_18
 	export PATH="$TERMUX_PKG_HOSTBUILD_DIR/node_modules/.bin:$PATH"
 }
 
@@ -93,7 +94,7 @@ termux_step_make_install() {
 	cp -Rf ./release-standalone/* $TERMUX_PREFIX/lib/code-server/
 
 	# Replace nodejs
-	ln -sf $TERMUX_PREFIX/opt/nodejs-16/bin/node $TERMUX_PREFIX/lib/code-server/lib/node
+	ln -sf $TERMUX_PREFIX/bin/node $TERMUX_PREFIX/lib/code-server/lib/node
 
 	# Replace ripgrep
 	ln -sf $TERMUX_PREFIX/bin/rg $TERMUX_PREFIX/lib/code-server/lib/vscode/node_modules/@vscode/ripgrep/bin/rg
