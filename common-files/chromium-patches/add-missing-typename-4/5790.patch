@@ -1,0 +1,11 @@
+--- a/third_party/blink/renderer/core/html/parser/html_document_parser_fastpath.cc
++++ b/third_party/blink/renderer/core/html/parser/html_document_parser_fastpath.cc
+@@ -169,7 +169,7 @@
+   using Span = base::span<const Char>;
+   using USpan = base::span<const UChar>;
+   // 32 matches that used by HTMLToken::Attribute.
+-  typedef std::conditional<std::is_same_v<Char, UChar>,
++  typedef typename std::conditional<std::is_same_v<Char, UChar>,
+                            UCharLiteralBuffer<32>,
+                            LCharLiteralBuffer<32>>::type LiteralBufferType;
+   typedef UCharLiteralBuffer<32> UCharLiteralBufferType;

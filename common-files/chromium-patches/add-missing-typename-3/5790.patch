@@ -1,0 +1,11 @@
+--- a/components/optimization_guide/core/tflite_model_executor.h
++++ b/components/optimization_guide/core/tflite_model_executor.h
+@@ -189,7 +189,7 @@
+   void SendForBatchExecution(
+       BatchExecutionCallback callback_on_complete,
+       base::TimeTicks start_time,
+-      ModelExecutor<OutputType, InputType>::ConstRefInputVector inputs)
++      typename ModelExecutor<OutputType, InputType>::ConstRefInputVector inputs)
+       override {
+     DCHECK(execution_task_runner_->RunsTasksInCurrentSequence());
+     DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);

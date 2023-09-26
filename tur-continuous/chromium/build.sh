@@ -2,11 +2,11 @@ TERMUX_PKG_HOMEPAGE=https://www.chromium.org/Home
 TERMUX_PKG_DESCRIPTION="Chromium web browser"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="Chongyun Lee <uchkks@protonmail.com>"
-_CHROMIUM_VERSION=112.0.5615.49
+_CHROMIUM_VERSION=114.0.5735.90
 TERMUX_PKG_VERSION=$_CHROMIUM_VERSION
 TERMUX_PKG_SRCURL=(https://commondatastorage.googleapis.com/chromium-browser-official/chromium-$_CHROMIUM_VERSION.tar.xz)
-TERMUX_PKG_SHA256=(ddfd37373c1fa0f433a6ac11f0baa2b1f3fdfb9c7b5867e32a4300f2eb5aff41)
-TERMUX_PKG_DEPENDS="atk, cups, dbus, gtk3, krb5, libc++, libxkbcommon, libminizip, libnss, libwayland, libx11, mesa, openssl, pango, pulseaudio, libdrm, libjpeg-turbo, libpng, libwebp, libflac, fontconfig, freetype, zlib, libxml2, libxslt, libopus, libsnappy"
+TERMUX_PKG_SHA256=(071a8620b6175923f91f0ce0e3a0b2b20bf350a7d1a0f5513c160df7c17526d8)
+TERMUX_PKG_DEPENDS="atk, cups, dbus, gtk3, krb5, libc++, libevdev, libxkbcommon, libminizip, libnss, libwayland, libx11, mesa, openssl, pango, pulseaudio, libdrm, libjpeg-turbo, libpng, libwebp, libflac, fontconfig, freetype, zlib, libxml2, libxslt, libopus, libsnappy"
 # TODO: Split chromium-common and chromium-headless
 # TERMUX_PKG_DEPENDS+=", chromium-common"
 # TERMUX_PKG_SUGGESTS="chromium-headless, chromium-driver"
@@ -15,8 +15,8 @@ TERMUX_PKG_BUILD_DEPENDS="qt5-qtbase, qt5-qtbase-cross-tools"
 # Chromium doesn't support i686 on Linux.
 TERMUX_PKG_BLACKLISTED_ARCHES="i686"
 
-SYSTEM_LIBRARIES="    libdrm  libjpeg        libpng  libwebp  flac     fontconfig  freetype  zlib  libxml   libxslt  opus     snappy   "
-# TERMUX_PKG_DEPENDS="libdrm, libjpeg-turbo, libpng, libwebp, libflac, fontconfig, freetype, zlib, libxml2, libxslt, libopus, libsnappy"
+SYSTEM_LIBRARIES="    libdrm  libjpeg        libpng  libwebp  flac     fontconfig  freetype  libxml   libxslt  opus     snappy   "
+# TERMUX_PKG_DEPENDS="libdrm, libjpeg-turbo, libpng, libwebp, libflac, fontconfig, freetype, libxml2, libxslt, libopus, libsnappy"
 
 termux_step_post_get_source() {
 	python $TERMUX_SCRIPTDIR/common-files/apply-chromium-patches.py -v $_CHROMIUM_VERSION
@@ -189,6 +189,7 @@ ozone_platform_wayland = true
 ozone_platform_headless = true
 angle_enable_vulkan = true
 angle_enable_swiftshader = true
+angle_enable_abseil = false
 # Use Chrome-branded ffmpeg for more codecs
 is_component_ffmpeg = true
 ffmpeg_branding = \"Chrome\"
@@ -206,16 +207,14 @@ enable_nacl = false
 is_cfi = false
 use_cfi_icall = false
 use_thin_lto = false
+# XXX: Do not generate v8_context_snapshot.bin for a faster build
+# TODO: Find out what causes failure on arm
+use_v8_context_snapshot = false
 " > $_common_args_file
 
 	if [ "$TERMUX_ARCH" = "arm" ]; then
 		echo "arm_arch = \"armv7-a\"" >> $_common_args_file
 		echo "arm_float_abi = \"softfp\"" >> $_common_args_file
-	fi
-
-	# TODO: Generate v8_context_snapshot.bin for arm
-	if [ "$TERMUX_ARCH" = "arm" ]; then
-		echo "use_v8_context_snapshot = false" >> $_common_args_file
 	fi
 
 	# Use custom toolchain
@@ -250,7 +249,7 @@ use_thin_lto = false
 
 termux_step_make() {
 	cd $TERMUX_PKG_BUILDDIR
-	ninja -C out/Release chromedriver chrome chrome_crashpad_handler headless_shell || bash
+	ninja -C out/Release chromedriver chrome chrome_crashpad_handler headless_shell -k 0 || bash
 }
 
 termux_step_make_install() {
@@ -303,10 +302,6 @@ termux_step_make_install() {
 		# Qt
 		libqt5_shim.so
 	)
-
-	if [ "$TERMUX_ARCH" != "arm" ]; then
-		normal_files+=(v8_context_snapshot.bin)
-	fi
 
 	cp "${normal_files[@]/#/out/Release/}" "$TERMUX_PREFIX/lib/chromium/"
 
@@ -375,8 +370,8 @@ termux_step_post_make_install() {
 # Name in Chromium | libdrm libjpeg       libpng libwebp fontconfig libxslt
 # Name in Termux   | libdrm libjpeg-turbo libpng libwebp fontconfig libxslt
 #
-# Name in Chromium | freetype libxml  opus    snappy    flac    zlib
-# Name in Termux   | freetype libxml2 libopus libsnappy libflac zlib
+# Name in Chromium | freetype libxml  opus    snappy    flac   
+# Name in Termux   | freetype libxml2 libopus libsnappy libflac
 #
 # These libraries cannot be used as system libraries, because Chromium-provided
 # debian rootfs doesn't have them (or their headers). Maybe we should construct

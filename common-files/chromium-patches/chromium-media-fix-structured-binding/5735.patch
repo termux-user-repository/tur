@@ -1,0 +1,13 @@
+--- a/media/base/cdm_promise_adapter.cc
++++ b/media/base/cdm_promise_adapter.cc
+@@ -94,7 +94,9 @@
+ void CdmPromiseAdapter::Clear(ClearReason reason) {
+   // Reject all outstanding promises.
+   DCHECK(thread_checker_.CalledOnValidThread());
+-  for (auto& [promise_id, promise] : promises_) {
++  for (auto& pair_ : promises_) {
++    auto& promise_id = pair_.first;
++    auto& promise = pair_.second;
+     TRACE_EVENT_NESTABLE_ASYNC_END1(
+         "media", "CdmPromise", TRACE_ID_WITH_SCOPE("CdmPromise", promise_id),
+         "status", "cleared");

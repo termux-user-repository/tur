@@ -1,0 +1,11 @@
+--- a/skia/ext/skcolorspace_trfn.cc
++++ b/skia/ext/skcolorspace_trfn.cc
+@@ -4,6 +4,8 @@
+ 
+ #include "skia/ext/skcolorspace_trfn.h"
+ 
++#include <cmath>
++
+ namespace skia {
+ 
+ namespace {

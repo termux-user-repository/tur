@@ -95,7 +95,7 @@ def check_metadata(metadata_dict):
 def apply_patch(patch_file, dry_run):
   try:
     subprocess.check_call(
-      ["patch", "-s", "--dry-run", "-p1", "-i", patch_file],
+      ["patch", "--dry-run", "-p1", "-i", patch_file],
       stdin=subprocess.DEVNULL
     )
   except:
@@ -107,7 +107,7 @@ def apply_patch(patch_file, dry_run):
 def revert_patch(patch_file, dry_run):
   try:
     subprocess.check_call(
-      ["patch", "-s", "-R", "--dry-run", "-p1", "-i", patch_file],
+      ["patch", "-R", "--dry-run", "-p1", "-i", patch_file],
       stdin=subprocess.DEVNULL
     )
   except:
