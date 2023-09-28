@@ -43,6 +43,10 @@
   "breakpad-no-elf_prstatus/4389.patch": {
     "start": 4389
   },
+  "chromium-atomic-in-oncecallback/5663.patch": {
+    "start": 5663,
+    "end": 5685
+  },
   "chromium-disable-sandbox/5359.patch": {
     "start": 5359
   },
