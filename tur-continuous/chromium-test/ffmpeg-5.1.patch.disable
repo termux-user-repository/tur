@@ -1,0 +1,29 @@
+--- a/media/filters/audio_file_reader.cc
++++ b/media/filters/audio_file_reader.cc
+@@ -243,10 +243,10 @@
+   // silence from being output. In the case where we are also discarding some
+   // portion of the packet (as indicated by a negative pts), we further want to
+   // adjust the duration downward by however much exists before zero.
+-  if (audio_codec_ == AudioCodec::kAAC && frame->duration) {
++  if (audio_codec_ == AudioCodec::kAAC && frame->pkt_duration) {
+     const base::TimeDelta pkt_duration = ConvertFromTimeBase(
+         glue_->format_context()->streams[stream_index_]->time_base,
+-        frame->duration + std::min(static_cast<int64_t>(0), frame->pts));
++        frame->pkt_duration + std::min(static_cast<int64_t>(0), frame->pts));
+     const base::TimeDelta frame_duration =
+         base::Seconds(frames_read / static_cast<double>(sample_rate_));
+
+Remove this if termux/termux-packages#13743 is merged
+--- a/media/filters/ffmpeg_demuxer.cc
++++ b/media/filters/ffmpeg_demuxer.cc
+@@ -91,6 +91,10 @@
+                             sample_rate);
+ }
+ 
++static inline int64_t av_stream_get_first_dts(const AVStream*) {
++  return kNoFFmpegTimestamp;
++}
++
+ static base::TimeDelta ExtractStartTime(AVStream* stream) {
+   // The default start time is zero.
+   base::TimeDelta start_time;
