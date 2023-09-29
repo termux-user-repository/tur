@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="Run VS Code on any machine anywhere and access it in the
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="4.17.0"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=git+https://github.com/coder/code-server
 TERMUX_PKG_DEPENDS="libandroid-spawn, libsecret, krb5, nodejs-lts (<< 19), ripgrep"
 TERMUX_PKG_BUILD_IN_SRC=true
@@ -72,6 +73,9 @@ termux_step_make() {
 	else
 		termux_error_exit "Unsupported arch: $TERMUX_ARCH"
 	fi
+
+	export npm_config_arch=$NPM_CONFIG_ARCH
+	export npm_config_build_from_source=true
 
 	# Create a dummy librt.so
 	rm -f $TERMUX_PREFIX/lib/librt.{so,a}
