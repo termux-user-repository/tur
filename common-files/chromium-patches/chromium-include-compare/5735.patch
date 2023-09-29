@@ -1,0 +1,10 @@
+--- a/components/password_manager/core/browser/password_form.h
++++ b/components/password_manager/core/browser/password_form.h
+@@ -5,6 +5,7 @@
+ #ifndef COMPONENTS_PASSWORD_MANAGER_CORE_BROWSER_PASSWORD_FORM_H_
+ #define COMPONENTS_PASSWORD_MANAGER_CORE_BROWSER_PASSWORD_FORM_H_
+ 
++#include <compare>
+ #include <map>
+ #include <memory>
+ #include <string>

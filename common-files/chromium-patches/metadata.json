@@ -2,6 +2,9 @@
   "add-missing-typename/5672.patch": {
     "start": 5672
   },
+  "add-missing-typename-2/5735.patch": {
+    "start": 5735
+  },
   "angle-fix-atomic/5615.patch": {
     "start": 5615
   },
@@ -19,7 +22,11 @@
     "end": 5537
   },
   "blink-fix-structured-binding-declaration/5672.patch": {
-    "start": 5672
+    "start": 5672,
+    "end": 5734
+  },
+  "blink-fix-structured-binding-declaration/5735.patch": {
+    "start": 5735
   },
   "blink-impl-wtf-stacksize/4389.patch": {
     "start": 4389,
@@ -30,7 +37,8 @@
     "end": 5544
   },
   "blink-include-bitset/5615.patch": {
-    "start": 5615
+    "start": 5615,
+    "end": 5734
   },
   "blink-include-cstring/4961.patch": {
     "start": 4961,
@@ -109,7 +117,11 @@
     "start": 5615
   },
   "chromium-impl-scoped-file/5249.patch": {
-    "start": 4961
+    "start": 4961,
+    "end": 5734
+  },
+  "chromium-impl-scoped-file/5735.patch": {
+    "start": 5735
   },
   "chromium-impl-sysinfo/4389.patch": {
     "start": 4389,
@@ -125,9 +137,18 @@
   "chromium-include-cmath/5249.patch": {
     "start": 4961
   },
+  "chromium-include-compare/5735.patch": {
+    "start": 5735
+  },
   "chromium-include-ctime/4389.patch": {
     "start": 4389,
     "end": 4472
+  },
+  "chromium-include-vector/5735.patch": {
+    "start": 5735
+  },
+  "chromium-media-fix-structured-binding/5735.patch": {
+    "start": 5735
   },
   "chromium-no-atomic_flag/5249.patch": {
     "start": 5249,
@@ -337,7 +358,8 @@
     "start": 4389
   },
   "sql-VirtualCursor-standard-layout/5359.patch": {
-    "start": 5359
+    "start": 5359,
+    "end": 5734
   },
   "swiftshader-fix-dynamic-loaded-libraries/4389.patch": {
     "start": 4389,
