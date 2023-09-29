@@ -2,11 +2,11 @@ TERMUX_PKG_HOMEPAGE=https://www.chromium.org/Home
 TERMUX_PKG_DESCRIPTION="Chromium web browser"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="Chongyun Lee <uchkks@protonmail.com>"
-_CHROMIUM_VERSION=113.0.5672.63
+_CHROMIUM_VERSION=114.0.5735.90
 TERMUX_PKG_VERSION=$_CHROMIUM_VERSION
 TERMUX_PKG_SRCURL=(https://commondatastorage.googleapis.com/chromium-browser-official/chromium-$_CHROMIUM_VERSION.tar.xz)
-TERMUX_PKG_SHA256=(76cec11dc13abe6703305b0300e1fe24c8f547c1ff313f7be09db0e23d12ee1e)
-TERMUX_PKG_DEPENDS="atk, cups, dbus, gtk3, krb5, libc++, libxkbcommon, libminizip, libnss, libwayland, libx11, mesa, openssl, pango, pulseaudio, libdrm, libjpeg-turbo, libpng, libwebp, libflac, fontconfig, freetype, zlib, libxml2, libxslt, libopus, libsnappy"
+TERMUX_PKG_SHA256=(071a8620b6175923f91f0ce0e3a0b2b20bf350a7d1a0f5513c160df7c17526d8)
+TERMUX_PKG_DEPENDS="atk, cups, dbus, gtk3, krb5, libc++, libevdev, libxkbcommon, libminizip, libnss, libwayland, libx11, mesa, openssl, pango, pulseaudio, libdrm, libjpeg-turbo, libpng, libwebp, libflac, fontconfig, freetype, zlib, libxml2, libxslt, libopus, libsnappy"
 # TODO: Split chromium-common and chromium-headless
 # TERMUX_PKG_DEPENDS+=", chromium-common"
 # TERMUX_PKG_SUGGESTS="chromium-headless, chromium-driver"
@@ -15,7 +15,6 @@ TERMUX_PKG_BUILD_DEPENDS="qt5-qtbase, qt5-qtbase-cross-tools"
 # Chromium doesn't support i686 on Linux.
 TERMUX_PKG_BLACKLISTED_ARCHES="i686"
 
-# TEMP disable zlib
 SYSTEM_LIBRARIES="    libdrm  libjpeg        libpng  libwebp  flac     fontconfig  freetype  libxml   libxslt  opus     snappy   "
 # TERMUX_PKG_DEPENDS="libdrm, libjpeg-turbo, libpng, libwebp, libflac, fontconfig, freetype, libxml2, libxslt, libopus, libsnappy"
 
@@ -250,7 +249,7 @@ use_v8_context_snapshot = false
 
 termux_step_make() {
 	cd $TERMUX_PKG_BUILDDIR
-	ninja -C out/Release chromedriver chrome chrome_crashpad_handler headless_shell || bash
+	ninja -C out/Release chromedriver chrome chrome_crashpad_handler headless_shell -k 0 || bash
 }
 
 termux_step_make_install() {
@@ -371,8 +370,8 @@ termux_step_post_make_install() {
 # Name in Chromium | libdrm libjpeg       libpng libwebp fontconfig libxslt
 # Name in Termux   | libdrm libjpeg-turbo libpng libwebp fontconfig libxslt
 #
-# Name in Chromium | freetype libxml  opus    snappy    flac    zlib
-# Name in Termux   | freetype libxml2 libopus libsnappy libflac zlib
+# Name in Chromium | freetype libxml  opus    snappy    flac   
+# Name in Termux   | freetype libxml2 libopus libsnappy libflac
 #
 # These libraries cannot be used as system libraries, because Chromium-provided
 # debian rootfs doesn't have them (or their headers). Maybe we should construct
