@@ -1,0 +1,91 @@
+--- a/third_party/blink/renderer/core/layout/ng/grid/ng_grid_layout_algorithm.cc
++++ b/third_party/blink/renderer/core/layout/ng/grid/ng_grid_layout_algorithm.cc
+@@ -238,7 +238,11 @@
+                               : BuildGridSizingTree(&oof_children);
+ 
+   LayoutUnit intrinsic_block_size;
+-  auto& [grid_items, layout_data, tree_size] = grid_sizing_tree.TreeRootData();
++
++  auto& sizing_data = grid_sizing_tree.TreeRootData();
++  auto& grid_items = sizing_data.grid_items;
++  auto& layout_data = sizing_data.layout_data;
++  auto& tree_size = sizing_data.subtree_size;
+ 
+   if (IsBreakInside(BreakToken())) {
+     // TODO(layout-dev): When we support variable inline-size fragments we'll
+@@ -655,8 +659,10 @@
+   NGGridSizingTree sizing_tree;
+ 
+   if (const auto* layout_subtree = ConstraintSpace().GridLayoutSubtree()) {
+-    auto& [grid_items, layout_data, subtree_size] =
+-        sizing_tree.CreateSizingData();
++    auto& sizing_data = sizing_tree.CreateSizingData();
++    auto& grid_items = sizing_data.grid_items;
++    auto& layout_data = sizing_data.layout_data;
++    auto& subtree_size = sizing_data.subtree_size;
+ 
+     const auto& node = Node();
+     grid_items =
+@@ -694,8 +700,9 @@
+   const auto& track_collection = (track_direction == kForColumns)
+                                      ? layout_data.Columns()
+                                      : layout_data.Rows();
+-  const auto& [begin_set_index, end_set_index] =
+-      grid_item.SetIndices(track_direction);
++  const auto& set_indices = grid_item.SetIndices(track_direction);
++  const auto& begin_set_index = set_indices.begin;
++  const auto& end_set_index = set_indices.end;
+ 
+   return (grid_item.BaselineGroup(track_direction) == BaselineGroup::kMajor)
+              ? track_collection.MajorBaseline(begin_set_index)
+@@ -1179,8 +1186,10 @@
+                                      : subgridded_item.Rows(writing_mode);
+ 
+   const auto margins = ComputeMarginsFor(space, item_style, constraint_space);
+-  const auto& [begin_set_index, end_set_index] =
+-      subgridded_item->SetIndices(track_collection.Direction());
++
++  const auto& set_indices = subgridded_item->SetIndices(track_collection.Direction());
++  const auto& begin_set_index = set_indices.begin;
++  const auto& end_set_index = set_indices.end;
+ 
+   const auto margin_sum =
+       (is_for_columns ? margins.InlineSum() : margins.BlockSum()) +
+@@ -1798,8 +1807,10 @@
+     bool* opt_needs_additional_pass) const {
+   DCHECK(sizing_subtree);
+ 
+-  auto& [grid_items, layout_data, subtree_size] =
+-      sizing_subtree.SubtreeRootData();
++  auto& sizing_data = sizing_subtree.SubtreeRootData();
++  auto& grid_items = sizing_data.grid_items;
++  auto& layout_data = sizing_data.layout_data;
++  auto& subtree_size = sizing_data.subtree_size;
+ 
+   const bool is_for_columns = track_direction == kForColumns;
+   const bool has_non_definite_track =
+@@ -1924,8 +1935,10 @@
+ void NGGridLayoutAlgorithm::ForEachSubgrid(
+     const NGGridSizingSubtree& sizing_subtree,
+     const CallbackFunc& callback_func) const {
+-  auto& [grid_items, layout_data, subtree_size] =
+-      sizing_subtree.SubtreeRootData();
++  auto& sizing_data = sizing_subtree.SubtreeRootData();
++  auto& grid_items = sizing_data.grid_items;
++  auto& layout_data = sizing_data.layout_data;
++  auto& subtree_size = sizing_data.subtree_size;
+ 
+   // If we know this subtree doesn't have nested subgrids we can exit early
+   // instead of iterating over every grid item looking for them.
+@@ -4253,8 +4266,9 @@
+   DCHECK(!grid_item.IsOutOfFlow());
+   DCHECK(!grid_item.is_subgridded_to_parent_grid);
+ 
+-  const auto& [begin_set_index, end_set_index] =
+-      grid_item.SetIndices(track_collection.Direction());
++  const auto& set_indices = grid_item.SetIndices(track_collection.Direction());
++  const auto& begin_set_index = set_indices.begin;
++  const auto& end_set_index = set_indices.end;
+ 
+   if (start_offset) {
+     *start_offset = track_collection.GetSetOffset(begin_set_index);

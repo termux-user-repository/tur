@@ -1,0 +1,14 @@
+--- a/content/browser/service_worker/service_worker_context_wrapper.cc
++++ b/content/browser/service_worker/service_worker_context_wrapper.cc
+@@ -1393,7 +1393,10 @@
+     return;
+   }
+ 
+-  auto [document_url, key, callback] = std::move(*request);
++  auto request_ = std::move(*request);
++  auto& document_url = std::get<0>(request_);
++  auto& key = std::get<1>(request_);
++  auto& callback = std::get<2>(request_);
+ 
+   DCHECK(document_url.is_valid());
+   TRACE_EVENT1("ServiceWorker",

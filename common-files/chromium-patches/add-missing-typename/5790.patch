@@ -1,0 +1,23 @@
+--- a/chrome/browser/download/bubble/download_bubble_update_service.cc
++++ b/chrome/browser/download/bubble/download_bubble_update_service.cc
+@@ -91,7 +91,7 @@
+ // Helper to get an iterator to the last element in the cache. The cache
+ // must not be empty.
+ template <typename Item>
+-SortedItems<Item>::const_iterator GetLastIter(const SortedItems<Item>& cache) {
++typename SortedItems<Item>::const_iterator GetLastIter(const SortedItems<Item>& cache) {
+   CHECK(!cache.empty());
+   auto it = cache.end();
+   return std::prev(it);
+@@ -967,9 +967,9 @@
+ }
+ 
+ template <typename Id, typename Item>
+-SortedItems<Item>::iterator
++typename SortedItems<Item>::iterator
+ DownloadBubbleUpdateService::CacheManager::RemoveItemFromCacheByIter(
+-    SortedItems<Item>::iterator iter,
++    typename SortedItems<Item>::iterator iter,
+     SortedItems<Item>& cache,
+     IterMap<Id, Item>& iter_map) {
+   CHECK(iter != cache.end());
