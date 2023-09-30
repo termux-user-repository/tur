@@ -2,10 +2,10 @@ TERMUX_PKG_HOMEPAGE=https://www.chromium.org/Home
 TERMUX_PKG_DESCRIPTION="Chromium web browser"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="Chongyun Lee <uchkks@protonmail.com>"
-_CHROMIUM_VERSION=114.0.5735.90
+_CHROMIUM_VERSION=115.0.5790.98
 TERMUX_PKG_VERSION=$_CHROMIUM_VERSION
 TERMUX_PKG_SRCURL=(https://commondatastorage.googleapis.com/chromium-browser-official/chromium-$_CHROMIUM_VERSION.tar.xz)
-TERMUX_PKG_SHA256=(071a8620b6175923f91f0ce0e3a0b2b20bf350a7d1a0f5513c160df7c17526d8)
+TERMUX_PKG_SHA256=(ffbe630ecf8fc8a250be05fdbec6c94d5881b5fcbbc5fb2b93e54ddc78d56af1)
 TERMUX_PKG_DEPENDS="atk, cups, dbus, gtk3, krb5, libc++, libevdev, libxkbcommon, libminizip, libnss, libwayland, libx11, mesa, openssl, pango, pulseaudio, libdrm, libjpeg-turbo, libpng, libwebp, libflac, fontconfig, freetype, zlib, libxml2, libxslt, libopus, libsnappy"
 # TODO: Split chromium-common and chromium-headless
 # TERMUX_PKG_DEPENDS+=", chromium-common"
@@ -210,6 +210,8 @@ use_thin_lto = false
 # XXX: Do not generate v8_context_snapshot.bin for a faster build
 # TODO: Find out what causes failure on arm
 use_v8_context_snapshot = false
+# Disable rust
+enable_rust = false
 " > $_common_args_file
 
 	if [ "$TERMUX_ARCH" = "arm" ]; then
