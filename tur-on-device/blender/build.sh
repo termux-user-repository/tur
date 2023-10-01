@@ -3,10 +3,10 @@ TERMUX_PKG_DESCRIPTION="A fully integrated 3D graphics creation suite"
 TERMUX_PKG_LICENSE="GPL-2.0"
 TERMUX_PKG_MAINTAINER="@T-Dynamos"
 BLENDER_MAJOR_VERSION=4 
-BLENDER_MINOR_VERSION=0
-BLENDER_ADDONS_COMMIT=92dd274c0bf08ad4786e7dfe715dee327f3ee43f 
-_COMMIT=0d7b0045c6795ba5ebd73bc588cb808d85ed10da
-_COMMIT_DATE=2023.08.03
+BLENDER_MINOR_VERSION=1
+BLENDER_ADDONS_COMMIT=d6ea3b545200028863daa406f18c97bfe00dcf84
+_COMMIT=c6c86b555d608dc73bb05a067e5d4d9b3386706b
+_COMMIT_DATE=2023.10.15
 TERMUX_PKG_VERSION=${BLENDER_MAJOR_VERSION}.${BLENDER_MINOR_VERSION}-${_COMMIT:0:8}-${_COMMIT_DATE}
 TERMUX_PKG_SRCURL=git+https://github.com/blender/blender
 TERMUX_PKG_GIT_BRANCH=main 
@@ -14,9 +14,9 @@ TERMUX_PKG_GIT_BRANCH=main
 # Blender does not support 32bit
 TERMUX_PKG_BLACKLISTED_ARCHES="arm, i686"
 
-TERMUX_PKG_DEPENDS="libpng, libtiff, python, python-pip, python-numpy, openexr, desktop-file-utils, potrace, shared-mime-info, hicolor-icon-theme, glew, openjpeg, freetype, ffmpeg, fftw, alembic, libsndfile, ptex, sdl2, libspnav, openal-soft, opencolorio, libblosc, sse2neon, libandroid-execinfo, brotli, libepoxy, openimageio, pybind11, openvdb, libraw, libpugixml"
+TERMUX_PKG_DEPENDS="libpng, libtiff, python, python-pip, python-numpy, openexr, desktop-file-utils, potrace, shared-mime-info, hicolor-icon-theme, glew, openjpeg, freetype, ffmpeg, fftw, alembic, libsndfile, ptex, sdl2, libspnav, openal-soft, libblosc, sse2neon, libandroid-execinfo, brotli, libepoxy, openimageio, pybind11, openvdb, libraw, libpugixml"
 TERMUX_PKG_BUILD_DEPENDS="subversion"
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_REVISION=2
 TERMUX_PKG_PYTHON_COMMON_DEPS="requests, zstandard, Cython"
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 -DPYTHON_LIBRARY=$TERMUX_PREFIX/lib/python$TERMUX_PYTHON_VERSION
