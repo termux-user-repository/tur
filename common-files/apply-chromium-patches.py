@@ -129,6 +129,7 @@ def parse_metadata(filepath):
     raise e
 
 def execute(args, p):
+  is_revert_mode = args.revert
   is_dry_run_mode = args.dry_run
   is_electron_skipped_mode = args.electron
   verbose_level = args.verbose
@@ -149,22 +150,24 @@ def execute(args, p):
       if is_electron_skipped_mode and is_electron_broken:
         logger.info(f"Skip patch {patch_path} for electron.")
         continue
-      logger.info("Applying %s...", patch_path)
-      if not execute_patch(os.path.join(PATCHES_DIR, patch_path), is_dry_run_mode, verbose_level, False):
+      ope_str = "revert" if is_revert_mode else "apply"
+      logger.info("%sing %s...", ope_str.capitalize(), patch_path)
+      if not execute_patch(os.path.join(PATCHES_DIR, patch_path), is_dry_run_mode, verbose_level, is_revert_mode):
         need_revert = True
         logger.error("Failed to apply %s", patch_path)
         break
       else:
         applied_patches.append(patch_path)
   if need_revert:
-    logger.info("Reverting patches due to previous error...")
+    ope_str = "re-apply" if is_revert_mode else "revert"
+    logger.info("%sing patches due to previous error...", ope_str.capitalize())
     for patch_path in applied_patches[::-1]:
-      logger.info("Reverting %s...", patch_path)
-      execute_patch(os.path.join(PATCHES_DIR, patch_path), is_dry_run_mode, verbose_level, True)
+      logger.info("%sing %s...", ope_str.capitalize(), patch_path)
+      execute_patch(os.path.join(PATCHES_DIR, patch_path), is_dry_run_mode, verbose_level, not is_revert_mode)
     exit(1)
 
 def main():
-  p = argparse.ArgumentParser(description="Apply patches for chromium based on versions.")
+  p = argparse.ArgumentParser(description="Apply/Revert patches for chromium based on versions.")
   p.add_argument(
     "-v",
     "--verbose",
@@ -172,6 +175,14 @@ def main():
     dest="verbose",
     default=0,
     help="Give more output. Option is additive",
+  )
+  p.add_argument(
+    "-R",
+    "--revert",
+    action="store_true",
+    dest="revert",
+    default=False,
+    help="Set to revert mode.",
   )
   p.add_argument(
     "--dry-run",
