@@ -91,32 +91,23 @@ def check_metadata(metadata_dict):
   checker.ranges_check()
   return metadata_dict
 
-def apply_patch(patch_file, dry_run, verbose=0):
+def execute_patch(patch_file, dry_run, verbose=0, revert=False):
+  patch_args = ["patch"]
+  suffix_args = ["-p1", "-i", patch_file]
+  additional_args = []
+  if revert:
+    patch_args += ["-R"]
   if verbose < 1:
-    additional_args = ["-s"]
+    additional_args += ["-s"]
   try:
     subprocess.check_call(
-      ["patch"] + additional_args + ["--dry-run", "-p1", "-i", patch_file],
+      patch_args + additional_args + ["--dry-run"] + suffix_args,
       stdin=subprocess.DEVNULL
     )
   except:
     return False
   if dry_run: return True
-  subprocess.check_call(["patch", "-s", "-p1", "-i", patch_file])
-  return True
-
-def revert_patch(patch_file, dry_run, verbose=0):
-  if verbose < 1:
-    additional_args = ["-s"]
-  try:
-    subprocess.check_call(
-      ["patch", "-R"] + additional_args + ["--dry-run", "-p1", "-i", patch_file],
-      stdin=subprocess.DEVNULL
-    )
-  except:
-    return False
-  if dry_run: return True
-  subprocess.check_call(["patch", "-s", "-R", "-p1", "-i", patch_file])
+  subprocess.check_call(patch_args + ["-s"] + suffix_args)
   return True
 
 def parse_chromium_version(version_str, p):
@@ -140,12 +131,12 @@ def parse_metadata(filepath):
 def execute(args, p):
   is_dry_run_mode = args.dry_run
   is_electron_skipped_mode = args.electron
+  verbose_level = args.verbose
   _, _, build_v, patch_v = parse_chromium_version(args.CHROMIUM_VERSION, p)
   logger.debug("Got chromium version %s", args.CHROMIUM_VERSION)
   metadata = parse_metadata(METADATA_FILE)
   need_revert = False
   applied_patches = []
-  verbose_level = args.verbose
   for patch_path, patch_info in metadata.items():
     excluded = patch_info.get("excluded", [])
     start_v = patch_info.get("start", 0)
@@ -159,7 +150,7 @@ def execute(args, p):
         logger.info(f"Skip patch {patch_path} for electron.")
         continue
       logger.info("Applying %s...", patch_path)
-      if not apply_patch(os.path.join(PATCHES_DIR, patch_path), is_dry_run_mode, verbose_level):
+      if not execute_patch(os.path.join(PATCHES_DIR, patch_path), is_dry_run_mode, verbose_level, False):
         need_revert = True
         logger.error("Failed to apply %s", patch_path)
         break
@@ -169,7 +160,7 @@ def execute(args, p):
     logger.info("Reverting patches due to previous error...")
     for patch_path in applied_patches[::-1]:
       logger.info("Reverting %s...", patch_path)
-      revert_patch(os.path.join(PATCHES_DIR, patch_path), is_dry_run_mode, verbose_level)
+      execute_patch(os.path.join(PATCHES_DIR, patch_path), is_dry_run_mode, verbose_level, True)
     exit(1)
 
 def main():
