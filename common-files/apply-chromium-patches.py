@@ -16,8 +16,7 @@ logger = logging.getLogger(__name__)
 
 class MetadataRangeConflictError(Exception):
   def __init__(self, a, b):
-    msg = (f"Conflict is detected between {a.path} and {b.path}. " +
-                       f"{a.desc()}, but {b.desc()}.")
+    msg = (f"Conflict is detected between {a.path} and {b.path}. " + f"{a.desc()}, but {b.desc()}.")
     super().__init__(msg)
 
 class MetadataRangeGapError(Exception):
@@ -67,7 +66,7 @@ class UniqueMetadataRangeHeapQueue:
 class MetadataChecker:
   def __init__(self):
     self._ranges = defaultdict(UniqueMetadataRangeHeapQueue)
-  
+
   def set_range(self, path, start, end):
     name, _ = path.split("/")
     r = MetadataRange(path, start, end)
@@ -92,10 +91,12 @@ def check_metadata(metadata_dict):
   checker.ranges_check()
   return metadata_dict
 
-def apply_patch(patch_file, dry_run):
+def apply_patch(patch_file, dry_run, verbose=0):
+  if verbose < 1:
+    additional_args = ["-s"]
   try:
     subprocess.check_call(
-      ["patch", "--dry-run", "-p1", "-i", patch_file],
+      ["patch"] + additional_args + ["--dry-run", "-p1", "-i", patch_file],
       stdin=subprocess.DEVNULL
     )
   except:
@@ -104,10 +105,12 @@ def apply_patch(patch_file, dry_run):
   subprocess.check_call(["patch", "-s", "-p1", "-i", patch_file])
   return True
 
-def revert_patch(patch_file, dry_run):
+def revert_patch(patch_file, dry_run, verbose=0):
+  if verbose < 1:
+    additional_args = ["-s"]
   try:
     subprocess.check_call(
-      ["patch", "-R", "--dry-run", "-p1", "-i", patch_file],
+      ["patch", "-R"] + additional_args + ["--dry-run", "-p1", "-i", patch_file],
       stdin=subprocess.DEVNULL
     )
   except:
@@ -142,6 +145,7 @@ def execute(args, p):
   metadata = parse_metadata(METADATA_FILE)
   need_revert = False
   applied_patches = []
+  verbose_level = args.verbose
   for patch_path, patch_info in metadata.items():
     excluded = patch_info.get("excluded", [])
     start_v = patch_info.get("start", 0)
@@ -155,7 +159,7 @@ def execute(args, p):
         logger.info(f"Skip patch {patch_path} for electron.")
         continue
       logger.info("Applying %s...", patch_path)
-      if not apply_patch(os.path.join(PATCHES_DIR, patch_path), is_dry_run_mode):
+      if not apply_patch(os.path.join(PATCHES_DIR, patch_path), is_dry_run_mode, verbose_level):
         need_revert = True
         logger.error("Failed to apply %s", patch_path)
         break
@@ -165,7 +169,7 @@ def execute(args, p):
     logger.info("Reverting patches due to previous error...")
     for patch_path in applied_patches[::-1]:
       logger.info("Reverting %s...", patch_path)
-      revert_patch(os.path.join(PATCHES_DIR, patch_path), is_dry_run_mode)
+      revert_patch(os.path.join(PATCHES_DIR, patch_path), is_dry_run_mode, verbose_level)
     exit(1)
 
 def main():
