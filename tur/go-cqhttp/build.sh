@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://docs.go-cqhttp.org
 TERMUX_PKG_DESCRIPTION="The golang implementation of cqhttp, lightweight, native cross-platform"
 TERMUX_PKG_LICENSE="AGPL-V3"
 TERMUX_PKG_MAINTAINER="2096779623 <admin@utermux.dev>"
-TERMUX_PKG_VERSION="1.1.0"
+TERMUX_PKG_VERSION="1.2.0"
 TERMUX_PKG_SRCURL=https://github.com/Mrs4s/go-cqhttp/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz
-TERMUX_PKG_SHA256=9ffe03eb36b6b93af794d4933c8658343aca3ec73872efb7a4320d20a93c2615
+TERMUX_PKG_SHA256=2abf0b93c9fdf42a009134c8f8d1637c351a5c985e37432a733c847a834d630b
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_AUTO_UPDATE=true
 
