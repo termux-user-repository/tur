@@ -4,6 +4,7 @@ TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="Chongyun Lee <uchkks@protonmail.com>"
 _CHROMIUM_VERSION=115.0.5790.98
 TERMUX_PKG_VERSION=$_CHROMIUM_VERSION
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=(https://commondatastorage.googleapis.com/chromium-browser-official/chromium-$_CHROMIUM_VERSION.tar.xz)
 TERMUX_PKG_SHA256=(ffbe630ecf8fc8a250be05fdbec6c94d5881b5fcbbc5fb2b93e54ddc78d56af1)
 TERMUX_PKG_DEPENDS="atk, cups, dbus, gtk3, krb5, libc++, libevdev, libxkbcommon, libminizip, libnss, libwayland, libx11, mesa, openssl, pango, pulseaudio, libdrm, libjpeg-turbo, libpng, libwebp, libflac, fontconfig, freetype, zlib, libxml2, libxslt, libopus, libsnappy"
@@ -15,34 +16,15 @@ TERMUX_PKG_BUILD_DEPENDS="qt5-qtbase, qt5-qtbase-cross-tools"
 # Chromium doesn't support i686 on Linux.
 TERMUX_PKG_BLACKLISTED_ARCHES="i686"
 
-SYSTEM_LIBRARIES="    libdrm  libjpeg        libpng  libwebp  flac     fontconfig  freetype  libxml   libxslt  opus     snappy   "
-# TERMUX_PKG_DEPENDS="libdrm, libjpeg-turbo, libpng, libwebp, libflac, fontconfig, freetype, libxml2, libxslt, libopus, libsnappy"
+SYSTEM_LIBRARIES="    libdrm  fontconfig"
+# TERMUX_PKG_DEPENDS="libdrm, fontconfig"
 
 termux_step_post_get_source() {
 	python $TERMUX_SCRIPTDIR/common-files/apply-chromium-patches.py -v $_CHROMIUM_VERSION
 
-	local _lib
-	for _lib in $SYSTEM_LIBRARIES libjpeg_turbo; do
-		echo "Removing buildscripts for system provided $_lib"
-		find . -type f -path "*third_party/$_lib/*" \
-			\! -path "*third_party/$_lib/chromium/*" \
-			\! -path "*third_party/$_lib/google/*" \
-			\! -path './base/third_party/icu/*' \
-			\! -path './third_party/libxml/*' \
-			\! -path './third_party/pdfium/third_party/freetype/include/pstables.h' \
-			\! -path './third_party/harfbuzz-ng/utils/hb_scoped.h' \
-			\! -path './third_party/crashpad/crashpad/third_party/zlib/zlib_crashpad.h' \
-			\! -regex '.*\.\(gn\|gni\|isolate\|py\)' \
-			-delete
-	done
-
 	python3 build/linux/unbundle/replace_gn_files.py --system-libraries \
 		$SYSTEM_LIBRARIES
 	python3 third_party/libaddressinput/chromium/tools/update-strings.py
-
-	# allow system dependencies in "official builds"
-	sed -i 's/OFFICIAL_BUILD/GOOGLE_CHROME_BUILD/' \
-		tools/generate_shim_headers/generate_shim_headers.py
 }
 
 termux_step_configure() {
@@ -70,11 +52,11 @@ termux_step_configure() {
 	# For qt build
 	export PATH="$TERMUX_PREFIX/opt/qt/cross/bin:$PATH"
 
+	# Install amd64 rootfs and deps
 	env -i PATH="$PATH" sudo apt update
-	env -i PATH="$PATH" sudo apt install libdrm-dev libjpeg-turbo8-dev libpng-dev fontconfig libfontconfig-dev libfontconfig1-dev libfreetype6-dev zlib1g-dev libcups2-dev libxkbcommon-dev libglib2.0-dev -yq
-	env -i PATH="$PATH" sudo apt install libdrm-dev:i386 libjpeg-turbo8-dev:i386 libpng-dev:i386 libfontconfig-dev:i386 libfontconfig1-dev:i386 libfreetype6-dev:i386 zlib1g-dev:i386 libcups2-dev:i386 libglib2.0-dev:i386 libxkbcommon-dev:i386 -yq
-
-	# Install amd64 rootfs
+	env -i PATH="$PATH" sudo apt install lsb-release -yq
+	env -i PATH="$PATH" sudo apt install libfontconfig1 libffi7 -yq
+	env -i PATH="$PATH" sudo ./build/install-build-deps.sh --no-syms --no-android --no-arm --no-chromeos-fonts --no-nacl --no-prompt
 	build/linux/sysroot_scripts/install-sysroot.py --arch=amd64
 	local _amd64_sysroot_path="$(pwd)/build/linux/$(ls build/linux | grep 'amd64-sysroot')"
 
@@ -118,15 +100,20 @@ termux_step_configure() {
 	popd
 
 	# Construct args
-	local _target_cpu _v8_current_cpu _v8_sysroot_path
-	local _v8_toolchain_name _target_sysroot="$TERMUX_PKG_TMPDIR/sysroot"
+	local _clang_base_path="/usr/lib/llvm-15"
+	local _host_cc="$_clang_base_path/bin/clang"
+	local _host_cxx="$_clang_base_path/bin/clang++"
+	local _target_cpu _target_sysroot="$TERMUX_PKG_TMPDIR/sysroot"
+	local _v8_toolchain_name _v8_current_cpu _v8_sysroot_path
 	if [ "$TERMUX_ARCH" = "aarch64" ]; then
 		_target_cpu="arm64"
 		_v8_current_cpu="x64"
 		_v8_sysroot_path="$_amd64_sysroot_path"
 		_v8_toolchain_name="clang_x64_v8_arm64"
 	elif [ "$TERMUX_ARCH" = "arm" ]; then
-		# Install i386 rootfs
+		# Install i386 rootfs and deps
+		env -i PATH="$PATH" sudo apt install libfontconfig1:i386 libffi7:i386 -yq
+		env -i PATH="$PATH" sudo ./build/install-build-deps.sh --lib32 --no-syms --no-android --no-arm --no-chromeos-fonts --no-nacl --no-prompt
 		build/linux/sysroot_scripts/install-sysroot.py --arch=i386
 		local _i386_sysroot_path="$(pwd)/build/linux/$(ls build/linux | grep 'i386-sysroot')"
 		_target_cpu="arm"
@@ -159,7 +146,7 @@ use_sysroot = false
 target_cpu = \"$_target_cpu\"
 target_rpath = \"$TERMUX_PREFIX/lib\"
 target_sysroot = \"$_target_sysroot\"
-clang_base_path = \"$TERMUX_STANDALONE_TOOLCHAIN\"
+clang_base_path = \"$_clang_base_path\"
 custom_toolchain = \"//build/toolchain/linux/unbundle:default\"
 host_toolchain = \"$TERMUX_PKG_CACHEDIR/custom-toolchain:host\"
 v8_snapshot_toolchain = \"$TERMUX_PKG_CACHEDIR/custom-toolchain:$_v8_toolchain_name\"
@@ -167,18 +154,15 @@ clang_use_chrome_plugins = false
 dcheck_always_on = false
 chrome_pgo_phase = 0
 treat_warnings_as_errors = false
-# Use system libraries as much as possible
-use_system_freetype = true
+# Use system libraries as little as possible
+use_system_freetype = false
 use_system_libdrm = true
 use_system_libffi = true
-use_system_libjpeg = true
-use_system_libpng = true
-use_system_zlib = true
 use_custom_libcxx = false
 use_allocator_shim = false
 use_partition_alloc_as_malloc = false
 enable_backup_ref_ptr_support = false
-enable_mte_checked_ptr_support = false
+enable_pointer_compression_support = false
 use_nss_certs = true
 use_udev = false
 use_ozone = true
@@ -207,9 +191,6 @@ enable_nacl = false
 is_cfi = false
 use_cfi_icall = false
 use_thin_lto = false
-# XXX: Do not generate v8_context_snapshot.bin for a faster build
-# TODO: Find out what causes failure on arm
-use_v8_context_snapshot = false
 # Disable rust
 enable_rust = false
 " > $_common_args_file
@@ -222,18 +203,18 @@ enable_rust = false
 	# Use custom toolchain
 	mkdir -p $TERMUX_PKG_CACHEDIR/custom-toolchain
 	cp -f $TERMUX_PKG_BUILDER_DIR/toolchain.gn.in $TERMUX_PKG_CACHEDIR/custom-toolchain/BUILD.gn
-	sed -i "s|@HOST_CC@|/usr/bin/clang-14|g
-			s|@HOST_CXX@|/usr/bin/clang++-14|g
-			s|@HOST_LD@|/usr/bin/clang++-14|g
+	sed -i "s|@HOST_CC@|$_host_cc|g
+			s|@HOST_CXX@|$_host_cxx|g
+			s|@HOST_LD@|$_host_cxx|g
 			s|@HOST_AR@|$(command -v llvm-ar)|g
 			s|@HOST_NM@|$(command -v llvm-nm)|g
 			s|@HOST_IS_CLANG@|true|g
 			s|@HOST_USE_GOLD@|false|g
 			s|@HOST_SYSROOT@|$_amd64_sysroot_path|g
 			" $TERMUX_PKG_CACHEDIR/custom-toolchain/BUILD.gn
-	sed -i "s|@V8_CC@|/usr/bin/clang-14|g
-			s|@V8_CXX@|/usr/bin/clang++-14|g
-			s|@V8_LD@|/usr/bin/clang++-14|g
+	sed -i "s|@V8_CC@|$_host_cc|g
+			s|@V8_CXX@|$_host_cxx|g
+			s|@V8_LD@|$_host_cxx|g
 			s|@V8_AR@|$(command -v llvm-ar)|g
 			s|@V8_NM@|$(command -v llvm-nm)|g
 			s|@V8_TOOLCHAIN_NAME@|$_v8_toolchain_name|g
@@ -275,6 +256,7 @@ termux_step_make_install() {
 
 		# V8 Snapshot data
 		snapshot_blob.bin
+		v8_context_snapshot.bin
 
 		# ICU Data
 		icudtl.dat
@@ -365,31 +347,11 @@ termux_step_post_make_install() {
 
 # ######################### About system libraries ############################
 # We only pick up a few libraries to let chromium link against. Others may
-# contains 
-# FYI, all the available libraries and whether they can be used for linking
-# are listed below.
+# contain linking error due to the version mismatch between Google-provided
+# sysroot and Termux.
+# Name in Chromium | libdrm fontconfig
+# Name in Termux   | libdrm fontconfig
 #
-# Name in Chromium | libdrm libjpeg       libpng libwebp fontconfig libxslt
-# Name in Termux   | libdrm libjpeg-turbo libpng libwebp fontconfig libxslt
-#
-# Name in Chromium | freetype libxml  opus    snappy    flac   
-# Name in Termux   | freetype libxml2 libopus libsnappy libflac
-#
-# These libraries cannot be used as system libraries, because Chromium-provided
-# debian rootfs doesn't have them (or their headers). Maybe we should construct
-# our own rootfs later.
-# Name in Chromium | harfbuzz-ng  dav1d ffmpeg libaom libjxl libvpx libevent double-conversion jsoncpp
-# Name in Termux   | harfbuzz  libdav1d ffmpeg libaom libjxl libvpx libevent double-conversion jsoncpp
-#
-# These libraries cannot be used due to configuation errors like
-# `error: '/usr/bin/brotli', needed by 'clang_x64/brotli', missing and no known rule to make it`/
-# Name in Chromium | brotli    icu    re2
-# Name in Termux   | brotli libicu libre2
-#
-# These libraries cannot be used because they don't exist in Termux.
-# Name in Chromium | absl* crc32c, libavif, libXNVCtrl, libyuv, openh264, libSPIRV-Tools
-#
-# TODO: link against system ffmpeg
 # #############################################################################
 
 # ######################### About Native Client ###############################

@@ -389,7 +389,8 @@
     "end": 5615
   },
   "script-add-ld-library-path/4389.patch": {
-    "start": 4389
+    "start": 9999999,
+    "comment": "Disable since 115.0.5790.98-1"
   },
   "skia-include-cmath/5790.patch": {
     "start": 5790
