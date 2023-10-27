@@ -5,6 +5,14 @@ Since commit [1], libcxx assumes that gcc has builtin `__is_nothrow_assignable` 
 
 --- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_nothrow_assignable.h
 +++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_nothrow_assignable.h
+@@ -11,6 +11,7 @@
+
+ #include <__config>
+ #include <__type_traits/integral_constant.h>
++#include <__type_traits/is_assignable.h>
+
+ #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
+ #  pragma GCC system_header
 @@ -18,13 +18,39 @@
  
  _LIBCPP_BEGIN_NAMESPACE_STD

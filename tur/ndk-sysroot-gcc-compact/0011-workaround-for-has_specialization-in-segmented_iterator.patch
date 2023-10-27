@@ -1,6 +1,6 @@
 GCC doesn't have proper support for CWG 1315 until commit [2], which is landed in GCC 
 12. I don't want to cherry-pick this commit for every GCC toolchain, so I implement
-`has_specialization` with SFINAE. Hopefully there aren't many bugs...
+`has_specialization` with SFINAE in another method. Hopefully there aren't many bugs...
 
 [1]: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=96555
 [2]: https://github.com/gcc-mirror/gcc/commit/9b94785dedb08b006419bec1a402614d9241317a
