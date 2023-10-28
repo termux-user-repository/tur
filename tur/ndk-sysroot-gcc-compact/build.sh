@@ -5,7 +5,7 @@ TERMUX_PKG_MAINTAINER="@licy183"
 # Version should be equal to TERMUX_NDK_{VERSION_NUM,REVISION} in
 # scripts/properties.sh
 TERMUX_PKG_VERSION=26b
-TERMUX_PKG_REVISION=2
+TERMUX_PKG_REVISION=3
 TERMUX_PKG_SRCURL=https://dl.google.com/android/repository/android-ndk-r${TERMUX_PKG_VERSION}-linux.zip
 TERMUX_PKG_SHA256=ad73c0370f0b0a87d1671ed2fd5a9ac9acfd1eb5c43a7fbfbd330f85d19dd632
 # This package has taken over <pty.h> from the previous libutil-dev
@@ -84,4 +84,8 @@ termux_step_make_install() {
 		echo 'INPUT(-lc)' > $TERMUX_PKG_MASSAGEDIR/$TERMUX_PREFIX/lib/$lib
 	done
 	unset lib
+
+	# Dummy libstdc++ as libc++
+	echo "INPUT(-lc++_shared)" > $TERMUX_PKG_MASSAGEDIR/$TERMUX_PREFIX/lib/libstdc++.so
+	echo "INPUT(-lc++_static -lc++abi)" > $TERMUX_PKG_MASSAGEDIR/$TERMUX_PREFIX/lib/libstdc++.a
 }
