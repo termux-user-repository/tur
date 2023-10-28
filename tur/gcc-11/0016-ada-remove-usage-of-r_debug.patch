@@ -1,0 +1,49 @@
+Do not pick up `s-tsmona.adb` on x86_64 and i686. It requires `_r_debug` which is GNU-specific.
+
+--- a/gcc/ada/Makefile.rtl
++++ b/gcc/ada/Makefile.rtl
+@@ -1748,7 +1748,7 @@
+   s-intman.adb<libgnarl/s-intman__posix.adb \
+   s-tpopsp.adb<libgnarl/s-tpopsp__tls.adb \
+   $(TRASYM_DWARF_UNIX_PAIRS) \
+-  s-tsmona.adb<libgnat/s-tsmona__linux.adb \
++  s-tsmona.adb<libgnat/s-tsmona.adb \
+   a-exetim.adb<libgnarl/a-exetim__posix.adb \
+   a-exetim.ads<libgnarl/a-exetim__default.ads \
+   s-linux.ads<libgnarl/s-linux.ads \
+@@ -2355,7 +2355,7 @@
+   s-tasinf.adb<libgnarl/s-tasinf__linux.adb \
+   s-taspri.ads<libgnarl/s-taspri__posix.ads \
+   $(TRASYM_DWARF_UNIX_PAIRS) \
+-  s-tsmona.adb<libgnat/s-tsmona__linux.adb \
++  s-tsmona.adb<libgnat/s-tsmona.adb \
+   $(ATOMICS_TARGET_PAIRS) \
+   $(ATOMICS_BUILTINS_TARGET_PAIRS) \
+   system.ads<libgnat/system-linux-ppc.ads
+@@ -2597,7 +2597,7 @@
+   s-tpopsp.adb<libgnarl/s-tpopsp__tls.adb \
+   s-taspri.ads<libgnarl/s-taspri__posix-noaltstack.ads \
+   $(TRASYM_DWARF_UNIX_PAIRS) \
+-  s-tsmona.adb<libgnat/s-tsmona__linux.adb \
++  s-tsmona.adb<libgnat/s-tsmona.adb \
+   $(ATOMICS_TARGET_PAIRS) \
+   $(ATOMICS_BUILTINS_TARGET_PAIRS) \
+   $(GNATRTL_128BIT_PAIRS) \
+@@ -2701,7 +2701,7 @@
+   s-tpopsp.adb<libgnarl/s-tpopsp__tls.adb \
+   s-taspri.ads<libgnarl/s-taspri__posix.ads \
+   $(TRASYM_DWARF_UNIX_PAIRS) \
+-  s-tsmona.adb<libgnat/s-tsmona__linux.adb \
++  s-tsmona.adb<libgnat/s-tsmona.adb \
+   $(ATOMICS_TARGET_PAIRS) \
+   $(X86_64_TARGET_PAIRS) \
+   $(GNATRTL_128BIT_PAIRS) \
+@@ -2744,7 +2744,7 @@
+   s-tpopsp.adb<libgnarl/s-tpopsp__tls.adb \
+   s-taspri.ads<libgnarl/s-taspri__posix.ads \
+   $(TRASYM_DWARF_UNIX_PAIRS) \
+-  s-tsmona.adb<libgnat/s-tsmona__linux.adb \
++  s-tsmona.adb<libgnat/s-tsmona.adb \
+   $(ATOMICS_TARGET_PAIRS) \
+   $(X86_64_TARGET_PAIRS) \
+   $(GNATRTL_128BIT_PAIRS) \

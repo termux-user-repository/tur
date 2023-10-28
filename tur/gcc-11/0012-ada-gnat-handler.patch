@@ -1,0 +1,13 @@
+Disable this error handler as it is only written for ARM (32-bit).
+
+--- a/gcc/ada/init.c
++++ b/gcc/ada/init.c
+@@ -2631,7 +2631,7 @@
+   __gnat_handler_installed = 1;
+ }
+ 
+-#elif defined(__ANDROID__)
++#elif 0
+ 
+ /*******************/
+ /* Android Section */
