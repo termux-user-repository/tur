@@ -21,12 +21,12 @@
   },
   "11": {
     "version": "11.4.0",
-    "revision": "2",
+    "revision": "3",
     "checksums": {
-      "aarch64": "56513eb495e9760f66795ec6d6ada04624a1bcdffc59aebb239ef2fc557915ce",
-      "arm": "157d3077d624d6f139fd87f3c9c369303a0ebdbf7b9f4b12b0fcf48cf3aef1db",
-      "i686": "085665d66b9fbf3413eb08aee90b1a966553facb96d093a63a3339c83c677c01",
-      "x86_64": "b47c64d9cb830a836e524b5384833773ae16e9b64ddcd3ca06290ccd879e08f1"
+      "aarch64": "3ae888628c7acb7c2e656cccbbe5d0ab0cb40d5a06189ac0b3a799f866954f24",
+      "arm": "51e43e0b9d29bf351b42a177794b763abef6159e35a16f27c2190459d6a0d526",
+      "i686": "ff7dc60648eec7351d9c52e36e286ffce4709fc433f828e9a0d8f961e94d63f1",
+      "x86_64": "eca95e2556891c3c83f00317f41bdf416d91d75f9acde2f9b3f3c683d65e3830"
     }
   },
   "10": {
