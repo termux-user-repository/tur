@@ -338,7 +338,8 @@
     "start": 5249
   },
   "eigen3-use-cxx14/5359.patch": {
-    "start": 5359
+    "start": 9999999,
+    "comment": "Disable since NDK r26"
   },
   "ffmpeg-disable-asm/4389.patch": {
     "start": 4389,
