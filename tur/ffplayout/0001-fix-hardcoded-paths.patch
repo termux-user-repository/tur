@@ -1,0 +1,111 @@
+--- a/ffplayout-api/src/main.rs
++++ b/ffplayout-api/src/main.rs
+@@ -41,8 +41,8 @@
+ }
+ 
+ fn public_path() -> &'static str {
+-    if Path::new("/usr/share/ffplayout/public/").is_dir() {
+-        return "/usr/share/ffplayout/public/";
++    if Path::new("@TERMUX_PREFIX@/share/ffplayout/public/").is_dir() {
++        return "@TERMUX_PREFIX@/share/ffplayout/public/";
+     }
+ 
+     if Path::new("./public/").is_dir() {
+--- a/ffplayout-api/src/utils/channels.rs
++++ b/ffplayout-api/src/utils/channels.rs
+@@ -21,7 +21,7 @@
+         return Err(ServiceError::BadRequest("Bad service name!".to_string()));
+     }
+ 
+-    if !target_channel.config_path.starts_with("/etc/ffplayout") {
++    if !target_channel.config_path.starts_with("@TERMUX_PREFIX@/etc/ffplayout") {
+         return Err(ServiceError::BadRequest("Bad config path!".to_string()));
+     }
+ 
+@@ -32,7 +32,7 @@
+     };
+ 
+     let mut config =
+-        PlayoutConfig::new(Some("/usr/share/ffplayout/ffplayout.yml.orig".to_string()));
++        PlayoutConfig::new(Some("@TERMUX_PREFIX@/share/ffplayout/ffplayout.yml.orig".to_string()));
+ 
+     config.general.stat_file = format!(".ffp_{channel_name}",);
+ 
+--- a/ffplayout-api/src/utils/control.rs
++++ b/ffplayout-api/src/utils/control.rs
+@@ -183,7 +183,7 @@
+ 
+         Ok(Self {
+             service: channel.service,
+-            cmd: vec_strings!["/usr/bin/systemctl"],
++            cmd: vec_strings!["@TERMUX_PREFIX@//bin/systemctl"],
+         })
+     }
+ 
+--- a/ffplayout-api/src/utils/mod.rs
++++ b/ffplayout-api/src/utils/mod.rs
+@@ -75,7 +75,7 @@
+ }
+ 
+ pub fn db_path() -> Result<String, Box<dyn std::error::Error>> {
+-    let sys_path = Path::new("/usr/share/ffplayout/db");
++    let sys_path = Path::new("@TERMUX_PREFIX@/share/ffplayout/db");
+     let mut db_path = "./ffplayout.db".to_string();
+ 
+     if sys_path.is_dir() && !sys_path.writable() {
+@@ -83,7 +83,7 @@
+     }
+ 
+     if sys_path.is_dir() && sys_path.writable() {
+-        db_path = "/usr/share/ffplayout/db/ffplayout.db".to_string();
++        db_path = "@TERMUX_PREFIX@/share/ffplayout/db/ffplayout.db".to_string();
+     } else if Path::new("./assets").is_dir() {
+         db_path = "./assets/ffplayout.db".to_string();
+     }
+--- a/ffplayout-api/src/db/handles.rs
++++ b/ffplayout-api/src/db/handles.rs
+@@ -104,7 +104,7 @@
+     };
+ 
+     let config_path = if env::consts::OS == "linux" {
+-        "/etc/ffplayout/ffplayout.yml"
++        "@TERMUX_PREFIX@/etc/ffplayout/ffplayout.yml"
+     } else {
+         "./assets/ffplayout.yml"
+     };
+--- a/lib/src/utils/config.rs
++++ b/lib/src/utils/config.rs
+@@ -318,7 +318,7 @@
+ impl PlayoutConfig {
+     /// Read config from YAML file, and set some extra config values.
+     pub fn new(cfg_path: Option<String>) -> Self {
+-        let mut config_path = PathBuf::from("/etc/ffplayout/ffplayout.yml");
++        let mut config_path = PathBuf::from("@TERMUX_PREFIX@/etc/ffplayout/ffplayout.yml");
+ 
+         if let Some(cfg) = cfg_path {
+             config_path = PathBuf::from(cfg);
+@@ -336,7 +336,7 @@
+             Ok(file) => file,
+             Err(_) => {
+                 println!(
+-                    "{config_path:?} doesn't exists!\nPut \"ffplayout.yml\" in \"/etc/playout/\" or beside the executable!"
++                    "{config_path:?} doesn't exists!\nPut \"ffplayout.yml\" in \"@TERMUX_PREFIX@/etc/playout/\" or beside the executable!"
+                 );
+                 process::exit(1);
+             }
+--- a/ffplayout-engine/src/utils/mod.rs
++++ b/ffplayout-engine/src/utils/mod.rs
+@@ -19,11 +19,11 @@
+ pub fn get_config(args: Args) -> PlayoutConfig {
+     let cfg_path = match args.channel {
+         Some(c) => {
+-            let path = PathBuf::from(format!("/etc/ffplayout/{c}.yml"));
++            let path = PathBuf::from(format!("@TERMUX_PREFIX@/etc/ffplayout/{c}.yml"));
+ 
+             if !path.is_file() {
+                 println!(
+-                    "Config file \"{c}\" under \"/etc/ffplayout/\" not found.\n\nCheck arguments!"
++                    "Config file \"{c}\" under \"@TERMUX_PREFIX@/etc/ffplayout/\" not found.\n\nCheck arguments!"
+                 );
+                 exit(1)
+             }
