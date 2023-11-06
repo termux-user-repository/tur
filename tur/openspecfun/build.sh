@@ -6,6 +6,7 @@ TERMUX_PKG_VERSION=0.5.6
 TERMUX_PKG_SRCURL=https://github.com/JuliaMath/openspecfun/archive/refs/tags/v$TERMUX_PKG_VERSION.tar.gz
 TERMUX_PKG_SHA256=f77401cdadde8e4c59cd862ebb71a015141f7ad3dca638a17dd617b5e801572a
 TERMUX_PKG_BUILD_IN_SRC=true
+TERMUX_PKG_AUTO_UPDATE=true
 
 source $TERMUX_SCRIPTDIR/common-files/setup_toolchain_gcc.sh
 
