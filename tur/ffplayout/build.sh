@@ -6,6 +6,7 @@ TERMUX_PKG_VERSION=0.19.1
 TERMUX_PKG_SRCURL=git+https://github.com/ffplayout/ffplayout
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_AUTO_UPDATE=true
+TERMUX_PKG_UPDATE_TAG_TYPE="latest-release-tag"
 TERMUX_PKG_HOSTBUILD=true
 
 termux_step_get_source() {
