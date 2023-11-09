@@ -3,17 +3,298 @@ Since commit [1], libcxx assumes that gcc has builtin `__is_nothrow_assignable` 
 
 [1]: https://github.com/llvm/llvm-project/commit/a13822b35d11cb6afa759fa0672fbc0b6ef295d0
 
---- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_nothrow_assignable.h
-+++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_nothrow_assignable.h
-@@ -11,6 +11,7 @@
-
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/alignment_of.h
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/alignment_of.h
+@@ -24,7 +24,7 @@
+ 
+ #if _LIBCPP_STD_VER > 14
+ template <class _Tp>
+-inline constexpr size_t alignment_of_v = _LIBCPP_ALIGNOF(_Tp);
++inline constexpr size_t alignment_of_v = alignment_of<_Tp>::value;
+ #endif
+ 
+ _LIBCPP_END_NAMESPACE_STD
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/apply_cv.h
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/apply_cv.h
+@@ -10,6 +10,7 @@
+ #define _LIBCPP___TYPE_TRAITS_APPLY_CV_H
+ 
+ #include <__config>
++#include <__type_traits/integral_constant.h>
+ #include <__type_traits/is_const.h>
+ #include <__type_traits/is_volatile.h>
+ #include <__type_traits/remove_reference.h>
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/decay.h
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/decay.h
+@@ -12,6 +12,7 @@
+ #include <__config>
+ #include <__type_traits/add_pointer.h>
+ #include <__type_traits/conditional.h>
++#include <__type_traits/integral_constant.h>
+ #include <__type_traits/is_array.h>
+ #include <__type_traits/is_function.h>
+ #include <__type_traits/is_referenceable.h>
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/disjunction.h
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/disjunction.h
+@@ -10,6 +10,7 @@
+ #define _LIBCPP___TYPE_TRAITS_DISJUNCTION_H
+ 
+ #include <__config>
++#include <__type_traits/conditional.h>
+ #include <__type_traits/integral_constant.h>
+ 
+ #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/has_virtual_destructor.h
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/has_virtual_destructor.h
+@@ -18,12 +18,21 @@
+ 
+ _LIBCPP_BEGIN_NAMESPACE_STD
+ 
++#if __has_builtin(__has_virtual_destructor)
++
+ template <class _Tp> struct _LIBCPP_TEMPLATE_VIS has_virtual_destructor
+     : public integral_constant<bool, __has_virtual_destructor(_Tp)> {};
+ 
++#else
++
++template <class _Tp> struct _LIBCPP_TEMPLATE_VIS has_virtual_destructor
++    : public false_type {};
++
++#endif
++
+ #if _LIBCPP_STD_VER > 14
+ template <class _Tp>
+-inline constexpr bool has_virtual_destructor_v = __has_virtual_destructor(_Tp);
++inline constexpr bool has_virtual_destructor_v = has_virtual_destructor<_Tp>::value;
+ #endif
+ 
+ _LIBCPP_END_NAMESPACE_STD
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_assignable.h
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_assignable.h
+@@ -18,6 +18,10 @@
+ 
+ _LIBCPP_BEGIN_NAMESPACE_STD
+ 
++template<typename, typename _Tp> struct __select_2nd { typedef _LIBCPP_NODEBUG _Tp type; };
++
++#if __has_builtin(__is_assignable)
++
+ template<class _Tp, class _Up>
+ struct _LIBCPP_TEMPLATE_VIS is_assignable : _BoolConstant<__is_assignable(_Tp, _Up)> { };
+ 
+@@ -26,6 +30,37 @@
+ inline constexpr bool is_assignable_v = __is_assignable(_Tp, _Arg);
+ #endif
+ 
++#else // __has_builtin(__is_assignable)
++
++template <class _Tp, class _Arg>
++typename __select_2nd<decltype((declval<_Tp>() = declval<_Arg>())), true_type>::type
++__is_assignable_test(int);
++
++template <class, class>
++false_type __is_assignable_test(...);
++
++
++template <class _Tp, class _Arg, bool = is_void<_Tp>::value || is_void<_Arg>::value>
++struct __is_assignable_imp
++    : public decltype((_VSTD::__is_assignable_test<_Tp, _Arg>(0))) {};
++
++template <class _Tp, class _Arg>
++struct __is_assignable_imp<_Tp, _Arg, true>
++    : public false_type
++{
++};
++
++template <class _Tp, class _Arg>
++struct is_assignable
++    : public __is_assignable_imp<_Tp, _Arg> {};
++
++#if _LIBCPP_STD_VER > 14
++template <class _Tp, class _Arg>
++inline constexpr bool is_assignable_v = is_assignable<_Tp, _Arg>::value;
++#endif
++
++#endif // __has_builtin(__is_assignable)
++
+ _LIBCPP_END_NAMESPACE_STD
+ 
+ #endif // _LIBCPP___TYPE_TRAITS_IS_ASSIGNABLE_H
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_class.h
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_class.h
+@@ -11,6 +11,8 @@
+ 
  #include <__config>
  #include <__type_traits/integral_constant.h>
-+#include <__type_traits/is_assignable.h>
-
++#include <__type_traits/is_union.h>
++#include <__type_traits/remove_cv.h>
+ 
  #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
  #  pragma GCC system_header
-@@ -18,13 +18,39 @@
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_constructible.h
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_constructible.h
+@@ -25,7 +25,7 @@
+ 
+ #if _LIBCPP_STD_VER > 14
+ template <class _Tp, class ..._Args>
+-inline constexpr bool is_constructible_v = __is_constructible(_Tp, _Args...);
++inline constexpr bool is_constructible_v = is_constructible<_Tp, _Args...>::value;
+ #endif
+ 
+ _LIBCPP_END_NAMESPACE_STD
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_copy_assignable.h
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_copy_assignable.h
+@@ -13,6 +13,7 @@
+ #include <__type_traits/add_const.h>
+ #include <__type_traits/add_lvalue_reference.h>
+ #include <__type_traits/integral_constant.h>
++#include <__type_traits/is_assignable.h>
+ 
+ #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
+ #  pragma GCC system_header
+@@ -20,12 +21,9 @@
+ 
+ _LIBCPP_BEGIN_NAMESPACE_STD
+ 
+-template <class _Tp>
+-struct _LIBCPP_TEMPLATE_VIS is_copy_assignable
+-    : public integral_constant<
+-          bool,
+-          __is_assignable(__add_lvalue_reference_t<_Tp>,
+-                          __add_lvalue_reference_t<typename add_const<_Tp>::type>)> {};
++template <class _Tp> struct _LIBCPP_TEMPLATE_VIS is_copy_assignable
++    : public is_assignable<typename add_lvalue_reference<_Tp>::type,
++                  typename add_lvalue_reference<typename add_const<_Tp>::type>::type> {};
+ 
+ #if _LIBCPP_STD_VER > 14
+ template <class _Tp>
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_copy_constructible.h
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_copy_constructible.h
+@@ -13,6 +13,7 @@
+ #include <__type_traits/add_const.h>
+ #include <__type_traits/add_lvalue_reference.h>
+ #include <__type_traits/integral_constant.h>
++#include <__type_traits/is_constructible.h>
+ 
+ #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
+ #  pragma GCC system_header
+@@ -22,9 +23,8 @@
+ 
+ template <class _Tp>
+ struct _LIBCPP_TEMPLATE_VIS is_copy_constructible
+-    : public integral_constant<
+-          bool,
+-          __is_constructible(_Tp, __add_lvalue_reference_t<typename add_const<_Tp>::type>)> {};
++    : public is_constructible<_Tp,
++                  typename add_lvalue_reference<typename add_const<_Tp>::type>::type> {};
+ 
+ #if _LIBCPP_STD_VER > 14
+ template <class _Tp>
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_default_constructible.h
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_default_constructible.h
+@@ -11,6 +11,7 @@
+ 
+ #include <__config>
+ #include <__type_traits/integral_constant.h>
++#include <__type_traits/is_constructible.h>
+ 
+ #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
+ #  pragma GCC system_header
+@@ -20,12 +21,12 @@
+ 
+ template <class _Tp>
+ struct _LIBCPP_TEMPLATE_VIS is_default_constructible
+-    : public integral_constant<bool, __is_constructible(_Tp)>
++    : public is_constructible<_Tp>
+     {};
+ 
+ #if _LIBCPP_STD_VER > 14
+ template <class _Tp>
+-inline constexpr bool is_default_constructible_v = __is_constructible(_Tp);
++inline constexpr bool is_default_constructible_v = is_default_constructible<_Tp>::value;
+ #endif
+ 
+ _LIBCPP_END_NAMESPACE_STD
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_enum.h
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_enum.h
+@@ -11,6 +11,7 @@
+ 
+ #include <__config>
+ #include <__type_traits/integral_constant.h>
++#include <__type_traits/remove_cv.h>
+ 
+ #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
+ #  pragma GCC system_header
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_literal_type.h
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_literal_type.h
+@@ -25,7 +25,7 @@
+ 
+ #if _LIBCPP_STD_VER > 14
+ template <class _Tp>
+-_LIBCPP_DEPRECATED_IN_CXX17 inline constexpr bool is_literal_type_v = __is_literal_type(_Tp);
++_LIBCPP_DEPRECATED_IN_CXX17 inline constexpr bool is_literal_type_v = is_literal_type<_Tp>::value;
+ #endif // _LIBCPP_STD_VER > 14
+ #endif // _LIBCPP_STD_VER <= 17 || defined(_LIBCPP_ENABLE_CXX20_REMOVED_TYPE_TRAITS)
+ 
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_move_assignable.h
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_move_assignable.h
+@@ -10,9 +10,11 @@
+ #define _LIBCPP___TYPE_TRAITS_IS_MOVE_ASSIGNABLE_H
+ 
+ #include <__config>
++#include <__type_traits/add_const.h>
+ #include <__type_traits/add_lvalue_reference.h>
+ #include <__type_traits/add_rvalue_reference.h>
+ #include <__type_traits/integral_constant.h>
++#include <__type_traits/is_assignable.h>
+ 
+ #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
+ #  pragma GCC system_header
+@@ -20,11 +22,9 @@
+ 
+ _LIBCPP_BEGIN_NAMESPACE_STD
+ 
+-template <class _Tp>
+-struct _LIBCPP_TEMPLATE_VIS is_move_assignable
+-    : public integral_constant<
+-          bool,
+-          __is_assignable(__add_lvalue_reference_t<_Tp>, __add_rvalue_reference_t<_Tp>)> {};
++template <class _Tp> struct _LIBCPP_TEMPLATE_VIS is_move_assignable
++    : public is_assignable<typename add_lvalue_reference<_Tp>::type,
++                           typename add_rvalue_reference<_Tp>::type> {};
+ 
+ #if _LIBCPP_STD_VER > 14
+ template <class _Tp>
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_move_constructible.h
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_move_constructible.h
+@@ -12,6 +12,7 @@
+ #include <__config>
+ #include <__type_traits/add_rvalue_reference.h>
+ #include <__type_traits/integral_constant.h>
++#include <__type_traits/is_constructible.h>
+ 
+ #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
+ #  pragma GCC system_header
+@@ -21,7 +22,7 @@
+ 
+ template <class _Tp>
+ struct _LIBCPP_TEMPLATE_VIS is_move_constructible
+-    : public integral_constant<bool, __is_constructible(_Tp, __add_rvalue_reference_t<_Tp>)>
++    : public is_constructible<_Tp, typename add_rvalue_reference<_Tp>::type>
+     {};
+ 
+ #if _LIBCPP_STD_VER > 14
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_nothrow_assignable.h
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_nothrow_assignable.h
+@@ -10,6 +10,7 @@
+ #define _LIBCPP___TYPE_TRAITS_IS_NOTHROW_ASSIGNABLE_H
+ 
+ #include <__config>
++#include <__type_traits/add_const.h>
+ #include <__type_traits/integral_constant.h>
+ 
+ #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
+@@ -18,13 +19,39 @@
  
  _LIBCPP_BEGIN_NAMESPACE_STD
  
@@ -54,32 +335,48 @@ Since commit [1], libcxx assumes that gcc has builtin `__is_nothrow_assignable` 
  #endif
  
  _LIBCPP_END_NAMESPACE_STD
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_nothrow_constructible.h
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_nothrow_constructible.h
+@@ -24,10 +24,10 @@
+ 
+ #if __has_builtin(__is_nothrow_constructible)
+ 
+-template <
+-    class _Tp, class... _Args>
++template <class _Tp, class... _Args>
+ struct _LIBCPP_TEMPLATE_VIS is_nothrow_constructible
+     : public integral_constant<bool, __is_nothrow_constructible(_Tp, _Args...)> {};
++
+ #else
+ 
+ template <bool, bool, class _Tp, class... _Args> struct __libcpp_is_nothrow_constructible;
 --- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_nothrow_copy_assignable.h
 +++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_nothrow_copy_assignable.h
-@@ -20,6 +20,8 @@
+@@ -13,6 +13,7 @@
+ #include <__type_traits/add_const.h>
+ #include <__type_traits/add_lvalue_reference.h>
+ #include <__type_traits/integral_constant.h>
++#include <__type_traits/is_nothrow_assignable.h>
+ 
+ #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
+ #  pragma GCC system_header
+@@ -20,13 +21,9 @@
  
  _LIBCPP_BEGIN_NAMESPACE_STD
  
-+#if __has_builtin(__is_nothrow_assignable)
-+
- template <class _Tp>
- struct _LIBCPP_TEMPLATE_VIS is_nothrow_copy_assignable
-     : public integral_constant<
-@@ -28,6 +30,14 @@
-               __add_lvalue_reference_t<_Tp>,
-               __add_lvalue_reference_t<typename add_const<_Tp>::type>)> {};
- 
-+#else
-+
+-template <class _Tp>
+-struct _LIBCPP_TEMPLATE_VIS is_nothrow_copy_assignable
+-    : public integral_constant<
+-          bool,
+-          __is_nothrow_assignable(
+-              __add_lvalue_reference_t<_Tp>,
+-              __add_lvalue_reference_t<typename add_const<_Tp>::type>)> {};
 +template <class _Tp> struct _LIBCPP_TEMPLATE_VIS is_nothrow_copy_assignable
 +    : public is_nothrow_assignable<typename add_lvalue_reference<_Tp>::type,
 +                  typename add_lvalue_reference<typename add_const<_Tp>::type>::type> {};
-+
-+#endif
-+
+ 
  #if _LIBCPP_STD_VER > 14
  template <class _Tp>
- inline constexpr bool is_nothrow_copy_assignable_v = is_nothrow_copy_assignable<_Tp>::value;
 --- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_nothrow_default_constructible.h
 +++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_nothrow_default_constructible.h
 @@ -11,6 +11,7 @@
@@ -90,24 +387,14 @@ Since commit [1], libcxx assumes that gcc has builtin `__is_nothrow_assignable` 
  
  #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
  #  pragma GCC system_header
-@@ -18,13 +19,23 @@
- 
+@@ -19,12 +20,12 @@
  _LIBCPP_BEGIN_NAMESPACE_STD
  
-+#if __has_builtin(__is_nothrow_constructible)
-+
  template <class _Tp> struct _LIBCPP_TEMPLATE_VIS is_nothrow_default_constructible
-     : public integral_constant<bool, __is_nothrow_constructible(_Tp)>
+-    : public integral_constant<bool, __is_nothrow_constructible(_Tp)>
++    : public is_nothrow_constructible<_Tp>
      {};
  
-+#else
-+
-+template <class _Tp> struct _LIBCPP_TEMPLATE_VIS is_nothrow_default_constructible
-+    : public is_nothrow_constructible<_Tp>
-+    {};
-+
-+#endif
-+
  #if _LIBCPP_STD_VER > 14
  template <class _Tp>
 -inline constexpr bool is_nothrow_default_constructible_v = __is_nothrow_constructible(_Tp);
@@ -115,6 +402,16 @@ Since commit [1], libcxx assumes that gcc has builtin `__is_nothrow_assignable` 
  #endif
  
  _LIBCPP_END_NAMESPACE_STD
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_nothrow_destructible.h
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_nothrow_destructible.h
+@@ -10,6 +10,7 @@
+ #define _LIBCPP___TYPE_TRAITS_IS_NOTHROW_DESTRUCTIBLE_H
+ 
+ #include <__config>
++#include <__type_traits/add_const.h>
+ #include <__type_traits/integral_constant.h>
+ #include <__type_traits/is_destructible.h>
+ #include <__type_traits/is_reference.h>
 --- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_nothrow_move_assignable.h
 +++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_nothrow_move_assignable.h
 @@ -13,6 +13,7 @@
@@ -125,28 +422,321 @@ Since commit [1], libcxx assumes that gcc has builtin `__is_nothrow_assignable` 
  
  #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
  #  pragma GCC system_header
-@@ -20,6 +21,8 @@
+@@ -20,12 +21,10 @@
  
  _LIBCPP_BEGIN_NAMESPACE_STD
  
-+#if __has_builtin(__is_nothrow_assignable)
-+
- template <class _Tp>
- struct _LIBCPP_TEMPLATE_VIS is_nothrow_move_assignable
-     : public integral_constant<
-@@ -27,6 +30,15 @@
-           __is_nothrow_assignable(__add_lvalue_reference_t<_Tp>, __add_rvalue_reference_t<_Tp>)> {
- };
- 
-+#else
-+
+-template <class _Tp>
+-struct _LIBCPP_TEMPLATE_VIS is_nothrow_move_assignable
+-    : public integral_constant<
+-          bool,
+-          __is_nothrow_assignable(__add_lvalue_reference_t<_Tp>, __add_rvalue_reference_t<_Tp>)> {
+-};
 +template <class _Tp> struct _LIBCPP_TEMPLATE_VIS is_nothrow_move_assignable
 +    : public is_nothrow_assignable<typename add_lvalue_reference<_Tp>::type,
 +                                     typename add_rvalue_reference<_Tp>::type>
 +    {};
+ 
+ #if _LIBCPP_STD_VER > 14
+ template <class _Tp>
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_nothrow_move_constructible.h
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_nothrow_move_constructible.h
+@@ -30,7 +30,7 @@
+ #else // _LIBCPP_COMPILER_GCC
+ 
+ template <class _Tp> struct _LIBCPP_TEMPLATE_VIS is_nothrow_move_constructible
+-    : public is_nothrow_constructible<_Tp, __add_rvalue_reference_t<_Tp> >
++    : public is_nothrow_constructible<_Tp, typename add_rvalue_reference<_Tp>::type >
+     {};
+ 
+ #endif // _LIBCPP_COMPILER_GCC
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_pod.h
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_pod.h
+@@ -11,6 +11,10 @@
+ 
+ #include <__config>
+ #include <__type_traits/integral_constant.h>
++#include <__type_traits/is_trivially_copy_assignable.h>
++#include <__type_traits/is_trivially_copy_constructible.h>
++#include <__type_traits/is_trivially_default_constructible.h>
++#include <__type_traits/is_trivially_destructible.h>
+ 
+ #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
+ #  pragma GCC system_header
+@@ -18,12 +22,24 @@
+ 
+ _LIBCPP_BEGIN_NAMESPACE_STD
+ 
++#if __has_builtin(__is_pod)
 +
-+#endif
+ template <class _Tp> struct _LIBCPP_TEMPLATE_VIS is_pod
+     : public integral_constant<bool, __is_pod(_Tp)> {};
+ 
++#else
++
++template <class _Tp> struct _LIBCPP_TEMPLATE_VIS is_pod
++    : public integral_constant<bool, is_trivially_default_constructible<_Tp>::value   &&
++                                     is_trivially_copy_constructible<_Tp>::value      &&
++                                     is_trivially_copy_assignable<_Tp>::value    &&
++                                     is_trivially_destructible<_Tp>::value> {};
++
++#endif // __has_builtin(__is_pod)
 +
  #if _LIBCPP_STD_VER > 14
  template <class _Tp>
- inline constexpr bool is_nothrow_move_assignable_v = is_nothrow_move_assignable<_Tp>::value;
+-inline constexpr bool is_pod_v = __is_pod(_Tp);
++inline constexpr bool is_pod_v = is_pod<_Tp>::value;
+ #endif
+ 
+ _LIBCPP_END_NAMESPACE_STD
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_standard_layout.h
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_standard_layout.h
+@@ -11,6 +11,7 @@
+
+ #include <__config>
+ #include <__type_traits/integral_constant.h>
++#include <__type_traits/is_scalar.h>
+
+ #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
+ #  pragma GCC system_header
+@@ -19,12 +20,16 @@
+ _LIBCPP_BEGIN_NAMESPACE_STD
+ 
+ template <class _Tp> struct _LIBCPP_TEMPLATE_VIS is_standard_layout
++#if __has_builtin(__is_standard_layout)
+     : public integral_constant<bool, __is_standard_layout(_Tp)>
++#else
++    : integral_constant<bool, is_scalar<typename remove_all_extents<_Tp>::type>::value>
++#endif
+     {};
+ 
+ #if _LIBCPP_STD_VER > 14
+ template <class _Tp>
+-inline constexpr bool is_standard_layout_v = __is_standard_layout(_Tp);
++inline constexpr bool is_standard_layout_v = is_standard_layout<_Tp>::value;
+ #endif
+ 
+ _LIBCPP_END_NAMESPACE_STD
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_trivial.h
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_trivial.h
+@@ -11,6 +11,8 @@
+
+ #include <__config>
+ #include <__type_traits/integral_constant.h>
++#include <__type_traits/is_trivially_copyable.h>
++#include <__type_traits/is_trivially_default_constructible.h>
+
+ #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
+ #  pragma GCC system_header
+@@ -19,12 +21,17 @@
+ _LIBCPP_BEGIN_NAMESPACE_STD
+
+ template <class _Tp> struct _LIBCPP_TEMPLATE_VIS is_trivial
++#if __has_builtin(__is_trivial)
+     : public integral_constant<bool, __is_trivial(_Tp)>
++#else
++    : integral_constant<bool, is_trivially_copyable<_Tp>::value &&
++                                 is_trivially_default_constructible<_Tp>::value>
++#endif
+     {};
+ 
+ #if _LIBCPP_STD_VER > 14
+ template <class _Tp>
+-inline constexpr bool is_trivial_v = __is_trivial(_Tp);
++inline constexpr bool is_trivial_v = is_trivial<_Tp>::value;
+ #endif
+ 
+ _LIBCPP_END_NAMESPACE_STD
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_trivially_assignable.h
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_trivially_assignable.h
+@@ -25,7 +25,7 @@
+ 
+ #if _LIBCPP_STD_VER > 14
+ template <class _Tp, class _Arg>
+-inline constexpr bool is_trivially_assignable_v = __is_trivially_assignable(_Tp, _Arg);
++inline constexpr bool is_trivially_assignable_v = is_trivially_assignable<_Tp, _Arg>::value;
+ #endif
+ 
+ _LIBCPP_END_NAMESPACE_STD
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_trivially_constructible.h
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_trivially_constructible.h
+@@ -26,7 +26,7 @@
+ 
+ #if _LIBCPP_STD_VER > 14
+ template <class _Tp, class... _Args>
+-inline constexpr bool is_trivially_constructible_v = __is_trivially_constructible(_Tp, _Args...);
++inline constexpr bool is_trivially_constructible_v = is_trivially_constructible<_Tp, _Args...>::value;
+ #endif
+ 
+ _LIBCPP_END_NAMESPACE_STD
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_trivially_copy_assignable.h
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_trivially_copy_assignable.h
+@@ -13,6 +13,7 @@
+ #include <__type_traits/add_const.h>
+ #include <__type_traits/add_lvalue_reference.h>
+ #include <__type_traits/integral_constant.h>
++#include <__type_traits/is_trivially_assignable.h>
+ 
+ #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
+ #  pragma GCC system_header
+@@ -20,13 +21,9 @@
+ 
+ _LIBCPP_BEGIN_NAMESPACE_STD
+ 
+-template <class _Tp>
+-struct _LIBCPP_TEMPLATE_VIS is_trivially_copy_assignable
+-    : public integral_constant<
+-          bool,
+-          __is_trivially_assignable(
+-              __add_lvalue_reference_t<_Tp>,
+-              __add_lvalue_reference_t<typename add_const<_Tp>::type>)> {};
++template <class _Tp> struct _LIBCPP_TEMPLATE_VIS is_trivially_copy_assignable
++    : public is_trivially_assignable<typename add_lvalue_reference<_Tp>::type,
++                  typename add_lvalue_reference<typename add_const<_Tp>::type>::type> {};
+ 
+ #if _LIBCPP_STD_VER > 14
+ template <class _Tp>
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_trivially_copy_constructible.h
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_trivially_copy_constructible.h
+@@ -12,6 +12,7 @@
+ #include <__config>
+ #include <__type_traits/add_lvalue_reference.h>
+ #include <__type_traits/integral_constant.h>
++#include <__type_traits/is_trivially_constructible.h>
+ 
+ #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
+ #  pragma GCC system_header
+@@ -20,7 +21,7 @@
+ _LIBCPP_BEGIN_NAMESPACE_STD
+ 
+ template <class _Tp> struct _LIBCPP_TEMPLATE_VIS is_trivially_copy_constructible
+-    : public integral_constant<bool, __is_trivially_constructible(_Tp, __add_lvalue_reference_t<const _Tp>)>
++    : public is_trivially_constructible<_Tp, typename add_lvalue_reference<const _Tp>::type>
+     {};
+ 
+ #if _LIBCPP_STD_VER > 14
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_trivially_copyable.h
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_trivially_copyable.h
+@@ -24,7 +24,7 @@
+ 
+ #if _LIBCPP_STD_VER > 14
+ template <class _Tp>
+-inline constexpr bool is_trivially_copyable_v = __is_trivially_copyable(_Tp);
++inline constexpr bool is_trivially_copyable_v = is_trivially_copyable<_Tp>::value;
+ #endif
+ 
+ _LIBCPP_END_NAMESPACE_STD
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_trivially_default_constructible.h
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_trivially_default_constructible.h
+@@ -11,6 +11,7 @@
+ 
+ #include <__config>
+ #include <__type_traits/integral_constant.h>
++#include <__type_traits/is_trivially_constructible.h>
+ 
+ #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
+ #  pragma GCC system_header
+@@ -19,12 +20,12 @@
+ _LIBCPP_BEGIN_NAMESPACE_STD
+ 
+ template <class _Tp> struct _LIBCPP_TEMPLATE_VIS is_trivially_default_constructible
+-    : public integral_constant<bool, __is_trivially_constructible(_Tp)>
++    : public is_trivially_constructible<_Tp>
+     {};
+ 
+ #if _LIBCPP_STD_VER > 14
+ template <class _Tp>
+-inline constexpr bool is_trivially_default_constructible_v = __is_trivially_constructible(_Tp);
++inline constexpr bool is_trivially_default_constructible_v = is_trivially_default_constructible<_Tp>::value;
+ #endif
+ 
+ _LIBCPP_END_NAMESPACE_STD
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_trivially_destructible.h
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_trivially_destructible.h
+@@ -31,7 +31,15 @@
+ 
+ #else
+ 
+-#error is_trivially_destructible is not implemented
++template <class _Tp> struct __libcpp_trivial_destructor
++    : public integral_constant<bool, is_scalar<_Tp>::value ||
++                                     is_reference<_Tp>::value> {};
++
++template <class _Tp> struct _LIBCPP_TEMPLATE_VIS is_trivially_destructible
++    : public __libcpp_trivial_destructor<typename remove_all_extents<_Tp>::type> {};
++
++template <class _Tp> struct _LIBCPP_TEMPLATE_VIS is_trivially_destructible<_Tp[]>
++    : public false_type {};
+ 
+ #endif // __has_builtin(__is_trivially_destructible)
+ 
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_trivially_move_assignable.h
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_trivially_move_assignable.h
+@@ -13,6 +13,7 @@
+ #include <__type_traits/add_lvalue_reference.h>
+ #include <__type_traits/add_rvalue_reference.h>
+ #include <__type_traits/integral_constant.h>
++#include <__type_traits/is_trivially_assignable.h>
+ 
+ #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
+ #  pragma GCC system_header
+@@ -20,11 +21,10 @@
+ 
+ _LIBCPP_BEGIN_NAMESPACE_STD
+ 
+-template <class _Tp>
+-struct _LIBCPP_TEMPLATE_VIS is_trivially_move_assignable
+-    : public integral_constant<
+-          bool,
+-          __is_trivially_assignable(__add_lvalue_reference_t<_Tp>, __add_rvalue_reference_t<_Tp>)> {};
++template <class _Tp> struct _LIBCPP_TEMPLATE_VIS is_trivially_move_assignable
++    : public is_trivially_assignable<typename add_lvalue_reference<_Tp>::type,
++                                     typename add_rvalue_reference<_Tp>::type>
++    {};
+ 
+ #if _LIBCPP_STD_VER > 14
+ template <class _Tp>
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_trivially_move_constructible.h
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_trivially_move_constructible.h
+@@ -12,6 +12,7 @@
+ #include <__config>
+ #include <__type_traits/add_rvalue_reference.h>
+ #include <__type_traits/integral_constant.h>
++#include <__type_traits/is_trivially_constructible.h>
+ 
+ #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
+ #  pragma GCC system_header
+@@ -19,9 +20,9 @@
+ 
+ _LIBCPP_BEGIN_NAMESPACE_STD
+ 
+-template <class _Tp>
+-struct _LIBCPP_TEMPLATE_VIS is_trivially_move_constructible
+-    : public integral_constant<bool, __is_trivially_constructible(_Tp, __add_rvalue_reference_t<_Tp>)> {};
++template <class _Tp> struct _LIBCPP_TEMPLATE_VIS is_trivially_move_constructible
++    : public is_trivially_constructible<_Tp, typename add_rvalue_reference<_Tp>::type>
++    {};
+ 
+ #if _LIBCPP_STD_VER > 14
+ template <class _Tp>
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_union.h
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/is_union.h
+@@ -11,6 +11,7 @@
+ 
+ #include <__config>
+ #include <__type_traits/integral_constant.h>
++#include <__type_traits/remove_cv.h>
+ 
+ #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
+ #  pragma GCC system_header
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/negation.h
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/negation.h
+@@ -25,7 +25,7 @@
+ template <class _Tp>
+ struct negation : _Not<_Tp> {};
+ template<class _Tp>
+-inline constexpr bool negation_v = !_Tp::value;
++inline constexpr bool negation_v = negation<_Tp>::value;
+ #endif // _LIBCPP_STD_VER > 14
+ 
+ _LIBCPP_END_NAMESPACE_STD
