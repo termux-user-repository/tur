@@ -1,0 +1,18 @@
+--- a/ffplayout-api/build.rs
++++ b/ffplayout-api/build.rs
+@@ -1,13 +1,8 @@
+-use static_files::NpmBuild;
++use static_files::resource_dir;
+ 
+ fn main() -> std::io::Result<()> {
+     if !cfg!(debug_assertions) {
+-        NpmBuild::new("../ffplayout-frontend")
+-            .install()?
+-            .run("generate")?
+-            .target("../ffplayout-frontend/.output/public")
+-            .change_detection()
+-            .to_resource_dir()
++        resource_dir("../ffplayout-frontend/.output/public")
+             .build()
+     } else {
+         Ok(())
