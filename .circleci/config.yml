@@ -1,0 +1,15 @@
+version: 2.1
+
+setup: true
+
+orbs:
+  path-filtering: circleci/path-filtering@0.0.2
+
+workflows:
+  setup-workflow:
+    jobs:
+      - path-filtering/filter:
+          base-revision: master
+          config-path: .circleci/continue-config.yml
+          mapping: |
+            tur-on-device/.* tur-on-device true

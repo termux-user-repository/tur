@@ -1,0 +1,106 @@
+version: 2.1
+
+executors:
+  base:
+    resource_class: arm.medium
+    machine:
+      image: ubuntu-2204:2023.07.1
+
+commands:
+  check-skip:
+    steps:
+      - run:
+          name: Check-skip
+          command: |
+            export git_log=$(git log --max-count=1 --pretty=format:"%B" | tr "\n" " ")
+            echo "Got commit message:"
+            echo "${git_log}"
+            if ([[ "$git_log" == *"[skip ci]"* ]] || [[ "$git_log" == *"[ci skip]"* ]]); then
+              echo "Skip detected, exiting job ${CIRCLE_JOB}"
+              circleci-agent step halt;
+            fi
+  merge-repos:
+    steps:
+      - run:
+          name: Merge Repos
+          command: |
+            ./setup-environment.sh
+
+  gather-build-summary:
+    steps:
+      - run:
+          name: Gather Build Summary
+          command: |
+            MAIN_BRANCH_NAME=master ./.circleci/build-steps/gather-build-summary.sh
+
+  lint-packages:
+    steps:
+      - run:
+          name: Lint Packages
+          command: |
+            ./.circleci/build-steps/lint-packages.sh
+
+  build-packages-aarch64:
+    steps:
+      - run:
+          name: Lint Packages
+          command: |
+            BUILD_ARCH=aarch64 ./.circleci/build-steps/build-packages-on-device.sh
+
+  build-packages-arm:
+    steps:
+      - run:
+          name: Lint Packages
+          command: |
+            BUILD_ARCH=arm ./.circleci/build-steps/build-packages-on-device.sh
+
+parameters:
+  tur-on-device:
+    type: boolean
+    default: false
+
+jobs:
+  tur-on-device-aarch64:
+    executor: base
+    steps:
+      - checkout
+      - check-skip
+      - merge-repos
+      - gather-build-summary
+      - lint-packages
+      - build-packages-aarch64
+      - store_artifacts:
+          path: ./artifacts
+
+  tur-on-device-arm:
+    executor: base
+    steps:
+      - checkout
+      - check-skip
+      - merge-repos
+      - gather-build-summary
+      - lint-packages
+      - build-packages-arm
+      - store_artifacts:
+          path: ./artifacts
+
+  upload-to-release:
+    executor: base
+    steps:
+      - run: |
+          exit -1
+
+workflows:
+  build-tur-on-device:
+    when: << pipeline.parameters.tur-on-device >>
+    jobs:
+      - tur-on-device-aarch64
+      - tur-on-device-arm
+      - hold-for-approval:
+          type: approval
+          requires:
+            - tur-on-device-aarch64
+            - tur-on-device-arm
+      - upload-to-release:
+          requires:
+            - hold-for-approval
