@@ -2,7 +2,7 @@ TERMUX_PKG_HOMEPAGE=https://github.com/termux-user-repository/tur-on-device
 TERMUX_PKG_DESCRIPTION="Dummy test for TUR on Device"
 TERMUX_PKG_LICENSE="GPL-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION=0.1
+TERMUX_PKG_VERSION=1:0.1
 TERMUX_PKG_SKIP_SRC_EXTRACT=true
 TERMUX_PKG_BUILD_IN_SRC=true
 
