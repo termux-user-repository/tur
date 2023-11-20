@@ -1,0 +1,12 @@
+Repology update is easy to reach the maximum number of times, so disable it anyway.
+
+--- a/scripts/updates/termux_pkg_auto_update.sh
++++ b/scripts/updates/termux_pkg_auto_update.sh
+@@ -32,6 +32,7 @@
+ 		fi
+ 		;;
+ 	repology)
++		return 0
+ 		termux_repology_auto_update
+ 		;;
+ 	*)
