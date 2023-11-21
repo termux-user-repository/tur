@@ -1,0 +1,10 @@
+--- a/third_party/blink/renderer/core/paint/object_paint_properties_sparse.h
++++ b/third_party/blink/renderer/core/paint/object_paint_properties_sparse.h
+@@ -8,6 +8,7 @@
+ #include <array>
+ #include <memory>
+ #include <utility>
++#include <variant>
+ 
+ #include "base/dcheck_is_on.h"
+ #include "base/memory/ptr_util.h"

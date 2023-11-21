@@ -1,0 +1,13 @@
+--- a/third_party/blink/renderer/core/paint/object_paint_properties_sparse.h
++++ b/third_party/blink/renderer/core/paint/object_paint_properties_sparse.h
+@@ -270,8 +270,8 @@
+       NodeList& nodes,
+       NodeId node_id,
+       const ParentType& parent,
+-      NodeType::State&& state,
+-      const NodeType::AnimationState& animation_state =
++      typename NodeType::State&& state,
++      const typename NodeType::AnimationState& animation_state =
+           NodeType::AnimationState()) {
+     // First, check if we need to add a new node.
+     if (!nodes.HasField(node_id)) {

@@ -16,6 +16,9 @@
   "add-missing-typename-4/5790.patch": {
     "start": 5790
   },
+  "add-missing-typename-5/5845.patch": {
+    "start": 5845
+  },
   "angle-fix-atomic/5615.patch": {
     "start": 5615
   },
@@ -44,6 +47,9 @@
   "blink-fix-structured-binding-declaration/5790.patch": {
     "start": 5790
   },
+  "blink-font-constructor/5845.patch": {
+    "start": 5845
+  },
   "blink-impl-wtf-stacksize/4389.patch": {
     "start": 4389,
     "end": 4960
@@ -59,6 +65,10 @@
   "blink-include-cstring/4961.patch": {
     "start": 4961,
     "end": 5005
+  },
+  "blink-include-variant/5845.patch": {
+    "start": 5845,
+    "end": 5845
   },
   "blink-skia-constructor/5790.patch": {
     "start": 5790
@@ -81,7 +91,11 @@
     "start": 5790
   },
   "chromium-disable-sandbox/5359.patch": {
-    "start": 5359
+    "start": 5359,
+    "end": 5844
+  },
+  "chromium-disable-sandbox/5845.patch": {
+    "start": 5845
   },
   "chromium-disable-shm/4389.patch": {
     "start": 4389,
@@ -96,6 +110,9 @@
   },
   "chromium-extensions-map/5359.patch": {
     "start": 5359
+  },
+  "chromium-dns-class-constructor/5845.patch": {
+    "start": 5845
   },
   "chromium-fill-elf/4389.patch": {
     "start": 4389
@@ -173,13 +190,15 @@
     "end": 4472
   },
   "chromium-include-vector/5735.patch": {
-    "start": 5735
+    "start": 5735,
+    "end": 5844
   },
   "chromium-media-fix-structured-binding/5735.patch": {
     "start": 5735
   },
   "chromium-net-include-vector/5790.patch": {
-    "start": 5790
+    "start": 5790,
+    "end": 5844
   },
   "chromium-no-atomic_flag/5249.patch": {
     "start": 5249,
@@ -239,7 +258,11 @@
     "end": 5562
   },
   "chromium-struct-contructor/5790.patch": {
-    "start": 5790
+    "start": 5790,
+    "end": 5844
+  },
+  "chromium-ui-constructor/5845.patch": {
+    "start": 5845
   },
   "chromium-ui-use-fabsf/5481.patch": {
     "start": 5481,
@@ -254,7 +277,8 @@
     "end": 5614
   },
   "compiler-remove-gsimple-template-names/5615.patch": {
-    "start": 5615
+    "start": 5615,
+    "end": 5844
   },
   "compiler-remove-unsupported-flags/4961.patch": {
     "start": 4961,
@@ -269,7 +293,11 @@
     "end": 5614
   },
   "compiler-remove-unsupported-flags/5615.patch": {
-    "start": 5615
+    "start": 5615,
+    "end": 5844
+  },
+  "compiler-remove-unsupported-flags/5845.patch": {
+    "start": 5845
   },
   "compiler-use-android-target/4389.patch": {
     "start": 4389,
@@ -315,7 +343,11 @@
     "end": 5671
   },
   "crypt-fix-dynamic-loaded-libraries/5672.patch": {
-    "start": 5672
+    "start": 5672,
+    "end": 5833
+  },
+  "crypt-fix-dynamic-loaded-libraries/5845.patch": {
+    "start": 5834
   },
   "dav1d-no-get-affinity/5249.patch": {
     "start": 4961
@@ -375,6 +407,9 @@
     "start": 4472,
     "end": 5480
   },
+  "ozone-wayland-memfd/5845.patch": {
+    "start": 5845
+  },
   "perfetto-no-android-jni/5359.patch": {
     "start": 5359
   },
@@ -394,7 +429,8 @@
     "comment": "Disable since 115.0.5790.98-1"
   },
   "skia-include-cmath/5790.patch": {
-    "start": 5790
+    "start": 5790,
+    "end": 5802
   },
   "sql-VirtualCursor-standard-layout/5359.patch": {
     "start": 5359,
@@ -437,7 +473,8 @@
     "end": 5413
   },
   "translate_ui_languages_manager-fix-include/5672.patch": {
-    "start": 5672
+    "start": 5672,
+    "end": 5816
   },
   "unity-fix-dynamic-loaded-libraries/4389.patch": {
     "start": 4389
@@ -470,7 +507,11 @@
     "end": 5671
   },
   "vk-layers-no-android-log/5672.patch": {
-    "start": 5672
+    "start": 5672,
+    "end": 5844
+  },
+  "vk-layers-no-android-log/5845.patch": {
+    "start": 5845
   },
   "wayland-memfd_create/5359.patch": {
     "start": 5359
