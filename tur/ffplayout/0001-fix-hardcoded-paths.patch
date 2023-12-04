@@ -5,7 +5,7 @@
      }
  
 -    if !target_channel.config_path.starts_with("/etc/ffplayout") {
-+    if !target_channel.config_path.starts_with("/data/data/com.termux/files/usr/etc/ffplayout") {
++    if !target_channel.config_path.starts_with("TERMUX_PREFIX@/etc/ffplayout") {
          return Err(ServiceError::BadRequest("Bad config path!".to_string()));
      }
  
@@ -25,7 +25,7 @@
          Ok(Self {
              service: channel.service,
 -            cmd: vec_strings!["/usr/bin/systemctl"],
-+            cmd: vec_strings!["@TERMUX_PREFIX@//bin/systemctl"],
++            cmd: vec_strings!["@TERMUX_PREFIX@/bin/systemctl"],
          })
      }
  
@@ -91,17 +91,17 @@
              }
 --- a/ffplayout-engine/src/utils/mod.rs
 +++ b/ffplayout-engine/src/utils/mod.rs
-@@ -19,11 +19,11 @@
- pub fn get_config(args: Args) -> PlayoutConfig {
+@@ -24,11 +24,11 @@
+ pub fn get_config(args: Args) -> Result<PlayoutConfig, ProcError> {
      let cfg_path = match args.channel {
          Some(c) => {
 -            let path = PathBuf::from(format!("/etc/ffplayout/{c}.yml"));
 +            let path = PathBuf::from(format!("@TERMUX_PREFIX@/etc/ffplayout/{c}.yml"));
  
              if !path.is_file() {
-                 println!(
+                 return Err(ProcError::Custom(format!(
 -                    "Config file \"{c}\" under \"/etc/ffplayout/\" not found.\n\nCheck arguments!"
 +                    "Config file \"{c}\" under \"@TERMUX_PREFIX@/etc/ffplayout/\" not found.\n\nCheck arguments!"
-                 );
-                 exit(1)
+                 )));
              }
+ 
