@@ -2,14 +2,11 @@ TERMUX_PKG_HOMEPAGE=https://scipy.org/
 TERMUX_PKG_DESCRIPTION="Fundamental algorithms for scientific computing in Python"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="1.11.4"
+TERMUX_PKG_VERSION="1:1.11.4"
 TERMUX_PKG_SRCURL=git+https://github.com/scipy/scipy
 TERMUX_PKG_DEPENDS="libc++, libopenblas, python, python-numpy"
 TERMUX_PKG_BUILD_DEPENDS="python-numpy-static"
 TERMUX_PKG_BUILD_IN_SRC=true
-TERMUX_PKG_CONFLICTS="python-scipy"
-TERMUX_PKG_REPLACES="python-scipy"
-TERMUX_PKG_PROVIDES="python-scipy"
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_UPDATE_TAG_TYPE="latest-release-tag"
 
