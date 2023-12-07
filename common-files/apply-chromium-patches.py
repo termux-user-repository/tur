@@ -16,8 +16,7 @@ logger = logging.getLogger(__name__)
 
 class MetadataRangeConflictError(Exception):
   def __init__(self, a, b):
-    msg = (f"Conflict is detected between {a.path} and {b.path}. " +
-                       f"{a.desc()}, but {b.desc()}.")
+    msg = (f"Conflict is detected between {a.path} and {b.path}. " + f"{a.desc()}, but {b.desc()}.")
     super().__init__(msg)
 
 class MetadataRangeGapError(Exception):
@@ -67,7 +66,7 @@ class UniqueMetadataRangeHeapQueue:
 class MetadataChecker:
   def __init__(self):
     self._ranges = defaultdict(UniqueMetadataRangeHeapQueue)
-  
+
   def set_range(self, path, start, end):
     name, _ = path.split("/")
     r = MetadataRange(path, start, end)
@@ -92,28 +91,23 @@ def check_metadata(metadata_dict):
   checker.ranges_check()
   return metadata_dict
 
-def apply_patch(patch_file, dry_run):
+def execute_patch(patch_file, dry_run, verbose=0, revert=False):
+  patch_args = ["patch"]
+  suffix_args = ["-p1", "-i", patch_file]
+  additional_args = []
+  if revert:
+    patch_args += ["-R"]
+  if verbose < 1:
+    additional_args += ["-s"]
   try:
     subprocess.check_call(
-      ["patch", "--dry-run", "-p1", "-i", patch_file],
+      patch_args + additional_args + ["--dry-run"] + suffix_args,
       stdin=subprocess.DEVNULL
     )
   except:
     return False
   if dry_run: return True
-  subprocess.check_call(["patch", "-s", "-p1", "-i", patch_file])
-  return True
-
-def revert_patch(patch_file, dry_run):
-  try:
-    subprocess.check_call(
-      ["patch", "-R", "--dry-run", "-p1", "-i", patch_file],
-      stdin=subprocess.DEVNULL
-    )
-  except:
-    return False
-  if dry_run: return True
-  subprocess.check_call(["patch", "-s", "-R", "-p1", "-i", patch_file])
+  subprocess.check_call(patch_args + ["-s"] + suffix_args)
   return True
 
 def parse_chromium_version(version_str, p):
@@ -135,8 +129,10 @@ def parse_metadata(filepath):
     raise e
 
 def execute(args, p):
+  is_revert_mode = args.revert
   is_dry_run_mode = args.dry_run
   is_electron_skipped_mode = args.electron
+  verbose_level = args.verbose
   _, _, build_v, patch_v = parse_chromium_version(args.CHROMIUM_VERSION, p)
   logger.debug("Got chromium version %s", args.CHROMIUM_VERSION)
   metadata = parse_metadata(METADATA_FILE)
@@ -154,22 +150,24 @@ def execute(args, p):
       if is_electron_skipped_mode and is_electron_broken:
         logger.info(f"Skip patch {patch_path} for electron.")
         continue
-      logger.info("Applying %s...", patch_path)
-      if not apply_patch(os.path.join(PATCHES_DIR, patch_path), is_dry_run_mode):
+      ope_str = "revert" if is_revert_mode else "apply"
+      logger.info("%sing %s...", ope_str.capitalize(), patch_path)
+      if not execute_patch(os.path.join(PATCHES_DIR, patch_path), is_dry_run_mode, verbose_level, is_revert_mode):
         need_revert = True
         logger.error("Failed to apply %s", patch_path)
         break
       else:
         applied_patches.append(patch_path)
   if need_revert:
-    logger.info("Reverting patches due to previous error...")
+    ope_str = "re-apply" if is_revert_mode else "revert"
+    logger.info("%sing patches due to previous error...", ope_str.capitalize())
     for patch_path in applied_patches[::-1]:
-      logger.info("Reverting %s...", patch_path)
-      revert_patch(os.path.join(PATCHES_DIR, patch_path), is_dry_run_mode)
+      logger.info("%sing %s...", ope_str.capitalize(), patch_path)
+      execute_patch(os.path.join(PATCHES_DIR, patch_path), is_dry_run_mode, verbose_level, not is_revert_mode)
     exit(1)
 
 def main():
-  p = argparse.ArgumentParser(description="Apply patches for chromium based on versions.")
+  p = argparse.ArgumentParser(description="Apply/Revert patches for chromium based on versions.")
   p.add_argument(
     "-v",
     "--verbose",
@@ -177,6 +175,14 @@ def main():
     dest="verbose",
     default=0,
     help="Give more output. Option is additive",
+  )
+  p.add_argument(
+    "-R",
+    "--revert",
+    action="store_true",
+    dest="revert",
+    default=False,
+    help="Set to revert mode.",
   )
   p.add_argument(
     "--dry-run",

@@ -1,0 +1,22 @@
+Fix error like `a-intnam.ads:164:25: "SIGSYS" not declared in "OS_Interface"` on ARM (32-bit)
+
+--- a/gcc/ada/libgnarl/s-linux__android.ads
++++ b/gcc/ada/libgnarl/s-linux__android.ads
+@@ -109,6 +109,7 @@
+    SIGPROF    : constant := 27; --  profiling timer expired
+    SIGXCPU    : constant := 24; --  CPU time limit exceeded
+    SIGXFSZ    : constant := 25; --  filesize limit exceeded
++   SIGSYS     : constant := 31; --  bad system call
+    SIGUNUSED  : constant := 31; --  unused signal (GNU/Linux)
+    SIGSTKFLT  : constant := 16; --  coprocessor stack fault (Linux)
+    SIG32      : constant := 32; --  glibc internal signal
+--- a/gcc/ada/libgnarl/s-osinte__android.ads
++++ b/gcc/ada/libgnarl/s-osinte__android.ads
+@@ -112,6 +112,7 @@
+    SIGPROF    : constant := System.Linux.SIGPROF;
+    SIGXCPU    : constant := System.Linux.SIGXCPU;
+    SIGXFSZ    : constant := System.Linux.SIGXFSZ;
++   SIGSYS     : constant := System.Linux.SIGSYS;
+    SIGUNUSED  : constant := System.Linux.SIGUNUSED;
+    SIGSTKFLT  : constant := System.Linux.SIGSTKFLT;
+ 

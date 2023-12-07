@@ -202,7 +202,10 @@ _setup_standalone_toolchain_current_ndk_newer_gcc() {
 		cp "$TERMUX_STANDALONE_TOOLCHAIN/sysroot/usr/lib/$TERMUX_HOST_PLATFORM/libc++_static.a" $GCC_STANDALONE_TOOLCHAIN_TMP/sysroot/usr/lib/
 		cp "$TERMUX_STANDALONE_TOOLCHAIN/sysroot/usr/lib/$TERMUX_HOST_PLATFORM/libc++abi.a" $GCC_STANDALONE_TOOLCHAIN_TMP/sysroot/usr/lib/
 		echo "INPUT(-lc++_shared)" > $GCC_STANDALONE_TOOLCHAIN_TMP/$TERMUX_HOST_PLATFORM/lib/libstdc++.so
+		echo "INPUT(-lc++_static -lc++abi)" > $GCC_STANDALONE_TOOLCHAIN_TMP/$TERMUX_HOST_PLATFORM/lib/libstdc++.a
 		mkdir -p $GCC_STANDALONE_TOOLCHAIN_TMP/include/c++/$GCC_VERSION
+		# Remove fix-includes
+		rm -rf $GCC_STANDALONE_TOOLCHAIN_TMP/lib/gcc/$TERMUX_HOST_PLATFORM/$GCC_VERSION/include-fixed
 		cp -R $GCC_STANDALONE_TOOLCHAIN_TMP/sysroot/usr/include/c++/v1/* $GCC_STANDALONE_TOOLCHAIN_TMP/include/c++/$GCC_VERSION
 		# See https://github.com/android/ndk/issues/215#issuecomment-524293090
 		sed -i "s/include_next <stddef.h>/include <stddef.h>/" $GCC_STANDALONE_TOOLCHAIN_TMP/include/c++/$GCC_VERSION/cstddef
@@ -213,7 +216,7 @@ _setup_standalone_toolchain_current_ndk_newer_gcc() {
 }
 
 _setup_toolchain_ndk_with_gfortran_11() {
-	local GCC_TOOLCHAIN_VERSION=0
+	local GCC_TOOLCHAIN_VERSION=1
 
     local PREBUILT_GCC_JSON="$TERMUX_SCRIPTDIR/common-files/prebuilt-gcc.json"
 	local GCC_VERSION=$(jq -r '.["11"].version' $PREBUILT_GCC_JSON)
@@ -236,7 +239,7 @@ _setup_toolchain_ndk_with_gfortran_11() {
 }
 
 _setup_toolchain_ndk_gcc_11() {
-	local GCC_TOOLCHAIN_VERSION=0
+	local GCC_TOOLCHAIN_VERSION=1
 
     local PREBUILT_GCC_JSON="$TERMUX_SCRIPTDIR/common-files/prebuilt-gcc.json"
 	local GCC_VERSION=$(jq -r '.["11"].version' $PREBUILT_GCC_JSON)
@@ -248,7 +251,7 @@ _setup_toolchain_ndk_gcc_11() {
 }
 
 _setup_toolchain_ndk_gcc_10() {
-	local GCC_TOOLCHAIN_VERSION=0
+	local GCC_TOOLCHAIN_VERSION=1
 
     local PREBUILT_GCC_JSON="$TERMUX_SCRIPTDIR/common-files/prebuilt-gcc.json"
 	local GCC_VERSION=$(jq -r '.["10"].version' $PREBUILT_GCC_JSON)
@@ -260,7 +263,7 @@ _setup_toolchain_ndk_gcc_10() {
 }
 
 _setup_toolchain_ndk_gcc_9() {
-	local GCC_TOOLCHAIN_VERSION=0
+	local GCC_TOOLCHAIN_VERSION=1
 
     local PREBUILT_GCC_JSON="$TERMUX_SCRIPTDIR/common-files/prebuilt-gcc.json"
 	local GCC_VERSION=$(jq -r '.["9"].version' $PREBUILT_GCC_JSON)
@@ -272,7 +275,7 @@ _setup_toolchain_ndk_gcc_9() {
 }
 
 _setup_toolchain_ndk_gcc_12() {
-	local GCC_TOOLCHAIN_VERSION=0
+	local GCC_TOOLCHAIN_VERSION=1
 
     local PREBUILT_GCC_JSON="$TERMUX_SCRIPTDIR/common-files/prebuilt-gcc.json"
 	local GCC_VERSION=$(jq -r '.["12"].version' $PREBUILT_GCC_JSON)
@@ -284,7 +287,7 @@ _setup_toolchain_ndk_gcc_12() {
 }
 
 _setup_toolchain_ndk_gcc_13() {
-	local GCC_TOOLCHAIN_VERSION=0
+	local GCC_TOOLCHAIN_VERSION=1
 
     local PREBUILT_GCC_JSON="$TERMUX_SCRIPTDIR/common-files/prebuilt-gcc.json"
 	local GCC_VERSION=$(jq -r '.["13"].version' $PREBUILT_GCC_JSON)

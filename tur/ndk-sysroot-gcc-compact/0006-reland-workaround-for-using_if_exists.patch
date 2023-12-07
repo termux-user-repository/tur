@@ -1,0 +1,59 @@
+Since commit [1], libcxx has dropped the workaround for C11 features on
+compilers that don't support attribute `using_if_exists`. They assume that
+the underlying platform supports a C11 standard library, but that's not
+true when targetting Android API 24.
+
+[1]: https://github.com/llvm/llvm-project/commit/21f73d5826fb5024a27eaacafadfa316f58949c5
+
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__config
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__config
+@@ -409,6 +409,18 @@
+ #    define _LIBCPP_NO_CFI
+ #  endif
+ 
++#if __has_attribute(using_if_exists)
++# define _LIBCPP_HAS_TIMESPEC_GET
++# define _LIBCPP_HAS_ALIGNED_ALLOC
++#elif defined(__BIONIC__)
++#  if __ANDROID_API__ >= 28
++#    define _LIBCPP_HAS_ALIGNED_ALLOC
++#  endif
++#  if __ANDROID_API__ >= 29
++#    define _LIBCPP_HAS_TIMESPEC_GET
++#  endif
++#endif
++
+ #  ifndef _LIBCPP_CXX03_LANG
+ 
+ #    define _LIBCPP_ALIGNOF(_Tp) alignof(_Tp)
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/cstdlib
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/cstdlib
+@@ -144,7 +144,7 @@
+ using ::at_quick_exit _LIBCPP_USING_IF_EXISTS;
+ using ::quick_exit _LIBCPP_USING_IF_EXISTS;
+ #endif
+-#if _LIBCPP_STD_VER > 14
++#if _LIBCPP_STD_VER > 14 && defined(_LIBCPP_HAS_ALIGNED_ALLOC)
+ using ::aligned_alloc _LIBCPP_USING_IF_EXISTS;
+ #endif
+ 
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/ctime
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/ctime
+@@ -66,7 +66,7 @@
+ using ::size_t _LIBCPP_USING_IF_EXISTS;
+ using ::time_t _LIBCPP_USING_IF_EXISTS;
+ using ::tm _LIBCPP_USING_IF_EXISTS;
+-#if _LIBCPP_STD_VER > 14
++#if _LIBCPP_STD_VER > 14 && defined(_LIBCPP_HAS_TIMESPEC_GET)
+ using ::timespec _LIBCPP_USING_IF_EXISTS;
+ #endif
+ using ::clock _LIBCPP_USING_IF_EXISTS;
+@@ -78,7 +78,7 @@
+ using ::gmtime _LIBCPP_USING_IF_EXISTS;
+ using ::localtime _LIBCPP_USING_IF_EXISTS;
+ using ::strftime _LIBCPP_USING_IF_EXISTS;
+-#if _LIBCPP_STD_VER > 14
++#if _LIBCPP_STD_VER > 14 && defined(_LIBCPP_HAS_TIMESPEC_GET)
+ using ::timespec_get _LIBCPP_USING_IF_EXISTS;
+ #endif
+ 

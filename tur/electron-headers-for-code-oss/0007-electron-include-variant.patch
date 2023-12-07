@@ -1,0 +1,10 @@
+--- a/electron/shell/browser/electron_browser_context.h
++++ b/electron/shell/browser/electron_browser_context.h
+@@ -8,6 +8,7 @@
+ #include <map>
+ #include <memory>
+ #include <string>
++#include <variant>
+ #include <vector>
+ 
+ #include "base/memory/weak_ptr.h"

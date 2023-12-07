@@ -1,0 +1,44 @@
+--- a/ui/base/wayland/color_manager_util.h
++++ b/ui/base/wayland/color_manager_util.h
+@@ -21,26 +21,41 @@
+ // These structs are used for holding ColorSpace enums, and the version of the
+ // color management protocol their support was introduced.
+ struct TransferFnVersion {
++  constexpr TransferFnVersion(const skcms_TransferFunction& p1, uint32_t p2): 
++    transfer_fn(p1), version(p2) {}
++
+   skcms_TransferFunction transfer_fn;
+   uint32_t version;
+ };
+ 
+ struct TransferVersion {
++  constexpr TransferVersion(const gfx::ColorSpace::TransferID& p1, uint32_t p2): 
++    transfer(p1), version(p2) {}
++
+   gfx::ColorSpace::TransferID transfer;
+   uint32_t version;
+ };
+ 
+ struct PrimaryVersion {
++  constexpr PrimaryVersion(const gfx::ColorSpace::PrimaryID& p1, uint32_t p2): 
++    primary(p1), version(p2) {}
++
+   gfx::ColorSpace::PrimaryID primary;
+   uint32_t version;
+ };
+ 
+ struct MatrixVersion {
++  constexpr MatrixVersion(const gfx::ColorSpace::MatrixID& p1, uint32_t p2): 
++    matrix(p1), version(p2) {}
++
+   gfx::ColorSpace::MatrixID matrix;
+   uint32_t version;
+ };
+ 
+ struct RangeVersion {
++  constexpr RangeVersion(const gfx::ColorSpace::RangeID& p1, uint32_t p2): 
++    range(p1), version(p2) {}
++
+   gfx::ColorSpace::RangeID range;
+   uint32_t version;
+ };

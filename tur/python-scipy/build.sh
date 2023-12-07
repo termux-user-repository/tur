@@ -2,7 +2,7 @@ TERMUX_PKG_HOMEPAGE=https://scipy.org/
 TERMUX_PKG_DESCRIPTION="Fundamental algorithms for scientific computing in Python"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="1.11.3"
+TERMUX_PKG_VERSION="1:1.11.4"
 TERMUX_PKG_SRCURL=git+https://github.com/scipy/scipy
 TERMUX_PKG_DEPENDS="libc++, libopenblas, python, python-numpy"
 TERMUX_PKG_BUILD_DEPENDS="python-numpy-static"
@@ -61,27 +61,17 @@ termux_step_make() {
 	pip --no-cache-dir install wheel
 	build-pip install numpy==$_NUMPY_VERSION pybind11 "Cython<3" pythran wheel
 
+	BUILD_SITE=${TERMUX_PYTHON_CROSSENV_PREFIX}/build/lib/python${TERMUX_PYTHON_VERSION}/site-packages
 	DEVICE_SITE=$TERMUX_PREFIX/lib/python${TERMUX_PYTHON_VERSION}/site-packages
 
-	# From https://gist.github.com/benfogle/85e9d35e507a8b2d8d9dc2175a703c22
-	BUILD_SITE=${TERMUX_PYTHON_CROSSENV_PREFIX}/build/lib/python${TERMUX_PYTHON_VERSION}/site-packages
-	INI=$(find $BUILD_SITE -name 'npymath.ini')
-	LIBDIR=$(find $DEVICE_SITE -path '*/numpy/core/lib')
-	INCDIR=$(find $DEVICE_SITE -path '*/numpy/core/include')
-	cat <<-EOF > $INI 
-	[meta]
-	Name=npymath
-	Description=Portable, core math library implementing C99 standard
-	Version=0.1
-	[variables]
-	# Force it to find cross-build libs when we build scipy
-	libdir=$LIBDIR
-	includedir=$INCDIR
-	[default]
-	Libs=-L\${libdir} -lnpymath
-	Cflags=-I\${includedir}
-	Requires=mlib
-	EOF
+	BUILD_INCDIR=$(find $BUILD_SITE -path '*/numpy/core/include')
+	DEVICE_INCDIR=$(find $DEVICE_SITE -path '*/numpy/core/include')
+
+	echo "Build INCDIR: $BUILD_INCDIR"
+	echo "Device INCDIR: $DEVICE_INCDIR"
+
+	rm -rf $BUILD_INCDIR
+	ln -sf $DEVICE_INCDIR $BUILD_INCDIR
 
 	cp $DEVICE_SITE/numpy/core/lib/libnpymath.a $TERMUX_PREFIX/lib
 	cp $DEVICE_SITE/numpy/random/lib/libnpyrandom.a $TERMUX_PREFIX/lib

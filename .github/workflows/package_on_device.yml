@@ -33,13 +33,16 @@ on:
         required: true
 
 jobs:
-  build-x86:
+  build:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        target_arch: [i686, x86_64]
+        target_arch: [i686, x86_64, arm, aarch64]
       fail-fast: false
     steps:
+    - name: Setup qemu
+      if: (matrix.target_arch == 'aarch64') || (matrix.target_arch == 'arm')
+      run: docker run --rm --privileged aptman/qus -s -- -p aarch64 arm
     - name: Clone repository
       uses: actions/checkout@v3
       with:
@@ -219,194 +222,9 @@ jobs:
         name: debs-${{ matrix.target_arch }}-${{ github.sha }}
         path: ./artifacts
 
-  build-arm:
-    runs-on: self-hosted
-    strategy:
-      matrix:
-        target_arch: [arm, aarch64]
-      fail-fast: false
-    steps:
-    - name: Clone repository
-      uses: actions/checkout@v3
-      with:
-        fetch-depth: 1000
-        path: ${{ github.workspace }}
-    - name: Merge repos
-      run: ./setup-environment.sh
-    - name: Gather build summary
-      run: |
-        if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
-          BASE_COMMIT=$(jq --raw-output .pull_request.base.sha "$GITHUB_EVENT_PATH")
-          OLD_COMMIT=$(jq --raw-output .commits[0].id "$GITHUB_EVENT_PATH")
-          HEAD_COMMIT=$(jq --raw-output .commits[-1].id "$GITHUB_EVENT_PATH")
-          if [ "$BASE_COMMIT" = "null" ]; then
-            if [ "$OLD_COMMIT" = "$HEAD_COMMIT" ]; then
-              # Single-commit push.
-              echo "Processing commit: ${HEAD_COMMIT}"
-              CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r "${HEAD_COMMIT}")
-            else
-              # Multi-commit push.
-              OLD_COMMIT="${OLD_COMMIT}~1"
-              echo "Processing commit range: ${OLD_COMMIT}..${HEAD_COMMIT}"
-              CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r "${OLD_COMMIT}" "${HEAD_COMMIT}")
-            fi
-          else
-            # Pull requests.
-            echo "Processing pull request #$(jq --raw-output .pull_request.number "$GITHUB_EVENT_PATH"): ${BASE_COMMIT}..HEAD"
-            CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r "${BASE_COMMIT}" "HEAD")
-          fi
-        fi
-        mkdir -p ./artifacts ./debs
-        touch ./debs/.placeholder
-        if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
-          # Process tag '%ci:no-build' that may be added as line to commit message.
-          # Forces CI to cancel current build with status 'passed'
-          if grep -qiP '^\s*%ci:no-build\s*$' <(git log --format="%B" -n 1 "HEAD"); then
-            tar cf artifacts/debs-${{ matrix.target_arch }}.tar debs
-            echo "[!] Force exiting as tag '%ci:no-build' was applied to HEAD commit message."
-            exit 0
-          fi
-          for repo_path in $(jq --raw-output 'keys | .[]' repo.json); do
-            repo=$(jq --raw-output '.["'${repo_path}'"].name' repo.json)
-            # Parse changed files and identify new packages and deleted packages.
-            # Create lists of those packages that will be passed to upload job for
-            # further processing.
-            while read -r file; do
-              if ! [[ $file == ${repo_path}/* ]]; then
-                # This file does not belong to a package, so ignore it
-                continue
-              fi
-              if [[ $file =~ ^${repo_path}/([.a-z0-9+-]*)/([.a-z0-9+-]*).subpackage.sh$ ]]; then
-                # A subpackage was modified, check if it was deleted or just updated
-                pkg=${BASH_REMATCH[1]}
-                subpkg=${BASH_REMATCH[2]}
-                if [ ! -f "${repo_path}/${pkg}/${subpkg}.subpackage.sh" ]; then
-                  echo "$subpkg" >> ./deleted_${repo}_packages.txt
-                fi
-              elif [[ $file =~ ^${repo_path}/([.a-z0-9+-]*)/.*$ ]]; then
-                # package, check if it was deleted or updated
-                pkg=${BASH_REMATCH[1]}
-                if [ -d "${repo_path}/${pkg}" ]; then
-                  echo "$pkg" >> ./built_${repo}_packages.txt
-                  # If there are subpackages we want to create a list of those
-                  # as well
-                  for file in $(find "${repo_path}/${pkg}/" -maxdepth 1 -type f -name \*.subpackage.sh | sort); do
-                    echo "$(basename "${file%%.subpackage.sh}")" >> ./built_${repo}_subpackages.txt
-                  done
-                else
-                  echo "$pkg" >> ./deleted_${repo}_packages
-                fi
-              fi
-            done<<<${CHANGED_FILES}
-          done
-        else
-          for pkg in ${{ github.event.inputs.packages }}; do
-            repo_paths=$(jq --raw-output 'keys | .[]' repo.json)
-            found=false
-            for repo_path in $repo_paths; do
-              repo=$(jq --raw-output '.["'${repo_path}'"].name' repo.json)
-              if [ -d "${repo_path}/${pkg}" ]; then
-                found=true
-                echo "$pkg" >> ./built_${repo}_packages.txt
-                for subpkg in $(find "${repo_path}/${pkg}/" -maxdepth 1 -type f -name \*.subpackage.sh | sort); do
-                  echo "$(basename "${subpkg%%.subpackage.sh}")" >> ./built_${repo}_subpackages.txt
-                done
-              fi
-            done
-            if [ "$found" != true ]; then
-              echo "Package '${pkg}' not found in any of the repo"
-              exit 1
-            fi
-          done
-        fi
-        for repo in $(jq --raw-output '.[].name' repo.json); do
-          # Fix so that lists do not contain duplicates
-          if [ -f ./built_${repo}_packages.txt ]; then
-            uniq ./built_${repo}_packages.txt > ./built_${repo}_packages.txt.tmp
-            mv ./built_${repo}_packages.txt.tmp ./built_${repo}_packages.txt
-          fi
-          if [ -f ./built_${repo}_subpackages.txt ]; then
-            uniq ./built_${repo}_subpackages.txt > ./built_${repo}_subpackages.txt.tmp
-            mv ./built_${repo}_subpackages.txt.tmp ./built_${repo}_subpackages.txt
-          fi
-          if [ -f ./deleted_${repo}_packages.txt ]; then
-            uniq ./deleted_${repo}_packages.txt > ./deleted_${repo}_packages.txt.tmp
-            mv ./deleted_${repo}_packages.txt.tmp ./deleted_${repo}_packages.txt
-          fi
-        done
-    - name: Lint packages
-      run: |
-        declare -a package_recipes
-        for repo_path in $(jq --raw-output 'keys | .[]' repo.json); do
-          repo=$(jq --raw-output '.["'${repo_path}'"].name' repo.json)
-          if [ -f ./built_${repo}_packages.txt ]; then
-            package_recipes="$package_recipes $(cat ./built_${repo}_packages.txt | repo_path=${repo_path} awk '{print ENVIRON["repo_path"]"/"$1"/build.sh"}')"
-          fi
-        done
-        if [ ! -z "$package_recipes" ]; then
-          ./scripts/lint-packages.sh $package_recipes
-        fi
-    - name: Build packages
-      env:
-        ARCH: ${{ matrix.target_arch }}
-      run: |
-        ./common-files/build-termux-docker.sh login ./scripts/setup-termux.sh
-        declare -a packages
-        for repo_path in $(jq --raw-output 'keys | .[]' repo.json); do
-          repo=$(jq --raw-output '.["'${repo_path}'"].name' repo.json)
-          if [ -f ./built_${repo}_packages.txt ]; then
-            packages="$packages $(cat ./built_${repo}_packages.txt)"
-          fi
-        done
-        sudo chown -R 1000:1000 $(pwd)
-        if [ ! -z "$packages" ]; then
-          ./common-files/build-termux-docker.sh login ./build-package.sh -I $packages
-        fi
-    - name: Clean up docker containers
-      env:
-        ARCH: ${{ matrix.target_arch }}
-      if: always()
-      run: ./common-files/clean-termux-docker.sh
-    - name: Generate build artifacts
-      if: always()
-      run: |
-        sudo chown -R $(id -u):$(id -u) $(pwd)
-        for repo in $(jq --raw-output '.[].name' repo.json); do
-          # Put package lists into directory with *.deb files so they will be transferred to
-          # upload job.
-          test -f ./built_${repo}_packages.txt && mv ./built_${repo}_packages.txt ./debs/
-          test -f ./built_${repo}_subpackages.txt && cat ./built_${repo}_subpackages.txt >> ./debs/built_${repo}_packages.txt \
-            && rm ./built_${repo}_subpackages.txt
-          test -f ./deleted_${repo}_packages.txt && mv ./deleted_${repo}_packages.txt ./debs/
-          # Move only debs from built_packages into debs/ folder before
-          # creating an archive.
-          while read -r pkg; do
-            # Match both $pkg.deb and $pkg-static.deb.
-            find output \( -name "$pkg_*.deb" -o -name "$pkg-static_*.deb" \) -type f -print0 | xargs -0r mv -t debs/
-          done < <(cat ./debs/built_${repo}_packages.txt)
-        done
-        # Files containing certain symbols (e.g. ":") will cause failure in actions/upload-artifact.
-        # Archiving *.deb files in a tarball to avoid issues with uploading.
-        tar cf artifacts/debs-${{ matrix.target_arch }}-${{ github.sha }}.tar debs
-        rm -rf output
-    - name: Checksums for built *.deb files
-      if: always()
-      run: |
-        find debs -type f -name "*.deb" -exec sha256sum "{}" \; | sort -k2
-    - name: Store *.deb files
-      if: always()
-      uses: actions/upload-artifact@v3
-      with:
-        name: debs-${{ matrix.target_arch }}-${{ github.sha }}
-        path: ./artifacts
-    - name: Remove *.debs
-      if: always()
-      run: |
-        rm -rf ./artifacts ./debs
-
   upload:
     if: github.event_name != 'pull_request'
-    needs: [ build-x86, build-arm ]
+    needs: [ build ]
     runs-on: ubuntu-latest
     steps:
     - name: Clone repository

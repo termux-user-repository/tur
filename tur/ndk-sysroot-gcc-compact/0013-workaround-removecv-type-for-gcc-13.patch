@@ -1,0 +1,26 @@
+Using built-in trait will break some headers on GCC 13. Error message is as the following.
+
+error: use of built-in trait '__remove_cvref(_Tp)' in function signature; use library traits instead
+
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/remove_cv.h
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/remove_cv.h
+@@ -19,7 +19,7 @@
+ 
+ _LIBCPP_BEGIN_NAMESPACE_STD
+ 
+-#if __has_builtin(__remove_cv)
++#if __has_builtin(__remove_cv) && !defined(_LIBCPP_COMPILER_GCC)
+ template <class _Tp>
+ struct remove_cv {
+   using type _LIBCPP_NODEBUG = __remove_cv(_Tp);
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/remove_cvref.h
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/remove_cvref.h
+@@ -20,7 +20,7 @@
+ 
+ _LIBCPP_BEGIN_NAMESPACE_STD
+ 
+-#if __has_builtin(__remove_cvref)
++#if __has_builtin(__remove_cvref) && !defined(_LIBCPP_COMPILER_GCC)
+ template <class _Tp>
+ using __remove_cvref_t _LIBCPP_NODEBUG = __remove_cvref(_Tp);
+ #else

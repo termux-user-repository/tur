@@ -1,0 +1,16 @@
+Fix error like following on x86_64.
+
+a-nallfl.ads:48:13: warning: intrinsic binding type mismatch on return value
+a-nallfl.ads:48:13: warning: intrinsic binding type mismatch on argument 1
+a-nallfl.ads:48:13: warning: profile of "Sin" doesn't match the builtin it binds
+
+--- a/gcc/ada/Makefile.rtl
++++ b/gcc/ada/Makefile.rtl
+@@ -2685,6 +2685,7 @@
+   a-exetim.adb<libgnarl/a-exetim__posix.adb \
+   a-exetim.ads<libgnarl/a-exetim__default.ads \
+   a-intnam.ads<libgnarl/a-intnam__linux.ads \
++  a-nallfl.ads<libgnat/a-nallfl__wraplf.ads \
+   a-synbar.adb<libgnarl/a-synbar__posix.adb \
+   a-synbar.ads<libgnarl/a-synbar__posix.ads \
+   s-inmaop.adb<libgnarl/s-inmaop__posix.adb \
