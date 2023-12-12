@@ -16,4 +16,9 @@ TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 
 termux_step_pre_configure() {
 	termux_setup_cmake
+
+	# Use a dummy include for `sys/ucontext.h` to get rid of `struct user`
+	mkdir -p $TERMUX_PKG_TMPDIR/dummy-include/sys/
+	echo "" > $TERMUX_PKG_TMPDIR/dummy-include/sys/ucontext.h
+	CPPFLAGS+=" -I$TERMUX_PKG_TMPDIR/dummy-include"
 }
