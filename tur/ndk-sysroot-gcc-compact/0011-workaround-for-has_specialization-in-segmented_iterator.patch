@@ -11,7 +11,7 @@ GCC doesn't have proper support for CWG 1315 until commit [2], which is landed i
  };
  */
  
-+#if defined(__GNUC__) && __GNUC__ < 12
++#if defined(_LIBCPP_COMPILER_GCC) && __GNUC__ < 12
 +
 +template <class _Tp, class = void>
 +struct __has_specialization : false_type {};
