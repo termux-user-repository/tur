@@ -9,7 +9,7 @@ but this breaks compile on gcc-9, gcc-10 and gcc-11.
  namespace __adl_only {
      // Those cause ADL to trigger but they are not viable candidates,
      // so they are never actually selected.
-+#if defined(__GNUC__) && __GNUC__ < 12
++#if defined(_LIBCPP_COMPILER_GCC) && __GNUC__ < 12
 +    void make_error_condition();
 +    void make_error_code();
 +#else
