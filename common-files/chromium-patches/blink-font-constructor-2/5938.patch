@@ -1,5 +1,5 @@
---- ../src/third_party/blink/renderer/platform/fonts/font_palette.h~	2023-12-17 22:46:52.667733433 +0800
-+++ ../src/third_party/blink/renderer/platform/fonts/font_palette.h	2023-12-17 22:47:40.227322832 +0800
+--- a/third_party/blink/renderer/platform/fonts/font_palette.h
++++ b/third_party/blink/renderer/platform/fonts/font_palette.h
 @@ -96,7 +96,7 @@
        Color::ColorSpace color_interpolation_space,
        absl::optional<Color::HueInterpolationMethod> hue_interpolation_method) {
