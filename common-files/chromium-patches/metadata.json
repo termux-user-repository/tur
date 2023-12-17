@@ -32,6 +32,9 @@
     "start": 5672,
     "end": 5775
   },
+  "avoid-emplace_back-struct/5938.patch": {
+    "start": 5938
+  },
   "blink-fix-narrowing/5511.patch": {
     "start": 5481,
     "end": 5537
@@ -45,7 +48,11 @@
     "end": 5789
   },
   "blink-fix-structured-binding-declaration/5790.patch": {
-    "start": 5790
+    "start": 5790,
+    "end": 5937
+  },
+  "blink-fix-structured-binding-declaration/5938.patch": {
+    "start": 5938
   },
   "blink-font-constructor/5845.patch": {
     "start": 5845
@@ -58,24 +65,8 @@
     "start": 4961,
     "end": 5544
   },
-  "blink-include-bitset/5615.patch": {
-    "start": 5615,
-    "end": 5734
-  },
-  "blink-include-cstring/4961.patch": {
-    "start": 4961,
-    "end": 5005
-  },
-  "blink-include-variant/5845.patch": {
-    "start": 5845,
-    "end": 5845
-  },
   "blink-skia-constructor/5790.patch": {
     "start": 5790
-  },
-  "breakpad-include-cstring/5249.patch": {
-    "start": 4961,
-    "end": 5413
   },
   "breakpad-no-elf_prstatus/4389.patch": {
     "start": 4389
@@ -83,9 +74,6 @@
   "chromium-atomic-in-oncecallback/5663.patch": {
     "start": 5663,
     "end": 5685
-  },
-  "chromedriver-include-vector/5790.patch": {
-    "start": 5790
   },
   "chromedriver-vector-emplace_back/5790.patch": {
     "start": 5790
@@ -179,26 +167,8 @@
   "chromium-impl-sysinfo/5249.patch": {
     "start": 5249
   },
-  "chromium-include-cmath/5249.patch": {
-    "start": 4961
-  },
-  "chromium-include-compare/5735.patch": {
-    "start": 5735
-  },
-  "chromium-include-ctime/4389.patch": {
-    "start": 4389,
-    "end": 4472
-  },
-  "chromium-include-vector/5735.patch": {
-    "start": 5735,
-    "end": 5844
-  },
   "chromium-media-fix-structured-binding/5735.patch": {
     "start": 5735
-  },
-  "chromium-net-include-vector/5790.patch": {
-    "start": 5790,
-    "end": 5844
   },
   "chromium-no-atomic_flag/5249.patch": {
     "start": 5249,
@@ -297,7 +267,11 @@
     "end": 5844
   },
   "compiler-remove-unsupported-flags/5845.patch": {
-    "start": 5845
+    "start": 5845,
+    "end": 5937
+  },
+  "compiler-remove-unsupported-flags/5938.patch": {
+    "start": 5938
   },
   "compiler-use-android-target/4389.patch": {
     "start": 4389,
@@ -428,10 +402,6 @@
     "start": 9999999,
     "comment": "Disable since 115.0.5790.98-1"
   },
-  "skia-include-cmath/5790.patch": {
-    "start": 5790,
-    "end": 5802
-  },
   "sql-VirtualCursor-standard-layout/5359.patch": {
     "start": 5359,
     "end": 5734
@@ -471,10 +441,6 @@
   "tflite-use-system-zlib/5359.patch": {
     "start": 5359,
     "end": 5413
-  },
-  "translate_ui_languages_manager-fix-include/5672.patch": {
-    "start": 5672,
-    "end": 5816
   },
   "unity-fix-dynamic-loaded-libraries/4389.patch": {
     "start": 4389
@@ -516,13 +482,6 @@
   "wayland-memfd_create/5359.patch": {
     "start": 5359
   },
-  "webauthn-variant/5672.patch": {
-    "start": 5672
-  },
-  "webrtc_overrides-include-vector/5414.patch": {
-    "start": 5414,
-    "end": 5480
-  },
   "weston-fix-dynamic-loaded-libraries/5249.patch": {
     "start": 4961
   },
@@ -531,5 +490,57 @@
   },
   "x11-fix-dynamic-loaded-libraries/4389.patch": {
     "start": 4389
+  },
+  "z-iwyu-blink-include-bitset/5615.patch": {
+    "start": 5615,
+    "end": 5734
+  },
+  "z-iwyu-blink-include-cstring/4961.patch": {
+    "start": 4961,
+    "end": 5005
+  },
+  "z-iwyu-blink-include-variant/5845.patch": {
+    "start": 5845,
+    "end": 5845
+  },
+  "z-iwyu-breakpad-include-cstring/5249.patch": {
+    "start": 4961,
+    "end": 5413
+  },
+  "z-iwyu-chromedriver-include-vector/5790.patch": {
+    "start": 5790
+  },
+  "z-iwyu-chromium-include-cmath/5249.patch": {
+    "start": 4961
+  },
+  "z-iwyu-chromium-include-compare/5735.patch": {
+    "start": 5735
+  },
+  "z-iwyu-chromium-include-ctime/4389.patch": {
+    "start": 4389,
+    "end": 4472
+  },
+  "z-iwyu-chromium-include-vector/5735.patch": {
+    "start": 5735,
+    "end": 5844
+  },
+  "z-iwyu-chromium-net-include-vector/5790.patch": {
+    "start": 5790,
+    "end": 5844
+  },
+  "z-iwyu-skia-include-cmath/5790.patch": {
+    "start": 5790,
+    "end": 5802
+  },
+  "z-iwyu-translate_ui_languages_manager-fix-include/5672.patch": {
+    "start": 5672,
+    "end": 5816
+  },
+  "z-iwyu-webauthn-variant/5672.patch": {
+    "start": 5672
+  },
+  "z-iwyu-webrtc_overrides-include-vector/5414.patch": {
+    "start": 5414,
+    "end": 5480
   }
 }
