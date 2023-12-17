@@ -1,0 +1,20 @@
+--- a/content/browser/fenced_frame/fenced_frame_reporter.h
++++ b/content/browser/fenced_frame/fenced_frame_reporter.h
+@@ -42,6 +42,8 @@
+ struct DestinationEnumEvent {
+   std::string type;
+   std::string data;
++
++  ~DestinationEnumEvent() {}
+ };
+ 
+ // An event to be sent to a custom url.
+@@ -49,6 +51,8 @@
+ // TODO(gtanzer): Macros are substituted using the `ReportingMacroMap`.
+ struct DestinationURLEvent {
+   GURL url;
++
++  ~DestinationURLEvent() {}
+ };
+ 
+ // Class that receives report events from fenced frames, and uses a

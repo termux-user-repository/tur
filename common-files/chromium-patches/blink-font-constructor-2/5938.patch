@@ -1,0 +1,20 @@
+--- ../src/third_party/blink/renderer/platform/fonts/font_palette.h~	2023-12-17 22:46:52.667733433 +0800
++++ ../src/third_party/blink/renderer/platform/fonts/font_palette.h	2023-12-17 22:47:40.227322832 +0800
+@@ -96,7 +96,7 @@
+       Color::ColorSpace color_interpolation_space,
+       absl::optional<Color::HueInterpolationMethod> hue_interpolation_method) {
+     return base::AdoptRef(new FontPalette(
+-        start, end, NonNormalizedPercentages(start_percentage, end_percentage),
++        start, end, NonNormalizedPercentages({start_percentage, end_percentage}),
+         normalized_percentage, alpha_multiplier, color_interpolation_space,
+         hue_interpolation_method));
+   }
+@@ -170,7 +170,7 @@
+       double normalized_percentage) {
+     double end_percentage = normalized_percentage * 100.0;
+     double start_percentage = 100.0 - end_percentage;
+-    return NonNormalizedPercentages(start_percentage, end_percentage);
++    return NonNormalizedPercentages({start_percentage, end_percentage});
+   }
+ 
+   double GetAlphaMultiplier() const {
