@@ -463,6 +463,9 @@
   "v8-fix-compress-pointer-offset/5546.patch": {
     "start": 5546
   },
+  "v8-fix-non-ptr-compr-compilation-on-old-compilers/5938.patch": {
+    "start": 5938
+  },
   "v8-fix-trap-handler/5249.patch": {
     "start": 4961,
     "end": 5413
