@@ -2,10 +2,10 @@ TERMUX_PKG_HOMEPAGE=https://www.chromium.org/Home
 TERMUX_PKG_DESCRIPTION="Chromium web browser"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="Chongyun Lee <uchkks@protonmail.com>"
-_CHROMIUM_VERSION=116.0.5845.96
+_CHROMIUM_VERSION=117.0.5938.149
 TERMUX_PKG_VERSION=$_CHROMIUM_VERSION
 TERMUX_PKG_SRCURL=(https://commondatastorage.googleapis.com/chromium-browser-official/chromium-$_CHROMIUM_VERSION.tar.xz)
-TERMUX_PKG_SHA256=(1ec1052a959abced9642b36482549bc2ebefa428ed136289d8e0c54b4ccd1c81)
+TERMUX_PKG_SHA256=(ddd7c852bd191c0917ab800655da341e7583c2377ca220ae077fc5de7fc7d9df)
 TERMUX_PKG_DEPENDS="atk, cups, dbus, gtk3, krb5, libc++, libevdev, libxkbcommon, libminizip, libnss, libwayland, libx11, mesa, openssl, pango, pulseaudio, libdrm, libjpeg-turbo, libpng, libwebp, libflac, fontconfig, freetype, zlib, libxml2, libxslt, libopus, libsnappy"
 # TODO: Split chromium-common and chromium-headless
 # TERMUX_PKG_DEPENDS+=", chromium-common"
@@ -28,9 +28,16 @@ termux_step_post_get_source() {
 
 termux_step_configure() {
 	cd $TERMUX_PKG_SRCDIR
-	termux_setup_gn
 	termux_setup_ninja
 	termux_setup_nodejs
+
+	# Fetch depot_tools
+	export DEPOT_TOOLS_UPDATE=0
+	if [ ! -f "$TERMUX_PKG_CACHEDIR/.depot_tools-fetched" ];then
+		git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git $TERMUX_PKG_CACHEDIR/depot_tools
+		touch "$TERMUX_PKG_CACHEDIR/.depot_tools-fetched"
+	fi
+	export PATH="$TERMUX_PKG_CACHEDIR/depot_tools:$PATH"
 
 	################################################################
 	# Please dont use these keys outside of Termux User Repository #
