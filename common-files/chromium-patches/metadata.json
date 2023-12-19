@@ -340,7 +340,11 @@
     "end": 5248
   },
   "dawn-fix-dynamic-loaded-libraries/5249.patch": {
-    "start": 5249
+    "start": 5249,
+    "end": 5992
+  },
+  "dawn-fix-dynamic-loaded-libraries/5993.patch": {
+    "start": 5993
   },
   "dawn-no-android-jni/5359.patch": {
     "start": 5359
@@ -350,7 +354,11 @@
     "end": 5248
   },
   "egl-fix-include/5249.patch": {
-    "start": 5249
+    "start": 5249,
+    "end": 5992
+  },
+  "egl-fix-include/5993.patch": {
+    "start": 5993
   },
   "eigen3-use-cxx14/5359.patch": {
     "start": 9999999,
@@ -460,6 +468,9 @@
   "v8-do-not-use-builtin-mul/5481.patch": {
     "start": 5481
   },
+  "v8-fix-compile-on-android-ndk/5993.patch": {
+    "start": 5993
+  },
   "v8-fix-compress-pointer-offset/5546.patch": {
     "start": 5546
   },
@@ -489,7 +500,11 @@
     "end": 5844
   },
   "vk-layers-no-android-log/5845.patch": {
-    "start": 5845
+    "start": 5845,
+    "end": 5992
+  },
+  "vk-layers-no-android-log/5993.patch": {
+    "start": 5993
   },
   "wayland-memfd_create/5359.patch": {
     "start": 5359
@@ -520,7 +535,11 @@
     "end": 5413
   },
   "z-iwyu-chromedriver-include-vector/5790.patch": {
-    "start": 5790
+    "start": 5790,
+    "end": 5992
+  },
+  "z-iwyu-chromium-net-include-string_view/5993.patch": {
+    "start": 5993
   },
   "z-iwyu-chromium-include-cmath/5249.patch": {
     "start": 4961
@@ -537,10 +556,14 @@
     "end": 5844
   },
   "z-iwyu-ipcz-include-memory/5938.patch": {
-    "start": 5938
+    "start": 5938,
+    "end": 5992
   },
   "z-iwyu-material_color_utilities-include-cmath/5938.patch": {
     "start": 5938
+  },
+  "z-iwyu-sensor_reading-inttypes/5993.patch": {
+    "start": 5993
   },
   "z-iwyu-chromium-net-include-vector/5790.patch": {
     "start": 5790,
