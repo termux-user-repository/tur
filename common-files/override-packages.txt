@@ -1,2 +1,3 @@
 packages/python-scipy
 packages/suitesparse
+packages/sundials
