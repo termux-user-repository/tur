@@ -1,0 +1,18 @@
+--- a/base/metrics/persistent_histogram_allocator.cc
++++ b/base/metrics/persistent_histogram_allocator.cc
+@@ -221,13 +221,13 @@
+     // The sample-record could be for any sparse histogram. Add the reference
+     // to the appropriate collection for later use.
+     if (found_id == match_id) {
+-      found_records.emplace_back(ref, value);
++      found_records.push_back({ref, value});
+       found = true;
+     } else {
+       std::vector<ReferenceAndSample>* samples =
+           GetSampleMapRecordsWhileLocked(found_id);
+       CHECK(samples);
+-      samples->emplace_back(ref, value);
++      samples->push_back({ref, value});
+     }
+   }
+ 

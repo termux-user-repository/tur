@@ -1,0 +1,22 @@
+--- a/build/config/compiler/BUILD.gn
++++ b/build/config/compiler/BUILD.gn
+@@ -1827,19 +1827,6 @@
+           "-Wno-deprecated-include-gch",
+         ]
+       }
+-
+-      if (!is_nacl) {
+-        cflags += [
+-          # TODO(crbug.com/1343975) Evaluate and possibly enable.
+-          "-Wno-deprecated-builtins",
+-
+-          # TODO(crbug.com/1352183) Evaluate and possibly enable.
+-          "-Wno-bitfield-constant-conversion",
+-
+-          # TODO(crbug.com/1412713) Evaluate and possibly enable.
+-          "-Wno-deprecated-this-capture",
+-        ]
+-      }
+     }
+ 
+     # Some builders, such as Cronet, use a different version of Clang than

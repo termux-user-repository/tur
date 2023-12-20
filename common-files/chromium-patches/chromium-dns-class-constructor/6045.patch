@@ -1,0 +1,11 @@
+--- a/net/dns/host_resolver_cache.cc
++++ b/net/dns/host_resolver_cache.cc
+@@ -368,7 +368,7 @@
+ 
+   std::string domain_name = result->domain_name();
+   entries_.emplace(
+-      Key(std::move(domain_name), network_anonymization_key),
++      Key{std::move(domain_name), network_anonymization_key},
+       Entry(std::move(result), source, secure, staleness_generation));
+ 
+   if (entries_.size() > max_entries_) {

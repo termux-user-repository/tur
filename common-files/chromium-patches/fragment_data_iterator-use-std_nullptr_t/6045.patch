@@ -1,0 +1,22 @@
+https://github.com/chromium/chromium/commit/929f99966f2f56664b386829347c2a89b06deed9
+
+--- a/third_party/blink/renderer/core/paint/fragment_data_iterator.h
++++ b/third_party/blink/renderer/core/paint/fragment_data_iterator.h
+@@ -52,7 +52,7 @@ class FragmentDataIterator
+  public:
+   explicit FragmentDataIterator(const LayoutObject& object)
+       : FragmentDataIteratorBase(&object.FirstFragment()) {}
+-  explicit FragmentDataIterator(nullptr_t)
++  explicit FragmentDataIterator(std::nullptr_t)
+       : FragmentDataIteratorBase(nullptr) {}
+ };
+ 
+@@ -63,7 +63,7 @@ class MutableFragmentDataIterator
+   explicit MutableFragmentDataIterator(const LayoutObject& object)
+       : FragmentDataIteratorBase(
+             &object.GetMutableForPainting().FirstFragment()) {}
+-  explicit MutableFragmentDataIterator(nullptr_t)
++  explicit MutableFragmentDataIterator(std::nullptr_t)
+       : FragmentDataIteratorBase(nullptr) {}
+ };
+ 
