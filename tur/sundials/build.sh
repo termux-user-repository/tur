@@ -2,11 +2,12 @@ TERMUX_PKG_HOMEPAGE=https://computing.llnl.gov/projects/sundials
 TERMUX_PKG_DESCRIPTION="SUite of Nonlinear and DIfferential/ALgebraic equation Solvers."
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION=6.5.1
-TERMUX_PKG_SRCURL=https://github.com/LLNL/sundials/releases/download/v${TERMUX_PKG_VERSION}/sundials-${TERMUX_PKG_VERSION}.tar.gz
-TERMUX_PKG_SHA256=4252303805171e4dbdd19a01e52c1dcfe0dafc599c3cfedb0a5c2ffb045a8a75
+TERMUX_PKG_VERSION=1:6.6.2
+TERMUX_PKG_SRCURL=https://github.com/LLNL/sundials/releases/download/v${TERMUX_PKG_VERSION#*:}/sundials-${TERMUX_PKG_VERSION#*:}.tar.gz
+TERMUX_PKG_SHA256=08f8223a5561327e44c072e46faa7f665c0c0bc8cd7e45d23f486c3d24c65009
 TERMUX_PKG_DEPENDS="libopenblas, suitesparse"
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
+-DCMAKE_SYSTEM_NAME=Linux
 -DBUILD_ARKODE=ON
 -DBUILD_CVODE=ON
 -DBUILD_CVODES=ON
@@ -21,6 +22,7 @@ TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 -DKLU_LIBRARY_DIR=$TERMUX_PREFIX/lib
 -DENABLE_OPENMP=ON
 -DENABLE_PTHREAD=ON
+-DEXAMPLES_INSTALL=OFF
 "
 TERMUX_PKG_RM_AFTER_INSTALL="examples/"
 
@@ -29,4 +31,31 @@ source $TERMUX_SCRIPTDIR/common-files/setup_toolchain_gcc.sh
 termux_step_pre_configure() {
 	_setup_toolchain_ndk_gcc_11
 	_override_configure_cmake_for_gcc
+}
+
+termux_step_post_massage() {
+	# Do not forget to bump revision of reverse dependencies and rebuild them
+	# after SOVERSION is changed.
+	local _SOVERSION_GUARD_FILES="
+lib/libsundials_arkode.so.5
+lib/libsundials_cvode.so.6
+lib/libsundials_cvodes.so.6
+lib/libsundials_generic.so.6
+lib/libsundials_ida.so.6
+lib/libsundials_idas.so.5
+lib/libsundials_kinsol.so.6
+lib/libsundials_nvecmanyvector.so.6
+lib/libsundials_nvecopenmp.so.6
+lib/libsundials_nvecpthreads.so.6
+lib/libsundials_nvecserial.so.6
+lib/libsundials_sunmatrixband.so.4
+lib/libsundials_sunmatrixdense.so.4
+lib/libsundials_sunmatrixsparse.so.4
+"
+	local f
+	for f in ${_SOVERSION_GUARD_FILES}; do
+		if [ ! -e "${f}" ]; then
+			termux_error_exit "SOVERSION guard check failed."
+		fi
+	done
 }
