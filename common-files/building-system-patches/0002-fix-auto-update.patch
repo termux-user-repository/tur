@@ -28,3 +28,25 @@ Only search packages from TUR repository when auto-updating.
  	fi
  
  	body="$(
+Sleep 1s after update in order to not reach GitHub rate limit.
+--- a/scripts/bin/update-packages
++++ b/scripts/bin/update-packages
+@@ -118,6 +118,7 @@
+ 	echo # Newline.
+ 	echo "INFO: Updating ${TERMUX_PKG_NAME} [Current version: ${TERMUX_PKG_VERSION}]"
+ 	termux_pkg_auto_update
++	sleep 1s
+ }
+ 
+ declare -A _LATEST_TAGS=()
+Do not run check-updated step, which will make it easy to reach GitHub rate limit.
+--- a/scripts/bin/update-packages
++++ b/scripts/bin/update-packages
+@@ -195,6 +195,7 @@
+ }
+ 
+ _check_updated() {
++	return 1
+ 	if [[ -n "${_LATEST_TAGS[${1##*/}]:-}" ]]; then
+ 		(
+ 			set +eu
