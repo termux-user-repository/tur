@@ -28,6 +28,9 @@
   "angle-no-android-jni/4389.patch": {
     "start": 4389
   },
+  "atspi-mark-possibly-unused-gn-variables/6045.patch": {
+    "start": 6045
+  },
   "avoid-constexpr-std-string/5672.patch": {
     "start": 5672,
     "end": 5775
@@ -106,7 +109,11 @@
     "start": 5938
   },
   "chromium-dns-class-constructor/5845.patch": {
-    "start": 5845
+    "start": 5845,
+    "end": 6044
+  },
+  "chromium-dns-class-constructor/6045.patch": {
+    "start": 6045
   },
   "chromium-fill-elf/4389.patch": {
     "start": 4389
@@ -280,7 +287,11 @@
     "end": 5937
   },
   "compiler-remove-unsupported-flags/5938.patch": {
-    "start": 5938
+    "start": 5938,
+    "end": 6044
+  },
+  "compiler-remove-unsupported-flags/6045.patch": {
+    "start": 6045
   },
   "compiler-use-android-target/4389.patch": {
     "start": 4389,
@@ -371,6 +382,9 @@
   "fix-compile-errors-when-allocator-shim-is-disabled/4389.patch": {
     "start": 4389
   },
+  "fragment_data_iterator-use-std_nullptr_t/6045.patch": {
+    "start": 6045
+  },
   "gtk-fix-dynamic-loaded-libraries/4472.patch": {
     "start": 4472,
     "end": 4960
@@ -403,6 +417,9 @@
   },
   "perfetto-no-android-jni/5359.patch": {
     "start": 5359
+  },
+  "persistent_histogram_allocator-constructor/6045.patch": {
+    "start": 6045
   },
   "pulse-fix-dynamic-loaded-libraries/4389.patch": {
     "start": 4389
@@ -447,7 +464,11 @@
     "end": 5248
   },
   "swiftshader-no-android/5249.patch": {
-    "start": 5249
+    "start": 5249,
+    "end": 6044
+  },
+  "swiftshader-no-android/6045.patch": {
+    "start": 6045
   },
   "swiftshader-no-spawn/5359.patch": {
     "start": 5359
@@ -504,7 +525,11 @@
     "end": 5992
   },
   "vk-layers-no-android-log/5993.patch": {
-    "start": 5993
+    "start": 5993,
+    "end": 6044
+  },
+  "vk-layers-no-android-log/6045.patch": {
+    "start": 6045
   },
   "wayland-memfd_create/5359.patch": {
     "start": 5359
@@ -516,7 +541,11 @@
     "start": 5359
   },
   "x11-fix-dynamic-loaded-libraries/4389.patch": {
-    "start": 4389
+    "start": 4389,
+    "end": 6044
+  },
+  "x11-fix-dynamic-loaded-libraries/6045.patch": {
+    "start": 6045
   },
   "z-iwyu-blink-include-bitset/5615.patch": {
     "start": 5615,
@@ -539,7 +568,8 @@
     "end": 5992
   },
   "z-iwyu-chromium-net-include-string_view/5993.patch": {
-    "start": 5993
+    "start": 5993,
+    "end": 6044
   },
   "z-iwyu-chromium-include-cmath/5249.patch": {
     "start": 4961
@@ -563,7 +593,8 @@
     "start": 5938
   },
   "z-iwyu-sensor_reading-inttypes/5993.patch": {
-    "start": 5993
+    "start": 5993,
+    "end": 6044
   },
   "z-iwyu-chromium-net-include-vector/5790.patch": {
     "start": 5790,
