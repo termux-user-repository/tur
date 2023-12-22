@@ -1,0 +1,450 @@
+--- a/ui/gfx/x/generated_protos/xinput.h
++++ b/ui/gfx/x/generated_protos/xinput.h
+@@ -443,15 +443,21 @@
+ 
+   struct InputInfo {
+     uint8_t len{};
+-    struct Key {
++    class Key {
++    public:
++      Key() {}
+       KeyCode min_keycode{};
+       KeyCode max_keycode{};
+       uint16_t num_keys{};
+     };
+-    struct Button {
++    class Button {
++    public:
++      Button() {}
+       uint16_t num_buttons{};
+     };
+-    struct Valuator {
++    class Valuator {
++    public:
++      Valuator() {}
+       ValuatorMode mode{};
+       uint32_t motion_size{};
+       std::vector<AxisInfo> axes{};
+@@ -588,7 +594,9 @@
+   struct FeedbackState {
+     uint8_t feedback_id{};
+     uint16_t len{};
+-    struct Keyboard {
++    class Keyboard {
++    public:
++      Keyboard() {}
+       uint16_t pitch{};
+       uint16_t duration{};
+       uint32_t led_mask{};
+@@ -598,25 +606,35 @@
+       uint8_t percent{};
+       std::array<uint8_t, 32> auto_repeats{};
+     };
+-    struct Pointer {
++    class Pointer {
++    public:
++      Pointer() {}
+       uint16_t accel_num{};
+       uint16_t accel_denom{};
+       uint16_t threshold{};
+     };
+-    struct String {
++    class String {
++    public:
++      String() {}
+       uint16_t max_symbols{};
+       std::vector<KeySym> keysyms{};
+     };
+-    struct Integer {
++    class Integer {
++    public:
++      Integer() {}
+       uint32_t resolution{};
+       int32_t min_value{};
+       int32_t max_value{};
+     };
+-    struct Led {
++    class Led {
++    public:
++      Led() {}
+       uint32_t led_mask{};
+       uint32_t led_values{};
+     };
+-    struct Bell {
++    class Bell {
++    public:
++      Bell() {}
+       uint8_t percent{};
+       uint16_t pitch{};
+       uint16_t duration{};
+@@ -725,7 +743,9 @@
+   struct FeedbackCtl {
+     uint8_t feedback_id{};
+     uint16_t len{};
+-    struct Keyboard {
++    class Keyboard {
++    public:
++      Keyboard() {}
+       KeyCode key{};
+       uint8_t auto_repeat_mode{};
+       int8_t key_click_percent{};
+@@ -735,22 +755,32 @@
+       uint32_t led_mask{};
+       uint32_t led_values{};
+     };
+-    struct Pointer {
++    class Pointer {
++    public:
++      Pointer() {}
+       int16_t num{};
+       int16_t denom{};
+       int16_t threshold{};
+     };
+-    struct String {
++    class String {
++    public:
++      String() {}
+       std::vector<KeySym> keysyms{};
+     };
+-    struct Integer {
++    class Integer {
++    public:
++      Integer() {}
+       int32_t int_to_display{};
+     };
+-    struct Led {
++    class Led {
++    public:
++      Led() {}
+       uint32_t led_mask{};
+       uint32_t led_values{};
+     };
+-    struct Bell {
++    class Bell {
++    public:
++      Bell() {}
+       int8_t percent{};
+       int16_t pitch{};
+       int16_t duration{};
+@@ -801,15 +831,21 @@
+ 
+   struct InputState {
+     uint8_t len{};
+-    struct Key {
++    class Key {
++    public:
++      Key() {}
+       uint8_t num_keys{};
+       std::array<uint8_t, 32> keys{};
+     };
+-    struct Button {
++    class Button {
++    public:
++      Button() {}
+       uint8_t num_buttons{};
+       std::array<uint8_t, 32> buttons{};
+     };
+-    struct Valuator {
++    class Valuator {
++    public:
++      Valuator() {}
+       ValuatorStateModeMask mode{};
+       std::vector<int32_t> valuators{};
+     };
+@@ -898,12 +934,16 @@
+ 
+   struct DeviceState {
+     uint16_t len{};
+-    struct Resolution {
++    class Resolution {
++    public:
++      Resolution() {}
+       std::vector<uint32_t> resolution_values{};
+       std::vector<uint32_t> resolution_min{};
+       std::vector<uint32_t> resolution_max{};
+     };
+-    struct AbsCalib {
++    class AbsCalib {
++    public:
++      AbsCalib() {}
+       int32_t min_x{};
+       int32_t max_x{};
+       int32_t min_y{};
+@@ -913,14 +953,20 @@
+       uint32_t rotation{};
+       uint32_t button_threshold{};
+     };
+-    struct Core {
++    class Core {
++    public:
++      Core() {}
+       uint8_t status{};
+       uint8_t iscore{};
+     };
+-    struct Enable {
++    class Enable {
++    public:
++      Enable() {}
+       uint8_t enable{};
+     };
+-    struct AbsArea {
++    class AbsArea {
++    public:
++      AbsArea() {}
+       uint32_t offset_x{};
+       uint32_t offset_y{};
+       uint32_t width{};
+@@ -1012,11 +1058,15 @@
+ 
+   struct DeviceCtl {
+     uint16_t len{};
+-    struct Resolution {
++    class Resolution {
++    public:
++      Resolution() {}
+       uint8_t first_valuator{};
+       std::vector<uint32_t> resolution_values{};
+     };
+-    struct AbsCalib {
++    class AbsCalib {
++    public:
++      AbsCalib() {}
+       int32_t min_x{};
+       int32_t max_x{};
+       int32_t min_y{};
+@@ -1026,13 +1076,19 @@
+       uint32_t rotation{};
+       uint32_t button_threshold{};
+     };
+-    struct Core {
++    class Core {
++    public:
++      Core() {}
+       uint8_t status{};
+     };
+-    struct Enable {
++    class Enable {
++    public:
++      Enable() {}
+       uint8_t enable{};
+     };
+-    struct AbsArea {
++    class AbsArea {
++    public:
++      AbsArea() {}
+       uint32_t offset_x{};
+       uint32_t offset_y{};
+       int32_t width{};
+@@ -1126,22 +1182,30 @@
+ 
+   struct HierarchyChange {
+     uint16_t len{};
+-    struct AddMaster {
++    class AddMaster {
++    public:
++      AddMaster() {}
+       uint8_t send_core{};
+       uint8_t enable{};
+       std::string name{};
+     };
+-    struct RemoveMaster {
++    class RemoveMaster {
++    public:
++      RemoveMaster() {}
+       DeviceId deviceid{};
+       ChangeMode return_mode{};
+       DeviceId return_pointer{};
+       DeviceId return_keyboard{};
+     };
+-    struct AttachSlave {
++    class AttachSlave {
++    public:
++      AttachSlave() {}
+       DeviceId deviceid{};
+       DeviceId master{};
+     };
+-    struct DetachSlave {
++    class DetachSlave {
++    public:
++      DetachSlave() {}
+       DeviceId deviceid{};
+     };
+     absl::optional<AddMaster> add_master{};
+@@ -1252,14 +1316,20 @@
+   struct DeviceClass {
+     uint16_t len{};
+     DeviceId sourceid{};
+-    struct Key {
++    class Key {
++    public:
++      Key() {}
+       std::vector<uint32_t> keys{};
+     };
+-    struct Button {
++    class Button {
++    public:
++      Button() {}
+       std::vector<uint32_t> state{};
+       std::vector<Atom> labels{};
+     };
+-    struct Valuator {
++    class Valuator {
++    public:
++      Valuator() {}
+       uint16_t number{};
+       Atom label{};
+       Fp3232 min{};
+@@ -1268,17 +1338,23 @@
+       uint32_t resolution{};
+       ValuatorMode mode{};
+     };
+-    struct Scroll {
++    class Scroll {
++    public:
++      Scroll() {}
+       uint16_t number{};
+       ScrollType scroll_type{};
+       ScrollFlags flags{};
+       Fp3232 increment{};
+     };
+-    struct Touch {
++    class Touch {
++    public:
++      Touch() {}
+       TouchMode mode{};
+       uint8_t num_touches{};
+     };
+-    struct Gesture {
++    class Gesture {
++    public:
++      Gesture() {}
+       uint8_t num_touches{};
+     };
+     absl::optional<Key> key{};
+--- a/ui/gfx/x/generated_protos/xkb.h
++++ b/ui/gfx/x/generated_protos/xkb.h
+@@ -2179,7 +2179,9 @@
+     uint8_t loaded{};
+     uint8_t newKeyboard{};
+     GBNDetail found{};
+-    struct Types {
++    class Types {
++    public:
++      Types() { }
+       uint8_t getmap_type{};
+       uint8_t typeDeviceID{};
+       uint16_t getmap_sequence{};
+@@ -2218,7 +2220,9 @@
+       absl::optional<std::vector<KeyModMap>> modmap_rtrn{};
+       absl::optional<std::vector<KeyVModMap>> vmodmap_rtrn{};
+     };
+-    struct CompatMap {
++    class CompatMap {
++    public:
++      CompatMap() {}
+       uint8_t compatmap_type{};
+       uint8_t compatDeviceID{};
+       uint16_t compatmap_sequence{};
+@@ -2229,7 +2233,9 @@
+       std::vector<SymInterpret> si_rtrn{};
+       std::vector<ModDef> group_rtrn{};
+     };
+-    struct IndicatorMaps {
++    class IndicatorMaps {
++    public:
++      IndicatorMaps() {}
+       uint8_t indicatormap_type{};
+       uint8_t indicatorDeviceID{};
+       uint16_t indicatormap_sequence{};
+@@ -2238,7 +2244,9 @@
+       uint32_t realIndicators{};
+       std::vector<IndicatorMap> maps{};
+     };
+-    struct KeyNames {
++    class KeyNames {
++    public:
++      KeyNames() {}
+       uint8_t keyname_type{};
+       uint8_t keyDeviceID{};
+       uint16_t keyname_sequence{};
+@@ -2270,7 +2278,9 @@
+       absl::optional<std::vector<KeyAlias>> keyAliases{};
+       absl::optional<std::vector<Atom>> radioGroupNames{};
+     };
+-    struct Geometry {
++    class Geometry {
++    public:
++      Geometry() {}
+       uint8_t geometry_type{};
+       uint8_t geometryDeviceID{};
+       uint16_t geometry_sequence{};
+--- a/ui/gfx/x/generated_protos/randr.h
++++ b/ui/gfx/x/generated_protos/randr.h
+@@ -272,7 +272,9 @@
+     static constexpr uint8_t type_id = 4;
+     static constexpr uint8_t opcode = 1;
+     uint16_t sequence{};
+-    struct Cc {
++    class Cc {
++    public:
++      Cc() {}
+       Time timestamp{};
+       Window window{};
+       Crtc crtc{};
+@@ -283,7 +285,9 @@
+       uint16_t width{};
+       uint16_t height{};
+     };
+-    struct Oc {
++    class Oc {
++    public:
++      Oc() {}
+       Time timestamp{};
+       Time config_timestamp{};
+       Window window{};
+@@ -294,30 +298,40 @@
+       RandRConnection connection{};
+       Render::SubPixel subpixel_order{};
+     };
+-    struct Op {
++    class Op {
++    public:
++      Op() {}
+       Window window{};
+       Output output{};
+       Atom atom{};
+       Time timestamp{};
+       Property status{};
+     };
+-    struct Pc {
++    class Pc {
++    public:
++      Pc() {}
+       Time timestamp{};
+       Window window{};
+       Provider provider{};
+     };
+-    struct Pp {
++    class Pp {
++    public:
++      Pp() {}
+       Window window{};
+       Provider provider{};
+       Atom atom{};
+       Time timestamp{};
+       uint8_t state{};
+     };
+-    struct Rc {
++    class Rc {
++    public:
++      Rc() {}
+       Time timestamp{};
+       Window window{};
+     };
+-    struct Lc {
++    class Lc {
++    public:
++      Lc() {}
+       Time timestamp{};
+       Window window{};
+       Lease lease{};

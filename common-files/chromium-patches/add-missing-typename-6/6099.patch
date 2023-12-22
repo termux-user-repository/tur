@@ -1,0 +1,20 @@
+--- a/base/containers/map_util.h
++++ b/base/containers/map_util.h
+@@ -42,7 +42,7 @@
+ template <typename Map,
+           typename Key,
+           typename MappedElementType =
+-              std::pointer_traits<internal::MappedType<Map>>::element_type>
++              typename std::pointer_traits<internal::MappedType<Map>>::element_type>
+ constexpr const MappedElementType* FindPtrOrNull(const Map& map,
+                                                  const Key& key) {
+   auto it = map.find(key);
+@@ -58,7 +58,7 @@
+ template <typename Map,
+           typename Key,
+           typename MappedElementType =
+-              std::pointer_traits<internal::MappedType<Map>>::element_type>
++              typename std::pointer_traits<internal::MappedType<Map>>::element_type>
+ constexpr MappedElementType* FindPtrOrNull(Map& map, const Key& key) {
+   auto it = map.find(key);
+   return it != map.end() ? std::to_address(it->second) : nullptr;

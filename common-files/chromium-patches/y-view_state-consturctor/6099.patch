@@ -1,0 +1,11 @@
+--- a/third_party/blink/renderer/core/loader/history_item.h
++++ b/third_party/blink/renderer/core/loader/history_item.h
+@@ -77,7 +77,7 @@
+     DISALLOW_NEW();
+ 
+    public:
+-    ViewState() = default;
++    ViewState() {}
+     ViewState(const ViewState&) = default;
+     ViewState& operator=(const ViewState&) = default;
+ 

@@ -1,0 +1,11 @@
+--- a/gpu/command_buffer/service/shared_image/shared_image_backing.h
++++ b/gpu/command_buffer/service/shared_image/shared_image_backing.h
+@@ -338,7 +338,7 @@
+  private:
+   class ScopedWriteUMA {
+    public:
+-    ScopedWriteUMA() = default;
++    ScopedWriteUMA() {}
+ 
+     ScopedWriteUMA(const ScopedWriteUMA&) = delete;
+     ScopedWriteUMA& operator=(const ScopedWriteUMA&) = delete;

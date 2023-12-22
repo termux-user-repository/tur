@@ -1,0 +1,14 @@
+--- a/third_party/blink/renderer/modules/media_controls/elements/media_control_timeline_element.h
++++ b/third_party/blink/renderer/modules/media_controls/elements/media_control_timeline_element.h
+@@ -48,7 +48,10 @@
+ 
+  private:
+   // Struct used to track the current live time.
+-  struct LiveAnchorTime {
++  class LiveAnchorTime {
++  public:
++    LiveAnchorTime() {}
++
+     base::TimeTicks clock_time_;
+     double media_time_ = 0;
+   };

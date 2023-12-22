@@ -1,0 +1,98 @@
+--- a/third_party/blink/renderer/core/layout/grid/grid_layout_algorithm.cc
++++ b/third_party/blink/renderer/core/layout/grid/grid_layout_algorithm.cc
+@@ -632,8 +632,9 @@
+   GridSizingTree sizing_tree;
+ 
+   if (const auto* layout_subtree = ConstraintSpace().GetGridLayoutSubtree()) {
+-    auto& [grid_items, layout_data, subtree_size] =
+-        sizing_tree.CreateSizingData();
++    auto& sizing_data = sizing_tree.CreateSizingData();
++    auto& grid_items = sizing_data.grid_items;
++    auto& layout_data = sizing_data.layout_data;
+ 
+     const auto& node = Node();
+     grid_items =
+@@ -671,8 +672,9 @@
+   const auto& track_collection = (track_direction == kForColumns)
+                                      ? layout_data.Columns()
+                                      : layout_data.Rows();
+-  const auto& [begin_set_index, end_set_index] =
+-      grid_item.SetIndices(track_direction);
++  const auto& set_indices = grid_item.SetIndices(track_direction);
++  const auto& begin_set_index = set_indices.begin;
++  const auto& end_set_index = set_indices.end;
+ 
+   return (grid_item.BaselineGroup(track_direction) == BaselineGroup::kMajor)
+              ? track_collection.MajorBaseline(begin_set_index)
+@@ -1181,8 +1183,10 @@
+                                      : subgridded_item.Rows(writing_mode);
+ 
+   const auto margins = ComputeMarginsFor(space, item_style, constraint_space);
+-  const auto& [begin_set_index, end_set_index] =
+-      subgridded_item->SetIndices(track_collection.Direction());
++
++  const auto& set_indices = subgridded_item->SetIndices(track_collection.Direction());
++  const auto& begin_set_index = set_indices.begin;
++  const auto& end_set_index = set_indices.end;
+ 
+   const auto margin_sum =
+       (is_for_columns ? margins.InlineSum() : margins.BlockSum()) +
+@@ -1835,8 +1839,9 @@
+     bool* opt_needs_additional_pass) const {
+   DCHECK(sizing_subtree);
+ 
+-  auto& [grid_items, layout_data, subtree_size] =
+-      sizing_subtree.SubtreeRootData();
++  auto& sizing_data = sizing_subtree.SubtreeRootData();
++  auto& grid_items = sizing_data.grid_items;
++  auto& layout_data = sizing_data.layout_data;
+ 
+   const bool is_for_columns = track_direction == kForColumns;
+   const bool has_non_definite_track =
+@@ -1982,8 +1987,10 @@
+ void GridLayoutAlgorithm::ForEachSubgrid(
+     const GridSizingSubtree& sizing_subtree,
+     const CallbackFunc& callback_func) const {
+-  auto& [grid_items, layout_data, subtree_size] =
+-      sizing_subtree.SubtreeRootData();
++  auto& sizing_data = sizing_subtree.SubtreeRootData();
++  auto& grid_items = sizing_data.grid_items;
++  auto& layout_data = sizing_data.layout_data;
++  auto& subtree_size = sizing_data.subtree_size;
+ 
+   // If we know this subtree doesn't have nested subgrids we can exit early
+   // instead of iterating over every grid item looking for them.
+@@ -3447,7 +3454,9 @@
+   DCHECK(out_row_break_between);
+ 
+   const auto& container_space = ConstraintSpace();
+-  const auto& [grid_items, layout_data, tree_size] = sizing_tree.TreeRootData();
++  const auto& sizing_data = sizing_tree.TreeRootData();
++  const auto& grid_items = sizing_data.grid_items;
++  const auto& layout_data = sizing_data.layout_data;
+ 
+   const auto* cached_layout_subtree = container_space.GetGridLayoutSubtree();
+   const auto container_writing_direction =
+@@ -3611,7 +3620,9 @@
+ 
+   // TODO(ikilpatrick): Update |SetHasSeenAllChildren| and early exit if true.
+   const auto& constraint_space = ConstraintSpace();
+-  const auto& [grid_items, layout_data, tree_size] = sizing_tree.TreeRootData();
++  const auto& sizing_data = sizing_tree.TreeRootData();
++  const auto& grid_items = sizing_data.grid_items;
++  const auto& layout_data = sizing_data.layout_data;
+ 
+   const auto* cached_layout_subtree = constraint_space.GetGridLayoutSubtree();
+   const auto container_writing_direction =
+@@ -4313,8 +4324,9 @@
+   DCHECK(!grid_item.IsOutOfFlow());
+   DCHECK(!grid_item.is_subgridded_to_parent_grid);
+ 
+-  const auto& [begin_set_index, end_set_index] =
+-      grid_item.SetIndices(track_collection.Direction());
++  const auto& set_indices = grid_item.SetIndices(track_collection.Direction());
++  const auto& begin_set_index = set_indices.begin;
++  const auto& end_set_index = set_indices.end;
+ 
+   if (start_offset) {
+     *start_offset = track_collection.GetSetOffset(begin_set_index);
