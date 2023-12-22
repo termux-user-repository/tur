@@ -1,0 +1,20 @@
+--- a/third_party/blink/renderer/bindings/core/v8/async_iterable.h
++++ b/third_party/blink/renderer/bindings/core/v8/async_iterable.h
+@@ -220,7 +220,7 @@
+  private:
+   virtual IterationSource* CreateIterationSource(
+       ScriptState* script_state,
+-      IterationSource::Kind kind,
++      typename IterationSource::Kind kind,
+       ExceptionState& exception_state) = 0;
+ };
+ 
+@@ -262,7 +262,7 @@
+  private:
+   virtual IterationSource* CreateIterationSource(
+       ScriptState* script_state,
+-      IterationSource::Kind kind,
++      typename IterationSource::Kind kind,
+       ExceptionState& exception_state) = 0;
+ };
+ 

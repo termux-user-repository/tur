@@ -1,0 +1,14 @@
+--- a/third_party/webrtc/modules/congestion_controller/goog_cc/loss_based_bwe_v2.h
++++ b/third_party/webrtc/modules/congestion_controller/goog_cc/loss_based_bwe_v2.h
+@@ -81,7 +81,10 @@
+     DataRate loss_limited_bandwidth = DataRate::MinusInfinity();
+   };
+ 
+-  struct Config {
++  class Config {
++  public:
++    Config() {}
++
+     double bandwidth_rampup_upper_bound_factor = 0.0;
+     double rampup_acceleration_max_factor = 0.0;
+     TimeDelta rampup_acceleration_maxout_time = TimeDelta::Zero();

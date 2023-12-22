@@ -19,6 +19,12 @@
   "add-missing-typename-5/5845.patch": {
     "start": 5845
   },
+  "add-missing-typename-6/6099.patch": {
+    "start": 6099
+  },
+  "add-missing-typename-7/6099.patch": {
+    "start": 6099
+  },
   "angle-fix-atomic/5615.patch": {
     "start": 5615
   },
@@ -30,6 +36,9 @@
   },
   "atspi-mark-possibly-unused-gn-variables/6045.patch": {
     "start": 6045
+  },
+  "autofill_i18n_api-no-constexpr-string/6099.patch": {
+    "start": 6099
   },
   "avoid-constexpr-std-string/5672.patch": {
     "start": 5672,
@@ -55,7 +64,11 @@
     "end": 5937
   },
   "blink-fix-structured-binding-declaration/5938.patch": {
-    "start": 5938
+    "start": 5938,
+    "end": 6098
+  },
+  "blink-fix-structured-binding-declaration/6099.patch": {
+    "start": 6099
   },
   "blink-font-constructor/5845.patch": {
     "start": 5845
@@ -106,7 +119,11 @@
     "start": 5359
   },
   "chromium-fenced_frame-declare-destructor/5938.patch": {
-    "start": 5938
+    "start": 5938,
+    "end": 6098
+  },
+  "chromium-fenced_frame-declare-destructor/6099.patch": {
+    "start": 6099
   },
   "chromium-dns-class-constructor/5845.patch": {
     "start": 5845,
@@ -202,7 +219,11 @@
     "end": 5562
   },
   "chromium-no-execinfo/5563.patch": {
-    "start": 5563
+    "start": 5563,
+    "end": 6098
+  },
+  "chromium-no-execinfo/6099.patch": {
+    "start": 6099
   },
   "chromium-no-futimes/4389.patch": {
     "start": 4389
@@ -291,7 +312,11 @@
     "end": 6044
   },
   "compiler-remove-unsupported-flags/6045.patch": {
-    "start": 6045
+    "start": 6045,
+    "end": 6098
+  },
+  "compiler-remove-unsupported-flags/6099.patch": {
+    "start": 6099
   },
   "compiler-use-android-target/4389.patch": {
     "start": 4389,
@@ -383,7 +408,11 @@
     "start": 4389
   },
   "fragment_data_iterator-use-std_nullptr_t/6045.patch": {
-    "start": 6045
+    "start": 6045,
+    "end": 6098
+  },
+  "fragment_data_iterator-use-std_nullptr_t/6099.patch": {
+    "start": 6099
   },
   "gtk-fix-dynamic-loaded-libraries/4472.patch": {
     "start": 4472,
@@ -415,8 +444,14 @@
   "ozone-wayland-memfd/5845.patch": {
     "start": 5845
   },
+  "partition_alloc-use-std_nullptr_t/6099.patch": {
+    "start": 6099
+  },
   "perfetto-no-android-jni/5359.patch": {
     "start": 5359
+  },
+  "perfetto-no-pthread_getname_np/6099.patch": {
+    "start": 6099
   },
   "persistent_histogram_allocator-constructor/6045.patch": {
     "start": 6045
@@ -546,6 +581,30 @@
   },
   "x11-fix-dynamic-loaded-libraries/6045.patch": {
     "start": 6045
+  },
+  "y-exclusive_sync_wait_info-constructor/6099.patch": {
+    "start": 6099
+  },
+  "y-geometry_mapper_transform_cache-constructor/6099.patch": {
+    "start": 6099
+  },
+  "y-gfx-constructor/6099.patch": {
+    "start": 6099
+  },
+  "y-live_anchor_time-constructor/6099.patch": {
+    "start": 6099
+  },
+  "y-loss_based_bwe_v2_config-constructor/6099.patch": {
+    "start": 6099
+  },
+  "y-race_network_request_info-constructor/6099.patch": {
+    "start": 6099
+  },
+  "y-shared_image_backing-constructor/6099.patch": {
+    "start": 6099
+  },
+  "y-view_state-consturctor/6099.patch": {
+    "start": 6099
   },
   "z-iwyu-blink-include-bitset/5615.patch": {
     "start": 5615,

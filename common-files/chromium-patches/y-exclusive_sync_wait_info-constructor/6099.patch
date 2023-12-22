@@ -1,0 +1,14 @@
+--- a/mojo/public/cpp/bindings/lib/multiplex_router.h
++++ b/mojo/public/cpp/bindings/lib/multiplex_router.h
+@@ -312,7 +312,10 @@
+   // Tracks information about the current exclusive sync wait, if any, on the
+   // MultiplexRouter's primary thread. Note that exclusive off-thread sync waits
+   // are not managed by the MultiplexRouter and thus are not relevant here.
+-  struct ExclusiveSyncWaitInfo {
++  class ExclusiveSyncWaitInfo {
++  public:
++    ExclusiveSyncWaitInfo() {}
++
+     InterfaceId interface_id = kInvalidInterfaceId;
+     uint64_t request_id = 0;
+     bool finished = false;

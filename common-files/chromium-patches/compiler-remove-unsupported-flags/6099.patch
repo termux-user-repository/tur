@@ -1,0 +1,34 @@
+--- a/build/config/compiler/BUILD.gn
++++ b/build/config/compiler/BUILD.gn
+@@ -1859,31 +1859,6 @@
+         # TODO(thakis): Only for no_chromium_code? http://crbug.com/912662
+         "-Wno-ignored-pragma-optimize",
+       ]
+-
+-      if (!is_nacl) {
+-        cflags += [
+-          # TODO(crbug.com/1343975) Evaluate and possibly enable.
+-          "-Wno-deprecated-builtins",
+-
+-          # TODO(crbug.com/1352183) Evaluate and possibly enable.
+-          "-Wno-bitfield-constant-conversion",
+-
+-          # TODO(crbug.com/1412713) Evaluate and possibly enable.
+-          "-Wno-deprecated-this-capture",
+-
+-          # TODO(https://crbug.com/1491833): Fix and re-enable.
+-          "-Wno-invalid-offsetof",
+-
+-          # TODO(crbug.com/1494809): Evaluate and possibly enable.
+-          "-Wno-vla-extension",
+-
+-          # TODO(https://crbug.com/1490607): Fix and re-enable.
+-          "-Wno-thread-safety-reference-return",
+-
+-          # TODO(crbug.com/1495100): Evaluate and possibly enable.
+-          "-Wno-delayed-template-parsing-in-cxx20",
+-        ]
+-      }
+     }
+ 
+     # Some builders, such as Cronet, use a different version of Clang than

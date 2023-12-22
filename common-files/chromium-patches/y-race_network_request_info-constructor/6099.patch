@@ -1,0 +1,17 @@
+--- a/third_party/blink/renderer/modules/service_worker/service_worker_global_scope.h
++++ b/third_party/blink/renderer/modules/service_worker/service_worker_global_scope.h
+@@ -776,7 +776,13 @@
+ 
+   blink::BlinkStorageKey storage_key_;
+ 
+-  struct RaceNetworkRequestInfo {
++  class RaceNetworkRequestInfo {
++  public:
++    RaceNetworkRequestInfo(
++        int fetch_event_id,
++        String token, 
++        mojo::PendingRemote<network::mojom::blink::URLLoaderFactory> url_loader_factory):
++        fetch_event_id(fetch_event_id), token(token), url_loader_factory(std::move(url_loader_factory)) { }
+     int fetch_event_id;
+     String token;
+     mojo::PendingRemote<network::mojom::blink::URLLoaderFactory>

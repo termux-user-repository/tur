@@ -1,0 +1,29 @@
+--- a/content/browser/fenced_frame/fenced_frame_reporter.h
++++ b/content/browser/fenced_frame/fenced_frame_reporter.h
+@@ -44,6 +44,8 @@
+   std::string type;
+   std::string data;
+ 
++  ~DestinationEnumEvent() {}
++
+   // The equal to operator is defined in order to enable comparison of
+   // DestinationVariant.
+   bool operator==(const DestinationEnumEvent& other) const {
+@@ -57,6 +59,8 @@
+ struct DestinationURLEvent {
+   GURL url;
+ 
++  ~DestinationURLEvent() {}
++
+   // The equal to operator is defined in order to enable comparison of
+   // DestinationVariant.
+   bool operator==(const DestinationURLEvent& other) const {
+@@ -71,6 +75,8 @@
+   blink::mojom::AutomaticBeaconType type;
+   std::string data;
+ 
++  ~AutomaticBeaconEvent() {}
++
+   // The equal to operator is defined in order to enable comparison of
+   // DestinationVariant.
+   bool operator==(const AutomaticBeaconEvent& other) const {
