@@ -1,3 +1,7 @@
 packages/python-scipy
 packages/suitesparse
 packages/sundials
+packages/arpack-ng
+packages/qrupdate-ng
+packages/octave
+x11-packages/octave-x
