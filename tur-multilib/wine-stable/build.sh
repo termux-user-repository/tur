@@ -6,9 +6,9 @@ LICENSE
 LICENSE.OLD
 COPYING.LIB"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION=7.0.1
+TERMUX_PKG_VERSION=8.0.2
 TERMUX_PKG_SRCURL=https://dl.winehq.org/wine/source/${TERMUX_PKG_VERSION:0:3}/wine-$TERMUX_PKG_VERSION.tar.xz
-TERMUX_PKG_SHA256=807caa78121b16250f240d2828a07ca4e3c609739e5524ef0f4cf89ae49a816c
+TERMUX_PKG_SHA256=6ec8fb6f2c72d576cb11f52b2f8d59af64404802154651d122b98466d91dc847
 TERMUX_PKG_DEPENDS="libc++, libgmp, libgnutls"
 TERMUX_PKG_NO_STATICSPLIT=true
 TERMUX_PKG_HOSTBUILD=true
@@ -30,11 +30,11 @@ exec_prefix=$TERMUX_PREFIX
 
 _setup_llvm_mingw_toolchain() {
 	# LLVM-mingw's version number must not be the same as the NDK's.
-	local _llvm_mingw_version=13
-	local _version="20211002"
-	local _url="https://github.com/mstorsjo/llvm-mingw/releases/download/$_version/llvm-mingw-$_version-ucrt-ubuntu-18.04-x86_64.tar.xz"
+	local _llvm_mingw_version=16
+	local _version="20230614"
+	local _url="https://github.com/mstorsjo/llvm-mingw/releases/download/$_version/llvm-mingw-$_version-ucrt-ubuntu-20.04-x86_64.tar.xz"
 	local _path="$TERMUX_PKG_CACHEDIR/$(basename $_url)"
-	local _sha256sum=30e9400783652091d9278ce21e5c170d01a5f44e4f1a25717b63cd9ad9fbe13b
+	local _sha256sum=9ae925f9b205a92318010a396170e69f74be179ff549200e8122d3845ca243b8
 	termux_download $_url $_path $_sha256sum
 	local _extract_path="$TERMUX_PKG_CACHEDIR/llvm-mingw-toolchain-$_llvm_mingw_version"
 	if [ ! -d "$_extract_path" ]; then
@@ -68,4 +68,8 @@ termux_step_pre_configure() {
 	if [ "$TERMUX_ARCH_BITS" = 64 ]; then
 		TERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" --enable-win64"
 	fi
+}
+
+termux_step_make() {
+	make -j $TERMUX_MAKE_PROCESSES || bash
 }
