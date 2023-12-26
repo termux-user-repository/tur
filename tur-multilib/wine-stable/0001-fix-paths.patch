@@ -24,6 +24,18 @@ diff -uNr a/dlls/dbghelp/macho_module.c b/dlls/dbghelp/macho_module.c
 diff -uNr a/dlls/dbghelp/module.c b/dlls/dbghelp/module.c
 --- a/dlls/dbghelp/module.c
 +++ b/dlls/dbghelp/module.c
+@@ -658,9 +658,9 @@
+     fmap_link = HeapAlloc(GetProcessHeap(), 0, sizeof(*fmap_link));
+     if (!fmap_link) return FALSE;
+
+-    p = malloc(sizeof(L"/usr/lib/debug/.build-id/") +
++    p = malloc(sizeof(L"/data/data/com.termux/files/usr/lib/debug/.build-id/") +
+                (idlen * 2 + 1) * sizeof(WCHAR) + sizeof(L".debug"));
+-    wcscpy(p, L"/usr/lib/debug/.build-id/");
++    wcscpy(p, L"/data/data/com.termux/files/usr/lib/debug/.build-id/");
+     z = p + wcslen(p);
+     if (idlen)
+     {
 @@ -701,7 +701,7 @@
                  if (!ret)
                  {
@@ -42,18 +54,6 @@ diff -uNr a/dlls/dbghelp/module.c b/dlls/dbghelp/module.c
                          p += wcslen(dst);
                          MultiByteToWideChar(CP_UNIXCP, 0, data, -1, p, filename_len);
                          ret = image_check_debug_link_gnu_id(dst, fmap_link, id, idlen);
-@@ -753,9 +753,9 @@
-     fmap_link = HeapAlloc(GetProcessHeap(), 0, sizeof(*fmap_link));
-     if (!fmap_link) return FALSE;
- 
--    p = malloc(sizeof(L"/usr/lib/debug/.build-id/") +
-+    p = malloc(sizeof(L"@TERMUX_PREFIX@/lib/debug/.build-id/") +
-                (idlen * 2 + 1) * sizeof(WCHAR) + sizeof(L".debug"));
--    wcscpy(p, L"/usr/lib/debug/.build-id/");
-+    wcscpy(p, L"@TERMUX_PREFIX@/lib/debug/.build-id/");
-     z = p + wcslen(p);
-     if (idlen)
-     {
 diff -uNr a/dlls/msvcrt/tests/environ.c b/dlls/msvcrt/tests/environ.c
 --- a/dlls/msvcrt/tests/environ.c
 +++ b/dlls/msvcrt/tests/environ.c
