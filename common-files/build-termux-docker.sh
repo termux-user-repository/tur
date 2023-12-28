@@ -29,7 +29,6 @@ $SUDO docker start $CONTAINER_NAME >/dev/null 2>&1 || {
 		--name $CONTAINER_NAME \
 		--network=host \
 		--volume $REPOROOT:$CONTAINER_HOME_DIR/termux-packages \
-		--privileged \
 		--security-opt seccomp=unconfined \
 		--tty \
 		-w $CONTAINER_HOME_DIR/termux-packages \
