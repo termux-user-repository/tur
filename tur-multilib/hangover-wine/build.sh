@@ -1,5 +1,5 @@
-TERMUX_PKG_HOMEPAGE=https://www.winehq.org/
-TERMUX_PKG_DESCRIPTION="A compatibility layer for running Windows programs"
+TERMUX_PKG_HOMEPAGE=https://github.com/AndreRH/wine
+TERMUX_PKG_DESCRIPTION="A compatibility layer for running Windows programs (Hangover forked)"
 TERMUX_PKG_LICENSE="LGPL-2.1"
 TERMUX_PKG_LICENSE_FILE="\
 LICENSE
@@ -8,6 +8,7 @@ COPYING.LIB"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 # FIXME: See comments at the end of this file for the reason why this version is used.
 TERMUX_PKG_VERSION=8.17
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://github.com/AndreRH/wine/archive/refs/tags/hangover-$TERMUX_PKG_VERSION.tar.gz
 TERMUX_PKG_SHA256=f4d94572c28ab36a8a4355e8d661a4f2bfe903d2e2b3e977f400c16f7bfad556
 TERMUX_PKG_DEPENDS="libandroid-spawn, libc++, libgmp, libgnutls"
@@ -24,15 +25,13 @@ TERMUX_PKG_CONFLICTS="wine-devel, wine-stable, wine-staging"
 
 TERMUX_PKG_BLACKLISTED_ARCHES="arm, i686, x86_64"
 
-_INSTALL_PREFIX="$TERMUX_PREFIX"
-
 # TODO: Enable X
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 enable_wineandroid_drv=no
-exec_prefix=$_INSTALL_PREFIX
---prefix=$_INSTALL_PREFIX
---libdir=$_INSTALL_PREFIX/lib
---sbindir=$_INSTALL_PREFIX/bin
+exec_prefix=$TERMUX_PREFIX
+--prefix=$TERMUX_PREFIX
+--libdir=$TERMUX_PREFIX/lib
+--sbindir=$TERMUX_PREFIX/bin
 --without-x
 --without-vulkan
 --with-wine-tools=$TERMUX_PKG_HOSTBUILD_DIR
