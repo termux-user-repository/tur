@@ -10,7 +10,7 @@ TERMUX_PKG_VERSION=8.0.2
 TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://dl.winehq.org/wine/source/${TERMUX_PKG_VERSION:0:3}/wine-$TERMUX_PKG_VERSION.tar.xz
 TERMUX_PKG_SHA256=6ec8fb6f2c72d576cb11f52b2f8d59af64404802154651d122b98466d91dc847
-TERMUX_PKG_DEPENDS="fontconfig, freetype, libc++, libgmp, libgnutls, libxcb, krb5, libxrender, opengl, mesa, xorg-xrandr, pulseaudio, sdl2, libxcomposite, libxfixes, libxcursor, vulkan-loader"
+TERMUX_PKG_DEPENDS="fontconfig, freetype, krb5, libc++, libgmp, libgnutls, libxcb, libxcomposite, libxcursor, libxfixes, libxrender, mesa, opengl, pulseaudio, sdl2, vulkan-loader, xorg-xrandr"
 TERMUX_PKG_ANTI_BUILD_DEPENDS="vulkan-loader"
 TERMUX_PKG_BUILD_DEPENDS="vulkan-loader-generic"
 TERMUX_PKG_NO_STATICSPLIT=true
@@ -20,7 +20,6 @@ TERMUX_PKG_EXTRA_HOSTBUILD_CONFIGURE_ARGS="
 --disable-tests
 "
 
-# TODO: Enable X
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 enable_wineandroid_drv=no
 exec_prefix=$TERMUX_PREFIX
