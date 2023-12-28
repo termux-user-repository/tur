@@ -1,0 +1,27 @@
+Link flag `--no-wchar-size-warning` is not supported by ld.lld until lld-16.
+--- a/tools/winegcc/winegcc.c.orig
++++ b/tools/winegcc/winegcc.c
+@@ -528,8 +528,8 @@
+ 
+     strarray_add( &link_args, "-shared" );
+     strarray_add( &link_args, "-Wl,-Bsymbolic" );
+-    if (!opts->noshortwchar && opts->target.cpu == CPU_ARM)
+-        strarray_add( &flags, "-Wl,--no-wchar-size-warning" );
++    // if (!opts->noshortwchar && opts->target.cpu == CPU_ARM)
++    //     strarray_add( &flags, "-Wl,--no-wchar-size-warning" );
+     if (!try_link( opts->prefix, link_args, "-Wl,-z,defs" ))
+         strarray_add( &flags, "-Wl,-z,defs" );
+ 
+--- a/tools/winebuild/utils.c.orig
++++ b/tools/winebuild/utils.c
+@@ -386,8 +386,8 @@
+         }
+     }
+ 
+-    if (target.cpu == CPU_ARM && !is_pe())
+-        strarray_add( &args, "--no-wchar-size-warning" );
++    // if (target.cpu == CPU_ARM && !is_pe())
++    //     strarray_add( &args, "--no-wchar-size-warning" );
+ 
+     return args;
+ }
