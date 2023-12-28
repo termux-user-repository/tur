@@ -1,0 +1,24 @@
+--- a/tools/winebuild/utils.c
++++ b/tools/winebuild/utils.c
+@@ -304,10 +304,6 @@
+     {
+         strarray_addall( &args, as_command );
+     }
+-    else if ((file = find_binary( target_alias, "as" )) || (file = find_binary( target_alias, "gas ")))
+-    {
+-        strarray_add( &args, file );
+-    }
+     else if ((file = find_binary( NULL, "clang" )))
+     {
+         strarray_add( &args, file );
+@@ -318,6 +314,10 @@
+         }
+         using_cc = 1;
+     }
++    else if ((file = find_binary( target_alias, "as" )) || (file = find_binary( target_alias, "gas ")))
++    {
++        strarray_add( &args, file );
++    }
+ 
+     if (using_cc)
+     {
