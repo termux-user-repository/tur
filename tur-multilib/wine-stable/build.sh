@@ -7,9 +7,12 @@ LICENSE.OLD
 COPYING.LIB"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION=8.0.2
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://dl.winehq.org/wine/source/${TERMUX_PKG_VERSION:0:3}/wine-$TERMUX_PKG_VERSION.tar.xz
 TERMUX_PKG_SHA256=6ec8fb6f2c72d576cb11f52b2f8d59af64404802154651d122b98466d91dc847
-TERMUX_PKG_DEPENDS="libc++, libgmp, libgnutls"
+TERMUX_PKG_DEPENDS="fontconfig, freetype, libc++, libgmp, libgnutls, libxcb, krb5, libxrender, opengl, mesa, xorg-xrandr, pulseaudio, sdl2, libxcomposite, libxfixes, libxcursor, vulkan-loader"
+TERMUX_PKG_ANTI_BUILD_DEPENDS="vulkan-loader"
+TERMUX_PKG_BUILD_DEPENDS="vulkan-loader-generic"
 TERMUX_PKG_NO_STATICSPLIT=true
 TERMUX_PKG_HOSTBUILD=true
 TERMUX_PKG_EXTRA_HOSTBUILD_CONFIGURE_ARGS="
@@ -21,12 +24,55 @@ TERMUX_PKG_EXTRA_HOSTBUILD_CONFIGURE_ARGS="
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 enable_wineandroid_drv=no
 exec_prefix=$TERMUX_PREFIX
---without-x
---without-vulkan
 --with-wine-tools=$TERMUX_PKG_HOSTBUILD_DIR
 --enable-nls
 --disable-tests
+--without-alsa
+--without-capi
+--without-coreaudio
+--without-cups
+--without-dbus
+--with-fontconfig
+--with-freetype
+--without-gettext
+--with-gettextpo=no
+--without-gphoto
+--with-gnutls
+--without-gstreamer
+--without-inotify
+--with-krb5
+--with-mingw
+--without-netapi
+--without-opencl
+--with-opengl
+--with-osmesa
+--without-oss
+--without-pcap
+--with-pthread
+--with-pulse
+--without-sane
+--with-sdl
+--without-udev
+--without-unwind
+--without-usb
+--without-v4l2
+--with-vulkan
+--with-xcomposite
+--with-xcursor
+--with-xfixes
+--without-xinerama
+--with-xinput
+--with-xinput2
+--with-xrandr
+--with-xrender
+--without-xshape
+--without-xshm
+--without-xxf86vm
 "
+
+# FIXME: This package doesn't work on arm since 8.x, but anyway
+# FIXME: I'd like to compile it.
+# TERMUX_PKG_BLACKLISTED_ARCHES="arm"
 
 _setup_llvm_mingw_toolchain() {
 	# LLVM-mingw's version number must not be the same as the NDK's.
@@ -60,8 +106,15 @@ termux_step_pre_configure() {
 	_setup_llvm_mingw_toolchain
 
 	# Fix overoptimization
+	CPPFLAGS="${CPPFLAGS/-Oz/}"
 	CFLAGS="${CFLAGS/-Oz/}"
-	CXXFLAGS="${CFLAGS/-Oz/}"
+	CXXFLAGS="${CXXFLAGS/-Oz/}"
+
+	# Disable hardening
+	CPPFLAGS="${CPPFLAGS/-fstack-protector-strong/}"
+	CFLAGS="${CFLAGS/-fstack-protector-strong/}"
+	CXXFLAGS="${CXXFLAGS/-fstack-protector-strong/}"
+	LDFLAGS="${LDFLAGS/-Wl,-z,relro,-z,now/}"
 
 	# Enable win64 on 64-bit arches.
 	# TODO: Enable win32 after TUR has full support for mutilib 
@@ -71,5 +124,9 @@ termux_step_pre_configure() {
 }
 
 termux_step_make() {
-	make -j $TERMUX_MAKE_PROCESSES || bash
+	make -j $TERMUX_MAKE_PROCESSES -k || bash
+}
+
+termux_step_make_install() {
+	make -j $TERMUX_MAKE_PROCESSES install || bash
 }
