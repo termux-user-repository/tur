@@ -1,6 +1,6 @@
 diff -uNr a/configure b/configure
---- a/configure	2023-03-23 19:04:50.936081299 +0900
-+++ b/configure	2023-03-23 19:14:22.188102851 +0900
+--- a/configure
++++ b/configure
 @@ -10766,7 +10766,7 @@
  	  STATEDIR="$enableval"
  	fi
@@ -20,8 +20,8 @@ diff -uNr a/configure b/configure
  
  
 diff -uNr a/configure.ac b/configure.ac
---- a/configure.ac	2020-05-21 12:32:38.000000000 +0900
-+++ b/configure.ac	2023-03-23 19:14:22.180102851 +0900
+--- a/configure.ac
++++ b/configure.ac
 @@ -633,7 +633,7 @@
  	else
  	  STATEDIR="$enableval"
@@ -41,8 +41,8 @@ diff -uNr a/configure.ac b/configure.ac
  AC_ARG_ENABLE(aptitude,
  	AS_HELP_STRING([--disable-aptitude], [don't compile the program itself]),
 diff -uNr a/src/apt_options.cc b/src/apt_options.cc
---- a/src/apt_options.cc	2020-05-21 12:32:38.000000000 +0900
-+++ b/src/apt_options.cc	2023-03-23 19:09:03.724090836 +0900
+--- a/src/apt_options.cc
++++ b/src/apt_options.cc
 @@ -348,7 +348,7 @@
  		 "be interpreted as a shell command that is to "
  		 "receive the log on standard input."),
@@ -53,8 +53,8 @@ diff -uNr a/src/apt_options.cc b/src/apt_options.cc
  	      N_("If this option is enabled, aptitude will use the "
  		 "user's locale for messages and dates in the log "
 diff -uNr a/src/cmdline/cmdline_changelog.cc b/src/cmdline/cmdline_changelog.cc
---- a/src/cmdline/cmdline_changelog.cc	2020-05-21 12:32:38.000000000 +0900
-+++ b/src/cmdline/cmdline_changelog.cc	2023-03-23 19:11:08.260095535 +0900
+--- a/src/cmdline/cmdline_changelog.cc
++++ b/src/cmdline/cmdline_changelog.cc
 @@ -288,9 +288,9 @@
  void do_cmdline_changelog(const vector<string> &packages,
                            const std::shared_ptr<terminal_metrics> &term_metrics)
@@ -68,8 +68,8 @@ diff -uNr a/src/cmdline/cmdline_changelog.cc b/src/cmdline/cmdline_changelog.cc
        _error->Warning(_("Can't execute sensible-pager, is this a working Debian system?"));
  
 diff -uNr a/src/generic/apt/log.cc b/src/generic/apt/log.cc
---- a/src/generic/apt/log.cc	2020-05-21 12:32:38.000000000 +0900
-+++ b/src/generic/apt/log.cc	2023-03-23 19:09:11.960091147 +0900
+--- a/src/generic/apt/log.cc
++++ b/src/generic/apt/log.cc
 @@ -230,7 +230,7 @@
  {
    vector<string> logs;
@@ -80,8 +80,8 @@ diff -uNr a/src/generic/apt/log.cc b/src/generic/apt/log.cc
    if(!main_log.empty())
      logs.push_back(main_log);
 diff -uNr a/src/generic/apt/matching/match.cc b/src/generic/apt/matching/match.cc
---- a/src/generic/apt/matching/match.cc	2020-05-21 12:32:38.000000000 +0900
-+++ b/src/generic/apt/matching/match.cc	2023-03-23 19:14:22.188102851 +0900
+--- a/src/generic/apt/matching/match.cc
++++ b/src/generic/apt/matching/match.cc
 @@ -384,7 +384,7 @@
  	  {
              const std::string filename =
@@ -92,8 +92,8 @@ diff -uNr a/src/generic/apt/matching/match.cc b/src/generic/apt/matching/match.c
  	  }
  	catch(...)
 diff -uNr a/src/generic/apt/pkg_changelog.cc b/src/generic/apt/pkg_changelog.cc
---- a/src/generic/apt/pkg_changelog.cc	2020-05-21 12:32:38.000000000 +0900
-+++ b/src/generic/apt/pkg_changelog.cc	2023-03-23 19:11:54.064097263 +0900
+--- a/src/generic/apt/pkg_changelog.cc
++++ b/src/generic/apt/pkg_changelog.cc
 @@ -515,7 +515,7 @@
  				// the changelog exists by trying to stat it.
  				struct stat buf;
@@ -104,8 +104,8 @@ diff -uNr a/src/generic/apt/pkg_changelog.cc b/src/generic/apt/pkg_changelog.cc
  				changelog_file += "/changelog.Debian";
  
 diff -uNr a/src/generic/apt/resolver_manager.cc b/src/generic/apt/resolver_manager.cc
---- a/src/generic/apt/resolver_manager.cc	2020-05-21 12:32:38.000000000 +0900
-+++ b/src/generic/apt/resolver_manager.cc	2023-03-23 19:13:09.632100114 +0900
+--- a/src/generic/apt/resolver_manager.cc
++++ b/src/generic/apt/resolver_manager.cc
 @@ -497,7 +497,7 @@
  	  // Should I close open fds here?
  
@@ -116,8 +116,8 @@ diff -uNr a/src/generic/apt/resolver_manager.cc b/src/generic/apt/resolver_manag
  		"-C",
  		trace_dir.c_str(),
 diff -uNr a/src/generic/apt/tags.cc b/src/generic/apt/tags.cc
---- a/src/generic/apt/tags.cc	2020-05-21 12:32:38.000000000 +0900
-+++ b/src/generic/apt/tags.cc	2023-03-23 19:14:22.188102851 +0900
+--- a/src/generic/apt/tags.cc
++++ b/src/generic/apt/tags.cc
 @@ -196,7 +196,7 @@
  static bool load_tags_from_debtags(OpProgress *progress)
  {
@@ -137,8 +137,8 @@ diff -uNr a/src/generic/apt/tags.cc b/src/generic/apt/tags.cc
    _error->RevertToStack();
  
 diff -uNr a/src/generic/apt/tasks.cc b/src/generic/apt/tasks.cc
---- a/src/generic/apt/tasks.cc	2020-05-21 12:32:38.000000000 +0900
-+++ b/src/generic/apt/tasks.cc	2023-03-23 19:12:11.676097927 +0900
+--- a/src/generic/apt/tasks.cc
++++ b/src/generic/apt/tasks.cc
 @@ -492,6 +492,7 @@
    const char *descdirs[] =
      {"/usr/share/tasksel/descs",
@@ -148,8 +148,8 @@ diff -uNr a/src/generic/apt/tasks.cc b/src/generic/apt/tasks.cc
    vector<string> descfiles;
    for(const char **it = descdirs; *it != NULL; ++it)
 diff -uNr a/src/gtk/changelog.cc b/src/gtk/changelog.cc
---- a/src/gtk/changelog.cc	2020-05-21 12:32:38.000000000 +0900
-+++ b/src/gtk/changelog.cc	2023-03-23 19:11:08.260095535 +0900
+--- a/src/gtk/changelog.cc
++++ b/src/gtk/changelog.cc
 @@ -65,7 +65,7 @@
        std::string URL = cw::util::ssprintf("http://bugs.debian.org/%s", bug_number.c_str());
  
@@ -160,8 +160,8 @@ diff -uNr a/src/gtk/changelog.cc b/src/gtk/changelog.cc
  
        Glib::spawn_async(".", arguments);
 diff -uNr a/src/gtk/filesview.cc b/src/gtk/filesview.cc
---- a/src/gtk/filesview.cc	2020-05-21 12:32:38.000000000 +0900
-+++ b/src/gtk/filesview.cc	2023-03-23 19:14:22.188102851 +0900
+--- a/src/gtk/filesview.cc
++++ b/src/gtk/filesview.cc
 @@ -297,7 +297,7 @@
  		     ver.VerStr());
        }
@@ -172,8 +172,8 @@ diff -uNr a/src/gtk/filesview.cc b/src/gtk/filesview.cc
  
      std::ifstream fileslist(fileslistname.c_str());
 diff -uNr a/src/gtk/gui.cc b/src/gtk/gui.cc
---- a/src/gtk/gui.cc	2020-05-21 12:32:38.000000000 +0900
-+++ b/src/gtk/gui.cc	2023-03-23 19:11:08.260095535 +0900
+--- a/src/gtk/gui.cc
++++ b/src/gtk/gui.cc
 @@ -363,7 +363,7 @@
  	  saw_any_output(false)
        {
