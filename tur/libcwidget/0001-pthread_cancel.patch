@@ -1,69 +1,52 @@
-diff -uNr a/src/cwidget/generic/threads/threads.h b/src/cwidget/generic/threads/threads.h
---- a/src/cwidget/generic/threads/threads.h	2018-04-27 03:46:57.000000000 +0900
-+++ b/src/cwidget/generic/threads/threads.h	2023-03-23 12:55:24.556137876 +0900
-@@ -192,7 +192,11 @@
+--- a/src/cwidget/generic/threads/threads.h
++++ b/src/cwidget/generic/threads/threads.h
+@@ -25,6 +25,8 @@
+ #ifndef THREADS_H
+ #define THREADS_H
+ 
++#include <stdatomic.h>
++
+ #include <errno.h>
+ #include <cwidget/generic/util/exception.h>
+ 
+@@ -120,6 +122,8 @@
+       }
+ 
+     public:
++      atomic_bool request_cancel;
++
+       /** \brief Stores the attributes with which a thread is to be
+        * created.
+        *
+@@ -157,7 +161,7 @@
+        */
+       template<typename F>
+       thread(const F &thunk, const attr &a = attr())
+-	:joined(false)
++	:joined(false), request_cancel(ATOMIC_VAR_INIT(false))
+       {
+ 	// Create a thunk on the heap to pass to the new thread.
+ 	F *tmp = new F(thunk);
+@@ -192,7 +196,7 @@
        /** Cancel this thread. */
        void cancel()
        {
-+#ifndef __ANDROID__
- 	pthread_cancel(tid);
-+#else
-+  pthread_kill(tid, SIGUSR2);
-+#endif
+-	pthread_cancel(tid);
++	atomic_store(&request_cancel, true);
        }
      };
  
-diff -uNr a/src/cwidget/toplevel.cc b/src/cwidget/toplevel.cc
---- a/src/cwidget/toplevel.cc	2019-06-19 07:31:29.000000000 +0900
-+++ b/src/cwidget/toplevel.cc	2023-03-23 19:00:23.620071214 +0900
-@@ -58,6 +58,14 @@
- 
- #include <fcntl.h>
- #include <sys/types.h>
-+#include <stdatomic.h>
-+
-+#ifdef __ANDROID__
-+static void threadSignalHandler(int signum)
-+{
-+  pthread_exit(0);
-+}
-+#endif
- 
- namespace cwidget
- {
-@@ -449,6 +457,7 @@
-       {
- 	// Block all signals so we don't interfere with the main
- 	// thread's signal handling.
-+	atomic_flag event_thread_cancel;
- 	sigset_t all_signals;
- 	sigfillset(&all_signals);
- 	sigprocmask(SIG_BLOCK, &all_signals, NULL);
-@@ -480,9 +489,9 @@
+--- a/src/cwidget/toplevel.cc
++++ b/src/cwidget/toplevel.cc
+@@ -480,9 +480,9 @@
  	    FD_ZERO(&selectfds);
  	    FD_SET(0, &selectfds);
  
 -	    pthread_testcancel();
-+	    if (!atomic_flag_test_and_set(&event_thread_cancel)) pthread_exit(NULL);
++	    if (atomic_load(&instancet->request_cancel)) pthread_exit(NULL);
  	    int result = select(1, &selectfds, NULL, NULL, &timeout);
 -	    pthread_testcancel();	// Workaround for Linux threads suckage.
-+	    if (!atomic_flag_test_and_set(&event_thread_cancel)) pthread_exit(NULL);
++	    if (atomic_load(&instancet->request_cancel)) pthread_exit(NULL);
  	    // See pthread_cancel(3).
  
  	    if(result != 1)
-@@ -853,6 +862,15 @@
- 
-     void init()
-     {
-+#ifdef __ANDROID__
-+      struct sigaction actions;
-+      memset(&actions, 0, sizeof(actions));
-+      sigemptyset(&actions.sa_mask);
-+      actions.sa_flags = 0;
-+      actions.sa_handler = threadSignalHandler;
-+      sigaction(SIGUSR2, &actions, NULL);
-+#endif
-+
-       threads::mutex::lock l(get_mutex());
- 
-       bindtextdomain(CWIDGET_DOMAIN, LOCALEDIR);
