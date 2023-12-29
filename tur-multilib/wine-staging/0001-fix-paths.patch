@@ -71,15 +71,19 @@ diff -uNr a/dlls/msvcrt/tests/environ.c b/dlls/msvcrt/tests/environ.c
 diff -uNr a/dlls/ntdll/unix/server.c b/dlls/ntdll/unix/server.c
 --- a/dlls/ntdll/unix/server.c
 +++ b/dlls/ntdll/unix/server.c
-@@ -1257,7 +1257,7 @@
+@@ -1257,10 +1257,10 @@
      else
          snprintf( tmp + p, sizeof(tmp) - p, "%lx", (unsigned long)ino );
  
--#ifdef __ANDROID__  /* there's no /tmp dir on Android */
+-#if defined(__ANDROID__)  /* there's no /tmp dir on Android */
 +#if defined(__ANDROID__) && ! defined(__TERMUX__)  /* there's no /tmp dir on Android */
      asprintf( &dir, "%s/.wineserver/server-%s", config_dir, tmp );
  #else
-     asprintf( &dir, "/tmp/.wine-%u/server-%s", getuid(), tmp );
+-    asprintf( &dir, "/tmp/.wine-%u/server-%s", getuid(), tmp );
++    asprintf( &dir, "@TERMUX_PREFIX@/tmp/.wine-%u/server-%s", getuid(), tmp );
+ #endif
+     return dir;
+ }
 diff -uNr a/programs/winebrowser/main.c b/programs/winebrowser/main.c
 --- a/programs/winebrowser/main.c
 +++ b/programs/winebrowser/main.c
