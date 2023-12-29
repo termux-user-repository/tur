@@ -7,6 +7,7 @@ LICENSE.OLD
 COPYING.LIB"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION=9.0-rc3
+TERMUX_PKG_REVISION=1
 _VERSION_FOLDER="$(test "${TERMUX_PKG_VERSION:2:1}" = 0 && echo ${TERMUX_PKG_VERSION:0:3} || echo ${TERMUX_PKG_VERSION:0:2}x)"
 TERMUX_PKG_SRCURL=https://dl.winehq.org/wine/source/${_VERSION_FOLDER}/wine-$TERMUX_PKG_VERSION.tar.xz
 TERMUX_PKG_SHA256=729801f1c933baa63cdce60b7758b6e2ea1f2ef46a160bb57475c5917a068921
@@ -128,9 +129,9 @@ termux_step_pre_configure() {
 }
 
 termux_step_make() {
-	make -j $TERMUX_MAKE_PROCESSES || bash
+	make -j $TERMUX_MAKE_PROCESSES
 }
 
 termux_step_make_install() {
-	make -j $TERMUX_MAKE_PROCESSES install || bash
+	make -j $TERMUX_MAKE_PROCESSES install
 }
