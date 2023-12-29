@@ -1,0 +1,14 @@
+--- a/Source/Tools/FEXLoader/ELFCodeLoader.h
++++ b/Source/Tools/FEXLoader/ELFCodeLoader.h
+@@ -37,6 +37,11 @@
+ #include <sys/personality.h>
+ #include <sys/random.h>
+ 
++#if defined __ANDROID__ && __ANDROID_API__ < 28
++#include <syscall.h>
++#define getrandom(buf,buflen,flags) syscall(SYS_getrandom,buf,buflen,flags)
++#endif
++
+ #define PAGE_START(x) ((x) & ~(uintptr_t)(4095))
+ #define PAGE_OFFSET(x) ((x) & 4095)
+ #define PAGE_ALIGN(x) (((x) + 4095) & ~(uintptr_t)(4095))
