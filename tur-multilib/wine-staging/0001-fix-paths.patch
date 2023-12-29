@@ -75,7 +75,7 @@ diff -uNr a/dlls/ntdll/unix/server.c b/dlls/ntdll/unix/server.c
      else
          snprintf( tmp + p, sizeof(tmp) - p, "%lx", (unsigned long)ino );
  
--#if defined(__ANDROID__)  /* there's no /tmp dir on Android */
+-#ifdef __ANDROID__  /* there's no /tmp dir on Android */
 +#if defined(__ANDROID__) && ! defined(__TERMUX__)  /* there's no /tmp dir on Android */
      asprintf( &dir, "%s/.wineserver/server-%s", config_dir, tmp );
  #else
