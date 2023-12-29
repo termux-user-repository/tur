@@ -1,6 +1,6 @@
 diff -uNr a/src/Makefile.am b/src/Makefile.am
---- a/src/Makefile.am	2020-05-21 12:32:38.000000000 +0900
-+++ b/src/Makefile.am	2023-03-23 19:33:12.832145507 +0900
+--- a/src/Makefile.am
++++ b/src/Makefile.am
 @@ -14,7 +14,7 @@
  
  localedir = $(datadir)/locale
