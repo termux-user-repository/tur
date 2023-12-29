@@ -25,7 +25,7 @@ termux_step_get_source() {
 				(sed "s|@TERMUX_PREFIX@|$TERMUX_PREFIX|g" "$f" | patch -f --silent -R -p1 -d "$TERMUX_PKG_SRCDIR") || true
 			done
 			shopt -u nullglob
-			python $TERMUX_SCRIPTDIR/common-files/apply-chromium-patches.py --electron -C "$TERMUX_PKG_SRCDIR" -R -v $_CHROMIUM_VERSION || bash
+			python $TERMUX_SCRIPTDIR/common-files/apply-chromium-patches.py --electron -C "$TERMUX_PKG_SRCDIR" -R -v $_CHROMIUM_VERSION
 			return
 		fi
 	fi
@@ -46,7 +46,7 @@ termux_step_get_source() {
 	mkdir -p "$TERMUX_PKG_CACHEDIR/tmp-checkout"
 	pushd "$TERMUX_PKG_CACHEDIR/tmp-checkout"
 	gclient config --name "src/electron" --unmanaged https://github.com/electron/electron
-	gclient sync --with_branch_heads --with_tags --no-history --revision v$TERMUX_PKG_VERSION || bash
+	gclient sync --with_branch_heads --with_tags --no-history --revision v$TERMUX_PKG_VERSION
 	popd
 
 	# Solve error like `.git/packed-refs is dirty`
@@ -229,12 +229,12 @@ use_thin_lto=false
 
 	mkdir -p $TERMUX_PKG_BUILDDIR/out/Release
 	cat $_common_args_file > $TERMUX_PKG_BUILDDIR/out/Release/args.gn
-	gn gen $TERMUX_PKG_BUILDDIR/out/Release --export-compile-commands || bash
+	gn gen $TERMUX_PKG_BUILDDIR/out/Release --export-compile-commands
 }
 
 termux_step_make() {
 	cd $TERMUX_PKG_BUILDDIR
-	ninja -C $TERMUX_PKG_BUILDDIR/out/Release electron electron_license chromium_licenses || bash
+	ninja -C $TERMUX_PKG_BUILDDIR/out/Release electron electron_license chromium_licenses
 }
 
 termux_step_make_install() {

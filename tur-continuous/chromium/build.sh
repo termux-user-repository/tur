@@ -233,12 +233,12 @@ llvm_android_mainline = true
 
 	mkdir -p $TERMUX_PKG_BUILDDIR/out/Release
 	cat $_common_args_file > $TERMUX_PKG_BUILDDIR/out/Release/args.gn
-	gn gen $TERMUX_PKG_BUILDDIR/out/Release --export-compile-commands || bash
+	gn gen $TERMUX_PKG_BUILDDIR/out/Release --export-compile-commands
 }
 
 termux_step_make() {
 	cd $TERMUX_PKG_BUILDDIR
-	ninja -C out/Release chromedriver chrome chrome_crashpad_handler headless_shell -k 0 || bash
+	ninja -C out/Release chromedriver chrome chrome_crashpad_handler headless_shell -k 0
 }
 
 termux_step_make_install() {

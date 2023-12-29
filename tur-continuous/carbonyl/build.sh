@@ -34,21 +34,21 @@ termux_step_post_get_source() {
 	pushd chromium/src
 	for f in $(find "$TERMUX_PKG_SRCDIR/chromium/patches/chromium/" -maxdepth 1 -type f -name *.patch | sort); do
 		echo "Applying patch: $(basename $f)"
-		patch --silent -p1 < "$f" || bash
+		patch --silent -p1 < "$f"
 	done
 	popd
 
 	pushd chromium/src/third_party/skia
 	for f in $(find "$TERMUX_PKG_SRCDIR/chromium/patches/skia/" -maxdepth 1 -type f -name *.diff | sort); do
 		echo "Applying patch: $(basename $f)"
-		patch --silent -p1 < "$f" || bash
+		patch --silent -p1 < "$f"
 	done
 	popd
 
 	pushd chromium/src/third_party/webrtc
 	for f in $(find "$TERMUX_PKG_SRCDIR/chromium/patches/webrtc/" -maxdepth 1 -type f -name *.diff | sort); do
 		echo "Applying patch: $(basename $f)"
-		patch --silent -p1 < "$f" || bash
+		patch --silent -p1 < "$f"
 	done
 	popd
 }
@@ -223,7 +223,7 @@ use_thin_lto=false
 	cd $TERMUX_PKG_SRCDIR/chromium/src
 	mkdir -p $TERMUX_PKG_BUILDDIR/out/Release
 	cat $_common_args_file > $TERMUX_PKG_BUILDDIR/out/Release/args.gn
-	gn gen $TERMUX_PKG_BUILDDIR/out/Release --export-compile-commands || bash
+	gn gen $TERMUX_PKG_BUILDDIR/out/Release --export-compile-commands
 }
 
 termux_step_make() {
@@ -232,7 +232,7 @@ termux_step_make() {
 	cargo build --jobs $TERMUX_MAKE_PROCESSES --target $CARGO_TARGET_NAME --release)
 
 	cd $TERMUX_PKG_BUILDDIR
-	ninja -C $TERMUX_PKG_BUILDDIR/out/Release headless:headless_shell || bash
+	ninja -C $TERMUX_PKG_BUILDDIR/out/Release headless:headless_shell
 }
 
 termux_step_make_install() {

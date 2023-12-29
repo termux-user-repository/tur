@@ -82,11 +82,11 @@ termux_step_pre_configure() {
 }
 
 termux_step_make() {
-	make -j $TERMUX_MAKE_PROCESSES || bash
+	make -j $TERMUX_MAKE_PROCESSES
 }
 
 termux_step_make_install() {
-	make -j $TERMUX_MAKE_PROCESSES install || bash
+	make -j $TERMUX_MAKE_PROCESSES install
 }
 
 # FIXME: Wine is broken since commit 25db1c5d49dc339e9b5a25514c198a524bd05484,

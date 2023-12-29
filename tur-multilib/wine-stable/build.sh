@@ -123,9 +123,9 @@ termux_step_pre_configure() {
 }
 
 termux_step_make() {
-	make -j $TERMUX_MAKE_PROCESSES -k || bash
+	make -j $TERMUX_MAKE_PROCESSES -k
 }
 
 termux_step_make_install() {
-	make -j $TERMUX_MAKE_PROCESSES install || bash
+	make -j $TERMUX_MAKE_PROCESSES install
 }
