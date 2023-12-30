@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://github.com/DrTimothyAldenDavis/SuiteSparse
 TERMUX_PKG_DESCRIPTION="A Suite of Sparse matrix packages."
 TERMUX_PKG_LICENSE="GPL-3.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION=1:7.3.1
+TERMUX_PKG_VERSION=1:7.4.0
 TERMUX_PKG_SRCURL=https://github.com/DrTimothyAldenDavis/SuiteSparse/archive/refs/tags/v${TERMUX_PKG_VERSION#*:}.tar.gz
-TERMUX_PKG_SHA256=b512484396a80750acf3082adc1807ba0aabb103c2e09be5691f46f14d0a9718
+TERMUX_PKG_SHA256=f9a5cc2316a967198463198f7bf10fb8c4332de6189b0e405419a7092bc921b7
 TERMUX_PKG_DEPENDS="blas-openblas, libopenblas, libgmp, libmpfr"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_FORCE_CMAKE=true
@@ -13,6 +13,7 @@ TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 -DCMAKE_SYSTEM_NAME=Linux
 -DBLA_VENDOR=Generic
 -DALLOW_64BIT_BLAS=OFF
+-DGRAPHBLAS_CROSS_TOOLCHAIN_FLAGS_NATIVE=\"-DCMAKE_TOOLCHAIN_FILE=$TERMUX_PKG_BUILDER_DIR/graphblas-host-toolchain.cmake\"
 "
 
 source $TERMUX_SCRIPTDIR/common-files/setup_toolchain_gcc.sh
@@ -87,16 +88,17 @@ lib/libccolamd.so.3
 lib/libcholmod.so.5
 lib/libcolamd.so.3
 lib/libcxsparse.so.4
-lib/libgpuqrengine.so.3
 lib/libgraphblas.so.8
 lib/libklu.so.2
 lib/libklu_cholmod.so.2
+lib/liblagraph.so.1
+lib/liblagraphx.so.1
 lib/libldl.so.3
-lib/libmongoose.so.3
+lib/libparu.so.0
 lib/librbio.so.4
 lib/libspex.so.2
 lib/libspqr.so.4
-lib/libsuitesparse_gpuruntime.so.3
+lib/libsuitesparse_mongoose.so.3
 lib/libsuitesparseconfig.so.7
 lib/libumfpack.so.6
 "
