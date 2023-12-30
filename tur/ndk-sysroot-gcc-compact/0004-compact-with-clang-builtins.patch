@@ -329,9 +329,9 @@ diff -uNr a/stdatomic.h b/stdatomic.h
 diff -uNr a/string.h b/string.h
 --- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/string.h
 +++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/string.h
-@@ -188,7 +188,7 @@
+@@ -209,7 +209,7 @@
  #endif
-
+ 
  /* Const-correct overloads. Placed after FORTIFY so we call those functions, if possible. */
 -#if defined(__cplusplus)
 +#if defined(__cplusplus) && defined(__clang__)

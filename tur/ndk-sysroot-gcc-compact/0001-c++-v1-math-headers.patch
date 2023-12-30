@@ -1,9 +1,9 @@
 This patch is one of the `ndk-sysroot` from termux main repo.
 --- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/cmath
 +++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/cmath
-@@ -301,7 +301,7 @@
+@@ -314,7 +314,7 @@
  #include <__type_traits/remove_cv.h>
- #include "version"
+ #include <version>
  
 -#include <math.h>
 +#include <c++/v1/math.h>

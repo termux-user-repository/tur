@@ -33,7 +33,7 @@ diff -uNr a/sys/cdefs.h b/sys/cdefs.h
  #if defined(__cplusplus)
  #define __BEGIN_DECLS extern "C" {
  #define __END_DECLS }
-@@ -131,12 +153,25 @@
+@@ -139,12 +162,25 @@
  
  #define __wur __attribute__((__warn_unused_result__))
  
@@ -65,7 +65,7 @@ diff -uNr a/sys/cdefs.h b/sys/cdefs.h
  
  #if defined(ANDROID_STRICT)
  /*
-@@ -273,19 +308,20 @@
+@@ -281,19 +317,20 @@
  
  #if defined(__BIONIC_FORTIFY)
  #  define __bos0(s) __bosn((s), 0)
@@ -89,7 +89,7 @@ diff -uNr a/sys/cdefs.h b/sys/cdefs.h
        __always_inline __VERSIONER_FORTIFY_INLINE
  /*
   * We should use __BIONIC_FORTIFY_VARIADIC instead of __BIONIC_FORTIFY_INLINE
-@@ -293,9 +329,21 @@
+@@ -301,9 +338,21 @@
   * The __always_inline attribute is useless, misleading, and could trigger
   * clang compiler bug to incorrectly inline variadic functions.
   */
@@ -113,7 +113,7 @@ diff -uNr a/sys/cdefs.h b/sys/cdefs.h
  #else
  /* Further increase sharing for some inline functions */
  #  define __pass_object_size_n(n)
-@@ -325,7 +373,16 @@
+@@ -333,7 +382,16 @@
  #  define __BIONIC_INCLUDE_FORTIFY_HEADERS 1
  #endif
  
@@ -129,9 +129,9 @@ diff -uNr a/sys/cdefs.h b/sys/cdefs.h
 +#  define __overloadable
 +#endif
  
- /* Used to tag non-static symbols that are private and never exposed by the shared library. */
- #define __LIBC_HIDDEN__ __attribute__((visibility("hidden")))
-@@ -358,6 +415,7 @@
+ #define __diagnose_as_builtin(...) __attribute__((diagnose_as_builtin(__VA_ARGS__)))
+ 
+@@ -368,6 +426,7 @@
  }
  #endif
  
@@ -139,7 +139,7 @@ diff -uNr a/sys/cdefs.h b/sys/cdefs.h
  /*
   * Used when we need to check for overflow when multiplying x and y. This
   * should only be used where __size_mul_overflow can not work, because it makes
-@@ -366,6 +424,7 @@
+@@ -376,6 +435,7 @@
   * __size_mul_overflow.
   */
  #define __unsafe_check_mul_overflow(x, y) ((__SIZE_TYPE__)-1 / (x) < (y))
