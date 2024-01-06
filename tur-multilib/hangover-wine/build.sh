@@ -8,11 +8,13 @@ COPYING.LIB"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 # FIXME: See comments at the end of this file for the reason why this version is used.
 TERMUX_PKG_VERSION=8.17
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_REVISION=2
 TERMUX_PKG_SRCURL=https://github.com/AndreRH/wine/archive/refs/tags/hangover-$TERMUX_PKG_VERSION.tar.gz
 TERMUX_PKG_SHA256=f4d94572c28ab36a8a4355e8d661a4f2bfe903d2e2b3e977f400c16f7bfad556
 TERMUX_PKG_DEPENDS="libandroid-spawn, libc++, libgmp, libgnutls"
-TERMUX_PKG_BUILD_DEPENDS="libandroid-spawn-static"
+TERMUX_PKG_DEPENDS="fontconfig, freetype, krb5, libandroid-spawn, libc++, libgmp, libgnutls, libxcb, libxcomposite, libxcursor, libxfixes, libxrender, mesa, opengl, pulseaudio, sdl2, vulkan-loader, xorg-xrandr"
+TERMUX_PKG_ANTI_BUILD_DEPENDS="vulkan-loader"
+TERMUX_PKG_BUILD_DEPENDS="libandroid-spawn-static, vulkan-loader-generic"
 TERMUX_PKG_NO_STATICSPLIT=true
 TERMUX_PKG_HOSTBUILD=true
 TERMUX_PKG_EXTRA_HOSTBUILD_CONFIGURE_ARGS="
@@ -25,20 +27,53 @@ TERMUX_PKG_CONFLICTS="wine-devel, wine-stable, wine-staging"
 
 TERMUX_PKG_BLACKLISTED_ARCHES="arm, i686, x86_64"
 
-# TODO: Enable X
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 enable_wineandroid_drv=no
 exec_prefix=$TERMUX_PREFIX
---prefix=$TERMUX_PREFIX
---libdir=$TERMUX_PREFIX/lib
---sbindir=$TERMUX_PREFIX/bin
---without-x
---without-vulkan
 --with-wine-tools=$TERMUX_PKG_HOSTBUILD_DIR
 --enable-nls
 --disable-tests
---enable-win64
+--without-alsa
+--without-capi
+--without-coreaudio
+--without-cups
+--without-dbus
+--with-fontconfig
+--with-freetype
+--without-gettext
+--with-gettextpo=no
+--without-gphoto
+--with-gnutls
+--without-gstreamer
+--without-inotify
+--with-krb5
 --with-mingw
+--without-netapi
+--without-opencl
+--with-opengl
+--with-osmesa
+--without-oss
+--without-pcap
+--with-pthread
+--with-pulse
+--without-sane
+--with-sdl
+--without-udev
+--without-unwind
+--without-usb
+--without-v4l2
+--with-vulkan
+--with-xcomposite
+--with-xcursor
+--with-xfixes
+--without-xinerama
+--with-xinput
+--with-xinput2
+--with-xrandr
+--with-xrender
+--without-xshape
+--without-xshm
+--without-xxf86vm
 --enable-archs=i386,arm,aarch64
 "
 
