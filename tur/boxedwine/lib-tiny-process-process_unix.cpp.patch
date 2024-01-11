@@ -1,0 +1,13 @@
+--- a/lib/tiny-process/process_unix.cpp
++++ b/lib/tiny-process/process_unix.cpp
+@@ -33,7 +33,9 @@
+   char cspath[PATH_MAX + 1] = {};
+   if(!path) {
+     // If env variable is not set, use static path string.
+-    confstr(_CS_PATH, cspath, sizeof(cspath));
++    //confstr(_CS_PATH, cspath, sizeof(cspath));
++    strncpy(cspath, "@TERMUX_PREFIX@/bin", sizeof(cspath));
++    cspath[sizeof(cspath) - 1] = '\0';
+     path = cspath;
+   }
+ 

@@ -1,0 +1,20 @@
+--- a/source/sdl/startupArgs.cpp
++++ b/source/sdl/startupArgs.cpp
+@@ -469,7 +469,7 @@
+         U32 width = 0;
+         U32 height = 0;
+         if (KNativeSystem::getScreenDimensions(&width, &height)) {
+-#ifdef __ANDROID__
++#if 0
+             this->screenCx = width / 2;
+             this->screenCy = height / 2;
+ #else
+@@ -765,7 +765,7 @@
+         }
+     }
+     if (!this->root.length()) {
+-#ifdef __ANDROID__
++#if 0
+         this->root=SDL_AndroidGetExternalStoragePath();
+         this->root+="/root";
+ #else

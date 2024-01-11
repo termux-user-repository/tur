@@ -1,0 +1,11 @@
+--- a/source/emulation/cpu/dynamic/dynamic_generic_base.h
++++ b/source/emulation/cpu/dynamic/dynamic_generic_base.h
+@@ -1019,7 +1019,7 @@
+         }
+         U8* begin = (U8*)mem + memory->dynamicExecutableMemoryPos;
+ 
+-        Platform::writeCodeToMemory(begin, outBufferPos, [begin, outBuffer, outBufferPos] {
++        Platform::writeCodeToMemory(begin, outBufferPos, [begin] {
+             memcpy(begin, outBuffer, outBufferPos);
+             });
+ 
