@@ -71,25 +71,19 @@ diff -uNr a/dlls/msvcrt/tests/environ.c b/dlls/msvcrt/tests/environ.c
 diff -uNr a/dlls/ntdll/unix/server.c b/dlls/ntdll/unix/server.c
 --- a/dlls/ntdll/unix/server.c
 +++ b/dlls/ntdll/unix/server.c
-@@ -1113,15 +1113,15 @@
-     char *p, *dir;
-     size_t len = sizeof("/server-") + 2 * sizeof(dev) + 2 * sizeof(ino) + 2;
+@@ -1257,10 +1257,10 @@
+     else
+         snprintf( tmp + p, sizeof(tmp) - p, "%lx", (unsigned long)ino );
  
 -#ifdef __ANDROID__  /* there's no /tmp dir on Android */
 +#if defined(__ANDROID__) && ! defined(__TERMUX__)  /* there's no /tmp dir on Android */
-     len += strlen( config_dir ) + sizeof("/.wineserver");
-     dir = malloc( len );
-     strcpy( dir, config_dir );
-     strcat( dir, "/.wineserver/server-" );
+     asprintf( &dir, "%s/.wineserver/server-%s", config_dir, tmp );
  #else
--    len += sizeof("/tmp/.wine-") + 12;
-+    len += sizeof("@TERMUX_PREFIX@/tmp/.wine-") + 12;
-     dir = malloc( len );
--    sprintf( dir, "/tmp/.wine-%u/server-", getuid() );
-+    sprintf( dir, "@TERMUX_PREFIX@/tmp/.wine-%u/server-", getuid() );
+-    asprintf( &dir, "/tmp/.wine-%u/server-%s", getuid(), tmp );
++    asprintf( &dir, "@TERMUX_PREFIX@/tmp/.wine-%u/server-%s", getuid(), tmp );
  #endif
-     p = dir + strlen( dir );
-     if (dev != (unsigned long)dev)
+     return dir;
+ }
 diff -uNr a/programs/winebrowser/main.c b/programs/winebrowser/main.c
 --- a/programs/winebrowser/main.c
 +++ b/programs/winebrowser/main.c
