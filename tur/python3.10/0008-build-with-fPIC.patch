@@ -1,0 +1,11 @@
+--- a/configure
++++ b/configure
+@@ -9295,7 +9295,7 @@
+ 		 then CCSHARED="-fPIC";
+ 		 else CCSHARED="+z";
+ 		 fi;;
+-	Linux-android*) ;;
++	Linux-android*) CCSHARED="-fPIC";;
+ 	Linux*|GNU*) CCSHARED="-fPIC";;
+ 	BSD/OS*/4*) CCSHARED="-fpic";;
+ 	FreeBSD*|NetBSD*|OpenBSD*|DragonFly*) CCSHARED="-fPIC";;
