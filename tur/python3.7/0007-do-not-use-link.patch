@@ -1,0 +1,11 @@
+--- a/configure
++++ b/configure
+@@ -11293,8 +11293,6 @@
+ _ACEOF
+ if ac_fn_c_try_compile "$LINENO"; then :
+ 
+-$as_echo "#define HAVE_LINK 1" >>confdefs.h
+-
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+ $as_echo "yes" >&6; }
+ else

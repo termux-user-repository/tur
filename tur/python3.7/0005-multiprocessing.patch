@@ -1,6 +1,5 @@
-diff -uNr Python-3.9.13/Lib/multiprocessing/heap.py Python-3.9.13.mod/Lib/multiprocessing/heap.py
---- Python-3.9.13/Lib/multiprocessing/heap.py     2022-05-17 19:12:56.000000000 +0800
-+++ Python-3.9.13.mod/Lib/multiprocessing/heap.py 2022-07-05 11:30:43.134657200 +0800
+--- a/Lib/multiprocessing/heap.py
++++ b/Lib/multiprocessing/heap.py
 @@ -70,7 +70,7 @@
          """
  
@@ -10,9 +9,8 @@ diff -uNr Python-3.9.13/Lib/multiprocessing/heap.py Python-3.9.13.mod/Lib/multip
          else:
              _dir_candidates = []
  
-diff -uNr Python-3.9.13/Modules/_multiprocessing/multiprocessing.c Python-3.9.13.mod/Modules/_multiprocessing/multiprocessing.c
---- Python-3.9.13/Modules/_multiprocessing/multiprocessing.c	2022-05-17 19:12:56.000000000 +0800
-+++ Python-3.9.13.mod/Modules/_multiprocessing/multiprocessing.c	2022-07-05 11:31:01.456088500 +0800
+--- a/Modules/_multiprocessing/multiprocessing.c
++++ b/Modules/_multiprocessing/multiprocessing.c
 @@ -128,7 +128,7 @@
      {"recv", multiprocessing_recv, METH_VARARGS, ""},
      {"send", multiprocessing_send, METH_VARARGS, ""},
