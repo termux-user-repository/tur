@@ -6,13 +6,12 @@ LICENSE
 LICENSE.OLD
 COPYING.LIB"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION=8.0.2
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_VERSION=9.0
 TERMUX_PKG_SRCURL=https://dl.winehq.org/wine/source/${TERMUX_PKG_VERSION:0:3}/wine-$TERMUX_PKG_VERSION.tar.xz
-TERMUX_PKG_SHA256=6ec8fb6f2c72d576cb11f52b2f8d59af64404802154651d122b98466d91dc847
-TERMUX_PKG_DEPENDS="fontconfig, freetype, krb5, libc++, libgmp, libgnutls, libxcb, libxcomposite, libxcursor, libxfixes, libxrender, mesa, opengl, pulseaudio, sdl2, vulkan-loader, xorg-xrandr"
+TERMUX_PKG_SHA256=7cfd090a5395f5b76d95bb5defac8a312c8de4c070c1163b8b58da38330ca6ee
+TERMUX_PKG_DEPENDS="fontconfig, freetype, krb5, libandroid-spawn, libc++, libgmp, libgnutls, libxcb, libxcomposite, libxcursor, libxfixes, libxrender, mesa, opengl, pulseaudio, sdl2, vulkan-loader, xorg-xrandr"
 TERMUX_PKG_ANTI_BUILD_DEPENDS="vulkan-loader"
-TERMUX_PKG_BUILD_DEPENDS="vulkan-loader-generic"
+TERMUX_PKG_BUILD_DEPENDS="libandroid-spawn-static, vulkan-loader-generic"
 TERMUX_PKG_NO_STATICSPLIT=true
 TERMUX_PKG_HOSTBUILD=true
 TERMUX_PKG_EXTRA_HOSTBUILD_CONFIGURE_ARGS="
@@ -73,6 +72,17 @@ exec_prefix=$TERMUX_PREFIX
 # FIXME: I'd like to compile it.
 # TERMUX_PKG_BLACKLISTED_ARCHES="arm"
 
+# Enable win64 on 64-bit arches.
+# TODO: Enable win32 after TUR has full support for mutilib 
+if [ "$TERMUX_ARCH_BITS" = 64 ]; then
+	TERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" --enable-win64"
+fi
+
+# Enable new WoW64 support on x86_64.
+if [ "$TERMUX_ARCH" = "x86_64" ]; then
+	TERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" --enable-archs=i386,x86_64"
+fi
+
 _setup_llvm_mingw_toolchain() {
 	# LLVM-mingw's version number must not be the same as the NDK's.
 	local _llvm_mingw_version=16
@@ -115,11 +125,7 @@ termux_step_pre_configure() {
 	CXXFLAGS="${CXXFLAGS/-fstack-protector-strong/}"
 	LDFLAGS="${LDFLAGS/-Wl,-z,relro,-z,now/}"
 
-	# Enable win64 on 64-bit arches.
-	# TODO: Enable win32 after TUR has full support for mutilib 
-	if [ "$TERMUX_ARCH_BITS" = 64 ]; then
-		TERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" --enable-win64"
-	fi
+	LDFLAGS+=" -landroid-spawn"
 }
 
 termux_step_make() {
