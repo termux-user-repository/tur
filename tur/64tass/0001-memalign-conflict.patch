@@ -1,0 +1,29 @@
+--- a/64tass.c
++++ b/64tass.c
+@@ -1046,7 +1046,7 @@
+     return offset - rem;
+ }
+ 
+-static address_t memalign(uval_t offset, uval_t size) {
++static address_t _memalign(uval_t offset, uval_t size) {
+     return rmemalign(offset, size, (all_mem2 == 0xffffffff && current_section->logicalrecursion == 0) ? current_address->address : ((current_address->l_address - current_address->l_start) & all_mem));
+ }
+ 
+@@ -4745,7 +4745,7 @@
+                                 waitfor->u.cmd_alignblk.size = ival;
+                                 offset = (vs == NULL) ? 0 : memalign_offset(get_val(), uval);
+                                 waitfor->u.cmd_alignblk.offset = offset;
+-                                db = memalign(offset, uval);
++                                db = _memalign(offset, uval);
+                                 if ((ival > 0) ? (size <= db) : (size < db)) {}
+                                 else if (db != 0) {
+                                     if (diagnostics.align) err_msg_alignblk(size - db, db, &epoint);
+@@ -4793,7 +4793,7 @@
+                     else {
+                         address_t db;
+                         vs = get_val();
+-                        db = memalign((vs == NULL ? 0 : memalign_offset(get_val(), uval)), uval);
++                        db = _memalign((vs == NULL ? 0 : memalign_offset(get_val(), uval)), uval);
+                         if (db != 0) {
+                             if (diagnostics.align) err_msg_align(db, &epoint);
+                             memskipfill(db, vs, &epoint);
