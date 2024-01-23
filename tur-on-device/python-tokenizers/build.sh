@@ -2,11 +2,11 @@ TERMUX_PKG_HOMEPAGE=https://github.com/huggingface/tokenizers
 TERMUX_PKG_DESCRIPTION="Fast State-of-the-Art Tokenizers optimized for Research and Production"
 TERMUX_PKG_LICENSE="Apache-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="0.15.0"
+TERMUX_PKG_VERSION="0.15.1"
 TERMUX_PKG_SRCURL=https://github.com/huggingface/tokenizers/archive/refs/tags/v$TERMUX_PKG_VERSION.tar.gz
-TERMUX_PKG_SHA256=7f749421dc97e143cd426816f253923a562b235b187b4bd345765af9f86b11e4
+TERMUX_PKG_SHA256=46c3beb449a505a304ba4a5793842bda343d6586622c838ce56568a87584efb6
 TERMUX_PKG_AUTO_UPDATE=true
-TERMUX_PKG_DEPENDS="libc++, python"
+TERMUX_PKG_DEPENDS="libc++, python, python-pip"
 TERMUX_PKG_SETUP_PYTHON=true
 TERMUX_PKG_BUILD_IN_SRC=true
 
