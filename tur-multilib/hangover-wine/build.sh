@@ -1,14 +1,11 @@
 TERMUX_PKG_HOMEPAGE=https://github.com/AndreRH/wine
-TERMUX_PKG_DESCRIPTION="A compatibility layer for running Windows programs (Hangover forked)"
+TERMUX_PKG_DESCRIPTION="A compatibility layer for running Windows programs (Hangover fork)"
 TERMUX_PKG_LICENSE="LGPL-2.1"
-TERMUX_PKG_LICENSE_FILE="\
-LICENSE
-LICENSE.OLD
-COPYING.LIB"
+TERMUX_PKG_LICENSE_FILE="LICENSE, LICENSE.OLD, COPYING.LIB"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION=9.0-rc4
+TERMUX_PKG_VERSION=9.1
 TERMUX_PKG_SRCURL=https://github.com/AndreRH/wine/archive/refs/tags/hangover-$TERMUX_PKG_VERSION.tar.gz
-TERMUX_PKG_SHA256=09f6a42279982bb414d71d85ad4489b12e00ce3cfa023bead952fa589f02150a
+TERMUX_PKG_SHA256=b265b4f5de12b843245ffaa9955e23cae047f5f3635d051e48b5c97b79927565
 TERMUX_PKG_DEPENDS="libandroid-spawn, libc++, libgmp, libgnutls"
 TERMUX_PKG_DEPENDS="fontconfig, freetype, krb5, libandroid-spawn, libc++, libgmp, libgnutls, libxcb, libxcomposite, libxcursor, libxfixes, libxrender, mesa, opengl, pulseaudio, sdl2, vulkan-loader, xorg-xrandr"
 TERMUX_PKG_ANTI_BUILD_DEPENDS="vulkan-loader"
@@ -110,6 +107,12 @@ termux_step_pre_configure() {
 	CPPFLAGS="${CPPFLAGS/-Oz/}"
 	CFLAGS="${CFLAGS/-Oz/}"
 	CXXFLAGS="${CXXFLAGS/-Oz/}"
+
+	# Disable hardening
+	CPPFLAGS="${CPPFLAGS/-fstack-protector-strong/}"
+	CFLAGS="${CFLAGS/-fstack-protector-strong/}"
+	CXXFLAGS="${CXXFLAGS/-fstack-protector-strong/}"
+	LDFLAGS="${LDFLAGS/-Wl,-z,relro,-z,now/}"
 
 	LDFLAGS+=" -landroid-spawn"
 }
