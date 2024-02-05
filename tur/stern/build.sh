@@ -1,5 +1,5 @@
 TERMUX_PKG_HOMEPAGE=https://github.com/stern/stern
-TERMUX_PKG_DESCRIPTION="⎈ Multi pod and container log tailing for Kubernetes -- Friendly fork of https://github.com/wercker/stern"
+TERMUX_PKG_DESCRIPTION="Multi pod and container log tailing for Kubernetes - Fork of https://github.com/wercker/stern"
 TERMUX_PKG_LICENSE="Apache License 2.0"
 TERMUX_PKG_LICENSE_FILE="LICENSE"
 TERMUX_PKG_MAINTAINER="@idj0"
