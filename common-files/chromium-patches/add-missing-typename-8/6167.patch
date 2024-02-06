@@ -1,0 +1,19 @@
+--- a/base/functional/bind_internal.h
++++ b/base/functional/bind_internal.h
+@@ -1533,12 +1533,12 @@
+           typename Param>
+ struct ParamCanBeBound {
+  private:
+-  using UnwrappedParam = BindArgument<i>::template ForwardedAs<
++  using UnwrappedParam = typename BindArgument<i>::template ForwardedAs<
+       Unwrapped>::template ToParamWithType<Param>;
+-  using ParamStorage = BindArgument<i>::template ToParamWithType<
++  using ParamStorage = typename BindArgument<i>::template ToParamWithType<
+       Param>::template StoredAs<Storage>;
+-  using BoundStorage =
+-      BindArgument<i>::template BoundAs<Arg>::template StoredAs<Storage>;
++  using BoundStorage = typename BindArgument<i>::template BoundAs<
++      Arg>::template StoredAs<Storage>;
+ 
+   // We forbid callbacks from using raw_ptr as a parameter. However, we allow
+   // `MayBeDangling<T>` iff the callback argument was created using

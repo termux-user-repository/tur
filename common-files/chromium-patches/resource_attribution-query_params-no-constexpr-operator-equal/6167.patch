@@ -1,0 +1,14 @@
+error: defaulted definition of equality comparison operator cannot be declared constexpr because it invokes a non-constexpr comparison function
+
+--- a/components/performance_manager/resource_attribution/query_params.h
++++ b/components/performance_manager/resource_attribution/query_params.h
+@@ -27,8 +27,7 @@
+   QueryParams(const QueryParams& other);
+   QueryParams& operator=(const QueryParams& other);
+ 
+-  friend constexpr bool operator==(const QueryParams&,
+-                                   const QueryParams&) = default;
++  friend bool operator==(const QueryParams&, const QueryParams&) = default;
+ 
+   // Individual resource contexts to measure.
+   std::set<ResourceContext> resource_contexts;
