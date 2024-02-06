@@ -2,10 +2,10 @@ TERMUX_PKG_HOMEPAGE=https://www.chromium.org/Home
 TERMUX_PKG_DESCRIPTION="Chromium web browser"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="Chongyun Lee <uchkks@protonmail.com>"
-_CHROMIUM_VERSION=120.0.6099.216
+_CHROMIUM_VERSION=121.0.6167.85
 TERMUX_PKG_VERSION=$_CHROMIUM_VERSION
 TERMUX_PKG_SRCURL=(https://commondatastorage.googleapis.com/chromium-browser-official/chromium-$_CHROMIUM_VERSION.tar.xz)
-TERMUX_PKG_SHA256=(7e7bea15bf56f3cc920bb015fed1a1b1368267299e132e795935c5cc604adfc0)
+TERMUX_PKG_SHA256=(a2f46c5266681126ea9e15c1c3067560d84f3e5d902e1ace934a3813c84e7152)
 TERMUX_PKG_DEPENDS="atk, cups, dbus, gtk3, krb5, libc++, libevdev, libxkbcommon, libminizip, libnss, libwayland, libx11, mesa, openssl, pango, pulseaudio, libdrm, libjpeg-turbo, libpng, libwebp, libflac, fontconfig, freetype, zlib, libxml2, libxslt, libopus, libsnappy"
 # TODO: Split chromium-common and chromium-headless
 # TERMUX_PKG_DEPENDS+=", chromium-common"
@@ -65,6 +65,8 @@ termux_step_configure() {
 	env -i PATH="$PATH" sudo ./build/install-build-deps.sh --no-syms --no-android --no-arm --no-chromeos-fonts --no-nacl --no-prompt
 	build/linux/sysroot_scripts/install-sysroot.py --arch=amd64
 	local _amd64_sysroot_path="$(pwd)/build/linux/$(ls build/linux | grep 'amd64-sysroot')"
+	rm -rf "$_amd64_sysroot_path"
+	build/linux/sysroot_scripts/install-sysroot.py --arch=amd64
 
 	# Link to system tools required by the build
 	mkdir -p third_party/node/linux/node-linux-x64/bin
@@ -103,6 +105,8 @@ termux_step_configure() {
 	# This is needed to build cups
 	cp -Rf $TERMUX_PREFIX/bin/cups-config usr/bin/
 	chmod +x usr/bin/cups-config
+	# Cherry-pick LWG3545 for NDK r26
+	patch -p1 < $TERMUX_SCRIPTDIR/common-files/chromium-patches/sysroot-patches/libcxx-17-lwg3545.diff
 	popd
 
 	# Construct args
@@ -122,6 +126,8 @@ termux_step_configure() {
 		env -i PATH="$PATH" sudo ./build/install-build-deps.sh --lib32 --no-syms --no-android --no-arm --no-chromeos-fonts --no-nacl --no-prompt
 		build/linux/sysroot_scripts/install-sysroot.py --arch=i386
 		local _i386_sysroot_path="$(pwd)/build/linux/$(ls build/linux | grep 'i386-sysroot')"
+		rm -rf "$_i386_sysroot_path"
+		build/linux/sysroot_scripts/install-sysroot.py --arch=i386
 		_target_cpu="arm"
 		_v8_current_cpu="x86"
 		_v8_sysroot_path="$_i386_sysroot_path"
@@ -230,6 +236,12 @@ llvm_android_mainline = true
 			s|@V8_USE_GOLD@|false|g
 			s|@V8_SYSROOT@|$_v8_sysroot_path|g
 			" $TERMUX_PKG_CACHEDIR/custom-toolchain/BUILD.gn
+
+	# Cherry-pick LWG3545 for GCC
+	patch -p1 -d $_amd64_sysroot_path < $TERMUX_SCRIPTDIR/common-files/chromium-patches/sysroot-patches/libstdcxx3-10-lwg3545.diff
+	if [ "$_v8_sysroot_path" != "$_amd64_sysroot_path" ]; then
+		patch -p1 -d $_v8_sysroot_path < $TERMUX_SCRIPTDIR/common-files/chromium-patches/sysroot-patches/libstdcxx3-10-lwg3545.diff
+	fi
 
 	mkdir -p $TERMUX_PKG_BUILDDIR/out/Release
 	cat $_common_args_file > $TERMUX_PKG_BUILDDIR/out/Release/args.gn
