@@ -1,0 +1,10 @@
+--- a/crypto/hkdf.h
++++ b/crypto/hkdf.h
+@@ -9,6 +9,7 @@
+ 
+ #include <string>
+ #include <string_view>
++#include <vector>
+ 
+ #include "base/containers/span.h"
+ #include "crypto/crypto_export.h"

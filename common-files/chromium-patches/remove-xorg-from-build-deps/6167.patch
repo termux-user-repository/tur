@@ -1,0 +1,12 @@
+https://github.com/chromium/chromium/commit/062769f739bb91aedbeeb396e5db9d92dbcc7c0e
+
+--- a/build/install-build-deps.py
++++ b/build/install-build-deps.py
+@@ -374,7 +374,6 @@ def lib_list():
+       "libxrender1",
+       "libxtst6",
+       "x11-utils",
+-      "xorg", # TODO(crbug.com/1417069): Experimental.
+       "xvfb",
+       "zlib1g",
+   ]

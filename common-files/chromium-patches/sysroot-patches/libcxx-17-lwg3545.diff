@@ -1,0 +1,45 @@
+https://github.com/ungoogled-software/ungoogled-chromium/pull/2681#issuecomment-1908371295
+https://github.com/llvm/llvm-project/issues/67449
+https://github.com/llvm/llvm-project/commit/078651b6de4b767b91e3e6a51e5df11a06d7bc4f
+
+--- a/usr/include/c++/v1/__memory/pointer_traits.h
++++ b/usr/include/c++/v1/__memory/pointer_traits.h
+@@ -35,7 +35,7 @@
+ struct __has_element_type<_Tp, __void_t<typename _Tp::element_type> > : true_type {};
+ 
+ template <class _Ptr, bool = __has_element_type<_Ptr>::value>
+-struct __pointer_traits_element_type;
++struct __pointer_traits_element_type {};
+ 
+ template <class _Ptr>
+ struct __pointer_traits_element_type<_Ptr, true>
+@@ -111,12 +111,14 @@
+     typedef _Sp<_Up, _Args...> type;
+ };
+ 
++template <class _Ptr, class = void>
++struct __pointer_traits_impl {};
++
+ template <class _Ptr>
+-struct _LIBCPP_TEMPLATE_VIS pointer_traits
+-{
+-    typedef _Ptr                                                     pointer;
+-    typedef typename __pointer_traits_element_type<pointer>::type    element_type;
+-    typedef typename __pointer_traits_difference_type<pointer>::type difference_type;
++struct __pointer_traits_impl<_Ptr, __void_t<typename __pointer_traits_element_type<_Ptr>::type> > {
++  typedef _Ptr pointer;
++  typedef typename __pointer_traits_element_type<pointer>::type element_type;
++  typedef typename __pointer_traits_difference_type<pointer>::type difference_type;
+ 
+ #ifndef _LIBCPP_CXX03_LANG
+     template <class _Up> using rebind = typename __pointer_traits_rebind<pointer, _Up>::type;
+@@ -133,6 +135,9 @@
+         {return pointer::pointer_to(__r);}
+ };
+ 
++template <class _Ptr>
++struct _LIBCPP_TEMPLATE_VIS pointer_traits : __pointer_traits_impl<_Ptr> {};
++
+ template <class _Tp>
+ struct _LIBCPP_TEMPLATE_VIS pointer_traits<_Tp*>
+ {

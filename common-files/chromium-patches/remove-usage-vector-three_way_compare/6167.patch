@@ -1,0 +1,36 @@
+In libcxx, three-way comparison operator <=> in std::vector is implemented since commit [1],
+which is not landed in NDK r26, so remove this usage.
+
+This reverts https://github.com/chromium/chromium/commit/0e55c3c70e8f492a83faa85e1af5053986c3167f.
+
+[1]: https://github.com/llvm/llvm-project/commit/55ec808a889726e0547b7e2f0aa12bc197f6d163
+
+--- a/base/containers/flat_tree.h
++++ b/base/containers/flat_tree.h
+@@ -350,8 +350,24 @@
+     return lhs.body_ == rhs.body_;
+   }
+ 
+-  friend auto operator<=>(const flat_tree& lhs, const flat_tree& rhs) {
+-    return lhs.body_ <=> rhs.body_;
++  friend bool operator!=(const flat_tree& lhs, const flat_tree& rhs) {
++    return !(lhs == rhs);
++  }
++
++  friend bool operator<(const flat_tree& lhs, const flat_tree& rhs) {
++    return lhs.body_ < rhs.body_;
++  }
++
++  friend bool operator>(const flat_tree& lhs, const flat_tree& rhs) {
++    return rhs < lhs;
++  }
++
++  friend bool operator>=(const flat_tree& lhs, const flat_tree& rhs) {
++    return !(lhs < rhs);
++  }
++
++  friend bool operator<=(const flat_tree& lhs, const flat_tree& rhs) {
++    return !(lhs > rhs);
+   }
+ 
+   friend void swap(flat_tree& lhs, flat_tree& rhs) noexcept { lhs.swap(rhs); }

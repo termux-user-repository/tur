@@ -25,6 +25,12 @@
   "add-missing-typename-7/6099.patch": {
     "start": 6099
   },
+  "add-missing-typename-8/6167.patch": {
+    "start": 6167
+  },
+  "add-missing-typename-9/6167.patch": {
+    "start": 6167
+  },
   "angle-fix-atomic/5615.patch": {
     "start": 5615
   },
@@ -35,7 +41,8 @@
     "start": 4389
   },
   "atspi-mark-possibly-unused-gn-variables/6045.patch": {
-    "start": 6045
+    "start": 6045,
+    "end": 6166
   },
   "autofill_i18n_api-no-constexpr-string/6099.patch": {
     "start": 6099
@@ -68,7 +75,11 @@
     "end": 6098
   },
   "blink-fix-structured-binding-declaration/6099.patch": {
-    "start": 6099
+    "start": 6099,
+    "end": 6166
+  },
+  "blink-fix-structured-binding-declaration/6167.patch": {
+    "start": 6167
   },
   "blink-font-constructor/5845.patch": {
     "start": 5845
@@ -316,7 +327,11 @@
     "end": 6098
   },
   "compiler-remove-unsupported-flags/6099.patch": {
-    "start": 6099
+    "start": 6099,
+    "end": 6166
+  },
+  "compiler-remove-unsupported-flags/6167.patch": {
+    "start": 6167
   },
   "compiler-use-android-target/4389.patch": {
     "start": 4389,
@@ -445,7 +460,8 @@
     "start": 5845
   },
   "partition_alloc-use-std_nullptr_t/6099.patch": {
-    "start": 6099
+    "start": 6099,
+    "end": 6166
   },
   "perfetto-no-android-jni/5359.patch": {
     "start": 5359
@@ -462,6 +478,22 @@
   "quiche-dcheck/4389.patch": {
     "start": 4389,
     "end": 4389
+  },
+  "remove-usage-vector-three_way_compare/6167.patch": {
+    "start": 6167
+  },
+  "remove-xorg-from-build-deps/6167.patch": {
+    "start": 6159,
+    "end": 6225
+  },
+  "resource_attribution-query_params-no-constexpr-operator-equal/6167.patch": {
+    "start": 6167
+  },
+  "revert-blink-v8-cxx20/6167.patch": {
+    "start": 6167
+  },
+  "revert-rust-qr-scanner/6167.patch": {
+    "start": 6167
   },
   "revert-split-out-ios-shared-feed-protos/5615.patch": {
     "start": 5615,
@@ -520,6 +552,9 @@
   },
   "unrar-no-lutimes/4389.patch": {
     "start": 4389
+  },
+  "use-std_to_address-from-libcxx/6167.patch": {
+    "start": 6167
   },
   "v8-do-not-use-builtin-mul/5481.patch": {
     "start": 5481
@@ -597,6 +632,9 @@
   "y-loss_based_bwe_v2_config-constructor/6099.patch": {
     "start": 6099
   },
+  "y-mime_util_xdg-file_info-consturctor/6167.patch": {
+    "start": 6167
+  },
   "y-race_network_request_info-constructor/6099.patch": {
     "start": 6099
   },
@@ -613,6 +651,9 @@
   "z-iwyu-blink-include-cstring/4961.patch": {
     "start": 4961,
     "end": 5005
+  },
+  "z-iwyu-blink-include-mutex/6167.patch": {
+    "start": 6167
   },
   "z-iwyu-blink-include-variant/5845.patch": {
     "start": 5845,
@@ -643,6 +684,15 @@
   "z-iwyu-chromium-include-vector/5735.patch": {
     "start": 5735,
     "end": 5844
+  },
+  "z-iwyu-crypto-hkdf-include-vector/6167.patch": {
+    "start": 6167
+  },
+  "z-iwyu-display_color_management-include-string/6167.patch": {
+    "start": 6167
+  },
+  "z-iwyu-gfx-include-bitset/6167.patch": {
+    "start": 6167
   },
   "z-iwyu-ipcz-include-memory/5938.patch": {
     "start": 5938,

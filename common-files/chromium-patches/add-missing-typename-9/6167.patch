@@ -1,0 +1,11 @@
+--- a/mojo/public/cpp/bindings/array_traits.h
++++ b/mojo/public/cpp/bindings/array_traits.h
+@@ -90,7 +90,7 @@
+     { c[i] } -> std::same_as<typename Container::reference>;
+   }
+ struct ArrayTraits<Container> {
+-  using Element = Container::value_type;
++  using Element = typename Container::value_type;
+ 
+   // vector-like containers have no built-in null.
+   static bool IsNull(const Container& c) { return false; }

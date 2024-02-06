@@ -1,0 +1,15 @@
+--- a/base/nix/mime_util_xdg.cc
++++ b/base/nix/mime_util_xdg.cc
+@@ -44,7 +44,11 @@
+ constexpr uint8_t kDefaultGlobWeight = 50;
+ 
+ // Path and last modified of mime.cache file.
+-struct FileInfo {
++class FileInfo {
++ public:
++  FileInfo(FilePath path_, Time last_modified_)
++      : path(path_), last_modified(last_modified_) {}
++
+   FilePath path;
+   Time last_modified;
+ };
