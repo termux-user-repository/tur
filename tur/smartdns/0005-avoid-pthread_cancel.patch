@@ -1,0 +1,73 @@
+--- a/src/lib/timer_wheel.c
++++ b/src/lib/timer_wheel.c
+@@ -25,6 +25,11 @@
+ #include <sys/types.h>
+ #include <unistd.h>
+ 
++#ifdef __ANDROID__
++#include <stdatomic.h>
++#include <stdbool.h>
++#endif
++
+ #include "timer_wheel.h"
+ 
+ #define TVR_BITS 10
+@@ -56,6 +60,10 @@
+ 	struct tvec tv3;
+ 	struct tvec tv4;
+ 	struct tvec tv5;
++
++#ifdef __ANDROID__
++	atomic_bool request_cancel;
++#endif
+ };
+ 
+ static inline void _tw_add_timer(struct tw_base *base, struct tw_timer_list *timer)
+@@ -227,17 +235,24 @@
+ 	int ret = 0;
+ 	void *res = NULL;
+ 
++#ifndef __ANDROID__
+ 	ret = pthread_cancel(base->runner);
+ 	if (ret != 0) {
+ 		goto errout;
+ 	}
++#else
++	atomic_store(&base->request_cancel, true);
++#endif
++
+ 	ret = pthread_join(base->runner, &res);
+ 	if (ret != 0) {
+ 		goto errout;
+ 	}
++#ifndef __ANDROID__
+ 	if (res != PTHREAD_CANCELED) {
+ 		goto errout;
+ 	}
++#endif
+ 
+ 	ret = pthread_spin_destroy(&base->lock);
+ 	if (ret != 0) {
+@@ -316,7 +331,11 @@
+ 	now = _tw_tick_count() - sleep;
+ 	last = now;
+ 	expect_time = now + sleep;
++#ifndef __ANDROID__
+ 	while (1) {
++#else
++	while (!atomic_load(&base->request_cancel)) {
++#endif
+ 		run_timers(base);
+ 
+ 		now = _tw_tick_count();
+@@ -361,6 +380,10 @@
+ 		goto errout;
+ 	}
+ 
++#ifdef __ANDROID__
++	base->request_cancel = ATOMIC_VAR_INIT(false);
++#endif
++
+ 	ret = pthread_spin_init(&base->lock, 0);
+ 	if (ret != 0) {
+ 		goto errout2;
