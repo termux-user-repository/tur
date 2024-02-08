@@ -80,14 +80,3 @@
 +}
 +
 +#endif
---- a/src/Makefile
-+++ b/src/Makefile
-@@ -15,7 +15,7 @@
- # along with this program.  If not, see <http://www.gnu.org/licenses/>.
- 
- BIN=smartdns 
--OBJS_LIB=lib/rbtree.o lib/art.o lib/bitops.o lib/radix.o
-+OBJS_LIB=lib/rbtree.o lib/art.o lib/bitops.o lib/radix.o lib/android_getdomainname.o
- OBJS_MAIN=smartdns.o fast_ping.o dns_client.o dns_server.o dns.o util.o tlog.o dns_conf.o dns_cache.o http_parse.o proxy.o lib/conf.o lib/nftset.o
- OBJS=$(OBJS_MAIN) $(OBJS_LIB)
- 
