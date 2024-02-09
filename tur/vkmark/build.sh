@@ -1,10 +1,11 @@
-TERMUX_PKG_HOMEPAGE=https://virgil3d.github.io/
-TERMUX_PKG_DESCRIPTION="A virtual 3D GPU for use inside qemu virtual machines"
+TERMUX_PKG_HOMEPAGE=https://github.com/vkmark/vkmark
+TERMUX_PKG_DESCRIPTION="Vulkan Benchmark"
 TERMUX_PKG_LICENSE="LGPL-2.1"
 TERMUX_PKG_LICENSE_FILE="COPYING-LGPL2.1"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 _COMMIT=ab6e6f34077722d5ae33f6bd40b18ef9c0e99a15
 TERMUX_PKG_VERSION="0.0.1-r139.${_COMMIT:0:7}"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=git+https://github.com/vkmark/vkmark
 TERMUX_PKG_GIT_BRANCH="master"
 TERMUX_PKG_SHA256=2fde566a542fddc5c74a62c40dcb2d62e1151c7fbdc395adb1dc21857defa09d
