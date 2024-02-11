@@ -2,7 +2,7 @@ TERMUX_PKG_HOMEPAGE=https://github.com/microsoft/vscode
 TERMUX_PKG_DESCRIPTION="Visual Studio Code"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="1.86.0"
+TERMUX_PKG_VERSION="1.86.1"
 TERMUX_PKG_SRCURL=git+https://github.com/microsoft/vscode
 TERMUX_PKG_GIT_BRANCH="$TERMUX_PKG_VERSION"
 TERMUX_PKG_DEPENDS="electron-deps, libx11, libxkbfile, libsecret, ripgrep"
@@ -78,6 +78,9 @@ termux_step_make() {
 		rm -rf $TERMUX_PREFIX/bin.bp
 		mv -f $TERMUX_PREFIX/bin $TERMUX_PREFIX/bin.bp
 	fi
+
+	env -i PATH="$PATH" sudo apt update
+	env -i PATH="$PATH" sudo apt install -yq libxkbfile-dev libsecret-1-dev libkrb5-dev
 
 	if [ $TERMUX_ARCH = "arm" ]; then
 		export NPM_CONFIG_ARCH=arm
