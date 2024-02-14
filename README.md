@@ -68,7 +68,7 @@ TUR also maintains some other git repos. These git repos are listed below.
 
 `electron-tur-builder`: It contains some scripts to build specific version of electron and release the pre-built binaries to GitHub Release. This repository provides an APT component called `tur-electron`.
 
-`pypi-index-tur`: It contains some scripts to build and publish wheels to a custom pypi index.
+`pypi-wheel-builder`: It contains some scripts to build and publish wheels to a custom pypi index.
 
 `pypi`: It hosts the pages of a pypi index for Termux/Android. 
 
