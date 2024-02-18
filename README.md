@@ -24,13 +24,40 @@ Please don't Discuss/Open issues about any of TUR packages in Termux Offical for
 
 ## Contribution
 
-### Add new package. 
+### Set up build environment
+#### Method 1 (Conventional)
 TUR uses same building scripts what Termux does.So all building mechanism is same.
 * Clone this repository.
-* Change directory and Execute `./setup-environment.sh` It will fetch Termux package building scripts. 
-* Create build.sh file under **tur** directory (_not in packages_). 
-Go through the official termux [wiki](https://github.com/termux/termux-packages/wiki). 
+* Change directory and Execute `./setup-environment.sh` It will fetch Termux package building scripts ([`termux/termux-packages`](https://github.com/termux/termux-packages)). 
+* Set up build environment following [this official termux guide](https://github.com/termux/termux-packages/wiki/Build-environment). 
 
+#### Method 2 (Dev Container)
+* Clone this repository
+* Create a Dev Container:
+    * Visual Studio Code (local, docker required): `Ctrl + Shift + P` &rarr; `>Dev Containers: Open Folder in Container...` &rarr; pick this repository
+    * Github Codespaces (online): green `<> Code` button on this repository Github website &rarr; `Codespaces` &rarr; `+`
+
+### Create and build a new package
+* Create build.sh file under **`tur/<your-package-name>`** directory (_not in `packages/<your-package-name>`_). For more details, see the official wiki "[Creating new package](https://github.com/termux/termux-packages/wiki/Creating-new-package)". 
+* Build the package with 
+    ```
+    TERMUX_INSTALL_DEPS=true ./build-package.sh -a <arch> <package-name>
+    ```
+  * `<arch>` accepts aarch64, arm, i686, x86_64. 
+  * `TERMUX_NO_CLEAN=true` should be needed when building on an Android device. 
+  * For more details, see the official wiki "[How to build package](https://github.com/termux/termux-packages/wiki/Building-packages)" and "[Build environment](https://github.com/termux/termux-packages/wiki/Build-environment)". 
+* Patch the source when needed. One way to do so is:
+  * After running `./build-package.sh` in the previous step, enter into `~/.termux-build/<package-name>/src` (using VS Code `File` &rarr; `Open Folder...` or `cd` in terminal)
+  * *If git is not set up in the directory*, run
+    ```
+    git init .
+    git commit -a -m "first commit"
+    ```
+  * modify files needed to be patched and then run 
+    ```
+    git diff <path-to-modified-file> > <path-to-tur-repo>/tur/<package-name>/<any-name>.patch
+    ```
+  * re-run `./build-package.sh` in the previous step. 
 
 ## TUR as a solution
 TUR solves following issues of termux user: 
