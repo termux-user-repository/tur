@@ -9,9 +9,20 @@ TERMUX_PKG_DEPENDS="exiv2, glib, graphicsmagick, gtk3, imath, json-glib, lensfun
 TERMUX_PKG_BUILD_DEPENDS="libllvm-static"
 TERMUX_PKG_BLACKLISTED_ARCHES="arm, i686"
 TERMUX_PKG_AUTO_UPDATE=true
+TERMUX_PKG_UPDATE_VERSION_REGEXP="\d+\.\d+\.\d+"
+TERMUX_PKG_UPDATE_TAG_TYPE="latest-release-tag"
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 -DBINARY_PACKAGE_BUILD=ON
 "
+
+termux_pkg_auto_update() {
+	local tag="$(termux_github_api_get_tag "${TERMUX_PKG_SRCURL}" "${TERMUX_PKG_UPDATE_TAG_TYPE}")"
+	if grep -qP "^release-${TERMUX_PKG_UPDATE_VERSION_REGEXP}\$" <<<"$tag"; then
+		termux_pkg_upgrade_version "$tag"
+	else
+		echo "WARNING: Skipping auto-update: Not stable release($tag)"
+	fi
+}
 
 termux_step_pre_configure() {
 	_RPATH_FLAG="-Wl,-rpath=$TERMUX_PREFIX/lib"
