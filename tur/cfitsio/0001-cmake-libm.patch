@@ -1,0 +1,13 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index e66e731..7639ed4 100755
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -92,7 +92,7 @@ IF(USE_BZIP2)
+ ENDIF(USE_BZIP2)
+ 
+ # Math library (not available in MSVC or MINGW)
+-IF(MSVC OR MINGW)
++IF(MSVC OR MINGW OR CMAKE_SYSTEM_NAME STREQUAL "Android")
+    SET(M_LIB "")
+ ELSE()
+    FIND_LIBRARY(M_LIB m)
