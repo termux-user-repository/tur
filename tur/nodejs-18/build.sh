@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="Open Source, cross-platform JavaScript runtime environme
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION=18.19.1
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://nodejs.org/dist/v${TERMUX_PKG_VERSION}/node-v${TERMUX_PKG_VERSION}.tar.xz
 TERMUX_PKG_SHA256=090f96a2ecde080b6b382c6d642bca5d0be4702a78cb555be7bf02b20bd16ded
 # Note that we do not use a shared libuv to avoid an issue with the Android
@@ -20,10 +21,10 @@ $_INSTALL_PREFIX/lib/dtrace
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_HOSTBUILD=true
 
-# termux_step_post_get_source() {
-# 	# Prevent caching of host build:
-# 	rm -Rf $TERMUX_PKG_HOSTBUILD_DIR
-# }
+termux_step_post_get_source() {
+	# Prevent caching of host build:
+	rm -Rf $TERMUX_PKG_HOSTBUILD_DIR
+}
 
 termux_step_host_build() {
 	local ICU_VERSION=74.1
@@ -104,8 +105,8 @@ termux_step_make() {
 
 termux_step_make_install() {
 	if [ "${TERMUX_DEBUG_BUILD}" = "true" ]; then
-		python tools/install.py install "" "${TERMUX_PREFIX}" out/Debug/
+		python tools/install.py install "" "$TERMUX_PREFIX/$_INSTALL_PREFIX" out/Debug/
 	else
-		python tools/install.py install "" "${TERMUX_PREFIX}" out/Release/
+		python tools/install.py install "" "$TERMUX_PREFIX/$_INSTALL_PREFIX" out/Release/
 	fi
 }
