@@ -3,8 +3,9 @@ TERMUX_PKG_DESCRIPTION="Run VS Code on any machine anywhere and access it in the
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="4.21.1"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=git+https://github.com/coder/code-server
-TERMUX_PKG_DEPENDS="libandroid-spawn, libsecret, krb5, nodejs-lts (<< 19), ripgrep"
+TERMUX_PKG_DEPENDS="libandroid-spawn, libsecret, krb5, nodejs-18, ripgrep"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_HOSTBUILD=true
 TERMUX_PKG_NO_STATICSPLIT=true
@@ -17,6 +18,12 @@ termux_step_post_get_source() {
 		echo "Applying patch: $(basename $f)"
 		patch -d . -p1 < "./patches/$f";
 	done
+
+	# Ensure that code-server supports node 18
+	local _node_version=$(cat .node-version | cut -d. -f1 -)
+	if [ "$_node_version" != 18 ]; then
+		termux_error_exit "Version mismatch: Expected 18, got $_node_version."
+	fi
 }
 
 _setup_nodejs_18() {
@@ -97,7 +104,7 @@ termux_step_make_install() {
 	cp -Rf ./release-standalone/* $TERMUX_PREFIX/lib/code-server/
 
 	# Replace nodejs
-	ln -sf $TERMUX_PREFIX/bin/node $TERMUX_PREFIX/lib/code-server/lib/node
+	ln -sf $TERMUX_PREFIX/opt/nodejs-18/bin/node $TERMUX_PREFIX/lib/code-server/lib/node
 
 	# Replace ripgrep
 	ln -sf $TERMUX_PREFIX/bin/rg $TERMUX_PREFIX/lib/code-server/lib/vscode/node_modules/@vscode/ripgrep/bin/rg
