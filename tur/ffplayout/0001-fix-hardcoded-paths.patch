@@ -49,10 +49,10 @@
      } else if Path::new("./assets").is_dir() {
          db_path = "./assets/ffplayout.db";
      }
-@@ -163,7 +163,7 @@
- }
+@@ -169,7 +169,7 @@
+         return path;
+     }
  
- pub fn public_path() -> PathBuf {
 -    let path = PathBuf::from("/usr/share/ffplayout/public/");
 +    let path = PathBuf::from("@TERMUX_PREFIX@/share/ffplayout/public/");
  
