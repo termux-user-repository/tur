@@ -1,0 +1,13 @@
+diff --git a/gsl-an/Makefile b/gsl-an/Makefile
+index 8b9ced0..cf1995f 100644
+--- a/gsl-an/Makefile
++++ b/gsl-an/Makefile
+@@ -201,7 +201,7 @@ $(GSL_LIB): config.h $(GSL_OBJS)
+ 	$(RANLIB) $@
+ 
+ config.h: configure config.h.in
+-	./configure --enable-shared=no --prefix=`pwd`/stage
++	./configure --disable-rpath --disable-rpath-hack --enable-shared=no --host=x86_64-linux-android --prefix=`pwd`/stage 
+ 	touch $@
+ 
+ config.h.in: ;
