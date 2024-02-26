@@ -36,7 +36,7 @@ $SUDO docker start $CONTAINER_NAME >/dev/null 2>&1 || {
 }
 
 if [ "$#" -eq  "0" ]; then
-	$SUDO docker exec --interactive $DOCKER_TTY $CONTAINER_NAME bash
+	$SUDO docker exec --interactive $DOCKER_TTY $CONTAINER_NAME /entrypoint.sh
 else
-	$SUDO docker exec --interactive $DOCKER_TTY $CONTAINER_NAME "$@"
+	$SUDO docker exec --interactive $DOCKER_TTY $CONTAINER_NAME /entrypoint.sh "$@"
 fi
