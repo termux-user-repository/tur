@@ -1,0 +1,16 @@
+diff --git a/util/ioutils.c b/util/ioutils.c
+index 3a9bd48..91b8832 100644
+--- a/util/ioutils.c
++++ b/util/ioutils.c
+@@ -638,7 +638,11 @@ char* shell_escape(const char* str) {
+ }
+ 
+ static char* get_temp_dir() {
++#ifdef __TERMUX__
++    char* dir = getenv("TMPDIR");
++#else
+     char* dir = getenv("TMP");
++#endif
+     if (!dir) {
+         dir = "/tmp";
+     }

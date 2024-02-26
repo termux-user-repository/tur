@@ -1,0 +1,31 @@
+diff --git a/util/Makefile b/util/Makefile
+index c35a8da..0338b8f 100644
+--- a/util/Makefile
++++ b/util/Makefile
+@@ -267,11 +267,7 @@ $(INCLUDE_DIR)/os-features-config.h: os-features-test.c
+ 	@echo "   NETPBM_INC is $(NETPBM_INC_ORIG)"
+ 	@echo "   NETPBM_LIB is $(NETPBM_LIB_ORIG)"
+ 	@echo "Testing netpbm..." >> os-features.log
+-	(($(CC) -o os-features-test-netpbm \
+-	   $(CPPFLAGS) $(CFLAGS) $(NETPBM_INC_ORIG) $^ $(LDFLAGS) $(NETPBM_LIB_ORIG) >> os-features.log && \
+-	   ./os-features-test-netpbm >> os-features.log && \
+-	   echo "#define HAVE_NETPBM 1") \
+-	|| echo "#define HAVE_NETPBM 0") >> $@.tmp
++	echo "#define HAVE_NETPBM 1" >> $@.tmp
+ 	@echo "--------------- End of expected error messages -----------------"
+ 	@echo
+ 	mv $@.tmp $@
+@@ -297,12 +293,4 @@ makefile.os-features: os-features-test.c
+-	 (($(CC) -o os-features-test-netpbm-make \
+-	   $(CPPFLAGS) $(CFLAGS) $(NETPBM_INC_ORIG) $^ $(LDFLAGS) $(NETPBM_LIB_ORIG) >> os-features-makefile.log && \
+-	   ./os-features-test-netpbm-make >> os-features-makefile.log && \
+-	   echo "HAVE_NETPBM := yes") \
+-	|| (echo "# Astrometry.net didn't find netpbm; not setting HAVE_NETPBM."; \
+-		echo "# See os-features-makefile.log for details."; \
+-		echo "# To re-run this test, do 'make reconfig; make makefile.os-features' (in the 'util' directory)"; \
+-		echo "# Or to do it yourself, just uncomment this line:"; \
+-		echo "# HAVE_NETPBM := yes")) \
++	   echo "HAVE_NETPBM := yes"  \
+ 	; \
+ 	echo) > $@.tmp
+ 	@echo "--------------- End of expected error messages -----------------"

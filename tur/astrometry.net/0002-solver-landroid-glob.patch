@@ -1,0 +1,13 @@
+diff --git a/solver/Makefile b/solver/Makefile
+index f225256..d5dfbcd 100644
+--- a/solver/Makefile
++++ b/solver/Makefile
+@@ -315,7 +315,7 @@ unpermute-stars: unpermute-stars-main.o $(SLIB)
+ ALL_OBJ += unpermute-stars-main.o
+ 
+ astrometry-engine: engine-main.o $(SLIB)
+-	$(CC) -o $@ $(CFLAGS) $(LDFLAGS) $^ $(LDLIBS)
++	$(CC) -o $@ $(CFLAGS) $(LDFLAGS) $^ $(LDLIBS) -landroid-glob
+ 
+ solve-field: solve-field.o augment-xylist.o image2xy-files.o $(SLIB) $(CFITS_SLIB)
+ 	$(CC) -o $@ $(CFLAGS) $(LDFLAGS) $^ $(CFITS_LIB) $(LDLIBS)
