@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://github.com/pola-rs/polars
 TERMUX_PKG_DESCRIPTION="Dataframes powered by a multithreaded, vectorized query engine, written in Rust"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="0.20.10"
+TERMUX_PKG_VERSION="0.20.11"
 TERMUX_PKG_SRCURL=https://github.com/pola-rs/polars/releases/download/py-$TERMUX_PKG_VERSION/polars-$TERMUX_PKG_VERSION.tar.gz
-TERMUX_PKG_SHA256=ab32a232916df61c9377edcb5893d0b1624d810444d8fa627f9885d33819a8b7
+TERMUX_PKG_SHA256=7a0b1a566c31925475815aadb4280048aeba740141dd1fe5d673e7621b9a758a
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_DEPENDS="libc++, python"
 TERMUX_PKG_PYTHON_COMMON_DEPS="wheel"
@@ -72,6 +72,13 @@ termux_step_pre_configure() {
 		$_CARGO_TARGET_LIBDIR/libz.so
 
 	LDFLAGS+=" -Wl,--no-as-needed -lpython${_PYTHON_VERSION}"
+
+	# XXX: Don't know why, this is needed for `cmake` in rust to work properly
+	local _rtarget _renv
+	for _rtarget in {aarch64,i686,x86_64}-linux-android armv7-linux-androideabi; do
+		_renv="CFLAGS_${_rtarget//-/_}"
+		export $_renv+=" --target=${CCTERMUX_HOST_PLATFORM}"
+	done
 }
 
 termux_step_make() {
