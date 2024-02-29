@@ -1,0 +1,13 @@
+error: defaulted definition of equality comparison operator cannot be declared constexpr because it invokes a non-constexpr comparison function
+
+--- a/components/autofill/core/common/unique_ids.h
++++ b/components/autofill/core/common/unique_ids.h
+@@ -137,7 +137,7 @@
+ 
+   friend constexpr auto operator<=>(const GlobalId<RendererId>& lhs,
+                                     const GlobalId<RendererId>& rhs) = default;
+-  friend constexpr bool operator==(const GlobalId<RendererId>& lhs,
++  friend bool operator==(const GlobalId<RendererId>& lhs,
+                                    const GlobalId<RendererId>& rhs) = default;
+ };
+ 
