@@ -1,0 +1,16 @@
+error: defaulted definition of equality comparison operator cannot be declared constexpr because it invokes a non-constexpr comparison function
+
+--- a/base/types/strong_alias.h
++++ b/base/types/strong_alias.h
+@@ -108,9 +108,9 @@
+   // because it is from an external library), then a work-around is to create a
+   // thin wrapper `W` around it, define `operator<=>` for the wrapper and create
+   // a `StrongAlias<W>`.
+-  friend constexpr auto operator<=>(const StrongAlias& lhs,
++  friend auto operator<=>(const StrongAlias& lhs,
+                                     const StrongAlias& rhs) = default;
+-  friend constexpr bool operator==(const StrongAlias& lhs,
++  friend bool operator==(const StrongAlias& lhs,
+                                    const StrongAlias& rhs) = default;
+ 
+   // Hasher to use in std::unordered_map, std::unordered_set, etc.
