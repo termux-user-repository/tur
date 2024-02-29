@@ -2,10 +2,10 @@ TERMUX_PKG_HOMEPAGE=https://www.chromium.org/Home
 TERMUX_PKG_DESCRIPTION="Chromium web browser"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="Chongyun Lee <uchkks@protonmail.com>"
-_CHROMIUM_VERSION=121.0.6167.184
+_CHROMIUM_VERSION=122.0.6261.69
 TERMUX_PKG_VERSION=$_CHROMIUM_VERSION
 TERMUX_PKG_SRCURL=(https://commondatastorage.googleapis.com/chromium-browser-official/chromium-$_CHROMIUM_VERSION.tar.xz)
-TERMUX_PKG_SHA256=(9fd6b82e7077ac26ec264bfcfc8ac8e0c2a0240378f035c9c0f34ad467aef09d)
+TERMUX_PKG_SHA256=(f5bf4085ad3173883b45ea72b483d07f50ec3aa0f7546ac3837a9d26d0b4f9c0)
 TERMUX_PKG_DEPENDS="atk, cups, dbus, gtk3, krb5, libc++, libevdev, libxkbcommon, libminizip, libnss, libwayland, libx11, mesa, openssl, pango, pulseaudio, libdrm, libjpeg-turbo, libpng, libwebp, libflac, fontconfig, freetype, zlib, libxml2, libxslt, libopus, libsnappy"
 # TODO: Split chromium-common and chromium-headless
 # TERMUX_PKG_DEPENDS+=", chromium-common"
@@ -110,7 +110,7 @@ termux_step_configure() {
 	popd
 
 	# Construct args
-	local _clang_base_path="/usr/lib/llvm-15"
+	local _clang_base_path="/usr/lib/llvm-16"
 	local _host_cc="$_clang_base_path/bin/clang"
 	local _host_cxx="$_clang_base_path/bin/clang++"
 	local _target_cpu _target_sysroot="$TERMUX_PKG_TMPDIR/sysroot"
@@ -195,7 +195,7 @@ use_libpci = false
 use_alsa = false
 use_pulseaudio = true
 rtc_use_pipewire = false
-use_vaapi_x11 = false
+use_vaapi = false
 # See comments below
 enable_nacl = false
 # Host compiler (clang-13) doesn't support LTO well
