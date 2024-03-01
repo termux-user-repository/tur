@@ -7,7 +7,7 @@ index 8b9ced0..cf1995f 100644
  
  config.h: configure config.h.in
 -	./configure --enable-shared=no --prefix=`pwd`/stage
-+	./configure --disable-rpath --disable-rpath-hack --enable-shared=no --host=x86_64-linux-android --prefix=`pwd`/stage 
++	./configure --disable-rpath --disable-rpath-hack --enable-shared=no --host=$(TERMUX_HOST_PLATFORM) --prefix=`pwd`/stage 
  	touch $@
  
  config.h.in: ;
