@@ -1,7 +1,7 @@
 Add some dependencies required by TUR-on-Device.
 --- a/scripts/setup-termux.sh
 +++ b/scripts/setup-termux.sh
-@@ -45,12 +45,30 @@
+@@ -45,12 +45,20 @@
  PACKAGES+=" xmlto"                      # Needed by git's manpage generation
  PACKAGES+=" zip"
  
