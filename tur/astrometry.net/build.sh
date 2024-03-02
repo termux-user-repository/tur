@@ -4,6 +4,7 @@ TERMUX_PKG_LICENSE="custom"
 TERMUX_PKG_LICENSE_FILE="LICENSE"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="0.94"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://github.com/dstndstn/astrometry.net/releases/download/${TERMUX_PKG_VERSION}/astrometry.net-${TERMUX_PKG_VERSION}.tar.gz
 TERMUX_PKG_SHA256=38c0d04171ecae42033ce5c9cd0757d8c5fc1418f2004d85e858f29aee383c5f
 TERMUX_PKG_DEPENDS="cfitsio, curl, file, libandroid-glob, libbz2, libcairo, libjpeg-turbo, libpng, netpbm, python, python-numpy, python-fitsio, swig, wcslib, zlib"
