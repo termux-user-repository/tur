@@ -25,9 +25,9 @@ echo "Running container '$CONTAINER_NAME' from image '$TERMUX_BUILDER_IMAGE_NAME
 $SUDO docker start $CONTAINER_NAME >/dev/null 2>&1 || {
 	echo "Creating new container..."
 	$SUDO docker run \
+		--interactive \
 		--detach \
 		--name $CONTAINER_NAME \
-		--network=host \
 		--volume $REPOROOT:$CONTAINER_HOME_DIR/termux-packages \
 		--security-opt seccomp=unconfined \
 		--tty \
