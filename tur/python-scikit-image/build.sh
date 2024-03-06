@@ -3,7 +3,7 @@ TERMUX_PKG_DESCRIPTION="Image processing in Python"
 TERMUX_PKG_LICENSE="BSD 2-Clause, BSD 3-Clause, MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="0.22.0"
-TERMUX_PKG_REVISION=3
+TERMUX_PKG_REVISION=4
 TERMUX_PKG_SRCURL=https://github.com/scikit-image/scikit-image/archive/refs/tags/v$TERMUX_PKG_VERSION.tar.gz
 TERMUX_PKG_SHA256=2875c81ffb224f9f25a1274734b502fb993cc729a2c790009d38035e52e6a123
 TERMUX_PKG_AUTO_UPDATE=true
@@ -49,4 +49,12 @@ termux_step_make_install() {
 	local _pyv="${TERMUX_PYTHON_VERSION/./}"
 	local _whl="scikit_image-${TERMUX_PKG_VERSION#*:}-cp$_pyv-cp$_pyv-linux_$TERMUX_ARCH.whl"
 	pip install --no-deps --prefix=$TERMUX_PREFIX $TERMUX_PKG_SRCDIR/dist/$_whl
+}
+
+termux_step_create_debscripts() {
+	cat <<- EOF > ./postinst
+	#!$TERMUX_PREFIX/bin/sh
+	echo "Installing dependencies through pip..."
+	pip3 install scikit-image==${TERMUX_PKG_VERSION#*:}
+	EOF
 }
