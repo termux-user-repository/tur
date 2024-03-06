@@ -13,9 +13,9 @@ _NUMPY_VERSION=$(. $TERMUX_SCRIPTDIR/packages/python-numpy/build.sh; echo $TERMU
 TERMUX_PKG_PYTHON_BUILD_DEPS="pythran, 'numpy==$_NUMPY_VERSION'"
 TERMUX_PKG_SETUP_PYTHON=true
 
-TERMUX_MESON_SKIMAGE_CROSSFILE="$TERMUX_PKG_TMPDIR/skimage-cross-file.txt"
+TERMUX_MESON_WHEEL_CROSSFILE="$TERMUX_PKG_TMPDIR/wheel-cross-file.txt"
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
---cross-file $TERMUX_MESON_SKIMAGE_CROSSFILE
+--cross-file $TERMUX_MESON_WHEEL_CROSSFILE
 "
 
 termux_step_pre_configure() {
@@ -29,11 +29,11 @@ termux_step_pre_configure() {
 termux_step_configure() {
 	termux_setup_meson
 
-	cp -f $TERMUX_MESON_CROSSFILE $TERMUX_MESON_SKIMAGE_CROSSFILE
+	cp -f $TERMUX_MESON_CROSSFILE $TERMUX_MESON_WHEEL_CROSSFILE
 	sed -i 's|^\(\[binaries\]\)$|\1\npython = '\'$(command -v python)\''|g' \
-		$TERMUX_MESON_SKIMAGE_CROSSFILE
+		$TERMUX_MESON_WHEEL_CROSSFILE
 	sed -i 's|^\(\[properties\]\)$|\1\nnumpy-include-dir = '\'$PYTHON_SITE_PKG/numpy/core/include\''|g' \
-		$TERMUX_MESON_SKIMAGE_CROSSFILE
+		$TERMUX_MESON_WHEEL_CROSSFILE
 
 	termux_step_configure_meson
 }

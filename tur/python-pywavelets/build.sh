@@ -11,9 +11,9 @@ TERMUX_PKG_DEPENDS="libc++, python, python-pip, python-numpy"
 TERMUX_PKG_BUILD_DEPENDS="python-numpy-static"
 TERMUX_PKG_PYTHON_COMMON_DEPS="wheel, 'Cython>=3.0.4', meson-python, build"
 
-TERMUX_MESON_PYWT_CROSSFILE="$TERMUX_PKG_TMPDIR/pywt-cross-file.txt"
+TERMUX_MESON_WHEEL_CROSSFILE="$TERMUX_PKG_TMPDIR/wheel-cross-file.txt"
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
---cross-file $TERMUX_MESON_PYWT_CROSSFILE
+--cross-file $TERMUX_MESON_WHEEL_CROSSFILE
 "
 
 termux_step_pre_configure() {
@@ -27,11 +27,11 @@ termux_step_pre_configure() {
 termux_step_configure() {
 	termux_setup_meson
 
-	cp -f $TERMUX_MESON_CROSSFILE $TERMUX_MESON_PYWT_CROSSFILE
+	cp -f $TERMUX_MESON_CROSSFILE $TERMUX_MESON_WHEEL_CROSSFILE
 	sed -i 's|^\(\[binaries\]\)$|\1\npython = '\'$(command -v python)\''|g' \
-		$TERMUX_MESON_PYWT_CROSSFILE
+		$TERMUX_MESON_WHEEL_CROSSFILE
 	sed -i 's|^\(\[properties\]\)$|\1\nnumpy-include-dir = '\'$PYTHON_SITE_PKG/numpy/core/include\''|g' \
-		$TERMUX_MESON_PYWT_CROSSFILE
+		$TERMUX_MESON_WHEEL_CROSSFILE
 
 	termux_step_configure_meson
 }
