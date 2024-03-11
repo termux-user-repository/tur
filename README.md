@@ -106,3 +106,6 @@ TUR also maintains some other git repos. These git repos are listed below.
 `ndk-toolchain-gcc-9/10/11/12`: These repos contain some build scripts to build a NDK toolchain with GCC rather than LLVM.
 
 `tur-on-device` **Archived**: It has been merged into TUR.
+
+## Stargazers over time
+[![Stargazers over time](https://starchart.cc/termux-user-repository/tur.svg?variant=adaptive)](https://starchart.cc/termux-user-repository/tur)
