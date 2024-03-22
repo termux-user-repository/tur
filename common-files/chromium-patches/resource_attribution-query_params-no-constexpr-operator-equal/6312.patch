@@ -1,0 +1,13 @@
+error: defaulted definition of equality comparison operator cannot be declared constexpr because it invokes a non-constexpr comparison function
+
+--- a/components/performance_manager/resource_attribution/query_params.h
++++ b/components/performance_manager/resource_attribution/query_params.h
+@@ -67,7 +67,7 @@
+   QueryParams(const QueryParams& other);
+   QueryParams& operator=(const QueryParams& other);
+ 
+-  friend constexpr bool operator==(const QueryParams&,
++  friend bool operator==(const QueryParams&,
+                                    const QueryParams&) = default;
+ 
+   // Resource types to measure.

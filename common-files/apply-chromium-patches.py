@@ -158,7 +158,7 @@ def execute(args, p):
         break
       else:
         applied_patches.append(patch_path)
-  if need_revert:
+  if need_revert and not is_dry_run_mode:
     ope_str = "re-apply" if is_revert_mode else "revert"
     logger.info("%sing patches due to previous error...", ope_str.capitalize())
     for patch_path in applied_patches[::-1]:

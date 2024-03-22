@@ -1,0 +1,23 @@
+--- a/services/network/shared_dictionary/simple_url_pattern_matcher.cc
++++ b/services/network/shared_dictionary/simple_url_pattern_matcher.cc
+@@ -28,17 +28,17 @@
+ namespace {
+ 
+ // https://urlpattern.spec.whatwg.org/#default-options
+-constexpr liburlpattern::Options kDefaultOptions = {.delimiter_list = "",
++static const inline liburlpattern::Options kDefaultOptions = {.delimiter_list = "",
+                                                     .prefix_list = "",
+                                                     .sensitive = true,
+                                                     .strict = true};
+ // https://urlpattern.spec.whatwg.org/#hostname-options
+-constexpr liburlpattern::Options kHostnameOptions = {.delimiter_list = ".",
++static const inline liburlpattern::Options kHostnameOptions = {.delimiter_list = ".",
+                                                      .prefix_list = "",
+                                                      .sensitive = true,
+                                                      .strict = true};
+ // https://urlpattern.spec.whatwg.org/#pathname-options
+-constexpr liburlpattern::Options kPathnameOptions = {.delimiter_list = "/",
++static const inline liburlpattern::Options kPathnameOptions = {.delimiter_list = "/",
+                                                      .prefix_list = "/",
+                                                      .sensitive = true,
+                                                      .strict = true};

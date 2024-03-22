@@ -296,6 +296,9 @@
   "chromium-no-set-process-title/5615.patch": {
     "start": 5615
   },
+  "chromium-numerics-byte_conversions-no-std-bit_cast/6312.patch": {
+    "start": 6312
+  },
   "chromium-redefine-termios2/5359.patch": {
     "start": 5359
   },
@@ -320,6 +323,12 @@
   "chromium-ui-use-fabsf/5481.patch": {
     "start": 5481,
     "end": 5487
+  },
+  "compiler-clang-lib-dir/6312.patch": {
+    "start": 6312
+  },
+  "compiler-custom-rust-abi-target-triple/6312.patch": {
+    "start": 6312
   },
   "compiler-no-unused-but-set-variable/4389.patch": {
     "start": 4389,
@@ -386,6 +395,9 @@
   },
   "compiler-use-android-target/5414.patch": {
     "start": 5414
+  },
+  "compiler-use-custom-libcxx-for-v8/6312.patch": {
+    "start": 6312
   },
   "cpuinfo-android-arm/5249.patch": {
     "start": 5249,
@@ -512,6 +524,9 @@
   "perfetto-no-pthread_getname_np/6099.patch": {
     "start": 6099
   },
+  "performance_manager-context_collection-no-constexpr-operator-equal/6312.patch": {
+    "start": 6312
+  },
   "persistent_histogram_allocator-constructor/6045.patch": {
     "start": 6045
   },
@@ -537,24 +552,37 @@
     "end": 6260
   },
   "resource_attribution-query_params-no-constexpr-operator-equal/6261.patch": {
-    "start": 6261
+    "start": 6261,
+    "end": 6311
+  },
+  "resource_attribution-query_params-no-constexpr-operator-equal/6312.patch": {
+    "start": 6312
   },
   "revert-blink-v8-cxx20/6167.patch": {
     "start": 6167,
     "end": 6260
   },
   "revert-blink-v8-cxx20/6261.patch": {
-    "start": 6261
+    "start": 6261,
+    "end": 6311
+  },
+  "revert-blink-v8-cxx20/6312.patch": {
+    "start": 6312
   },
   "revert-blink-v8-cxx20-2/6261.patch": {
-    "start": 6261
+    "start": 6261,
+    "end": 6311
+  },
+  "revert-blink-v8-cxx20-2/6312.patch": {
+    "start": 6312
   },
   "revert-rust-qr-scanner/6167.patch": {
     "start": 6167,
     "end": 6260
   },
   "revert-rust-qr-scanner/6261.patch": {
-    "start": 6261
+    "start": 6261,
+    "end": 6261
   },
   "revert-split-out-ios-shared-feed-protos/5615.patch": {
     "start": 5615,
@@ -563,6 +591,9 @@
   "script-add-ld-library-path/4389.patch": {
     "start": 9999999,
     "comment": "Disable since 115.0.5790.98-1"
+  },
+  "simple_url_pattern_matcher-no-constexpr-string/6312.patch" : {
+    "start": 6312
   },
   "sql-VirtualCursor-standard-layout/5359.patch": {
     "start": 5359,
@@ -613,7 +644,9 @@
     "end": 5413
   },
   "undo-internal-alloc/6261.patch": {
-    "start": 6261
+    "start": 6261,
+    "end": 6261,
+    "comment": "Disable since 123.0.6312.58, from which clang and libcxx shipped by chromium is used to build host binaries"
   },
   "unity-fix-dynamic-loaded-libraries/4389.patch": {
     "start": 4389
@@ -794,6 +827,9 @@
   },
   "z-iwyu-material_color_utilities-include-cmath/5938.patch": {
     "start": 5938
+  },
+  "z-iwyu-preview_cancel_reason-include-string/6312.patch": {
+    "start": 6312
   },
   "z-iwyu-sensor_reading-inttypes/5993.patch": {
     "start": 5993,
