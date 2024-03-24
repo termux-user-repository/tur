@@ -2,10 +2,10 @@ TERMUX_PKG_HOMEPAGE=https://www.chromium.org/Home
 TERMUX_PKG_DESCRIPTION="Chromium web browser"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="Chongyun Lee <uchkks@protonmail.com>"
-_CHROMIUM_VERSION=122.0.6261.111
+_CHROMIUM_VERSION=123.0.6312.58
 TERMUX_PKG_VERSION=$_CHROMIUM_VERSION
 TERMUX_PKG_SRCURL=(https://commondatastorage.googleapis.com/chromium-browser-official/chromium-$_CHROMIUM_VERSION.tar.xz)
-TERMUX_PKG_SHA256=(0b3da2f0ca63625e84a1b36571f23591248b8fcb422ce683c09283dbfc35c309)
+TERMUX_PKG_SHA256=(f8dae4a2ff7b00bb44fa136c2101638fea4f232e4819be3f73381ddc0d3bf718)
 TERMUX_PKG_DEPENDS="atk, cups, dbus, gtk3, krb5, libc++, libevdev, libxkbcommon, libminizip, libnss, libwayland, libx11, mesa, openssl, pango, pulseaudio, libdrm, libjpeg-turbo, libpng, libwebp, libflac, fontconfig, freetype, zlib, libxml2, libxslt, libopus, libsnappy"
 # TODO: Split chromium-common and chromium-headless
 # TERMUX_PKG_DEPENDS+=", chromium-common"
@@ -50,10 +50,10 @@ termux_step_configure() {
 	# Remove termux's dummy pkg-config
 	local _target_pkg_config=$(command -v pkg-config)
 	local _host_pkg_config="$(cat $_target_pkg_config | grep exec | awk '{print $2}')"
-	rm -rf $TERMUX_PKG_TMPDIR/host-pkg-config-bin
-	mkdir -p $TERMUX_PKG_TMPDIR/host-pkg-config-bin
-	ln -s $_host_pkg_config $TERMUX_PKG_TMPDIR/host-pkg-config-bin/pkg-config
-	export PATH="$TERMUX_PKG_TMPDIR/host-pkg-config-bin:$PATH"
+	rm -rf $TERMUX_PKG_CACHEDIR/host-pkg-config-bin
+	mkdir -p $TERMUX_PKG_CACHEDIR/host-pkg-config-bin
+	ln -s $_host_pkg_config $TERMUX_PKG_CACHEDIR/host-pkg-config-bin/pkg-config
+	export PATH="$TERMUX_PKG_CACHEDIR/host-pkg-config-bin:$PATH"
 
 	# For qt build
 	export PATH="$TERMUX_PREFIX/opt/qt/cross/bin:$PATH"
@@ -65,8 +65,15 @@ termux_step_configure() {
 	env -i PATH="$PATH" sudo ./build/install-build-deps.sh --no-syms --no-android --no-arm --no-chromeos-fonts --no-nacl --no-prompt
 	build/linux/sysroot_scripts/install-sysroot.py --arch=amd64
 	local _amd64_sysroot_path="$(pwd)/build/linux/$(ls build/linux | grep 'amd64-sysroot')"
-	rm -rf "$_amd64_sysroot_path"
-	build/linux/sysroot_scripts/install-sysroot.py --arch=amd64
+
+	# Setup rust toolchain and clang toolchain
+	./tools/rust/update_rust.py
+	./tools/clang/scripts/update.py
+
+	local CARGO_TARGET_NAME="${TERMUX_ARCH}-linux-android"
+	if [[ "${TERMUX_ARCH}" == "arm" ]]; then
+		CARGO_TARGET_NAME="armv7-linux-androideabi"
+	fi
 
 	# Link to system tools required by the build
 	mkdir -p third_party/node/linux/node-linux-x64/bin
@@ -87,33 +94,37 @@ termux_step_configure() {
 	ln -sfr $TERMUX_PREFIX/lib/libffi.a $TERMUX_PREFIX/lib/libffi_pic.a
 
 	# Merge sysroots
-	rm -rf $TERMUX_PKG_TMPDIR/sysroot
-	mkdir -p $TERMUX_PKG_TMPDIR/sysroot
-	pushd $TERMUX_PKG_TMPDIR/sysroot
-	mkdir -p usr/include usr/lib usr/bin
-	cp -R $TERMUX_STANDALONE_TOOLCHAIN/sysroot/usr/include/* usr/include
-	cp -R $TERMUX_STANDALONE_TOOLCHAIN/sysroot/usr/include/$TERMUX_HOST_PLATFORM/* usr/include
-	cp -R $TERMUX_STANDALONE_TOOLCHAIN/sysroot/usr/lib/$TERMUX_HOST_PLATFORM/$TERMUX_PKG_API_LEVEL/* usr/lib/
-	cp "$TERMUX_STANDALONE_TOOLCHAIN/sysroot/usr/lib/$TERMUX_HOST_PLATFORM/libc++_shared.so" usr/lib/
-	cp "$TERMUX_STANDALONE_TOOLCHAIN/sysroot/usr/lib/$TERMUX_HOST_PLATFORM/libc++_static.a" usr/lib/
-	cp "$TERMUX_STANDALONE_TOOLCHAIN/sysroot/usr/lib/$TERMUX_HOST_PLATFORM/libc++abi.a" usr/lib/
-	cp -Rf $TERMUX_PREFIX/include/* usr/include
-	cp -Rf $TERMUX_PREFIX/lib/* usr/lib
-	ln -sf /data ./data
-	# This is needed to build crashpad
-	rm -rf $TERMUX_PREFIX/include/spawn.h
-	# This is needed to build cups
-	cp -Rf $TERMUX_PREFIX/bin/cups-config usr/bin/
-	chmod +x usr/bin/cups-config
-	# Cherry-pick LWG3545 for NDK r26
-	patch -p1 < $TERMUX_SCRIPTDIR/common-files/chromium-patches/sysroot-patches/libcxx-17-lwg3545.diff
-	popd
+	if [ ! -d "$TERMUX_PKG_CACHEDIR/sysroot-$TERMUX_ARCH" ]; then
+		rm -rf $TERMUX_PKG_TMPDIR/sysroot
+		mkdir -p $TERMUX_PKG_TMPDIR/sysroot
+		pushd $TERMUX_PKG_TMPDIR/sysroot
+		mkdir -p usr/include usr/lib usr/bin
+		cp -R $TERMUX_STANDALONE_TOOLCHAIN/sysroot/usr/include/* usr/include
+		cp -R $TERMUX_STANDALONE_TOOLCHAIN/sysroot/usr/include/$TERMUX_HOST_PLATFORM/* usr/include
+		cp -R $TERMUX_STANDALONE_TOOLCHAIN/sysroot/usr/lib/$TERMUX_HOST_PLATFORM/$TERMUX_PKG_API_LEVEL/* usr/lib/
+		cp "$TERMUX_STANDALONE_TOOLCHAIN/sysroot/usr/lib/$TERMUX_HOST_PLATFORM/libc++_shared.so" usr/lib/
+		cp "$TERMUX_STANDALONE_TOOLCHAIN/sysroot/usr/lib/$TERMUX_HOST_PLATFORM/libc++_static.a" usr/lib/
+		cp "$TERMUX_STANDALONE_TOOLCHAIN/sysroot/usr/lib/$TERMUX_HOST_PLATFORM/libc++abi.a" usr/lib/
+		cp -Rf $TERMUX_PREFIX/include/* usr/include
+		cp -Rf $TERMUX_PREFIX/lib/* usr/lib
+		ln -sf /data ./data
+		# This is needed to build crashpad
+		rm -rf $TERMUX_PREFIX/include/spawn.h
+		# This is needed to build cups
+		cp -Rf $TERMUX_PREFIX/bin/cups-config usr/bin/
+		chmod +x usr/bin/cups-config
+		# Cherry-pick LWG3545 for NDK r26
+		patch -p1 < $TERMUX_SCRIPTDIR/common-files/chromium-patches/sysroot-patches/libcxx-17-lwg3545.diff
+		popd
+		mv $TERMUX_PKG_TMPDIR/sysroot $TERMUX_PKG_CACHEDIR/sysroot-$TERMUX_ARCH
+	fi
 
 	# Construct args
-	local _clang_base_path="/usr/lib/llvm-16"
+	local _clang_base_path="$PWD/third_party/llvm-build/Release+Asserts"
 	local _host_cc="$_clang_base_path/bin/clang"
 	local _host_cxx="$_clang_base_path/bin/clang++"
-	local _target_cpu _target_sysroot="$TERMUX_PKG_TMPDIR/sysroot"
+	local _host_clang_version=$($_host_cc --version | grep -m1 version | sed -E 's|.*\bclang version ([0-9]+).*|\1|')
+	local _target_cpu _target_sysroot="$TERMUX_PKG_CACHEDIR/sysroot-$TERMUX_ARCH"
 	local _v8_toolchain_name _v8_current_cpu _v8_sysroot_path
 	if [ "$TERMUX_ARCH" = "aarch64" ]; then
 		_target_cpu="arm64"
@@ -126,8 +137,6 @@ termux_step_configure() {
 		env -i PATH="$PATH" sudo ./build/install-build-deps.sh --lib32 --no-syms --no-android --no-arm --no-chromeos-fonts --no-nacl --no-prompt
 		build/linux/sysroot_scripts/install-sysroot.py --arch=i386
 		local _i386_sysroot_path="$(pwd)/build/linux/$(ls build/linux | grep 'i386-sysroot')"
-		rm -rf "$_i386_sysroot_path"
-		build/linux/sysroot_scripts/install-sysroot.py --arch=i386
 		_target_cpu="arm"
 		_v8_current_cpu="x86"
 		_v8_sysroot_path="$_i386_sysroot_path"
@@ -154,12 +163,14 @@ is_official_build = true
 is_debug = false
 symbol_level = 0
 # Use our custom toolchain
+clang_version = \"$_host_clang_version\"
 use_sysroot = false
 target_cpu = \"$_target_cpu\"
 target_rpath = \"$TERMUX_PREFIX/lib\"
 target_sysroot = \"$_target_sysroot\"
-clang_base_path = \"$_clang_base_path\"
 custom_toolchain = \"//build/toolchain/linux/unbundle:default\"
+custom_toolchain_clang_base_path = \"$TERMUX_STANDALONE_TOOLCHAIN\"
+custom_toolchain_clang_version = "17"
 host_toolchain = \"$TERMUX_PKG_CACHEDIR/custom-toolchain:host\"
 v8_snapshot_toolchain = \"$TERMUX_PKG_CACHEDIR/custom-toolchain:$_v8_toolchain_name\"
 clang_use_chrome_plugins = false
@@ -171,6 +182,7 @@ use_system_freetype = false
 use_system_libdrm = true
 use_system_libffi = true
 use_custom_libcxx = false
+use_custom_libcxx_for_host = true
 use_allocator_shim = false
 use_partition_alloc_as_malloc = false
 enable_backup_ref_ptr_support = false
@@ -202,8 +214,8 @@ enable_nacl = false
 is_cfi = false
 use_cfi_icall = false
 use_thin_lto = false
-# Disable rust
-enable_rust = false
+# Enable rust
+custom_target_rust_abi_target = \"$CARGO_TARGET_NAME\"
 llvm_android_mainline = true
 " > $_common_args_file
 
@@ -237,12 +249,7 @@ llvm_android_mainline = true
 			s|@V8_SYSROOT@|$_v8_sysroot_path|g
 			" $TERMUX_PKG_CACHEDIR/custom-toolchain/BUILD.gn
 
-	# Cherry-pick LWG3545 for GCC
-	patch -p1 -d $_amd64_sysroot_path < $TERMUX_SCRIPTDIR/common-files/chromium-patches/sysroot-patches/libstdcxx3-10-lwg3545.diff
-	if [ "$_v8_sysroot_path" != "$_amd64_sysroot_path" ]; then
-		patch -p1 -d $_v8_sysroot_path < $TERMUX_SCRIPTDIR/common-files/chromium-patches/sysroot-patches/libstdcxx3-10-lwg3545.diff
-	fi
-
+	# Generate ninja files
 	mkdir -p $TERMUX_PKG_BUILDDIR/out/Release
 	cat $_common_args_file > $TERMUX_PKG_BUILDDIR/out/Release/args.gn
 	gn gen $TERMUX_PKG_BUILDDIR/out/Release --export-compile-commands
@@ -251,6 +258,7 @@ llvm_android_mainline = true
 termux_step_make() {
 	cd $TERMUX_PKG_BUILDDIR
 	ninja -C out/Release chromedriver chrome chrome_crashpad_handler headless_shell -k 0
+	rm -rf "$TERMUX_PKG_CACHEDIR/sysroot-$TERMUX_ARCH"
 }
 
 termux_step_make_install() {
