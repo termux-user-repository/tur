@@ -3,10 +3,12 @@ TERMUX_PKG_DESCRIPTION="A compatibility layer for running Windows programs"
 TERMUX_PKG_LICENSE="LGPL-2.1"
 TERMUX_PKG_LICENSE_FILE="LICENSE, LICENSE.OLD, COPYING.LIB"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION=9.1
+TERMUX_PKG_VERSION=9.5
 _VERSION_FOLDER="$(test "${TERMUX_PKG_VERSION:2:1}" = 0 && echo ${TERMUX_PKG_VERSION:0:3} || echo ${TERMUX_PKG_VERSION:0:2}x)"
-TERMUX_PKG_SRCURL=https://dl.winehq.org/wine/source/${_VERSION_FOLDER}/wine-$TERMUX_PKG_VERSION.tar.xz
-TERMUX_PKG_SHA256=01b3b91b6fc35cabe93b28f190a237ba95c8ac70c436d919586deaa3da258fff
+TERMUX_PKG_SRCURL=(https://dl.winehq.org/wine/source/${_VERSION_FOLDER}/wine-$TERMUX_PKG_VERSION.tar.xz)
+TERMUX_PKG_SRCURL+=(https://github.com/wine-staging/wine-staging/archive/v$TERMUX_PKG_VERSION.tar.gz)
+TERMUX_PKG_SHA256=(12cf2fb7098134e2351c49ea3ba8f4da2a674f1f8722bebd4c3a4a6ca6d2e975)
+TERMUX_PKG_SHA256+=(950dc87325ae418dc590559b3c4c4c09f917ebdb5fcf9629839dadf65228c345)
 TERMUX_PKG_DEPENDS="fontconfig, freetype, krb5, libandroid-spawn, libc++, libgmp, libgnutls, libxcb, libxcomposite, libxcursor, libxfixes, libxrender, mesa, opengl, pulseaudio, sdl2, vulkan-loader, xorg-xrandr"
 TERMUX_PKG_ANTI_BUILD_DEPENDS="vulkan-loader"
 TERMUX_PKG_BUILD_DEPENDS="libandroid-spawn-static, vulkan-loader-generic"
@@ -17,8 +19,8 @@ TERMUX_PKG_EXTRA_HOSTBUILD_CONFIGURE_ARGS="
 --disable-tests
 "
 
-TERMUX_PKG_BREAKS="hangover-wine, wine-stable"
-TERMUX_PKG_CONFLICTS="hangover-wine, wine-stable"
+TERMUX_PKG_BREAKS="hangover-wine, wine-stable, wine-devel"
+TERMUX_PKG_CONFLICTS="hangover-wine, wine-stable, wine-devel"
 
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 enable_wineandroid_drv=no
@@ -72,6 +74,12 @@ exec_prefix=$TERMUX_PREFIX
 # FIXME: This package doesn't work on arm since 8.x, but anyway
 # FIXME: I'd like to compile it.
 # TERMUX_PKG_BLACKLISTED_ARCHES="arm"
+
+termux_step_post_get_source() {
+	# XXX: `eventfd` doesn't always work on Android, due to kernel settings
+	python ./wine-staging-$TERMUX_PKG_VERSION/staging/patchinstall.py \
+		--all -W eventfd_synchronization
+}
 
 _setup_llvm_mingw_toolchain() {
 	# LLVM-mingw's version number must not be the same as the NDK's.
