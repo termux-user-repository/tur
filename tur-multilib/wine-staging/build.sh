@@ -78,7 +78,7 @@ exec_prefix=$TERMUX_PREFIX
 termux_step_post_get_source() {
 	# XXX: `eventfd` doesn't always work on Android, due to kernel settings
 	python ./wine-staging-$TERMUX_PKG_VERSION/staging/patchinstall.py \
-		--all --exclude=eventfd_synchronization
+		--all --exclude eventfd_synchronization
 }
 
 _setup_llvm_mingw_toolchain() {
