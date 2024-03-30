@@ -168,7 +168,7 @@ jobs:
         done
     - name: Free additional disk space (if necessary)
       run: |
-        if grep -Eq '^(code-server|code-oss|electron-headers-.*)$' ./built_tur_packages.txt; then
+        if grep -Eq '^(chromium|code-server|code-oss|electron-headers-.*)$' ./built_tur_packages.txt; then
           sudo apt purge -yq $(dpkg -l | grep '^ii' | awk '{ print $2 }' | grep -P '(cabal-|dotnet-|ghc-|libmono|php|aspnetcore)') \
             mono-runtime-common monodoc-manual ruby
           sudo apt autoremove -yq
