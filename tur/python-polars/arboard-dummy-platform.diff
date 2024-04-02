@@ -1,0 +1,103 @@
+https://github.com/1Password/arboard/pull/50
+--- a/src/common.rs
++++ b/src/common.rs
+@@ -30,6 +30,7 @@ pub enum Error {
+ 	/// This can be caused by a few conditions:
+ 	/// - Using the Primary clipboard with an older Wayland compositor (that doesn't support version 2)
+ 	/// - Using the Secondary clipboard on Wayland
++	/// - Using the clipboard on an unsupported platform
+ 	#[error("The selected clipboard is not supported with the current system configuration.")]
+ 	ClipboardNotSupported,
+ 
+--- /dev/null
++++ b/src/platform/dummy.rs
+@@ -0,0 +1,78 @@
++/*
++SPDX-License-Identifier: Apache-2.0 OR MIT
++
++Copyright 2022 The Arboard contributors
++
++The project to which this file belongs is licensed under either of
++the Apache 2.0 or the MIT license at the licensee's choice. The terms
++and conditions of the chosen license apply to this file.
++*/
++
++use crate::common::Error;
++#[cfg(feature = "image-data")]
++use crate::common::ImageData;
++use std::borrow::Cow;
++
++pub(crate) struct Clipboard { }
++
++impl Clipboard {
++	pub(crate) fn new() -> Result<Clipboard, Error> {
++		Ok(Self {})
++	}
++}
++
++pub(crate) struct Get<'clipboard> {
++	clipboard: &'clipboard mut Clipboard,
++}
++
++impl<'clipboard> Get<'clipboard> {
++	pub(crate) fn new(clipboard: &'clipboard mut Clipboard) -> Self {
++		Self { clipboard }
++	}
++
++	pub(crate) fn text(self) -> Result<String, Error> {
++		Err(Error::ContentNotAvailable)
++	}
++
++	#[cfg(feature = "image-data")]
++	pub(crate) fn image(self) -> Result<ImageData<'static>, Error> {
++		Err(Error::ContentNotAvailable)
++	}
++}
++
++pub(crate) struct Set<'clipboard> {
++	clipboard: &'clipboard mut Clipboard,
++}
++
++impl<'clipboard> Set<'clipboard> {
++	pub(crate) fn new(clipboard: &'clipboard mut Clipboard) -> Self {
++		Self { clipboard }
++	}
++
++	pub(crate) fn text(self, data: Cow<'_, str>) -> Result<(), Error> {
++		Err(Error::ClipboardNotSupported)
++	}
++
++	pub(crate) fn html(self, html: Cow<'_, str>, alt: Option<Cow<'_, str>>) -> Result<(), Error> {
++		Err(Error::ClipboardNotSupported)
++	}
++
++	#[cfg(feature = "image-data")]
++	pub(crate) fn image(self, data: ImageData) -> Result<(), Error> {
++		Err(Error::ClipboardNotSupported)
++	}
++}
++
++pub(crate) struct Clear<'clipboard> {
++	clipboard: &'clipboard mut Clipboard,
++}
++
++impl<'clipboard> Clear<'clipboard> {
++	pub(crate) fn new(clipboard: &'clipboard mut Clipboard) -> Self {
++		Self { clipboard }
++	}
++
++	pub(crate) fn clear(self) -> Result<(), Error> {
++		Err(Error::ClipboardNotSupported)
++	}
++}
+--- a/src/platform/mod.rs
++++ b/src/platform/mod.rs
+@@ -15,3 +15,8 @@
+ mod osx;
+ #[cfg(target_os = "macos")]
+ pub(crate) use osx::*;
++
++#[cfg(target_os = "android")]
++mod dummy;
++#[cfg(target_os = "android")]
++pub use dummy::*;

@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://github.com/pola-rs/polars
 TERMUX_PKG_DESCRIPTION="Dataframes powered by a multithreaded, vectorized query engine, written in Rust"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="0.20.17"
+TERMUX_PKG_VERSION="0.20.18"
 TERMUX_PKG_SRCURL=https://github.com/pola-rs/polars/releases/download/py-$TERMUX_PKG_VERSION/polars-$TERMUX_PKG_VERSION.tar.gz
-TERMUX_PKG_SHA256=ad9050c4dd594e66312f4e240479c6fa2893ea970ce09eb9d47043d48330138f
+TERMUX_PKG_SHA256=8a321cbdbb459e3c0cc1af2ce6ac930d0d3b5ccbeb2dd3e4237ad07d487fd290
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_DEPENDS="libc++, python"
 TERMUX_PKG_PYTHON_COMMON_DEPS="wheel"
@@ -46,6 +46,7 @@ termux_step_pre_configure() {
 
 	rm -rf $CARGO_HOME/registry/src/*/cmake-*
 	rm -rf $CARGO_HOME/registry/src/*/jemalloc-sys-*
+	rm -rf $CARGO_HOME/registry/src/*/arboard-*
 	cargo fetch --target "${CARGO_TARGET_NAME}"
 
 	local p="cmake-0.1.50-src-lib.rs.diff"
@@ -57,6 +58,11 @@ termux_step_pre_configure() {
 
 	p="jemalloc-sys-0.5.4+5.3.0-patched-src-lib.rs.diff"
 	for d in $CARGO_HOME/registry/src/*/jemalloc-sys-*; do
+		patch --silent -p1 -d ${d} < "$TERMUX_PKG_BUILDER_DIR/${p}"
+	done
+
+	p="arboard-dummy-platform.diff"
+	for d in $CARGO_HOME/registry/src/*/arboard-*; do
 		patch --silent -p1 -d ${d} < "$TERMUX_PKG_BUILDER_DIR/${p}"
 	done
 
