@@ -1,0 +1,23 @@
+From 38336d55e45a7cc0d1c88c4694d133b2e30a1683 Mon Sep 17 00:00:00 2001
+From: Sam James <sam@gentoo.org>
+Date: Mon, 13 Dec 2021 23:46:50 +0000
+Subject: [PATCH] build: respect LDFLAGS
+
+Signed-off-by: Sam James <sam@gentoo.org>
+---
+ src/Makefile.in | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/Makefile.in b/src/Makefile.in
+index bcd32ca..1903039 100644
+--- a/src/Makefile.in
++++ b/src/Makefile.in
+@@ -65,7 +65,7 @@ $(LIBSTATIC): $(OBJS)
+ 	ar -cr $@ $(OBJS)
+ 	$(RANLIB) $@
+ $(LIBSHARED): $(OBJS_SHARED)
+-	$(CC) -shared -Wl,-soname,$(LIBSHARED) -o $(LIBSHARED) $(OBJS_SHARED) $(LIBS) $(LNETLIB) $(PCAPLIB)
++	$(CC) -shared -Wl,-soname,$(LIBSHARED) $(LDFLAGS) -o $(LIBSHARED) $(OBJS_SHARED) $(LIBS) $(LNETLIB) $(PCAPLIB)
+ 
+ _install install: $(LIBSTATIC)
+ 	../mkinstalldirs $(install_prefix)$(libdir)
