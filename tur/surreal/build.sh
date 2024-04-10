@@ -1,11 +1,12 @@
 TERMUX_PKG_HOMEPAGE=https://github.com/surrealdb/surrealdb
 TERMUX_PKG_DESCRIPTION="A scalable, distributed, collaborative, document-graph database, for the realtime web"
+# LICENSE: Business Source License 1.1 (BSL-1.1)
 TERMUX_PKG_LICENSE="non-free"
 TERMUX_PKG_LICENSE_FILE="LICENSE"
 TERMUX_PKG_MAINTAINER="@SunPodder"
-TERMUX_PKG_VERSION="1.3.1"
+TERMUX_PKG_VERSION="1.4.0"
 TERMUX_PKG_SRCURL="https://github.com/surrealdb/surrealdb/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz"
-TERMUX_PKG_SHA256=c0705985eb4a4ce13225003147c57d4cfa9bf1eb25f83cbffcb12f4a1c3cd59e
+TERMUX_PKG_SHA256=10bd04f590f4570ce9a9241c5a9ee76daa298db15bf3b66af3ee26f8244af9d8
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_BUILD_DEPENDS="openssl, zlib"
@@ -15,30 +16,30 @@ termux_step_configure() {
 	env -i PATH="$PATH" sudo apt update
 	env -i PATH="$PATH" sudo apt install protobuf-compiler -y
 
-    termux_setup_rust
-    export CARGO_HOME="${HOME}/.cargo"
-    cargo fetch --target $CARGO_TARGET_NAME
+	termux_setup_rust
+	export CARGO_HOME="${HOME}/.cargo"
+	cargo fetch --target $CARGO_TARGET_NAME
 
-    rm -rf $CARGO_HOME/registry/src/index.crates.io-*/librocksdb-sys-0.11.0*/
-    rm -rf $CARGO_HOME/registry/src/index.crates.io-*/jemalloc-sys*/
-    cargo fetch --target $CARGO_TARGET_NAME
+	rm -rf $CARGO_HOME/registry/src/index.crates.io-*/librocksdb-sys-0.11.0*/
+	rm -rf $CARGO_HOME/registry/src/index.crates.io-*/jemalloc-sys*/
+	cargo fetch --target $CARGO_TARGET_NAME
 
-    sed -e "s|@TERMUX_PREFIX@|$TERMUX_PREFIX|" \
-        $TERMUX_PKG_BUILDER_DIR/librocksdb-sys.diff \
-	    | patch --silent -p1 \
-            -d $CARGO_HOME/registry/src/index.crates.io-*/librocksdb-sys-0.11.0*/rocksdb
+	sed -e "s|@TERMUX_PREFIX@|$TERMUX_PREFIX|" \
+		$TERMUX_PKG_BUILDER_DIR/librocksdb-sys.diff \
+		| patch --silent -p1 \
+			-d $CARGO_HOME/registry/src/index.crates.io-*/librocksdb-sys-0.11.0*/rocksdb
 
-    cat $TERMUX_PKG_BUILDER_DIR/jemalloc-sys.diff \
-        | patch --silent -p1 \
-            -d $CARGO_HOME/registry/src/index.crates.io-*/jemalloc-sys-*/
+	cat $TERMUX_PKG_BUILDER_DIR/jemalloc-sys.diff \
+		| patch --silent -p1 \
+			-d $CARGO_HOME/registry/src/index.crates.io-*/jemalloc-sys-*/
 }
 
 termux_step_make() {
-    export CXXFLAGS+=" -lz"
+	export CXXFLAGS+=" -lz"
+	RUSTFLAGS="--cfg surrealdb_unstable $RUSTFLAGS"
 	cargo build --jobs $TERMUX_MAKE_PROCESSES --target $CARGO_TARGET_NAME --release
 }
 
 termux_step_make_install() {
 	install -Dm755 -t $TERMUX_PREFIX/bin target/${CARGO_TARGET_NAME}/release/surreal
 }
-
