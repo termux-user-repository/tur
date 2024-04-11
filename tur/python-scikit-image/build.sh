@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://github.com/scikit-image/scikit-image
 TERMUX_PKG_DESCRIPTION="Image processing in Python"
 TERMUX_PKG_LICENSE="BSD 2-Clause, BSD 3-Clause, MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="0.23.0rc0"
+TERMUX_PKG_VERSION="0.23.1"
 TERMUX_PKG_SRCURL=https://github.com/scikit-image/scikit-image/archive/refs/tags/v$TERMUX_PKG_VERSION.tar.gz
-TERMUX_PKG_SHA256=0e6ff6c657f2b50f03498778803174ef43506652485d50f7cc980a2b11350eff
+TERMUX_PKG_SHA256=b37564b1a341f77e9483a24b89dbdc31fc8d76e8ee4f8c8864eefc2c3875d63a
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_DEPENDS="libc++, python, python-pip, python-numpy, python-pillow, python-pywavelets, python-scipy"
 TERMUX_PKG_PYTHON_COMMON_DEPS="wheel, 'Cython>=3.0.4', meson-python, build"
