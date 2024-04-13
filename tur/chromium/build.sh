@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://www.chromium.org/Home
 TERMUX_PKG_DESCRIPTION="Chromium web browser"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="Chongyun Lee <uchkks@protonmail.com>"
-TERMUX_PKG_VERSION=123.0.6312.105
+TERMUX_PKG_VERSION=123.0.6312.122
 TERMUX_PKG_SRCURL=https://commondatastorage.googleapis.com/chromium-browser-official/chromium-$TERMUX_PKG_VERSION.tar.xz
-TERMUX_PKG_SHA256=0a14fba1fb1a288d99b188160e3138295aa8604bdf492e62a94c0ec35a4e229d
+TERMUX_PKG_SHA256=c883f192af7cb76cf46de4044349645b0fb0b5c42a1c0f7950a24c825c17f885
 TERMUX_PKG_DEPENDS="atk, cups, dbus, gtk3, krb5, libc++, libevdev, libxkbcommon, libminizip, libnss, libwayland, libx11, mesa, openssl, pango, pulseaudio, libdrm, libjpeg-turbo, libpng, libwebp, libflac, fontconfig, freetype, zlib, libxml2, libxslt, libopus, libsnappy"
 # TODO: Split chromium-common and chromium-headless
 # TERMUX_PKG_DEPENDS+=", chromium-common"
