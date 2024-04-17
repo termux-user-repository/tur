@@ -71,7 +71,7 @@
      };
 --- a/lib/src/utils/config.rs
 +++ b/lib/src/utils/config.rs
-@@ -353,7 +353,7 @@
+@@ -363,7 +363,7 @@
  impl PlayoutConfig {
      /// Read config from YAML file, and set some extra config values.
      pub fn new(cfg_path: Option<PathBuf>) -> Self {
@@ -80,10 +80,10 @@
  
          if let Some(cfg) = cfg_path {
              config_path = cfg;
-@@ -336,7 +336,7 @@
+@@ -381,7 +381,7 @@
              Ok(file) => file,
              Err(_) => {
-                 println!(
+                 eprintln!(
 -                    "{config_path:?} doesn't exists!\nPut \"ffplayout.yml\" in \"/etc/playout/\" or beside the executable!"
 +                    "{config_path:?} doesn't exists!\nPut \"ffplayout.yml\" in \"@TERMUX_PREFIX@/etc/playout/\" or beside the executable!"
                  );

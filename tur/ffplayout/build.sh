@@ -2,7 +2,7 @@ TERMUX_PKG_HOMEPAGE=https://ffplayout.github.io
 TERMUX_PKG_DESCRIPTION="Rust and ffmpeg based playout"
 TERMUX_PKG_LICENSE="GPL-3.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="0.20.5"
+TERMUX_PKG_VERSION="0.21.1"
 TERMUX_PKG_SRCURL=git+https://github.com/ffplayout/ffplayout
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_AUTO_UPDATE=true
@@ -38,6 +38,11 @@ termux_step_get_source() {
 	cp -Rf $TMP_CHECKOUT $TERMUX_PKG_SRCDIR
 }
 
+termux_step_post_get_source() {
+	# Remove this marker all the time
+	rm -rf $TERMUX_HOSTBUILD_MARKER
+}
+
 termux_step_host_build() {
 	termux_setup_nodejs
 	pushd $TERMUX_PKG_SRCDIR
@@ -48,11 +53,6 @@ termux_step_host_build() {
 	npm run generate
 	cp -r .output/public ../public
 	popd
-}
-
-termux_step_configure() {
-	# Remove this marker all the time
-	rm -rf $TERMUX_HOSTBUILD_MARKER
 }
 
 termux_step_make() {
