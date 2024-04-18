@@ -1,0 +1,32 @@
+--- a/chrome/common/extensions/chrome_manifest_url_handlers.cc
++++ b/chrome/common/extensions/chrome_manifest_url_handlers.cc
+@@ -97,6 +97,7 @@
+ 
+   using UrlOverrideInfo = api::chrome_url_overrides::UrlOverrideInfo;
+   auto url_overrides = std::make_unique<URLOverrides>();
++#ifndef __ANDROID__
+   auto property_map =
+       std::map<const char*,
+                std::reference_wrapper<const std::optional<std::string>>>{
+@@ -110,6 +111,21 @@
+            std::ref(manifest_keys.chrome_url_overrides.activationmessage)},
+           {UrlOverrideInfo::kKeyboard,
+            std::ref(manifest_keys.chrome_url_overrides.keyboard)}};
++#else
++  auto property_map = std::map<
++      const char*, std::reference_wrapper<const std::optional<std::string>>>{
++      std::make_pair(UrlOverrideInfo::kNewtab,
++                     std::ref(manifest_keys.chrome_url_overrides.newtab)),
++      std::make_pair(UrlOverrideInfo::kBookmarks,
++                     std::ref(manifest_keys.chrome_url_overrides.bookmarks)),
++      std::make_pair(UrlOverrideInfo::kHistory,
++                     std::ref(manifest_keys.chrome_url_overrides.history)),
++      std::make_pair(
++          UrlOverrideInfo::kActivationmessage,
++          std::ref(manifest_keys.chrome_url_overrides.activationmessage)),
++      std::make_pair(UrlOverrideInfo::kKeyboard,
++                     std::ref(manifest_keys.chrome_url_overrides.keyboard))};
++#endif
+ 
+   for (const auto& property : property_map) {
+     if (!property.second.get())

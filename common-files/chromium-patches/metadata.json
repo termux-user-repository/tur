@@ -48,10 +48,15 @@
     "comment": "Disable since host clang-16"
   },
   "angle-fix-atomic/5615.patch": {
-    "start": 5615
+    "start": 5615,
+    "end": 6366
+  },
+  "angle-fix-atomic/6367.patch": {
+    "start": 6367
   },
   "angle-fix-specialization/5672.patch": {
-    "start": 5672
+    "start": 5672,
+    "end": 6366
   },
   "angle-no-android-jni/4389.patch": {
     "start": 4389
@@ -64,7 +69,8 @@
     "start": 6099
   },
   "autofill-unique_ids-no-constexpr-operator-equal/6261.patch": {
-    "start": 6261
+    "start": 6261,
+    "end": 6366
   },
   "avoid-constexpr-std-string/5672.patch": {
     "start": 5672,
@@ -157,7 +163,11 @@
     "end": 5551
   },
   "chromium-extensions-map/5359.patch": {
-    "start": 5359
+    "start": 5359,
+    "end": 6366
+  },
+  "chromium-extensions-map/6367.patch": {
+    "start": 6367
   },
   "chromium-fenced_frame-declare-destructor/5938.patch": {
     "start": 5938,
@@ -266,7 +276,11 @@
     "end": 6098
   },
   "chromium-no-execinfo/6099.patch": {
-    "start": 6099
+    "start": 6099,
+    "end": 6366
+  },
+  "chromium-no-execinfo/6367.patch": {
+    "start": 6367
   },
   "chromium-no-futimes/4389.patch": {
     "start": 4389
@@ -294,7 +308,11 @@
     "end": 5614
   },
   "chromium-no-set-process-title/5615.patch": {
-    "start": 5615
+    "start": 5615,
+    "end": 6366
+  },
+  "chromium-no-set-process-title/6367.patch": {
+    "start": 6367
   },
   "chromium-numerics-byte_conversions-no-std-bit_cast/6312.patch": {
     "start": 6312
@@ -311,7 +329,8 @@
     "end": 5562
   },
   "chromium-strong_alias-no-constexpr-operator-equal/6261.patch": {
-    "start": 6261
+    "start": 6261,
+    "end": 6366
   },
   "chromium-struct-contructor/5790.patch": {
     "start": 5790,
@@ -496,6 +515,9 @@
     "start": 4389,
     "end": 4472
   },
+  "libdav1d-config/6367.patch": {
+    "start": 6367
+  },
   "minigbm-no-android-log/5359.patch": {
     "start": 5359,
     "end": 5480
@@ -525,7 +547,8 @@
     "start": 6099
   },
   "performance_manager-context_collection-no-constexpr-operator-equal/6312.patch": {
-    "start": 6312
+    "start": 6312,
+    "end": 6366
   },
   "persistent_histogram_allocator-constructor/6045.patch": {
     "start": 6045
@@ -539,6 +562,9 @@
   },
   "remove-usage-vector-three_way_compare/6167.patch": {
     "start": 6167
+  },
+  "remove-usage-vector-three_way_compare-2/6367.patch": {
+    "start": 6367
   },
   "remove-xorg-from-build-deps/6167.patch": {
     "start": 6159,
@@ -556,7 +582,8 @@
     "end": 6311
   },
   "resource_attribution-query_params-no-constexpr-operator-equal/6312.patch": {
-    "start": 6312
+    "start": 6312,
+    "end": 6366
   },
   "revert-blink-v8-cxx20/6167.patch": {
     "start": 6167,
@@ -659,7 +686,8 @@
     "end": 6260
   },
   "use-std_to_address-from-libcxx/6261.patch": {
-    "start": 6261
+    "start": 6261,
+    "end": 6366
   },
   "v8-do-not-use-builtin-mul/5481.patch": {
     "start": 5481,

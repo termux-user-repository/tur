@@ -1,0 +1,17 @@
+The declaration of `operator<=>` in base::flat_tree is removed was deleted
+in the previous patch, so do not use `base::flat_tree::operator<=>` in the
+class which uses `base::flat_tree`.
+
+--- a/components/autofill/core/browser/data_model/credit_card_benefit.h
++++ b/components/autofill/core/browser/data_model/credit_card_benefit.h
+@@ -183,8 +183,8 @@
+ 
+   friend bool operator==(const CreditCardMerchantBenefit&,
+                          const CreditCardMerchantBenefit&) = default;
+-  friend auto operator<=>(const CreditCardMerchantBenefit&,
+-                          const CreditCardMerchantBenefit&) = default;
++  friend bool operator<(const CreditCardMerchantBenefit&,
++                        const CreditCardMerchantBenefit&) = default;
+ 
+   bool IsValid() const;
+ 
