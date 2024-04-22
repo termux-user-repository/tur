@@ -3,9 +3,9 @@ TERMUX_PKG_DESCRIPTION="A compatibility layer for running Windows programs (Hang
 TERMUX_PKG_LICENSE="LGPL-2.1"
 TERMUX_PKG_LICENSE_FILE="LICENSE, LICENSE.OLD, COPYING.LIB"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION=9.5
+TERMUX_PKG_VERSION=9.7
 TERMUX_PKG_SRCURL=https://github.com/AndreRH/wine/archive/refs/tags/hangover-$TERMUX_PKG_VERSION.tar.gz
-TERMUX_PKG_SHA256=73bb4e2f4d4ae954cb012ecd0ab4ed8a057c6161c6b4157b24763901192de2ee
+TERMUX_PKG_SHA256=c55e4c1e525d42cc00f1bb10fafa300b0c29db68e996078791ebdf56c55bae5a
 TERMUX_PKG_DEPENDS="fontconfig, freetype, krb5, libandroid-spawn, libc++, libgmp, libgnutls, libxcb, libxcomposite, libxcursor, libxfixes, libxrender, mesa, opengl, pulseaudio, sdl2, vulkan-loader, xorg-xrandr"
 TERMUX_PKG_ANTI_BUILD_DEPENDS="vulkan-loader"
 TERMUX_PKG_BUILD_DEPENDS="libandroid-spawn-static, vulkan-loader-generic"
@@ -73,11 +73,11 @@ exec_prefix=$TERMUX_PREFIX
 
 _setup_llvm_mingw_toolchain() {
 	# LLVM-mingw's version number must not be the same as the NDK's.
-	local _llvm_mingw_version=16
-	local _version="20230614"
+	local _llvm_mingw_version=18
+	local _version="20240417"
 	local _url="https://github.com/mstorsjo/llvm-mingw/releases/download/$_version/llvm-mingw-$_version-ucrt-ubuntu-20.04-x86_64.tar.xz"
 	local _path="$TERMUX_PKG_CACHEDIR/$(basename $_url)"
-	local _sha256sum=9ae925f9b205a92318010a396170e69f74be179ff549200e8122d3845ca243b8
+	local _sha256sum=d28ce4168c83093adf854485446011a0327bad9fe418014de81beba233ce76f1
 	termux_download $_url $_path $_sha256sum
 	local _extract_path="$TERMUX_PKG_CACHEDIR/llvm-mingw-toolchain-$_llvm_mingw_version"
 	if [ ! -d "$_extract_path" ]; then
