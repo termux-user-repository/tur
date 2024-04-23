@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="Open Source, cross-platform JavaScript runtime environme
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION=12.18.3
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://nodejs.org/dist/v${TERMUX_PKG_VERSION}/node-v${TERMUX_PKG_VERSION}.tar.xz
 TERMUX_PKG_SHA256=71158026579487422fd13cc2553b34cddb76519098aa6030faab52f88c6e0d0e
 # Note that we do not use a shared libuv to avoid an issue with the Android
@@ -12,7 +13,7 @@ TERMUX_PKG_SHA256=71158026579487422fd13cc2553b34cddb76519098aa6030faab52f88c6e0d
 # Node.js 16.x does not support `NODE_OPTIONS=--openssl-legacy-provider` option.
 # See https://github.com/termux/termux-packages/issues/9266. Please revert back
 # to depending on openssl (instead of openssl-1.1) when migrating to next LTS.
-TERMUX_PKG_DEPENDS="libc++, openssl-1.1, c-ares, libicu, zlib"
+TERMUX_PKG_DEPENDS="libc++, openssl-1.1, c-ares, zlib"
 TERMUX_PKG_SUGGESTS="clang, make, pkg-config, python"
 _INSTALL_PREFIX=opt/nodejs-12
 TERMUX_PKG_RM_AFTER_INSTALL="
@@ -22,35 +23,6 @@ $_INSTALL_PREFIX/share/systemtap
 $_INSTALL_PREFIX/lib/dtrace
 "
 TERMUX_PKG_BUILD_IN_SRC=true
-TERMUX_PKG_HOSTBUILD=true
-
-termux_step_post_get_source() {
-	# Prevent caching of host build:
-	rm -Rf $TERMUX_PKG_HOSTBUILD_DIR
-}
-
-termux_step_host_build() {
-	local ICU_VERSION=73.1
-	local ICU_TAR=icu4c-${ICU_VERSION//./_}-src.tgz
-	local ICU_DOWNLOAD=https://github.com/unicode-org/icu/releases/download/release-${ICU_VERSION//./-}/$ICU_TAR
-	termux_download \
-		$ICU_DOWNLOAD\
-		$TERMUX_PKG_CACHEDIR/$ICU_TAR \
-		a457431de164b4aa7eca00ed134d00dfbf88a77c6986a10ae7774fc076bb8c45
-	tar xf $TERMUX_PKG_CACHEDIR/$ICU_TAR
-	cd icu/source
-	if [ "$TERMUX_ARCH_BITS" = 32 ]; then
-		./configure --prefix $TERMUX_PKG_HOSTBUILD_DIR/icu-installed \
-			--disable-samples \
-			--disable-tests \
-			--build=i686-pc-linux-gnu "CFLAGS=-m32" "CXXFLAGS=-m32" "LDFLAGS=-m32"
-	else
-		./configure --prefix $TERMUX_PKG_HOSTBUILD_DIR/icu-installed \
-			--disable-samples \
-			--disable-tests
-	fi
-	make -j $TERMUX_MAKE_PROCESSES install
-}
 
 termux_step_configure() {
 	local DEST_CPU
@@ -67,9 +39,13 @@ termux_step_configure() {
 	fi
 
 	export GYP_DEFINES="host_os=linux"
-	export CC_host=gcc
-	export CXX_host=g++
-	export LINK_host=g++
+	local _host_compiler_suffix=""
+	if [ $TERMUX_ARCH_BITS = 32 ]; then
+		_host_compiler_suffix="-m32"
+	fi
+	export CC_host="gcc $_host_compiler_suffix"
+	export CXX_host="g++ $_host_compiler_suffix"
+	export LINK_host="g++ $_host_compiler_suffix"
 
 	LDFLAGS+=" -ldl"
 
@@ -94,7 +70,7 @@ termux_step_configure() {
 
 	# See note above TERMUX_PKG_DEPENDS why we do not use a shared libuv.
 	./configure \
-		--prefix=$TERMUX_PREFIX \
+		--prefix=$TERMUX_PREFIX/$_INSTALL_PREFIX \
 		--dest-cpu=$DEST_CPU \
 		--dest-os=android \
 		--shared-cares \
@@ -102,15 +78,15 @@ termux_step_configure() {
 		--shared-openssl-includes=$_SHARED_OPENSSL_INCLUDES \
 		--shared-openssl-libpath=$_SHARED_OPENSSL_LIBPATH \
 		--shared-zlib \
-		--with-intl=system-icu \
+		--with-intl=full-icu --download=all \
 		--without-snapshot \
 		--without-node-snapshot \
 		--cross-compiling
 
-	export LD_LIBRARY_PATH=$TERMUX_PKG_HOSTBUILD_DIR/icu-installed/lib
-	perl -p -i -e "s@LIBS := \\$\\(LIBS\\)@LIBS := -L$TERMUX_PKG_HOSTBUILD_DIR/icu-installed/lib -lpthread -licui18n -licuuc -licudata@" \
-		$TERMUX_PKG_SRCDIR/out/tools/v8_gypfiles/torque.host.mk \
-		$TERMUX_PKG_SRCDIR/out/tools/v8_gypfiles/bytecode_builtins_list_generator.host.mk \
-		$TERMUX_PKG_SRCDIR/out/tools/v8_gypfiles/v8_libbase.host.mk \
-		$TERMUX_PKG_SRCDIR/out/tools/v8_gypfiles/gen-regexp-special-case.host.mk
+	sed -i "s@-I$TERMUX_PREFIX/include/openssl-1.1@ @
+			s@-I$TERMUX_PREFIX/include@ @
+			s@-L$TERMUX_PREFIX/lib/openssl-1.1@ @
+			s@-L$TERMUX_PREFIX/lib@ @" \
+		$TERMUX_PKG_SRCDIR/out/tools/icu/*.host.mk \
+		$TERMUX_PKG_SRCDIR/out/tools/v8_gypfiles/*.host.mk
 }
