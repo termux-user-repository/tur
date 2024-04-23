@@ -98,7 +98,7 @@ termux_step_make_install() {
 
 	build-python -m maturin build --release --skip-auditwheel --target $CARGO_BUILD_TARGET
 
-	pip install --no-deps ./target/wheels/*.whl --prefix $TERMUX_PREFIX 
+	pip install --no-deps ./target/wheels/*.whl --prefix $TERMUX_PREFIX
 }
 
 termux_step_post_make_install() {
