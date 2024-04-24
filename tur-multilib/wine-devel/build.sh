@@ -118,7 +118,7 @@ termux_step_pre_configure() {
 	LDFLAGS+=" -landroid-spawn"
 
 	# Enable win64 on 64-bit arches.
-	# TODO: Enable win32 after TUR has full support for mutilib 
+	# TODO: Enable win32 after TUR has full support for mutilib
 	if [ "$TERMUX_ARCH_BITS" = 64 ]; then
 		TERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" --enable-win64"
 	fi
