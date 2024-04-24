@@ -1,0 +1,68 @@
+--- a/GNUmakefile
++++ b/GNUmakefile
+@@ -19,6 +19,13 @@
+ CARGO  ?= cargo
+ CARGOFLAGS ?=
+ 
++CARGO_TARGET_NAME ?=
++CROSS_COMPILE := 0
++ifneq ($(CARGO_TARGET_NAME),)
++CROSS_COMPILE := 1
++CARGOFLAGS := --target ${CARGO_TARGET_NAME} ${CARGOFLAGS}
++endif
++
+ # Install directories
+ PREFIX ?= /usr/local
+ DESTDIR ?=
+@@ -33,7 +40,11 @@
+ # This won't support any directory with spaces in its name, but you can just
+ # make a symlink without spaces that points to the directory.
+ BASEDIR       ?= $(shell pwd)
++ifeq ($(CARGO_TARGET_NAME),)
+ BUILDDIR      := $(BASEDIR)/target/${PROFILE}
++else
++BUILDDIR      := $(BASEDIR)/target/${CARGO_TARGET_NAME}/${PROFILE}
++endif
+ PKG_BUILDDIR  := $(BUILDDIR)/deps
+ DOCSDIR       := $(BASEDIR)/docs
+ 
+@@ -337,18 +348,22 @@
+ 	$(CARGO) clean $(CARGOFLAGS) && $(CARGO) update $(CARGOFLAGS)
+ 
+ manpages: build-coreutils
++ifeq ($(CROSS_COMPILE),0)
+ 	mkdir -p $(BUILDDIR)/man/
+ 	$(foreach prog, $(INSTALLEES), \
+ 		$(BUILDDIR)/coreutils manpage $(prog) > $(BUILDDIR)/man/$(PROG_PREFIX)$(prog).1; \
+ 	)
++endif
+ 
+ completions: build-coreutils
++ifeq ($(CROSS_COMPILE),0)
+ 	mkdir -p $(BUILDDIR)/completions/zsh $(BUILDDIR)/completions/bash $(BUILDDIR)/completions/fish
+ 	$(foreach prog, $(INSTALLEES), \
+ 		$(BUILDDIR)/coreutils completion $(prog) zsh > $(BUILDDIR)/completions/zsh/_$(PROG_PREFIX)$(prog); \
+ 		$(BUILDDIR)/coreutils completion $(prog) bash > $(BUILDDIR)/completions/bash/$(PROG_PREFIX)$(prog); \
+ 		$(BUILDDIR)/coreutils completion $(prog) fish > $(BUILDDIR)/completions/fish/$(PROG_PREFIX)$(prog).fish; \
+ 	)
++endif
+ 
+ install: build manpages completions
+ 	mkdir -p $(INSTALLDIR_BIN)
+@@ -362,6 +377,8 @@
+ 		$(INSTALL) $(BUILDDIR)/$(prog) $(INSTALLDIR_BIN)/$(PROG_PREFIX)$(prog);)
+ 	$(if $(findstring test,$(INSTALLEES)), $(INSTALL) $(BUILDDIR)/test $(INSTALLDIR_BIN)/$(PROG_PREFIX)[)
+ endif
++
++ifeq ($(CROSS_COMPILE),0)
+ 	mkdir -p $(DESTDIR)$(DATAROOTDIR)/man/man1
+ 	$(foreach prog, $(INSTALLEES), \
+ 		$(INSTALL) $(BUILDDIR)/man/$(PROG_PREFIX)$(prog).1 $(DESTDIR)$(DATAROOTDIR)/man/man1/; \
+@@ -375,6 +392,7 @@
+ 		$(INSTALL) $(BUILDDIR)/completions/bash/$(PROG_PREFIX)$(prog) $(DESTDIR)$(DATAROOTDIR)/bash-completion/completions/; \
+ 		$(INSTALL) $(BUILDDIR)/completions/fish/$(PROG_PREFIX)$(prog).fish $(DESTDIR)$(DATAROOTDIR)/fish/vendor_completions.d/; \
+ 	)
++endif
+ 
+ uninstall:
+ ifeq (${MULTICALL}, y)
