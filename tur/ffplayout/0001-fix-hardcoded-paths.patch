@@ -5,19 +5,19 @@
      }
  
 -    if !target_channel.config_path.starts_with("/etc/ffplayout") {
-+    if !target_channel.config_path.starts_with("TERMUX_PREFIX@/etc/ffplayout") {
++    if !target_channel.config_path.starts_with("@TERMUX_PREFIX@/etc/ffplayout") {
          return Err(ServiceError::BadRequest("Bad config path!".to_string()));
      }
  
 @@ -32,7 +32,7 @@
      };
  
-     let mut config = PlayoutConfig::new(Some(PathBuf::from(
--        "/usr/share/ffplayout/ffplayout.yml.orig",
-+        "@TERMUX_PREFIX@/share/ffplayout/ffplayout.yml.orig",
-     )));
+     let mut config = PlayoutConfig::new(
+-        Some(PathBuf::from("/usr/share/ffplayout/ffplayout.yml.orig")),
++        Some(PathBuf::from("@TERMUX_PREFIX@/share/ffplayout/ffplayout.yml.orig")),
+         None,
+     );
  
-     config.general.stat_file = format!(".ffp_{channel_name}",);
 --- a/ffplayout-api/src/utils/control.rs
 +++ b/ffplayout-api/src/utils/control.rs
 @@ -183,7 +183,7 @@
@@ -71,21 +71,21 @@
      };
 --- a/lib/src/utils/config.rs
 +++ b/lib/src/utils/config.rs
-@@ -363,7 +363,7 @@
+@@ -365,7 +365,7 @@
  impl PlayoutConfig {
      /// Read config from YAML file, and set some extra config values.
-     pub fn new(cfg_path: Option<PathBuf>) -> Self {
+     pub fn new(cfg_path: Option<PathBuf>, advanced_path: Option<PathBuf>) -> Self {
 -        let mut config_path = PathBuf::from("/etc/ffplayout/ffplayout.yml");
 +        let mut config_path = PathBuf::from("@TERMUX_PREFIX@/etc/ffplayout/ffplayout.yml");
  
          if let Some(cfg) = cfg_path {
              config_path = cfg;
-@@ -381,7 +381,7 @@
+@@ -383,7 +383,7 @@
              Ok(file) => file,
              Err(_) => {
                  eprintln!(
--                    "{config_path:?} doesn't exists!\nPut \"ffplayout.yml\" in \"/etc/playout/\" or beside the executable!"
-+                    "{config_path:?} doesn't exists!\nPut \"ffplayout.yml\" in \"@TERMUX_PREFIX@/etc/playout/\" or beside the executable!"
+-                    "ffplayout.yml not found!\nPut \"ffplayout.yml\" in \"/etc/playout/\" or beside the executable!"
++                    "ffplayout.yml not found!\nPut \"ffplayout.yml\" in \"@TERMUX_PREFIX@/etc/playout/\" or beside the executable!"
                  );
                  process::exit(1);
              }
