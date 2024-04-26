@@ -1,0 +1,22 @@
+To get rid of warning message
+
+OpenJDK 64-Bit Server VM warning: No monotonic clock was available - timed services may be adversely affected if the time-of-day clock 
+changes
+
+--- a/src/hotspot/os/linux/os_linux.cpp
++++ b/src/hotspot/os/linux/os_linux.cpp
+@@ -1477,10 +1477,14 @@
+ void os::Linux::clock_init() {
+   // we do dlopen's in this particular order due to bug in linux
+   // dynamical loader (see 6348968) leading to crash on exit
++#ifndef __ANDROID__
+   void* handle = dlopen("librt.so.1", RTLD_LAZY);
+   if (handle == NULL) {
+     handle = dlopen("librt.so", RTLD_LAZY);
+   }
++#else
++  void* handle = dlopen("libc.so", RTLD_LAZY);
++#endif
+ 
+   if (handle) {
+     int (*clock_getres_func)(clockid_t, struct timespec*) =

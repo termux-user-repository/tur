@@ -1,0 +1,16 @@
+https://bugs.freebsd.org/bugzilla/show_bug.cgi?id=258954
+
+https://github.com/battleblow/jdk11u/commit/305a68a90c722aa7a7b75589e24d5b5d554c96c1
+
+--- a/src/hotspot/share/oops/markOop.hpp
++++ b/src/hotspot/share/oops/markOop.hpp
+@@ -104,6 +104,9 @@ class JavaThread;
+ class markOopDesc: public oopDesc {
+  private:
+   // Conversion
++#if defined(__clang_major__) && (__clang_major__ >= 13)
++  NOINLINE
++#endif
+   uintptr_t value() const { return (uintptr_t) this; }
+ 
+  public:
