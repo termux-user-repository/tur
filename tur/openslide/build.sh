@@ -1,0 +1,9 @@
+TERMUX_PKG_HOMEPAGE=https://openslide.org
+TERMUX_PKG_DESCRIPTION="C library for reading virtual slide images"
+TERMUX_PKG_LICENSE="LGPL-2.1"
+TERMUX_PKG_MAINTAINER="@termux-user-repository"
+TERMUX_PKG_VERSION=4.0.0
+TERMUX_PKG_SRCURL=https://github.com/openslide/openslide/releases/download/v$TERMUX_PKG_VERSION/openslide-$TERMUX_PKG_VERSION.tar.xz
+TERMUX_PKG_SHA256=cc227c44316abb65fb28f1c967706eb7254f91dbfab31e9ae6a48db6cf4ae562
+TERMUX_PKG_DEPENDS="gdk-pixbuf, glib, libcairo, libdicom, libjpeg-turbo, libpng, libsqlite, libtiff, libxml2, openjpeg, zlib"
+TERMUX_PKG_AUTO_UPDATE=true
