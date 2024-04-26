@@ -1,0 +1,13 @@
+--- a/src/hotspot/cpu/aarch64/macroAssembler_aarch64.cpp
++++ b/src/hotspot/cpu/aarch64/macroAssembler_aarch64.cpp
+@@ -5852,9 +5852,7 @@
+ // On other systems, the helper is a usual C function.
+ //
+ void MacroAssembler::get_thread(Register dst) {
+-  RegSet saved_regs =
+-    LINUX_ONLY(RegSet::range(r0, r1)  + lr - dst)
+-    NOT_LINUX (RegSet::range(r0, r17) + lr - dst);
++  RegSet saved_regs = RegSet::range(r0, r17) + lr - dst;
+ 
+   push(saved_regs, sp);
+ 
