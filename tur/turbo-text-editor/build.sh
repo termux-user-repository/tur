@@ -23,5 +23,5 @@ termux_step_post_get_source() {
 }
 
 termux_step_post_make_install() {
-    rm -f $TERMUX_PREFIX/lib/libfmt.a
+	rm -f $TERMUX_PREFIX/lib/libfmt.a
 }

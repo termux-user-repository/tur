@@ -8,11 +8,17 @@ TERMUX_PKG_SRCURL=(https://android.googlesource.com/platform/bionic/+/refs/heads
 				https://android.googlesource.com/platform/bionic/+/refs/heads/master/libm/upstream-freebsd/lib/msun/src/s_cpow.c
 				https://android.googlesource.com/platform/bionic/+/refs/heads/master/libm/upstream-freebsd/lib/msun/src/s_cpowf.c
 				https://android.googlesource.com/platform/bionic/+/refs/heads/master/libm/fpmath.h)
+TERMUX_PKG_SHA256=(SKIP_CHECKSUM
+				SKIP_CHECKSUM
+				SKIP_CHECKSUM
+				SKIP_CHECKSUM
+				SKIP_CHECKSUM
+				SKIP_CHECKSUM)
 TERMUX_PKG_VERSION=0.1
 TERMUX_PKG_SKIP_SRC_EXTRACT=true
 TERMUX_PKG_BUILD_IN_SRC=true
 
-# Files are taken from the Bionic libc repo. 
+# Files are taken from the Bionic libc repo.
 # *.c/math_private.h: https://android.googlesource.com/platform/bionic/+/refs/heads/master/libm/upstream-freebsd/lib/msun/src/
 # fpmath.h: https://android.googlesource.com/platform/bionic/+/refs/heads/master/libm/fpmath.h
 termux_step_get_source() {

@@ -102,7 +102,7 @@ termux_step_configure() {
 
 	# Dummy librt.so
 	# Why not dummy a librt.a? Some of the binaries reference symbols only exists in Android
-	# for some reason, such as the `chrome_crashpad_handler`, which needs to link with 
+	# for some reason, such as the `chrome_crashpad_handler`, which needs to link with
 	# libprotobuf_lite.a, but it is hard to remove the usage of `android/log.h` in protobuf.
 	echo "INPUT(-llog -liconv -landroid-shmem)" > "$TERMUX_PREFIX/lib/librt.so"
 

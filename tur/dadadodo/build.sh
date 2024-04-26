@@ -14,7 +14,7 @@ termux_step_post_get_source() {
 }
 
 termux_step_make() {
-	make CC="$CC" CFLAGS="$CFLAGS $CPPFLAGS" LDFLAGS="$LDFLAGS" 
+	make CC="$CC" CFLAGS="$CFLAGS $CPPFLAGS" LDFLAGS="$LDFLAGS"
 }
 
 termux_step_make_install() {

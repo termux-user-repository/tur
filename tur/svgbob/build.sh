@@ -9,11 +9,11 @@ TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_AUTO_UPDATE=true
 
 termux_step_make() {
-    termux_setup_rust
-    cargo build --jobs $TERMUX_MAKE_PROCESSES --release --target $CARGO_TARGET_NAME
+	termux_setup_rust
+	cargo build --jobs $TERMUX_MAKE_PROCESSES --release --target $CARGO_TARGET_NAME
 }
 
 termux_step_make_install() {
-    install -Dm700 $TERMUX_PKG_SRCDIR/target/${CARGO_TARGET_NAME}/release/svgbob "${TERMUX_PREFIX}/bin/svgbob"
+	install -Dm700 $TERMUX_PKG_SRCDIR/target/${CARGO_TARGET_NAME}/release/svgbob "${TERMUX_PREFIX}/bin/svgbob"
 }
 

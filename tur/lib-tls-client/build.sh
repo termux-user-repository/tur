@@ -18,7 +18,7 @@ termux_step_pre_configure() {
 }
 
 termux_step_make() {
-    cd cffi_dist
+	cd cffi_dist
 	go build -buildmode=c-shared -o ./dist/lib-tls-client.so
 }
 

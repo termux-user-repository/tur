@@ -16,7 +16,7 @@ termux_step_get_source() {
 	curl "$TERMUX_PKG_SRCURL?format=text" | base64 -d > nl_types.cpp
 }
 
-# Files are taken from the Bionic libc repo. 
+# Files are taken from the Bionic libc repo.
 # nl_types.cpp: https://android.googlesource.com/platform/bionic/+/refs/heads/master/libc/bionic/nl_types.cpp
 termux_step_make() {
 	$CXX $CFLAGS $CPPFLAGS -I$TERMUX_PKG_BUILDER_DIR -c nl_types.cpp

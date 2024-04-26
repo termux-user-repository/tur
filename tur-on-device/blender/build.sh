@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://www.blender.org
 TERMUX_PKG_DESCRIPTION="A fully integrated 3D graphics creation suite"
 TERMUX_PKG_LICENSE="GPL-2.0"
 TERMUX_PKG_MAINTAINER="@T-Dynamos"
-BLENDER_MAJOR_VERSION=4 
+BLENDER_MAJOR_VERSION=4
 BLENDER_MINOR_VERSION=0
-BLENDER_ADDONS_COMMIT=92dd274c0bf08ad4786e7dfe715dee327f3ee43f 
+BLENDER_ADDONS_COMMIT=92dd274c0bf08ad4786e7dfe715dee327f3ee43f
 _COMMIT=63e9cead5ff002921eb4921037971e24d1c61abc
 _COMMIT_DATE=2023.12.18
 TERMUX_PKG_REVISION=1
@@ -40,31 +40,31 @@ bin/normalizer
 "
 
 termux_step_post_get_source() {
-    git fetch --unshallow
-    git checkout $_COMMIT
-    local version="$(git log -1 --format=%cs | sed 's/-/./g')"
-    if [ "$version" != "$_COMMIT_DATE" ]; then
-        echo -n "ERROR: The specified version \"$TERMUX_PKG_VERSION\""
-        echo " is different from what is expected to be: \"$version\""
-        return 1
-    fi
+	git fetch --unshallow
+	git checkout $_COMMIT
+	local version="$(git log -1 --format=%cs | sed 's/-/./g')"
+	if [ "$version" != "$_COMMIT_DATE" ]; then
+		echo -n "ERROR: The specified version \"$TERMUX_PKG_VERSION\""
+		echo " is different from what is expected to be: \"$version\""
+		return 1
+	fi
 }
 
 termux_step_pre_configure(){
-    if [ "${TERMUX_ON_DEVICE_BUILD}" = false ]; then
-        termux_error_exit "This package doesn't support cross-compiling."
-    fi 
-    # ld.lld: error: undefined symbol: backtrace
-    LDFLAGS+=" -landroid-execinfo"
-    # ld.lld: error: version script assignment 
-    LDFLAGS+=" -Wl,--undefined-version"
-    # Position independent executables are not supported on android
-    sed -i "s/no-pie/pie/g" $TERMUX_PKG_SRCDIR/build_files/cmake/platform/platform_unix.cmake
+	if [ "${TERMUX_ON_DEVICE_BUILD}" = false ]; then
+		termux_error_exit "This package doesn't support cross-compiling."
+	fi
+	# ld.lld: error: undefined symbol: backtrace
+	LDFLAGS+=" -landroid-execinfo"
+	# ld.lld: error: version script assignment
+	LDFLAGS+=" -Wl,--undefined-version"
+	# Position independent executables are not supported on android
+	sed -i "s/no-pie/pie/g" $TERMUX_PKG_SRCDIR/build_files/cmake/platform/platform_unix.cmake
 }
 
 termux_step_post_make_install() {
-    export MODIR=$TERMUX_PREFIX/share/blender/$BLENDER_MAJOR_VERSION.$BLENDER_MINOR_VERSION/scripts/modules 
-    curl -L https://github.com/blender/blender-addons/archive/$BLENDER_ADDONS_COMMIT.tar.gz | tar xvz -C $MODIR/ 
-    cp -r $MODIR/blender-addons-$BLENDER_ADDONS_COMMIT/* $MODIR/ 
-    rm -rf $MODIR/blender-addons-$BLENDER_ADDONS_COMMIT
+	export MODIR=$TERMUX_PREFIX/share/blender/$BLENDER_MAJOR_VERSION.$BLENDER_MINOR_VERSION/scripts/modules
+	curl -L https://github.com/blender/blender-addons/archive/$BLENDER_ADDONS_COMMIT.tar.gz | tar xvz -C $MODIR/
+	cp -r $MODIR/blender-addons-$BLENDER_ADDONS_COMMIT/* $MODIR/
+	rm -rf $MODIR/blender-addons-$BLENDER_ADDONS_COMMIT
 }

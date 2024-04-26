@@ -60,10 +60,10 @@ termux_step_configure() {
 	env -i PATH="$PATH" sudo apt install llvm-14 -yq
 
 	case $TERMUX_ARCH in
-	    "aarch64" ) CARGO_TARGET_NAME=aarch64-linux-android ;;
-	    "arm" ) CARGO_TARGET_NAME=armv7-linux-androideabi ;;
-	    "i686" ) CARGO_TARGET_NAME=i686-linux-android ;;
-	    "x86_64" ) CARGO_TARGET_NAME=x86_64-linux-android ;;
+		"aarch64" ) CARGO_TARGET_NAME=aarch64-linux-android ;;
+		"arm" ) CARGO_TARGET_NAME=armv7-linux-androideabi ;;
+		"i686" ) CARGO_TARGET_NAME=i686-linux-android ;;
+		"x86_64" ) CARGO_TARGET_NAME=x86_64-linux-android ;;
 	esac
 
 	export RUST_BACKTRACE=1

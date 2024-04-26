@@ -32,5 +32,5 @@ termux_step_post_get_source() {
 }
 
 termux_step_post_make_install() {
-    find "$_INSTALL_PREFIX/lib" -name "*.so*" -exec ln -sfr "{}" "$TERMUX_PREFIX/lib" \;
+	find "$_INSTALL_PREFIX/lib" -name "*.so*" -exec ln -sfr "{}" "$TERMUX_PREFIX/lib" \;
 }

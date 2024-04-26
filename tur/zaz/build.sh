@@ -9,5 +9,5 @@ TERMUX_PKG_DEPENDS="sdl, libtheora, sdl-image, libftgl2"
 TERMUX_PKG_GROUPS="games"
 
 termux_step_pre_configure() {
-    export LDFLAGS+=" -lvorbis"
+	export LDFLAGS+=" -lvorbis"
 }

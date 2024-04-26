@@ -9,12 +9,12 @@ TERMUX_PKG_DEPENDS="sdl2, sdl2-mixer, sdl2-image"
 TERMUX_PKG_BUILD_IN_SRC=true
 
 termux_step_post_get_source() {
-    git clone https://github.com/davidjoffe/gnukem_data data --depth=1
-    mkdir -p debian/icons/hicolor/128x128/apps/
-    wget https://raw.githubusercontent.com/Mailaender/dave_gnukem/1349b0f0caf445370c08c366b8e9acf86d163aaf/debian/icons/hicolor/128x128/apps/davegnukem.png \
-        -o debian/icons/hicolor/128x128/apps/davegnukem.png
+	git clone https://github.com/davidjoffe/gnukem_data data --depth=1
+	mkdir -p debian/icons/hicolor/128x128/apps/
+	wget https://raw.githubusercontent.com/Mailaender/dave_gnukem/1349b0f0caf445370c08c366b8e9acf86d163aaf/debian/icons/hicolor/128x128/apps/davegnukem.png \
+		-o debian/icons/hicolor/128x128/apps/davegnukem.png
 }
 
 termux_step_post_make_install() {
-    ln -sr $TERMUX_PREFIX/games/davegnukem $TERMUX_PREFIX/bin/davegnukem
+	ln -sr $TERMUX_PREFIX/games/davegnukem $TERMUX_PREFIX/bin/davegnukem
 }

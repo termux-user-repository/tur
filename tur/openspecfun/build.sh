@@ -21,7 +21,7 @@ termux_step_make() {
 }
 
 termux_step_make_install() {
-	 make install -j 1 prefix="$PREFIX" \
+	make install -j 1 prefix="$PREFIX" \
 			FFLAGS="$FCFLAGS" CFLAGS="$CFLAGS" CPPFLAGS="$CPPFLAGS" \
 			FC="$FC" CC="$CC" AR="$AR"
 }

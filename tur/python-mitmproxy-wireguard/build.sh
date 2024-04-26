@@ -37,5 +37,5 @@ termux_step_make_install() {
 			./target/wheels/mitmproxy_wireguard-$TERMUX_PKG_VERSION-py37-none-any.whl
 	fi
 
-	pip install --no-deps ./target/wheels/*.whl --prefix $TERMUX_PREFIX 
+	pip install --no-deps ./target/wheels/*.whl --prefix $TERMUX_PREFIX
 }

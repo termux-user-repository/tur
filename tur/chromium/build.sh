@@ -90,7 +90,7 @@ termux_step_make_install() {
 # When set `enable_nacl = true`, the following error occurs.
 # ninja: error: 'native_client/toolchain/linux_x86/pnacl_newlib/bin/arm-nacl-objcopy', needed by 'nacl_irt_arm.nexe', missing and no known rule to make it.
 # If we want to enable NaCl, maybe we should build the toolchain of NaCl too.
-# But I don't think this is necessary. NaCl existing or not will take little 
+# But I don't think this is necessary. NaCl existing or not will take little
 # influence on Chromium. So I'd like to disable NaCl.
 # #############################################################################
 

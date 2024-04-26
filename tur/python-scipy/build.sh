@@ -14,10 +14,10 @@ TERMUX_PKG_UPDATE_TAG_TYPE="latest-release-tag"
 
 # Tests will hang on arm and will failed with `Segmentation fault` on i686.
 # See https://github.com/termux-user-repository/tur/pull/21#issue-1295483266.
-# 
-# The logs of this crash on i686 are as following. 
+#
+# The logs of this crash on i686 are as following.
 # linalg/tests/test_basic.py: Fatal Python error: Segmentation fault
-# 
+#
 # Current thread 0xf7f4b580 (most recent call first):
 #   File "/data/data/com.termux/files/usr/lib/python3.10/site-packages/scipy-1.8.0-py3.10-linux-i686.egg/scipy/linalg/_basic.py", line 1227 in lstsq
 #   File "/data/data/com.termux/files/usr/lib/python3.10/site-packages/scipy-1.8.0-py3.10-linux-i686.egg/scipy/linalg/tests/test_basic.py", line 1047 in test_simple_overdet_complex

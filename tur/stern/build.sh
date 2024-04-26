@@ -13,28 +13,28 @@ TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_UPDATE_TAG_TYPE="newest-tag"
 
 termux_step_make() {
-    termux_setup_golang
+	termux_setup_golang
 
-    mkdir bin
-    go build -o ./bin ./...
+	mkdir bin
+	go build -o ./bin ./...
 }
 
 termux_step_make_install() {
-    install -Dm700 -t $TERMUX_PREFIX/bin bin/stern
+	install -Dm700 -t $TERMUX_PREFIX/bin bin/stern
 }
 
 termux_step_post_make_install() {
-    mkdir -p ${TERMUX_PREFIX}/share/zsh/site-functions
-    mkdir -p ${TERMUX_PREFIX}/share/bash-completions/completions
-    mkdir -p ${TERMUX_PREFIX}/share/fish/vendor_completions.d
+	mkdir -p ${TERMUX_PREFIX}/share/zsh/site-functions
+	mkdir -p ${TERMUX_PREFIX}/share/bash-completions/completions
+	mkdir -p ${TERMUX_PREFIX}/share/fish/vendor_completions.d
 
-    touch ${TERMUX_PREFIX}/share/zsh/site-functions/_stern
-    touch ${TERMUX_PREFIX}/share/bash-completions/completions/stern
-    touch ${TERMUX_PREFIX}/share/fish/vendor_completions.d/stern.fish
+	touch ${TERMUX_PREFIX}/share/zsh/site-functions/_stern
+	touch ${TERMUX_PREFIX}/share/bash-completions/completions/stern
+	touch ${TERMUX_PREFIX}/share/fish/vendor_completions.d/stern.fish
 }
 
 termux_step_create_debscripts() {
-    cat <<- EOF > ./postinst
+	cat <<- EOF > ./postinst
 		#!${TERMUX_PREFIX}/bin/sh
 
 		stern --completion zsh  > ${TERMUX_PREFIX}/share/zsh/site-functions/_stern

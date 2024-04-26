@@ -9,5 +9,5 @@ TERMUX_PKG_SHA256=630a6bcf5e65d1b1b40cdb8608bdb922316759bfb981c65091fec8682d1543
 TERMUX_PKG_DEPENDS="littlecms, libjasper"
 
 termux_step_pre_configure() {
-    LDFLAGS+=" $($CC -print-libgcc-file-name)"
+	LDFLAGS+=" $($CC -print-libgcc-file-name)"
 }
