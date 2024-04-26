@@ -1,0 +1,11 @@
+TERMUX_PKG_HOMEPAGE=https://libdicom.readthedocs.io
+TERMUX_PKG_DESCRIPTION="C library for reading DICOM files"
+TERMUX_PKG_LICENSE="MIT"
+TERMUX_PKG_MAINTAINER="@termux-user-repository"
+TERMUX_PKG_VERSION=1.1.0
+TERMUX_PKG_SRCURL=https://github.com/ImagingDataCommons/libdicom/releases/download/v$TERMUX_PKG_VERSION/libdicom-$TERMUX_PKG_VERSION.tar.xz
+TERMUX_PKG_SHA256=058bfaa7653c60a70798e021001d765e3f91ca4df5a8824b7604eaa57376449b
+TERMUX_PKG_AUTO_UPDATE=true
+TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
+-Dtests=false
+"
