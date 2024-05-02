@@ -8,7 +8,7 @@ TERMUX_PKG_SHA256=88462530dbfac4e17c8f8ba560802d21042d90236043e11461a1cfbf458380
 TERMUX_PKG_DEPENDS="firefox"
 TERMUX_PKG_ANTI_BUILD_DEPENDS="firefox"
 TERMUX_PKG_BUILD_IN_SRC=true
-TERMUX_PKG_BLACKLISTED_ARCHES="i686"
+TERMUX_PKG_AUTO_UPDATE=true
 
 termux_step_post_get_source() {
 	local extension_url="https://github.com/browsh-org/browsh/releases/download/v$TERMUX_PKG_VERSION/browsh-$TERMUX_PKG_VERSION.xpi"
