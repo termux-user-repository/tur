@@ -10,6 +10,7 @@ TERMUX_PKG_SHA256=bf44bb121d0cb852213723cc301220f8a7c4ec3b99ded45cbb3d81b27fb9b2
 TERMUX_PKG_DEPENDS="python, python-pygame, python-future"
 TERMUX_PKG_ANTI_BUILD_DEPENDS="python, python-pygame, python-future"
 TERMUX_PKG_PLATFORM_INDEPENDENT=true
+TERMUX_PKG_AUTO_UPDATE=false
 
 termux_step_pre_configure(){
 	# Create Directories
