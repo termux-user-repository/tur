@@ -2,7 +2,7 @@ TERMUX_PKG_HOMEPAGE=https://github.com/microsoft/vscode
 TERMUX_PKG_DESCRIPTION="Visual Studio Code"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="1.88.1"
+TERMUX_PKG_VERSION="1.89.0"
 TERMUX_PKG_SRCURL=git+https://github.com/microsoft/vscode
 TERMUX_PKG_GIT_BRANCH="$TERMUX_PKG_VERSION"
 TERMUX_PKG_DEPENDS="electron-deps, libx11, libxkbfile, libsecret, ripgrep"
@@ -31,6 +31,12 @@ _setup_nodejs_18() {
 }
 
 termux_step_post_get_source() {
+	# Ensure that code-oss supports node 18
+	local _node_version=$(cat .nvmrc | cut -d. -f1 -)
+	if [ "$_node_version" != 18 ]; then
+		termux_error_exit "Version mismatch: Expected 18, got $_node_version."
+	fi
+
 	# Check whether the electron version matches the node headers version
 	local _electron_verion="$(jq -r '.devDependencies.electron' $TERMUX_PKG_SRCDIR/package.json)"
 	local _header_version="$(. $TERMUX_SCRIPTDIR/tur/electron-headers-for-code-oss/build.sh; echo $TERMUX_PKG_VERSION)"
@@ -52,6 +58,9 @@ termux_step_post_get_source() {
 	termux_download $_native_keymap_src_url $_native_keymap_path $_native_keymap_sha256sum
 	mkdir -p $TERMUX_PKG_SRCDIR/node-native-keymap-src
 	tar -xf $_native_keymap_path -C $TERMUX_PKG_SRCDIR/node-native-keymap-src --strip-components=1
+
+	# Replace package.json
+	jq ".dependencies.\"native-keymap\" = \"file:./node-native-keymap-src\"" package.json > package.json.tmp && mv package.json.tmp package.json
 }
 
 termux_step_host_build() {
