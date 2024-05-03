@@ -1,9 +1,12 @@
-TERMUX_PKG_HOMEPAGE=https://github.com/coin-or/Clp
-TERMUX_PKG_DESCRIPTION="An open-source linear programming solver"
+TERMUX_PKG_HOMEPAGE=https://github.com/exaloop/codon
+TERMUX_PKG_DESCRIPTION="A high-performance, zero-overhead, extensible Python compiler using LLVM"
+# LICENSE: BSL-1.1 (to Apache-2.0)
+# TODO: Review license of non-free packages
 TERMUX_PKG_LICENSE="non-free"
 TERMUX_PKG_LICENSE_FILE="LICENSE"
 TERMUX_PKG_MAINTAINER="@termux"
 TERMUX_PKG_VERSION=0.16.3
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://github.com/exaloop/codon/archive/refs/tags/v$TERMUX_PKG_VERSION.tar.gz
 TERMUX_PKG_SHA256=f28b9d8fd5349257aab47154703e9bc744a4884d5975c55776f4b0a72302eb31
 TERMUX_PKG_DEPENDS="libc++, libxml2, zlib, zstd"
@@ -23,6 +26,9 @@ TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 TERMUX_PKG_BLACKLISTED_ARCHES="arm, i686"
 
 termux_step_host_build() {
+	env -i PATH="$PATH" sudo apt update
+	env -i PATH="$PATH" sudo apt install -y libzstd-dev
+
 	termux_setup_cmake
 	cmake "$TERMUX_PKG_SRCDIR"
 	make -j $TERMUX_MAKE_PROCESSES peg2cpp
@@ -33,7 +39,7 @@ termux_step_pre_configure() {
 
 	_RPATH_FLAG="-Wl,-rpath=$TERMUX_PREFIX/lib"
 	_RPATH_FLAG_ADD="-Wl,-rpath='\$ORIGIN' -Wl,-rpath='\$ORIGIN/../lib/codon' -Wl,-rpath=$TERMUX_PREFIX/lib"
-	LDFLAGS="${LDFLAGS/$_RPATH_FLAG/$_RPATH_FLAG_ADD}"
+	LDFLAGS="${LDFLAGS/$_RPATH_FLAG/$_RPATH_FLAG_ADD} -Wl,--undefined-version"
 	echo $LDFLAGS
 }
 
@@ -46,4 +52,9 @@ exec env PATH="$TERMUX_PREFIX/opt/codon/bin:\$PATH" $TERMUX_PREFIX/opt/codon/bin
 
 EOF
 	chmod +x $TERMUX_PREFIX/bin/codon
+}
+
+termux_step_post_massage() {
+	# Remove libfmt.a
+	rm -rf lib
 }
