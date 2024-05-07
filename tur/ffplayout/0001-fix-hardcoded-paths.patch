@@ -13,8 +13,8 @@
      };
  
      let mut config = PlayoutConfig::new(
--        Some(PathBuf::from("/usr/share/ffplayout/ffplayout.yml.orig")),
-+        Some(PathBuf::from("@TERMUX_PREFIX@/share/ffplayout/ffplayout.yml.orig")),
+-        Some(PathBuf::from("/usr/share/ffplayout/ffplayout.toml.orig")),
++        Some(PathBuf::from("@TERMUX_PREFIX@/share/ffplayout/ffplayout.toml.orig")),
          None,
      );
  
@@ -64,10 +64,10 @@
      };
  
      let config_path = if env::consts::OS == "linux" {
--        "/etc/ffplayout/ffplayout.yml"
-+        "@TERMUX_PREFIX@/etc/ffplayout/ffplayout.yml"
+-        "/etc/ffplayout/ffplayout.toml"
++        "@TERMUX_PREFIX@/etc/ffplayout/ffplayout.toml"
      } else {
-         "./assets/ffplayout.yml"
+         "./assets/ffplayout.toml"
      };
 --- a/lib/src/utils/config.rs
 +++ b/lib/src/utils/config.rs
@@ -75,8 +75,8 @@
  impl PlayoutConfig {
      /// Read config from YAML file, and set some extra config values.
      pub fn new(cfg_path: Option<PathBuf>, advanced_path: Option<PathBuf>) -> Self {
--        let mut config_path = PathBuf::from("/etc/ffplayout/ffplayout.yml");
-+        let mut config_path = PathBuf::from("@TERMUX_PREFIX@/etc/ffplayout/ffplayout.yml");
+-        let mut config_path = PathBuf::from("/etc/ffplayout/ffplayout.toml");
++        let mut config_path = PathBuf::from("@TERMUX_PREFIX@/etc/ffplayout/ffplayout.toml");
  
          if let Some(cfg) = cfg_path {
              config_path = cfg;
@@ -84,8 +84,8 @@
              Ok(file) => file,
              Err(_) => {
                  eprintln!(
--                    "ffplayout.yml not found!\nPut \"ffplayout.yml\" in \"/etc/playout/\" or beside the executable!"
-+                    "ffplayout.yml not found!\nPut \"ffplayout.yml\" in \"@TERMUX_PREFIX@/etc/playout/\" or beside the executable!"
+-                    "ffplayout.toml not found!\nPut \"ffplayout.toml\" in \"/etc/playout/\" or beside the executable!"
++                    "ffplayout.toml not found!\nPut \"ffplayout.toml\" in \"@TERMUX_PREFIX@/etc/playout/\" or beside the executable!"
                  );
                  process::exit(1);
              }
@@ -95,8 +95,8 @@
  pub fn get_config(args: Args) -> Result<PlayoutConfig, ProcError> {
      let cfg_path = match args.channel {
          Some(c) => {
--            let path = PathBuf::from(format!("/etc/ffplayout/{c}.yml"));
-+            let path = PathBuf::from(format!("@TERMUX_PREFIX@/etc/ffplayout/{c}.yml"));
+-            let path = PathBuf::from(format!("/etc/ffplayout/{c}.toml"));
++            let path = PathBuf::from(format!("@TERMUX_PREFIX@/etc/ffplayout/{c}.toml"));
  
              if !path.is_file() {
                  return Err(ProcError::Custom(format!(
