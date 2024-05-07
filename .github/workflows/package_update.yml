@@ -47,6 +47,8 @@ jobs:
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Merge repos
+        run: ./setup-environment.sh
       - name: Gather build summary
         run: |
           BASE_COMMIT=$(jq --raw-output .pull_request.base.sha "$GITHUB_EVENT_PATH")
