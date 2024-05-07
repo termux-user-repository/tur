@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://github.com/pola-rs/polars
 TERMUX_PKG_DESCRIPTION="Dataframes powered by a multithreaded, vectorized query engine, written in Rust"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="0.20.23"
+TERMUX_PKG_VERSION="0.20.24"
 TERMUX_PKG_SRCURL=https://github.com/pola-rs/polars/releases/download/py-$TERMUX_PKG_VERSION/polars-$TERMUX_PKG_VERSION.tar.gz
-TERMUX_PKG_SHA256=4503c446c7771d5b52d5bff4f2dbf2e999a87a1cc3c89931db255cff43218436
+TERMUX_PKG_SHA256=a0c11f3b5e756bab7ba164ed73104c96fa9c861efce157fe8991b3eafeb4b0b8
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_DEPENDS="libc++, python"
 TERMUX_PKG_PYTHON_COMMON_DEPS="wheel"
@@ -36,8 +36,6 @@ termux_pkg_auto_update() {
 }
 
 termux_step_pre_configure() {
-	_PYTHON_VERSION=$(. $TERMUX_SCRIPTDIR/packages/python/build.sh; echo $_MAJOR_VERSION)
-
 	termux_setup_cmake
 	termux_setup_rust
 
@@ -77,7 +75,7 @@ termux_step_pre_configure() {
 	ln -sfT $(readlink -f $TERMUX_PREFIX/lib/libz.so.tmp) \
 		$_CARGO_TARGET_LIBDIR/libz.so
 
-	LDFLAGS+=" -Wl,--no-as-needed -lpython${_PYTHON_VERSION}"
+	LDFLAGS+=" -Wl,--no-as-needed -lpython${TERMUX_PYTHON_VERSION}"
 
 	# XXX: Don't know why, this is needed for `cmake` in rust to work properly
 	local _rtarget _renv
@@ -94,7 +92,7 @@ termux_step_make() {
 termux_step_make_install() {
 	export CARGO_BUILD_TARGET=${CARGO_TARGET_NAME}
 	export PYO3_CROSS_LIB_DIR=$TERMUX_PREFIX/lib
-	export PYTHONPATH=$TERMUX_PREFIX/lib/python${_PYTHON_VERSION}/site-packages
+	export PYTHONPATH=$TERMUX_PREFIX/lib/python${TERMUX_PYTHON_VERSION}/site-packages
 
 	build-python -m maturin build --release --skip-auditwheel --target $CARGO_BUILD_TARGET
 
@@ -111,4 +109,8 @@ termux_step_post_make_install() {
 termux_step_post_massage() {
 	rm -f lib/libz.so.1
 	rm -f lib/libz.so
+
+	rm -rf $CARGO_HOME/registry/src/*/cmake-*
+	rm -rf $CARGO_HOME/registry/src/*/jemalloc-sys-*
+	rm -rf $CARGO_HOME/registry/src/*/arboard-*
 }
