@@ -17,6 +17,13 @@
 name: Package updates
 
 on:
+  pull_request:
+    paths:
+    - 'tur/**'
+    - 'tur-on-device/**'
+    - 'tur-continuous/**'
+    - 'tur-multilib/**'
+    - 'tur-hacking/**'
   schedule:
     - cron: "0 */6 * * *"
   workflow_dispatch:
