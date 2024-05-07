@@ -1,0 +1,11 @@
+--- a/melib/Cargo.toml
++++ b/melib/Cargo.toml
+@@ -73,7 +73,7 @@
+ notmuch = ["notify"]
+ smtp = ["tls", "base64"]
+ smtp-trace = ["smtp"]
+-sqlite3 = ["rusqlite"]
++sqlite3 = ["rusqlite", "rusqlite/buildtime_bindgen"]
+ sqlite3-static = ["sqlite3", "rusqlite/bundled-full"]
+ tls = ["native-tls"]
+ tls-static = ["tls", "native-tls/vendored"]
