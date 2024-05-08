@@ -1,0 +1,9 @@
+TERMUX_PKG_HOMEPAGE=https://github.com/knyipab/skyseg-ncnn
+TERMUX_PKG_DESCRIPTION="Sky segmentation on image using ncnn machine learning model"
+TERMUX_PKG_DEPENDS="libncnn, opencv"
+TERMUX_PKG_LICENSE="MIT"
+TERMUX_PKG_MAINTAINER="@knyipab"
+TERMUX_PKG_VERSION="0.1.0"
+TERMUX_PKG_SRCURL="https://github.com/knyipab/skyseg-ncnn/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz"
+TERMUX_PKG_SHA256=c8c5d6afa02cfce886c10ee331ec2382214881febdd124a4fc151a94fe0c80ca
+TERMUX_PKG_AUTO_UPDATE=true
