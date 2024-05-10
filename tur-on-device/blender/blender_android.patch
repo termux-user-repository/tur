@@ -1,0 +1,34 @@
+diff '--color=auto' -uNr blender/intern/cycles/kernel/CMakeLists.txt blender.mod/intern/cycles/kernel/CMakeLists.txt
+--- blender/intern/cycles/kernel/CMakeLists.txt	2024-04-15 12:57:33.000000000 +0530
++++ blender.mod/intern/cycles/kernel/CMakeLists.txt	2024-05-08 22:48:33.069855396 +0530
+@@ -1144,12 +1144,12 @@
+ endif()
+ 
+ # Warnings to avoid using doubles in the kernel.
+-if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_C_COMPILER_ID MATCHES "Clang")
+-  add_check_cxx_compiler_flag(CMAKE_CXX_FLAGS _has_cxxflag_float_conversion "-Werror=float-conversion")
+-  add_check_cxx_compiler_flag(CMAKE_CXX_FLAGS _has_cxxflag_double_promotion "-Werror=double-promotion")
+-  unset(_has_cxxflag_float_conversion)
+-  unset(_has_cxxflag_double_promotion)
+-endif()
++# if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_C_COMPILER_ID MATCHES "Clang")
++#   add_check_cxx_compiler_flag(CMAKE_CXX_FLAGS _has_cxxflag_float_conversion "-Werror=float-conversion")
++#   add_check_cxx_compiler_flag(CMAKE_CXX_FLAGS _has_cxxflag_double_promotion "-Werror=double-promotion")
++#   unset(_has_cxxflag_float_conversion)
++#   unset(_has_cxxflag_double_promotion)
++# endif()
+ 
+ cycles_add_library(cycles_kernel "${LIB}"
+   ${SRC_KERNEL_DEVICE_CPU}
+diff '--color=auto' -uNr blender/source/blender/blenlib/intern/uuid.cc blender.mod/source/blender/blenlib/intern/uuid.cc
+--- blender/source/blender/blenlib/intern/uuid.cc	2024-04-15 12:57:33.000000000 +0530
++++ blender.mod/source/blender/blenlib/intern/uuid.cc	2024-05-08 22:47:26.255901812 +0530
+@@ -29,7 +29,7 @@
+     static_assert(std::mt19937_64::max() == 0xffffffffffffffffLL);
+ 
+     struct timespec ts;
+-#ifdef __APPLE__
++#ifdef __ANDROID__
+     /* `timespec_get()` is only available on macOS 10.15+, so until that's the minimum version
+      * supported by Blender, use another function to get the timespec.
+      *
