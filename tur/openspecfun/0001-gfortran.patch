@@ -1,0 +1,11 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -3,7 +3,7 @@
+ SET(VERSION 0.0.5)
+ 
+ set(CMAKE_BUILD_TYPE Release)
+-SET(CMAKE_Fortran_COMPILER gfortran)
++# SET(CMAKE_Fortran_COMPILER gfortran)
+ 
+ SET(SRC_FADDEEVA ${CMAKE_SOURCE_DIR}/Faddeeva)
+ SET(FADDEEVA_src ${SRC_FADDEEVA}/Faddeeva.c)
