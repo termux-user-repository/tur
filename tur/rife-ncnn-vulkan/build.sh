@@ -1,0 +1,11 @@
+TERMUX_PKG_HOMEPAGE=https://github.com/nihui/rife-ncnn-vulkan
+TERMUX_PKG_DESCRIPTION="A metapackage that provides rife-ncnn-vulkan"
+TERMUX_PKG_LICENSE="MIT"
+TERMUX_PKG_MAINTAINER="@termux-user-repository"
+TERMUX_PKG_VERSION=0.1
+TERMUX_PKG_AUTO_UPDATE=false
+TERMUX_PKG_DEPENDS="rife-ncnn-vulkan-nihui | rife-ncnn-vulkan-tntwise"
+TERMUX_PKG_ANTI_BUILD_DEPENDS="rife-ncnn-vulkan-nihui, rife-ncnn-vulkan-tntwise"
+TERMUX_PKG_PLATFORM_INDEPENDENT=true
+TERMUX_PKG_SKIP_SRC_EXTRACT=true
+TERMUX_PKG_METAPACKAGE=true
