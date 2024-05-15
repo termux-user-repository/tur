@@ -34,8 +34,9 @@ termux_step_make_install () {
 	if [ -e "${system_lib}" ]; then
 	export LD_PRELOAD="${system_lib}:\$LD_PRELOAD"
 	fi
-	"$TERMUX_PREFIX/opt/rife-ncnn-vulkan" "\$@"
+	"$TERMUX_PREFIX/opt/rife-ncnn-vulkan/rife-ncnn-vulkan" "\$@"
 	EOF
+	chmod 700 "$TERMUX_PREFIX/bin/rife-ncnn-vulkan"
 	
 	# install models
 	cp -r models/rife-v2.3 "$TERMUX_PREFIX/opt/rife-ncnn-vulkan/rife-v2.3" # default value of model arg
@@ -47,11 +48,11 @@ termux_step_make_install () {
 		ver=${ver##rife-v}
 		[ "${#ver}" -eq 1 ] && ver="$ver.0"
 		if [ "${ver: -5}" == "-lite" ] && ver="${ver::-5}"; then
-			[ "${ver::1}" -ge "${max_lite_ver::1}" ] && [ "${ver:2}" -ge "${max_lite_ver:2}" ] && max_lite_ver="$ver"
-		elif [ "${ver::1}" -ge "${max_ver::1}" ] && [ "${ver:2}" -ge "${max_ver:2}" ]; then
+			[ "${ver::1}" == 4 ] && [ "${ver:2}" -ge "${max_lite_ver:2}" ] && max_lite_ver="$ver"
+		elif [ "${ver::1}" == 4 ] && [ "${ver:2}" -ge "${max_ver:2}" ]; then
 			max_ver="$ver"
 		fi
 	done
-	[ "$max_lite_ver" != 0.0 ] && cp -r models/rife-v"${max_lite_ver%%.0}"-lite "$TERMUX_PREFIX/opt/rife-ncnn-vulkan/rife-lite-latest"
-	[ "$max_ver" != 0.0 ] && cp -r models/rife-v"${max_ver%%.0}" "$TERMUX_PREFIX/opt/rife-ncnn-vulkan/rife-latest"
+	[ "$max_lite_ver" != 0.0 ] && cp -r models/rife-v"${max_lite_ver%%.0}"-lite "$TERMUX_PREFIX/opt/rife-ncnn-vulkan/rife-v4-lite-latest"
+	[ "$max_ver" != 0.0 ] && cp -r models/rife-v"${max_ver%%.0}" "$TERMUX_PREFIX/opt/rife-ncnn-vulkan/rife-v4-latest"
 }
