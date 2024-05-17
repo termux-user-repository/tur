@@ -10,7 +10,6 @@ export PREFIX=@TERMUX_PREFIX@
 export TMPDIR=@TERMUX_PREFIX@/tmp
 export EXTUTILS_LIBBUILDER_VERSION=@EXTUTILS_LIBBUILDER_VERSION@
 export TEXT_BIBTEX_VERSION=@TEXT_BIBTEX_VERSION@
-export XML_LIBXML_VERSION=@XML_LIBXML_VERSION@
 export BIBER_VERSION=@BIBER_VERSION@
 
 # Lock terminal to prevent sending text input and special key
@@ -51,31 +50,6 @@ tar -xf Text-BibTeX-${TEXT_BIBTEX_VERSION}.tar.gz
 cd Text-BibTeX-${TEXT_BIBTEX_VERSION}
 patch -Np1 -i $PREFIX/opt/biber/Text-BibTeX.diff
 cpanm .
-
-cd ..
-
-if [ ! -f XML-LibXML-${XML_LIBXML_VERSION}.tar.gz ]; then
-	curl --fail --retry 3 --location --output "$TMPDIR/XML-LibXML-${XML_LIBXML_VERSION}.tar.gz" \
-             "https://cpan.metacpan.org/authors/id/S/SH/SHLOMIF/XML-LibXML-${XML_LIBXML_VERSION}.tar.gz"
-else
-	rm -rf XML-LibXML-${XML_LIBXML_VERSION}
-fi
-tar -xf XML-LibXML-${XML_LIBXML_VERSION}.tar.gz
-cd XML-LibXML-${XML_LIBXML_VERSION}
-patch -Np1 -i $PREFIX/opt/biber/XML-LibXML.diff
-# test 35huge_mode.t fails with:
-#     Failed test 'exception thrown during parse'
-#     at t/35huge_mode.t line 58.
-#            got: ''
-#       expected: anything else
-#
-#     Failed test 'exception refers to entity reference loop'
-#     at t/35huge_mode.t line 60.
-#                     ''
-#       doesn't match '(?^si:entity.*loop)'
-#   Looks like you failed 2 tests of 5.
-# so skip tests and hope this isn't fatal
-cpanm --notest .
 
 cd ..
 
