@@ -1,0 +1,11 @@
+--- a/components/omnibox/browser/on_device_tail_model_service.cc
++++ b/components/omnibox/browser/on_device_tail_model_service.cc
+@@ -30,7 +30,7 @@
+ // The maximum idle time before the model executor is unloaded from memory.
+ constexpr base::TimeDelta kMaxExecutorIdleSeconds = base::Seconds(60);
+ // Constants for TFlite model validation.
+-constexpr std::string kTestPrefix = "face";
++static inline const std::string kTestPrefix = "face";
+ constexpr std::string_view kModelValidationSwitchName =
+     "omnibox-on-device-tail-model-validation";
+ 

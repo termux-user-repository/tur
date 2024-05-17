@@ -1,0 +1,15 @@
+--- a/base/strings/cstring_view.h
++++ b/base/strings/cstring_view.h
+@@ -420,10 +420,8 @@
+   //
+   // cstring views are weakly ordered, since string views pointing into
+   // different strings can compare as equal.
+-  friend constexpr std::weak_ordering operator<=>(basic_cstring_view l,
+-                                                  basic_cstring_view r) {
+-    return std::lexicographical_compare_three_way(l.begin(), l.end(), r.begin(),
+-                                                  r.end());
++  friend constexpr bool operator<(basic_cstring_view l, basic_cstring_view r) {
++    return std::lexicographical_compare(l.begin(), l.end(), r.begin(), r.end());
+   }
+ 
+   // Implicitly converts from cstring_view to a non-NUL-terminated

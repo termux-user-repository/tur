@@ -52,7 +52,8 @@
     "end": 6366
   },
   "angle-fix-atomic/6367.patch": {
-    "start": 6367
+    "start": 6367,
+    "end": 6421
   },
   "angle-fix-specialization/5672.patch": {
     "start": 5672,
@@ -75,6 +76,9 @@
   "avoid-constexpr-std-string/5672.patch": {
     "start": 5672,
     "end": 5775
+  },
+  "avoid-constexpr-std-string-2/6422.patch": {
+    "start": 6422
   },
   "avoid-emplace_back-struct/5938.patch": {
     "start": 5938,
@@ -174,7 +178,11 @@
     "end": 6098
   },
   "chromium-fenced_frame-declare-destructor/6099.patch": {
-    "start": 6099
+    "start": 6099,
+    "end": 6421
+  },
+  "chromium-fenced_frame-declare-destructor/6422.patch": {
+    "start": 6422
   },
   "chromium-dns-class-constructor/5845.patch": {
     "start": 5845,
@@ -280,7 +288,11 @@
     "end": 6366
   },
   "chromium-no-execinfo/6367.patch": {
-    "start": 6367
+    "start": 6367,
+    "end": 6421
+  },
+  "chromium-no-execinfo/6422.patch": {
+    "start": 6422
   },
   "chromium-no-futimes/4389.patch": {
     "start": 4389
@@ -566,6 +578,9 @@
   "remove-usage-vector-three_way_compare-2/6367.patch": {
     "start": 6367
   },
+  "remove-usage-three_way_compare/6422.patch": {
+    "start": 6422
+  },
   "remove-xorg-from-build-deps/6167.patch": {
     "start": 6159,
     "end": 6225
@@ -601,7 +616,11 @@
     "end": 6311
   },
   "revert-blink-v8-cxx20-2/6312.patch": {
-    "start": 6312
+    "start": 6312,
+    "end": 6421
+  },
+  "revert-blink-v8-cxx20-2/6422.patch": {
+    "start": 6422
   },
   "revert-rust-qr-scanner/6167.patch": {
     "start": 6167,
@@ -658,7 +677,11 @@
     "end": 6260
   },
   "swiftshader-no-android/6261.patch": {
-    "start": 6261
+    "start": 6261,
+    "end": 6421
+  },
+  "swiftshader-no-android/6422.patch": {
+    "start": 6422
   },
   "swiftshader-no-spawn/5359.patch": {
     "start": 5359
@@ -876,7 +899,8 @@
     "end": 5816
   },
   "z-iwyu-webauthn-variant/5672.patch": {
-    "start": 5672
+    "start": 5672,
+    "end": 6421
   },
   "z-iwyu-webrtc_overrides-include-vector/5414.patch": {
     "start": 5414,
