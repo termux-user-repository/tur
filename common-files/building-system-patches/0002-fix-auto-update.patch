@@ -6,7 +6,7 @@ Only search packages from TUR repository when auto-updating.
  if [[ "$1" == "@all" ]]; then
  	_fetch_and_cache_tags
 -	for repo_dir in $(jq --raw-output 'del(.pkg_format) | keys | .[]' "${TERMUX_SCRIPTDIR}/repo.json"); do
-+	for repo_dir in "tur" "tur-on-device"; do
++	for repo_dir in "tur" "tur-on-device" "tur-multilib" "tur-hacking"; do
  		for pkg_dir in "${repo_dir}"/*; do
  			_unix_millis=$(date +%s%N | cut -b1-13)
  			! _should_update "${pkg_dir}" && continue # Skip if not needed.
@@ -15,7 +15,7 @@ Only search packages from TUR repository when auto-updating.
  	for pkg in "$@"; do
  		if [ ! -d "${pkg}" ]; then # If only package name is given, try to find it's directory.
 -			for repo_dir in $(jq --raw-output 'del(.pkg_format) | keys | .[]' "${TERMUX_SCRIPTDIR}/repo.json"); do
-+			for repo_dir in "tur" "tur-on-device"; do
++			for repo_dir in "tur" "tur-on-device" "tur-multilib" "tur-hacking"; do
  				if [ -d "${repo_dir}/${pkg}" ]; then
  					pkg="${repo_dir}/${pkg}"
  					break

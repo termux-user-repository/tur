@@ -17,7 +17,7 @@ termux_step_pre_configure() {
 }
 
 termux_step_make() {
-        cd $TERMUX_PKG_SRCDIR
+	cd $TERMUX_PKG_SRCDIR
 	go build -o fscan main.go
 }
 

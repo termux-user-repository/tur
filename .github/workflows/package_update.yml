@@ -21,7 +21,6 @@ on:
     paths:
     - 'tur/**'
     - 'tur-on-device/**'
-    - 'tur-continuous/**'
     - 'tur-multilib/**'
     - 'tur-hacking/**'
   schedule:

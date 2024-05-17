@@ -10,5 +10,5 @@ TERMUX_PKG_DEPENDS="aircrack-ng, libnl, libpcap"
 TERMUX_PKG_BUILD_IN_SRC=true
 
 termux_step_pre_configure() {
-        CFLAGS+=" -Wno-implicit-function-declaration"
+	CFLAGS+=" -Wno-implicit-function-declaration"
 }
