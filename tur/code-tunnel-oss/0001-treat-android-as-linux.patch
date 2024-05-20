@@ -1,0 +1,172 @@
+--- a/cli/src/desktop/version_manager.rs
++++ b/cli/src/desktop/version_manager.rs
+@@ -231,7 +231,7 @@
+ 		if let Some(uri) = PRODUCT_DOWNLOAD_URL {
+ 			// todo: on some platforms, we may be able to help automate installation. For example,
+ 			// we can unzip the app ourselves on macOS and on windows we can download and spawn the GUI installer
+-			#[cfg(target_os = "linux")]
++			#[cfg(any(target_os = "linux", target_os = "android"))]
+ 			println!("Install it from your system's package manager or {}, restart your shell, and try again.", uri);
+ 			#[cfg(target_os = "macos")]
+ 			println!("Download and unzip it from {} and try again.", uri);
+@@ -370,7 +370,7 @@
+ 
+ // Looks for the given binary name in the PATH, returning all candidate matches.
+ // Based on https://github.dev/microsoft/vscode-js-debug/blob/7594d05518df6700df51771895fcad0ddc7f92f9/src/common/pathUtils.ts#L15
+-#[cfg(target_os = "linux")]
++#[cfg(any(target_os = "linux", target_os = "android"))]
+ fn detect_installed_program(log: &log::Logger) -> io::Result<Vec<PathBuf>> {
+ 	use crate::constants::APPLICATION_NAME;
+ 
+--- a/cli/src/tunnels.rs
++++ b/cli/src/tunnels.rs
+@@ -22,6 +22,8 @@
+ mod nosleep_macos;
+ #[cfg(target_os = "windows")]
+ mod nosleep_windows;
++#[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
++mod nosleep_dummy;
+ mod port_forwarder;
+ mod server_bridge;
+ mod server_multiplexer;
+@@ -32,6 +34,8 @@
+ mod service_macos;
+ #[cfg(target_os = "windows")]
+ mod service_windows;
++#[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
++mod service_dummy;
+ mod socket_signal;
+ mod wsl_detect;
+ 
+--- a/cli/src/tunnels/control_server.rs
++++ b/cli/src/tunnels/control_server.rs
+@@ -1027,6 +1027,8 @@
+ 		os_platform: "linux",
+ 		#[cfg(target_os = "macos")]
+ 		os_platform: "darwin",
++		#[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
++		os_platform: "unknown",
+ 	})
+ }
+ 
+--- a/cli/src/tunnels/nosleep.rs
++++ b/cli/src/tunnels/nosleep.rs
+@@ -11,3 +11,6 @@
+ 
+ #[cfg(target_os = "macos")]
+ pub type SleepInhibitor = super::nosleep_macos::SleepInhibitor;
++
++#[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
++pub type SleepInhibitor = super::nosleep_dummy::SleepInhibitor;
+--- a/cli/src/tunnels/nosleep_dummy.rs
++++ b/cli/src/tunnels/nosleep_dummy.rs
+@@ -0,0 +1,12 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++pub struct SleepInhibitor { }
++
++impl SleepInhibitor {
++		pub async fn new() -> Result<Self, std::io::Error> {
++				Err(std::io::Error::last_os_error())
++		}
++}
+--- a/cli/src/tunnels/service.rs
++++ b/cli/src/tunnels/service.rs
+@@ -57,6 +57,9 @@
+ #[cfg(target_os = "macos")]
+ pub type ServiceManagerImpl = super::service_macos::LaunchdService;
+ 
++#[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
++pub type ServiceManagerImpl = super::service_dummy::DummyService;
++
+ #[allow(unreachable_code)]
+ #[allow(unused_variables)]
+ pub fn create_service_manager(log: log::Logger, paths: &LauncherPaths) -> ServiceManagerImpl {
+@@ -72,6 +75,10 @@
+ 	{
+ 		super::service_linux::SystemdService::new(log, paths.clone())
+ 	}
++	#[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
++	{
++			super::service_dummy::DummyService::new(log, paths)
++	}
+ }
+ 
+ #[allow(dead_code)] // unused on Linux
+--- a/cli/src/tunnels/service_dummy.rs
++++ b/cli/src/tunnels/service_dummy.rs
+@@ -0,0 +1,56 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++use async_trait::async_trait;
++use std::{path::PathBuf};
++
++use crate::{
++		log,
++		state::LauncherPaths,
++		util::errors::AnyError,
++};
++
++use super::service::{tail_log_file, ServiceContainer, ServiceManager};
++
++pub struct DummyService {
++		log: log::Logger,
++		log_file: PathBuf,
++}
++
++impl DummyService {
++		pub fn new(log: log::Logger, paths: &LauncherPaths) -> Self {
++				Self {
++						log,
++						log_file: paths.service_log_file(),
++				}
++		}
++}
++
++#[async_trait]
++impl ServiceManager for DummyService {
++		async fn register(&self, _exe: std::path::PathBuf, _args: &[&str]) -> Result<(), AnyError> {
++				Ok(())
++		}
++
++		async fn show_logs(&self) -> Result<(), AnyError> {
++				tail_log_file(&self.log_file).await
++		}
++
++		async fn run(
++				self,
++				_launcher_paths: LauncherPaths,
++				mut _handle: impl 'static + ServiceContainer,
++		) -> Result<(), AnyError> {
++				Ok(())
++		}
++
++		async fn is_installed(&self) -> Result<bool, AnyError> {
++				Ok(true)
++		}
++
++		async fn unregister(&self) -> Result<(), AnyError> {
++				Ok(())
++		}
++}
+--- a/cli/src/util/zipper.rs
++++ b/cli/src/util/zipper.rs
+@@ -92,10 +92,10 @@
+ 			use std::io::Read;
+ 			use std::os::unix::ffi::OsStringExt;
+ 
+-			#[cfg(target_os = "macos")]
++			#[cfg(any(target_os = "macos", all(target_os = "android", target_arch = "arm")))]
+ 			const S_IFLINK_32: u32 = S_IFLNK as u32;
+ 
+-			#[cfg(target_os = "linux")]
++			#[cfg(any(target_os = "linux", all(target_os = "android", not(target_arch = "arm"))))]
+ 			const S_IFLINK_32: u32 = S_IFLNK;
+ 
+ 			if matches!(file.unix_mode(), Some(mode) if mode & S_IFLINK_32 == S_IFLINK_32) {
