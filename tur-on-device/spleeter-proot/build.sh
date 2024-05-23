@@ -21,6 +21,12 @@ termux_step_post_get_source () {
 }
 
 termux_step_make_install(){
+	# install 2stems model
+	mkdir -p "$PREFIX/etc/spleeter-proot/pretrained_models/2stems"
+	wget "https://github.com/deezer/spleeter/releases/download/v1.4.0/2stems.tar.gz"
+	tar -xf 2stems.tar.gz -C "$PREFIX/etc/spleeter-proot/pretrained_models/2stems/"
+
+	# install proot rootfs and spleeter
 	proot-distro install --override-alias app_spleeter ubuntu
 	proot-distro login app_spleeter --isolated -- eval useradd -U -m -s /bin/bash -p root android
 	proot-distro login app_spleeter --user android -- eval "
@@ -36,6 +42,7 @@ rm -rf ~/miniconda3/miniconda.sh
 ~/miniconda3/bin/conda run -n spleeter_py310 pip install --no-deps spleeter
 ~/miniconda3/bin/conda run -n spleeter_py310 pip install ffmpeg-python httpx==0.19.0 norbert typer==0.3.2
 ~/miniconda3/bin/conda run -n spleeter_py310 pip install pandas==1.5.3 tensorflow==2.10
+~/miniconda3/bin/conda run -n spleeter_py310 pip cache purge
 "
 	install -Dm700 "$TERMUX_PKG_BUILDER_DIR"/spleeter-proot $TERMUX_PREFIX/bin/
 	ln -sfr $TERMUX_PREFIX/bin/spleeter-proot $TERMUX_PREFIX/bin/spleeter

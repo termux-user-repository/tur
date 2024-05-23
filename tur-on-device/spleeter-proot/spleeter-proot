@@ -1,3 +1,3 @@
 #!/data/data/com.termux/files/usr/bin/sh
 
-proot-distro login --user android app_spleeter --shared-tmp --work-dir "$PWD" -- /home/android/miniconda3/bin/conda run -n spleeter_py310 spleeter "$@"
+proot-distro login --user android app_spleeter --shared-tmp --env MODEL_PATH="$PREFIX/etc/spleeter-proot/pretrained_models/2stems" --work-dir "$PWD" -- /home/android/miniconda3/bin/conda run -n spleeter_py310 spleeter "$@"
