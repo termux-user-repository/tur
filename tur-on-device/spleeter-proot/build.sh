@@ -20,6 +20,13 @@ termux_step_post_get_source () {
 	cp "$TERMUX_PKG_BUILDER_DIR"/LICENSE "$TERMUX_PKG_SRCDIR"/
 }
 
+proot_run () {
+	proot-distro login app_spleeter --isolated -- "$@"
+}
+proot_run_user () {
+	proot-distro login app_spleeter --user android --isolated -- "$@"
+}
+
 termux_step_make_install(){
 	# install 2stems model
 	mkdir -p "$PREFIX/etc/spleeter-proot/pretrained_models/2stems"
@@ -28,22 +35,23 @@ termux_step_make_install(){
 
 	# install proot rootfs and spleeter
 	proot-distro install --override-alias app_spleeter ubuntu
-	proot-distro login app_spleeter --isolated -- eval useradd -U -m -s /bin/bash -p root android
-	proot-distro login app_spleeter --user android -- eval "
-mkdir -p ~/miniconda3
-wget https://repo.anaconda.com/miniconda/Miniconda3-py310_24.4.0-0-Linux-$TERMUX_ARCH.sh -O ~/miniconda3/miniconda.sh
-"
-	proot-distro login app_spleeter --user android --isolated -- eval "
-bash ~/miniconda3/miniconda.sh -b -u -p ~/miniconda3
-rm -rf ~/miniconda3/miniconda.sh
 
-~/miniconda3/bin/conda config --set auto_activate_base false
-~/miniconda3/bin/conda create -n spleeter_py310 -y python=3.10
-~/miniconda3/bin/conda run -n spleeter_py310 pip install --no-deps spleeter
-~/miniconda3/bin/conda run -n spleeter_py310 pip install ffmpeg-python httpx==0.19.0 norbert typer==0.3.2
-~/miniconda3/bin/conda run -n spleeter_py310 pip install pandas==1.5.3 tensorflow==2.10
-~/miniconda3/bin/conda run -n spleeter_py310 pip cache purge
-"
+	proot_run apt update
+	proot_run apt upgrade -y
+	proot_run apt install -y libhdf5-dev gcc wget pkg-config
+	proot_run useradd -U -m -s /bin/bash -p root android
+	proot_run_user mkdir -p /home/android/miniconda3
+	proot_run_user wget https://repo.anaconda.com/miniconda/Miniconda3-py310_24.4.0-0-Linux-$TERMUX_ARCH.sh -O /home/android/miniconda3/miniconda.sh
+	proot_run_user bash /home/android/miniconda3/miniconda.sh -b -u -p /home/android/miniconda3
+	proot_run_user rm -rf /home/android/miniconda3/miniconda.sh
+	proot_run_user /home/android/miniconda3/bin/conda config --set auto_activate_base false
+	proot_run_user /home/android/miniconda3/bin/conda create -n spleeter_py310 -y python=3.10
+	proot_run_user /home/android/miniconda3/bin/conda run -n spleeter_py310 pip install ffmpeg-python httpx[http2]==0.19.0 norbert typer==0.3.2
+	proot_run_user /home/android/miniconda3/bin/conda run -n spleeter_py310 pip install pandas==1.5.3 tensorflow==2.10
+	proot_run_user /home/android/miniconda3/bin/conda run -n spleeter_py310 pip install --no-deps spleeter
+	proot_run_user /home/android/miniconda3/bin/conda run -n spleeter_py310 pip cache purge
+	proot_run apt autoremove -y gcc wget pkg-config
+
 	install -Dm700 "$TERMUX_PKG_BUILDER_DIR"/spleeter-proot $TERMUX_PREFIX/bin/
 	ln -sfr $TERMUX_PREFIX/bin/spleeter-proot $TERMUX_PREFIX/bin/spleeter
 }
