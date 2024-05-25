@@ -1,0 +1,12 @@
+https://github.com/bazelbuild/bazel/commit/af50ad37eda9173f6c1ffe50c8522b67f70baf79
+
+--- a/scripts/bootstrap/compile.sh
++++ b/scripts/bootstrap/compile.sh
+@@ -450,6 +450,7 @@ function run_bazel_jar() {
+       -XX:+HeapDumpOnOutOfMemoryError -Xverify:none -Dfile.encoding=ISO-8859-1 \
+       -XX:HeapDumpPath=${OUTPUT_DIR} \
+       -Djava.util.logging.config.file=${OUTPUT_DIR}/javalog.properties \
++      --add-opens java.base/java.lang=ALL-UNNAMED \
+       ${JNI_FLAGS} \
+       -jar ${ARCHIVE_DIR}/libblaze.jar \
+       --batch \
