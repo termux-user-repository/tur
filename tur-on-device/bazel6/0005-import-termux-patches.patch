@@ -1,0 +1,55 @@
+--- a/third_party/BUILD
++++ b/third_party/BUILD
+@@ -46,6 +46,7 @@
+         "//third_party/py/mock:srcs",
+         "//third_party/py/six:srcs",
+         "//third_party/rules_python:srcs",
++        "//third_party/termux-patches:srcs",
+         "//third_party/zlib:srcs",
+         "//third_party/upb:srcs",
+         "@googleapis//:srcs",
+--- a/distdir_deps.bzl
++++ b/distdir_deps.bzl
+@@ -105,7 +105,10 @@
+             "https://github.com/protocolbuffers/protobuf/archive/v3.19.6.tar.gz",
+         ],
+         "patch_args": ["-p1"],
+-        "patches": ["//third_party/protobuf:3.19.6.patch"],
++        "patches": [
++            "//third_party/protobuf:3.19.6.patch",
++            "//third_party/termux-patches:protobuf.patch",
++        ],
+         "used_in": [
+             "additional_distfiles",
+             "test_WORKSPACE_files",
+@@ -123,6 +126,8 @@
+         "patches": [
+             "//third_party/grpc:grpc_1.47.0.patch",
+             "//third_party/grpc:grpc_1.47.0.win_arm64.patch",
++            "//third_party/termux-patches:grpc.patch",
++            "//third_party/termux-patches:cares-config.patch",
+         ],
+         "used_in": [
+             "additional_distfiles",
+@@ -196,6 +200,10 @@
+             "https://mirror.bazel.build/github.com/protocolbuffers/upb/archive/a5477045acaa34586420942098f5fecd3570f577.tar.gz",
+             "https://github.com/protocolbuffers/upb/archive/a5477045acaa34586420942098f5fecd3570f577.tar.gz",
+         ],
++        "patch_args": ["-p1"],
++        "patches": [
++            "//third_party/termux-patches:upb-config.patch",
++        ],
+         "used_in": [
+             "additional_distfiles",
+             "test_WORKSPACE_files",
+@@ -211,6 +219,10 @@
+             "https://mirror.bazel.build/github.com/c-ares/c-ares/archive/6654436a307a5a686b008c1d4c93b0085da6e6d8.tar.gz",
+             "https://github.com/c-ares/c-ares/archive/6654436a307a5a686b008c1d4c93b0085da6e6d8.tar.gz",
+         ],
++        "patch_args": ["-p1"],
++        "patches": [
++            "//third_party/termux-patches:cares.patch",
++        ],
+         "used_in": [
+             "additional_distfiles",
+             "test_WORKSPACE_files",

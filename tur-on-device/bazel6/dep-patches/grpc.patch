@@ -1,0 +1,77 @@
+diff --git a/src/core/lib/gpr/log_android.cc b/src/core/lib/gpr/log_android.cc
+index 11ffd64..a1df434 100644
+--- a/src/core/lib/gpr/log_android.cc
++++ b/src/core/lib/gpr/log_android.cc
+@@ -18,7 +18,7 @@
+ 
+ #include <grpc/support/port_platform.h>
+ 
+-#ifdef GPR_ANDROID
++#if defined(GPR_ANDROID) && !defined(__TERMUX__)
+ 
+ #include <android/log.h>
+ #include <stdarg.h>
+diff --git a/src/core/lib/gpr/log_posix.cc b/src/core/lib/gpr/log_posix.cc
+index 2c28bdd..c1b5d6e 100644
+--- a/src/core/lib/gpr/log_posix.cc
++++ b/src/core/lib/gpr/log_posix.cc
+@@ -18,7 +18,7 @@
+ 
+ #include <grpc/support/port_platform.h>
+ 
+-#ifdef GPR_POSIX_LOG
++#if defined(GPR_POSIX_LOG) || defined(__TERMUX__)
+ 
+ #include <inttypes.h>
+ #include <pthread.h>
+diff --git a/src/core/lib/gpr/tmpfile_posix.cc b/src/core/lib/gpr/tmpfile_posix.cc
+index 166cdf6..ed77a76 100644
+--- a/src/core/lib/gpr/tmpfile_posix.cc
++++ b/src/core/lib/gpr/tmpfile_posix.cc
+@@ -39,7 +39,7 @@ FILE* gpr_tmpfile(const char* prefix, char** tmp_filename) {
+ 
+   if (tmp_filename != nullptr) *tmp_filename = nullptr;
+ 
+-  gpr_asprintf(&filename_template, "/tmp/%s_XXXXXX", prefix);
++  gpr_asprintf(&filename_template, "/data/data/com.termux/files/usr/tmp/%s_XXXXXX", prefix);
+   GPR_ASSERT(filename_template != nullptr);
+ 
+   fd = mkstemp(filename_template);
+diff --git a/src/core/lib/security/security_connector/load_system_roots_linux.cc b/src/core/lib/security/security_connector/load_system_roots_linux.cc
+index 6b9c50b..52213b8 100644
+--- a/src/core/lib/security/security_connector/load_system_roots_linux.cc
++++ b/src/core/lib/security/security_connector/load_system_roots_linux.cc
+@@ -52,12 +52,12 @@ namespace grpc_core {
+ namespace {
+ 
+ const char* kLinuxCertFiles[] = {
+-    "/etc/ssl/certs/ca-certificates.crt", "/etc/pki/tls/certs/ca-bundle.crt",
+-    "/etc/ssl/ca-bundle.pem", "/etc/pki/tls/cacert.pem",
+-    "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem"};
++    "/data/data/com.termux/files/usr/etc/ssl/certs/ca-certificates.crt", "/data/data/com.termux/files/usr/etc/pki/tls/certs/ca-bundle.crt",
++    "/data/data/com.termux/files/usr/etc/ssl/ca-bundle.pem", "/data/data/com.termux/files/usr/etc/pki/tls/cacert.pem",
++    "/data/data/com.termux/files/usr/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem"};
+ const char* kLinuxCertDirectories[] = {
+-    "/etc/ssl/certs", "/system/etc/security/cacerts", "/usr/local/share/certs",
+-    "/etc/pki/tls/certs", "/etc/openssl/certs"};
++    "/data/data/com.termux/files/usr/etc/ssl/certs", "/system/etc/security/cacerts", "/data/data/com.termux/files/usr/local/share/certs",
++    "/data/data/com.termux/files/usr/etc/pki/tls/certs", "/data/data/com.termux/files/usr/etc/openssl/certs"};
+ 
+ grpc_slice GetSystemRootCerts() {
+   grpc_slice valid_bundle_slice = grpc_empty_slice();
+diff --git a/src/core/lib/security/security_connector/ssl_utils.cc b/src/core/lib/security/security_connector/ssl_utils.cc
+index 07983c3..706a5bd 100644
+--- a/src/core/lib/security/security_connector/ssl_utils.cc
++++ b/src/core/lib/security/security_connector/ssl_utils.cc
+@@ -45,9 +45,9 @@
+ static const char* installed_roots_path = GRPC_ROOT_PEM_PATH;
+ #elif defined(INSTALL_PREFIX)
+ static const char* installed_roots_path =
+-    INSTALL_PREFIX "/usr/share/grpc/roots.pem";
++    "/data/data/com.termux/files/usr/share/grpc/roots.pem";
+ #else
+-static const char* installed_roots_path = "/usr/share/grpc/roots.pem";
++static const char* installed_roots_path = "/data/data/com.termux/files/usr/share/grpc/roots.pem";
+ #endif
+ 
+ #ifndef TSI_OPENSSL_ALPN_SUPPORT

@@ -1,0 +1,9 @@
+--- a/third_party/cncf_udpa/cncf_udpa_0.0.1.patch
++++ b/third_party/cncf_udpa/cncf_udpa_0.0.1.patch
+@@ -155,4 +155,4 @@
+ +#        "//udpa/service/orca/v1:pkg_go_proto",
+ +#        "//udpa/type/v1:pkg_go_proto",
+ +#    ],
+-+#)
+\ No newline at end of file
+++#)
