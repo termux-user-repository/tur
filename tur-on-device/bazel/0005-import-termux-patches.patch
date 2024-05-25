@@ -1,0 +1,52 @@
+--- a/third_party/BUILD
++++ b/third_party/BUILD
+@@ -35,6 +35,7 @@
+         "//third_party/py/mock:srcs",
+         "//third_party/py/six:srcs",
+         "//third_party/remoteapis:srcs",
++        "//third_party/termux-patches:srcs",
+         "//third_party/zlib:srcs",
+     ],
+ )
+--- a/MODULE.bazel
++++ b/MODULE.bazel
+@@ -59,6 +59,39 @@
+ bazel_dep(name = "rules_go", version = "0.39.1")
+ bazel_dep(name = "upb", version = "0.0.0-20220923-a547704")
+ 
++single_version_override(
++    module_name = "c-ares",
++    patch_strip = 1,
++    patches = [
++       "//third_party/termux-patches:cares.patch",
++       "//third_party/termux-patches:cares-config.patch",
++    ],
++)
++
++single_version_override(
++    module_name = "upb",
++    patch_strip = 1,
++    patches = [
++       "//third_party/termux-patches:upb-config.patch",
++    ],
++)
++
++single_version_override(
++    module_name = "protobuf",
++    patch_strip = 1,
++    patches = [
++       "//third_party/termux-patches:protobuf.patch",
++    ],
++)
++
++single_version_override(
++    module_name = "grpc",
++    patch_strip = 1,
++    patches = [
++       "//third_party/termux-patches:grpc.patch",
++    ],
++)
++
+ # =========================================
+ # Java dependencies
+ # =========================================
