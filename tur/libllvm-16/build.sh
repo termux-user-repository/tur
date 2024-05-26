@@ -11,6 +11,7 @@ TERMUX_PKG_SRCURL=https://github.com/llvm/llvm-project/releases/download/llvmorg
 TERMUX_PKG_SHA256=ce5e71081d17ce9e86d7cbcfa28c4b04b9300f8fb7e78422b1feb6bc52c3028e
 TERMUX_PKG_HOSTBUILD=true
 TERMUX_PKG_DEPENDS="binutils, libc++, ncurses, ndk-sysroot, libffi, zlib"
+TERMUX_PKG_UNDEF_SYMBOLS_FILES=all
 
 _INSTALL_PREFIX_R="opt/libllvm-16"
 _INSTALL_PREFIX="$TERMUX_PREFIX/$_INSTALL_PREFIX_R"
