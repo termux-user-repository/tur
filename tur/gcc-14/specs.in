@@ -1,0 +1,27 @@
+# This file is taken from gcc-11 package in its-pointless repo.
+# Android 5 requires position-independent executables, so we use the
+#   %{!S:X}     Substitutes X, if the -S switch is not given to GCC"
+# construct (see https://gcc.gnu.org/onlinedocs/gcc/Spec-Files.html for full reference)
+# to add -fPIE and -pie flags as appropriate.
+#
+# this first changes Oz calls that only clang has into Os and also removes
+# Werror=unguarded-availability-new this arg is in llvm-config. 
+# may add -Wstring-conversion  -Wcovered-switch-default to specs in future
+
+*cc1:
++ %{Oz:-Os}  %>Oz %>Werror=unguarded-availability-new %{static-openmp:-fopenmp} %>static-openmp  
+
+*cc1_options:
++ %{!fpie: %{!fPIE: %{!fpic: %{!fPIC: %{!fno-pic:-fPIC}}}}} %{!fno-common:-fcommon} 
+
+*cc1plus:
++ -I@TERMUX_PREFIX@/include/c++/v1  %{!fpie: %{!fPIE: %{!fpic: %{!fPIC: %{!fno-pic:-fPIC}}}}} %{!frtti: %{!fno-rtti: -frtti}} 
+
+*link:
++ -L@TERMUX_PREFIX@/lib/gcc/@TERMUX_HOST_PLATFORM@/@TERMUX_PKG_VERSION@ -L@TERMUX_PREFIX@/lib   %{!nopie: %{!static: %{!shared: %{!nostdlib: %{!nostartfiles: %{!fno-PIE: %{!fno-pie: -pie}}}}}}} --enable-new-dtags --eh-frame-hdr  -rpath=@TERMUX_PREFIX@/lib
+
+*cc1:
++ -I@TERMUX_PREFIX@/include/@TERMUX_HOST_PLATFORM@ -I@TERMUX_PREFIX@/include 
+
+*link_gomp: -lgomp %{static: -ldl } 
+@ARCH_PLACEHOLDER@
