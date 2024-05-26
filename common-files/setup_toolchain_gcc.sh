@@ -310,3 +310,15 @@ _setup_toolchain_ndk_gcc_13() {
 	_setup_standalone_toolchain_current_ndk_newer_gcc "$GCC_VERSION" "$GCC_TOOLCHAIN_REVISION" "$GCC_PREBUILT_SHA256" "$GCC_TOOLCHAIN_VERSION"
 	_setup_toolchain_gcc_envs_with_fc
 }
+
+_setup_toolchain_ndk_gcc_14() {
+	local GCC_TOOLCHAIN_VERSION=0
+
+    local PREBUILT_GCC_JSON="$TERMUX_SCRIPTDIR/common-files/prebuilt-gcc.json"
+	local GCC_VERSION=$(jq -r '.["14"].version' $PREBUILT_GCC_JSON)
+	local GCC_TOOLCHAIN_REVISION=$(jq -r '.["14"].revision' $PREBUILT_GCC_JSON)
+	local GCC_PREBUILT_SHA256=$(jq -r ".[\"14\"].checksums.$TERMUX_ARCH" $PREBUILT_GCC_JSON)
+
+	_setup_standalone_toolchain_current_ndk_newer_gcc "$GCC_VERSION" "$GCC_TOOLCHAIN_REVISION" "$GCC_PREBUILT_SHA256" "$GCC_TOOLCHAIN_VERSION"
+	_setup_toolchain_gcc_envs_with_fc
+}
