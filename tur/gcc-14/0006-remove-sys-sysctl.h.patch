@@ -1,0 +1,16 @@
+Header <sys/sysctl.h> has been removed since glibc 2.32 [1], neither does it
+exist in Android NDK Header. For some reason, HAVE_SYS_SYSCTL_H is not false when
+performing a build for `x86_64-linux-gnu`, so just assume this header is missing.
+
+[1]: https://sourceware.org/pipermail/libc-announce/2020/000029.html.
+--- a/libiberty/physmem.c
++++ b/libiberty/physmem.c
+@@ -48,7 +48,7 @@
+ # include <sys/param.h>
+ #endif
+ 
+-#if HAVE_SYS_SYSCTL_H
++#if false
+ # include <sys/sysctl.h>
+ #endif
+ 
