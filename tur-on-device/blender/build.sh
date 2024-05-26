@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="A fully integrated 3D graphics creation suite"
 TERMUX_PKG_LICENSE="GPL-2.0"
 TERMUX_PKG_MAINTAINER="@T-Dynamos"
 TERMUX_PKG_VERSION=1:3.6.11
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=git+https://github.com/blender/blender.git
 TERMUX_PKG_GIT_BRANCH=blender-v3.6-release
 
