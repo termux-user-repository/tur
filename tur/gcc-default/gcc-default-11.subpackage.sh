@@ -1,8 +1,8 @@
 TERMUX_SUBPKG_DESCRIPTION="Use GNU Compiler Collections as default compiler suit (Version 11)"
 TERMUX_SUBPKG_DEPEND_ON_PARENT=no
 TERMUX_SUBPKG_DEPENDS="gcc-11"
-TERMUX_SUBPKG_BREAKS="gcc-default-9, gcc-default-10, gcc-default-12, gcc-default-13"
-TERMUX_SUBPKG_CONFLICTS="gcc-default-9, gcc-default-10, gcc-default-12, gcc-default-13"
+TERMUX_SUBPKG_BREAKS="gcc-default-9, gcc-default-10, gcc-default-12, gcc-default-13, gcc-default-14"
+TERMUX_SUBPKG_CONFLICTS="gcc-default-9, gcc-default-10, gcc-default-12, gcc-default-13, gcc-default-14"
 TERMUX_SUBPKG_INCLUDE="share/$TERMUX_PKG_NAME/.placeholder-11"
 
 termux_step_create_subpkg_debscripts() {
