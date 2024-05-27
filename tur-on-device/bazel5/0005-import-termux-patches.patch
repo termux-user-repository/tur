@@ -1,0 +1,67 @@
+--- a/third_party/BUILD
++++ b/third_party/BUILD
+@@ -46,6 +46,7 @@
+         "//third_party/py/mock:srcs",
+         "//third_party/py/six:srcs",
+         "//third_party/rules_python:srcs",
++        "//third_party/termux-patches:srcs",
+         "//third_party/zlib:srcs",
+         "//third_party/upb:srcs",
+         "@googleapis//:srcs",
+--- a/distdir_deps.bzl
++++ b/distdir_deps.bzl
+@@ -101,7 +101,10 @@
+             "https://github.com/protocolbuffers/protobuf/archive/v3.13.0.tar.gz",
+         ],
+         "patch_args": ["-p1"],
+-        "patches": ["//third_party/protobuf:3.13.0.patch"],
++        "patches": [
++            "//third_party/protobuf:3.13.0.patch",
++            "//third_party/termux-patches:protobuf.patch",
++        ],
+         "used_in": [
+             "additional_distfiles",
+             "test_WORKSPACE_files",
+@@ -114,6 +117,10 @@
+             "https://mirror.bazel.build/github.com/protocolbuffers/upb/archive/2de300726a1ba2de9a468468dc5ff9ed17a3215f.tar.gz",
+             "https://github.com/protocolbuffers/upb/archive/2de300726a1ba2de9a468468dc5ff9ed17a3215f.tar.gz",
+         ],
++        "patch_args": ["-p1"],
++        "patches": [
++            "//third_party/termux-patches:upb-config.patch",
++        ],
+         "used_in": [
+             "additional_distfiles",
+             "test_WORKSPACE_files",
+@@ -131,6 +138,9 @@
+         "patches": [
+             "//third_party/grpc:grpc_1.41.0.patch",
+             "//third_party/grpc:grpc_1.41.0.win_arm64.patch",
++            "//third_party/termux-patches:grpc.patch",
++            "//third_party/termux-patches:grpc-upb.patch",
++            "//third_party/termux-patches:cares-config.patch",
+         ],
+         "used_in": [
+             "additional_distfiles",
+@@ -144,6 +153,10 @@
+             "https://mirror.bazel.build/github.com/c-ares/c-ares/archive/e982924acee7f7313b4baa4ee5ec000c5e373c30.tar.gz",
+             "https://github.com/c-ares/c-ares/archive/e982924acee7f7313b4baa4ee5ec000c5e373c30.tar.gz",
+         ],
++        "patch_args": ["-p1"],
++        "patches": [
++            "//third_party/termux-patches:cares.patch",
++        ],
+         "used_in": [
+             "additional_distfiles",
+             "test_WORKSPACE_files",
+@@ -168,6 +181,10 @@
+             "https://mirror.bazel.build/github.com/abseil/abseil-cpp/archive/refs/tags/20211102.0.tar.gz",
+             "https://github.com/abseil/abseil-cpp/archive/refs/tags/20211102.0.tar.gz",
+         ],
++        "patch_args": ["-p1"],
++        "patches": [
++            "//third_party/termux-patches:absl.patch",
++        ],
+         "used_in": [
+             "additional_distfiles",
+             "test_WORKSPACE_files",
