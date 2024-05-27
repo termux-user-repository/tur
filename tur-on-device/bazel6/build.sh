@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="Correct, reproducible, and fast builds for everyone"
 TERMUX_PKG_LICENSE="Apache-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="6.5.0"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://github.com/bazelbuild/bazel/releases/download/$TERMUX_PKG_VERSION/bazel-$TERMUX_PKG_VERSION-dist.zip
 TERMUX_PKG_SHA256=fc89da919415289f29e4ff18a5e01270ece9a6fe83cb60967218bac4a3bb3ed2
 TERMUX_PKG_DEPENDS="libarchive, openjdk-17, patch, unzip, zip"
@@ -10,6 +11,7 @@ TERMUX_PKG_BUILD_DEPENDS="libandroid-spawn-static, which"
 TERMUX_PKG_BREAKS="openjdk-11"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_BLACKLISTED_ARCHES="arm, i686"
+TERMUX_PKG_NO_STRIP=true
 
 __ensure_is_on_device_compile() {
 	if [ "${TERMUX_ON_DEVICE_BUILD}" = false ]; then
