@@ -1,0 +1,20 @@
+--- a/bazel/build_defs.bzl
++++ b/bazel/build_defs.bzl
+@@ -35,6 +35,8 @@
+         # "-Wshorten-64-to-32",  # not in GCC (and my Kokoro images doesn't have Clang)
+         "-Werror",
+         "-Wno-long-long",
++        "-Wno-deprecated-builtins",
++        "-Wno-gnu-offsetof-extensions",
+         # copybara:strip_end
+     ],
+ })
+@@ -49,6 +51,8 @@
+         "-Werror=pedantic",
+         "-Wall",
+         "-Wstrict-prototypes",
++        "-Wno-deprecated-builtins",
++        "-Wno-gnu-offsetof-extensions",
+         # GCC (at least) emits spurious warnings for this that cannot be fixed
+         # without introducing redundant initialization (with runtime cost):
+         #   https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80635

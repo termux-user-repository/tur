@@ -1,0 +1,13 @@
+--- a/bazel/grpc_deps.bzl
++++ b/bazel/grpc_deps.bzl
+@@ -339,6 +343,10 @@
+         http_archive(
+             name = "upb",
+             sha256 = "6a5f67874af66b239b709c572ac1a5a00fdb1b29beaf13c3e6f79b1ba10dc7c4",
++            patches = [
++                "//third_party/termux-patches:grpc-upb-config.patch",
++            ],
++            patch_args = ["-p1"],
+             strip_prefix = "upb-2de300726a1ba2de9a468468dc5ff9ed17a3215f",
+             urls = [
+                 "https://storage.googleapis.com/grpc-bazel-mirror/github.com/protocolbuffers/upb/archive/2de300726a1ba2de9a468468dc5ff9ed17a3215f.tar.gz",
