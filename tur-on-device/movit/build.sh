@@ -14,14 +14,14 @@ TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="--disable-static"
 TERMUX_PKG_EXTRA_MAKE_ARGS="TESTS="
 
-termux_step_pre_configure() { 
-	# fix arm build and potentially other archs hidden bugs 
+termux_step_pre_configure() {
+	# fix arm build and potentially other archs hidden bugs
 	# ERROR: ./lib/libmovit.so contains undefined symbols:
 	#     69: 00000000     0 NOTYPE  GLOBAL DEFAULT   UND __aeabi_uidiv
 	#    120: 00000000     0 NOTYPE  GLOBAL DEFAULT   UND __aeabi_idiv
 	#    155: 00000000     0 NOTYPE  GLOBAL DEFAULT   UND __aeabi_ul2d
 	#    205: 00000000     0 NOTYPE  GLOBAL DEFAULT   UND __aeabi_uidivmod
 	#    217: 00000000     0 NOTYPE  GLOBAL DEFAULT   UND __aeabi_idivmod
-	LDFLAGS+=" $($CC -print-libgcc-file-name)" 
-	autoreconf -fi 
+	LDFLAGS+=" $($CC -print-libgcc-file-name)"
+	autoreconf -fi
 }
