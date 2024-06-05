@@ -12,8 +12,6 @@ termux_step_make()
 export CGO_ENABLED=0
 termux_setup_golang
 export GOOS="android" GOARCH="arm64"
-cd $TERMUX_PKG_SRCDIR/
-ls
 go build -o tget
 }
 termux_step_make_install(){
