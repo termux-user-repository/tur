@@ -243,7 +243,8 @@ jobs:
         path: ./
     - name: Upload to a temporary release
       env:
-       GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+        GH_TOKEN: ${{ github.token }}
+       # GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
       run: |
         GITHUB_SHA=${{ github.sha }}
         for archive in debs-*/debs-{aarch64,arm,i686,x86_64}-${{ github.sha }}.tar; do
