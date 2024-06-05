@@ -9,7 +9,7 @@ TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_AUTO_UPDATE=true
 termux_step_make()
 {
-export CGO_ENABLED=0
+export CGO_ENABLED=1
 termux_setup_golang
 export GOOS="android" GOARCH="$TERMUX_ARCH"
 go build -o tget
