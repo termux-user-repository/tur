@@ -11,5 +11,6 @@ termux_step_make()
 {
 export CGO_ENABLED=0
 termux_setup_golang
+export GOPATH="${PWD}/go"
 export GOOS="android" GOARCH="arm64"
 }
