@@ -3,7 +3,7 @@ TERMUX_SUBPKG_DEPEND_ON_PARENT=no
 TERMUX_SUBPKG_DEPENDS="gcc-14"
 TERMUX_SUBPKG_BREAKS="gcc-default-9, gcc-default-10, gcc-default-11, gcc-default-12, gcc-default-13"
 TERMUX_SUBPKG_CONFLICTS="gcc-default-9, gcc-default-10, gcc-default-11, gcc-default-12, gcc-default-13"
-TERMUX_SUBPKG_INCLUDE="share/$TERMUX_PKG_NAME/.placeholder-13"
+TERMUX_SUBPKG_INCLUDE="share/$TERMUX_PKG_NAME/.placeholder-14"
 
 termux_step_create_subpkg_debscripts() {
 	local _GCC_DEFAULT_VERSION=14
