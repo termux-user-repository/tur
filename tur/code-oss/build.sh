@@ -2,7 +2,7 @@ TERMUX_PKG_HOMEPAGE=https://github.com/microsoft/vscode
 TERMUX_PKG_DESCRIPTION="Visual Studio Code"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="1.89.1"
+TERMUX_PKG_VERSION="1.90.0"
 TERMUX_PKG_SRCURL=git+https://github.com/microsoft/vscode
 TERMUX_PKG_GIT_BRANCH="$TERMUX_PKG_VERSION"
 TERMUX_PKG_DEPENDS="electron-deps, libx11, libxkbfile, libsecret, ripgrep"
@@ -15,8 +15,8 @@ TERMUX_PKG_BLACKLISTED_ARCHES="i686"
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_UPDATE_TAG_TYPE="latest-release-tag"
 
-_setup_nodejs_18() {
-	local NODEJS_VERSION=18.18.0
+_setup_nodejs_20() {
+	local NODEJS_VERSION=20.12.1
 	local NODEJS_FOLDER=${TERMUX_PKG_CACHEDIR}/build-tools/nodejs-${NODEJS_VERSION}
 
 	if [ ! -x "$NODEJS_FOLDER/bin/node" ]; then
@@ -24,17 +24,17 @@ _setup_nodejs_18() {
 		local NODEJS_TAR_FILE=$TERMUX_PKG_TMPDIR/nodejs-$NODEJS_VERSION.tar.xz
 		termux_download https://nodejs.org/dist/v${NODEJS_VERSION}/node-v${NODEJS_VERSION}-linux-x64.tar.xz \
 			"$NODEJS_TAR_FILE" \
-			3008408e9098f2462f7b1a0f6a48b8a46079beb1c92b6ec43b04713265c96978
+			042844eeea4e19fa46687cc028dd5e323602d81784a9da8386c24463e3984e11
 		tar -xf "$NODEJS_TAR_FILE" -C "$NODEJS_FOLDER" --strip-components=1
 	fi
-	export PATH=$NODEJS_FOLDER/bin:$PATH
+	export PATH="$NODEJS_FOLDER/bin:$PATH"
 }
 
 termux_step_post_get_source() {
-	# Ensure that code-oss supports node 18
+	# Ensure that code-oss supports node 20
 	local _node_version=$(cat .nvmrc | cut -d. -f1 -)
-	if [ "$_node_version" != 18 ]; then
-		termux_error_exit "Version mismatch: Expected 18, got $_node_version."
+	if [ "$_node_version" != 20 ]; then
+		termux_error_exit "Version mismatch: Expected 20, got $_node_version."
 	fi
 
 	# Check whether the electron version matches the node headers version
@@ -68,7 +68,7 @@ termux_step_host_build() {
 		rm -rf $TERMUX_PREFIX/bin.bp
 		mv -f $TERMUX_PREFIX/bin $TERMUX_PREFIX/bin.bp
 	fi
-	_setup_nodejs_18
+	_setup_nodejs_20
 	npm install yarn node-gyp
 	export PATH="$TERMUX_PKG_HOSTBUILD_DIR/node_modules/.bin:$PATH"
 	if [ -e "$TERMUX_PREFIX/bin.bp" ]; then
@@ -78,7 +78,7 @@ termux_step_host_build() {
 }
 
 termux_step_configure() {
-	_setup_nodejs_18
+	_setup_nodejs_20
 	export PATH="$TERMUX_PKG_HOSTBUILD_DIR/node_modules/.bin:$PATH"
 }
 
