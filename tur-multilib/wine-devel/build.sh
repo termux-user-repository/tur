@@ -73,6 +73,17 @@ exec_prefix=$TERMUX_PREFIX
 # FIXME: I'd like to compile it.
 # TERMUX_PKG_BLACKLISTED_ARCHES="arm"
 
+# Enable win64 on 64-bit arches.
+# TODO: Enable win32 after TUR has full support for mutilib
+if [ "$TERMUX_ARCH_BITS" = 64 ]; then
+	TERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" --enable-win64"
+fi
+
+# Enable new WoW64 support on x86_64.
+if [ "$TERMUX_ARCH" = "x86_64" ]; then
+	TERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" --enable-archs=i386,x86_64"
+fi
+
 _setup_llvm_mingw_toolchain() {
 	# LLVM-mingw's version number must not be the same as the NDK's.
 	local _llvm_mingw_version=18
@@ -116,12 +127,6 @@ termux_step_pre_configure() {
 	LDFLAGS="${LDFLAGS/-Wl,-z,relro,-z,now/}"
 
 	LDFLAGS+=" -landroid-spawn"
-
-	# Enable win64 on 64-bit arches.
-	# TODO: Enable win32 after TUR has full support for mutilib
-	if [ "$TERMUX_ARCH_BITS" = 64 ]; then
-		TERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" --enable-win64"
-	fi
 }
 
 termux_step_make() {
