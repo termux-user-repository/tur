@@ -1,0 +1,14 @@
+ERROR: ./lib/liblagraphx.so.1.1.3 contains undefined symbols:
+    55: 0000000000000000     0 NOTYPE  GLOBAL DEFAULT  UND sqrt
+
+--- a/LAGraph/experimental/CMakeLists.txt
++++ b/LAGraph/experimental/CMakeLists.txt
+@@ -38,7 +38,7 @@
+         set_target_properties ( LAGraphX PROPERTIES EXPORT_NO_SYSTEM ON )
+     endif ( )
+ 
+-    target_link_libraries ( LAGraphX PRIVATE LAGraph GraphBLAS::GraphBLAS )
++    target_link_libraries ( LAGraphX PRIVATE LAGraph GraphBLAS::GraphBLAS m )
+ 
+     target_include_directories ( LAGraphX PUBLIC
+         $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
