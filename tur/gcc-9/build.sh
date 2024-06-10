@@ -3,7 +3,7 @@ TERMUX_PKG_DESCRIPTION="GNU C compiler"
 TERMUX_PKG_LICENSE="GPL-3.0"
 TERMUX_PKG_DEPENDS="binutils, libc++, libgmp, libmpfr, libmpc, libisl, zlib"
 TERMUX_PKG_VERSION=9.5.0
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_REVISION=2
 TERMUX_PKG_MAINTAINER="@licy183"
 TERMUX_PKG_SRCURL=https://ftp.gnu.org/gnu/gcc/gcc-${TERMUX_PKG_VERSION}/gcc-${TERMUX_PKG_VERSION}.tar.gz
 TERMUX_PKG_SHA256=15b34072105272a3eb37f6927409f7ce9aa0dd1498efebc35f851d6e6f029a4d
@@ -97,5 +97,18 @@ termux_step_post_make_install() {
 	# Copy the build spec file
 	cp $TERMUX_PKG_TMPDIR/specs $TERMUX_PREFIX/lib/gcc/$TERMUX_HOST_PLATFORM/$TERMUX_PKG_VERSION/
 	# Avoid extract `ndk-sysroot-gcc-compact` at building time.
-	TERMUX_PKG_DEPENDS+=", ndk-sysroot-gcc-compact"
+	TERMUX_PKG_DEPENDS+=", ndk-sysroot-gcc-compact (>= 26b-3), ndk-sysroot-gcc-compact (<< 27)"
+}
+
+termux_step_create_debscripts() {
+	cat <<-EOF > ./postinst
+		#!$TERMUX_PREFIX/bin/sh
+		echo
+		echo "********"
+		echo "GCC 10 and older no longer receive upstream support or fixes for bugs."
+		echo "Please switch to a newer GCC version or clang."
+		echo "The support for GCC 10 and older will be dropped when Android NDK 27 ships."
+		echo "********"
+		echo
+	EOF
 }
