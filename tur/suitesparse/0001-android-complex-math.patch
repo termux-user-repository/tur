@@ -1,3 +1,9 @@
+ERROR: ./lib/libgraphblas.so.9.1.0 contains undefined symbols:
+    50: 0000000000000000     0 NOTYPE  GLOBAL DEFAULT  UND cpowf
+   101: 0000000000000000     0 NOTYPE  GLOBAL DEFAULT  UND clog
+   151: 0000000000000000     0 NOTYPE  GLOBAL DEFAULT  UND cpow
+   161: 0000000000000000     0 NOTYPE  GLOBAL DEFAULT  UND clogf
+
 --- a/GraphBLAS/Config/GraphBLAS.h.in
 +++ b/GraphBLAS/Config/GraphBLAS.h.in
 @@ -179,6 +179,13 @@
@@ -14,3 +20,25 @@
      #else
  
          #error "Unknown or unsupported complex number arithmetic"
+--- a/GraphBLAS/CMakeLists.txt
++++ b/GraphBLAS/CMakeLists.txt
+@@ -400,13 +400,13 @@
+ 
+ # libm:
+ check_symbol_exists ( fmax "math.h" NO_LIBM )
+-if ( NOT NO_LIBM )
+-    set ( GB_M "m" )
++if ( TRUE )
++    set ( GB_M "m android-complex-math" )
+     if ( BUILD_SHARED_LIBS )
+-        target_link_libraries ( GraphBLAS PRIVATE m )
++        target_link_libraries ( GraphBLAS PRIVATE m android-complex-math )
+     endif ( )
+     if ( BUILD_STATIC_LIBS )
+-        list ( APPEND GRAPHBLAS_STATIC_LIBS "m" )
+-        target_link_libraries ( GraphBLAS_static PUBLIC m )
++        list ( APPEND GRAPHBLAS_STATIC_LIBS "m" "android-complex-math" )
++        target_link_libraries ( GraphBLAS_static PUBLIC m android-complex-math )
+     endif ( )
+ endif ( )
+ 
