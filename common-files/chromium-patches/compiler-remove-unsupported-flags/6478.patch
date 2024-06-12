@@ -1,0 +1,16 @@
+--- a/build/config/compiler/BUILD.gn
++++ b/build/config/compiler/BUILD.gn
+@@ -1898,13 +1898,6 @@
+         # TODO(crbug.com/328490295): Fix and re-enable for C flags.
+         "-Wenum-compare-conditional",
+       ]
+-
+-      if (!is_nacl) {
+-        cflags_cc += [
+-          # TODO(crbug.com/41486292): Fix and re-enable.
+-          "-Wno-c++11-narrowing-const-reference",
+-        ]
+-      }
+     }
+ 
+     # Some builders, such as Cronet, use a different version of Clang than

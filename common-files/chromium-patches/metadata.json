@@ -361,6 +361,9 @@
   "compiler-custom-rust-abi-target-triple/6312.patch": {
     "start": 6312
   },
+  "compiler-disable-warnings/6478.patch": {
+    "start": 6478
+  },
   "compiler-no-unused-but-set-variable/4389.patch": {
     "start": 4389,
     "end": 4472
@@ -410,7 +413,11 @@
     "end": 6260
   },
   "compiler-remove-unsupported-flags/6261.patch": {
-    "start": 6261
+    "start": 6261,
+    "end": 6477
+  },
+  "compiler-remove-unsupported-flags/6478.patch": {
+    "start": 6478
   },
   "compiler-use-android-target/4389.patch": {
     "start": 4389,
@@ -586,7 +593,11 @@
     "end": 6225
   },
   "remove-xorg-from-build-deps-2/6255.patch": {
-    "start": 6255
+    "start": 6255,
+    "end": 6477
+  },
+  "remove-xorg-from-build-deps-2/6478.patch": {
+    "start": 6478
   },
   "resource_attribution-query_params-no-constexpr-operator-equal/6167.patch": {
     "start": 6167,
