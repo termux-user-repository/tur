@@ -479,6 +479,9 @@
   "dav1d-no-get-affinity/5249.patch": {
     "start": 4961
   },
+  "dawn-aligned-alloc/6478.patch": {
+    "start": 6478
+  },
   "dawn-fix-dynamic-loaded-libraries/4961.patch": {
     "start": 4961,
     "end": 5248
