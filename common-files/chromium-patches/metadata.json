@@ -588,6 +588,9 @@
   "remove-usage-vector-three_way_compare-2/6367.patch": {
     "start": 6367
   },
+  "remove-usage-vector-three_way_compare-3/6478.patch": {
+    "start": 6478
+  },
   "remove-usage-three_way_compare/6422.patch": {
     "start": 6422
   },

@@ -1,0 +1,15 @@
+The declaration of `operator<=>` in base::flat_tree is removed in the
+previous patch, so do not use `base::flat_tree::operator<=>` in the
+class which uses `base::flat_tree`.
+
+--- a/components/viz/common/view_transition_element_resource_id.h
++++ b/components/viz/common/view_transition_element_resource_id.h
+@@ -33,7 +33,7 @@
+   VIZ_COMMON_EXPORT friend bool operator==(
+       const ViewTransitionElementResourceId&,
+       const ViewTransitionElementResourceId&);
+-  friend auto operator<=>(const ViewTransitionElementResourceId&,
++  friend bool operator<(const ViewTransitionElementResourceId&,
+                           const ViewTransitionElementResourceId&) = default;
+ 
+   bool IsValid() const;
