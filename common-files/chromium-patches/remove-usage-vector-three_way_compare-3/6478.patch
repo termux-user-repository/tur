@@ -4,12 +4,17 @@ class which uses `base::flat_tree`.
 
 --- a/components/viz/common/view_transition_element_resource_id.h
 +++ b/components/viz/common/view_transition_element_resource_id.h
-@@ -33,7 +33,7 @@
+@@ -33,8 +33,11 @@
    VIZ_COMMON_EXPORT friend bool operator==(
        const ViewTransitionElementResourceId&,
        const ViewTransitionElementResourceId&);
 -  friend auto operator<=>(const ViewTransitionElementResourceId&,
-+  friend bool operator<(const ViewTransitionElementResourceId&,
-                           const ViewTransitionElementResourceId&) = default;
+-                          const ViewTransitionElementResourceId&) = default;
++  friend bool operator<(const ViewTransitionElementResourceId& lhs,
++                        const ViewTransitionElementResourceId& rhs) {
++    return std::tie(lhs.transition_token_, lhs.kInvalidLocalId) < 
++            std::tie(rhs.transition_token_, rhs.kInvalidLocalId);
++  }
  
    bool IsValid() const;
+   std::string ToString() const;
