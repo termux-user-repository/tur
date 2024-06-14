@@ -12,8 +12,8 @@ class which uses `base::flat_tree`.
 -                          const ViewTransitionElementResourceId&) = default;
 +  friend bool operator<(const ViewTransitionElementResourceId& lhs,
 +                        const ViewTransitionElementResourceId& rhs) {
-+    return std::tie(lhs.transition_token_, lhs.kInvalidLocalId) < 
-+            std::tie(rhs.transition_token_, rhs.kInvalidLocalId);
++    return std::tie(lhs.transition_token_, lhs.local_id_) < 
++            std::tie(rhs.transition_token_, rhs.local_id_);
 +  }
  
    bool IsValid() const;

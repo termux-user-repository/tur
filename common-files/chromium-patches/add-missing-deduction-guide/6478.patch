@@ -1,0 +1,16 @@
+This should be not necessary when NDK bumps to r27
+
+--- a/components/visited_url_ranking/public/url_visit.h
++++ b/components/visited_url_ranking/public/url_visit.h
+@@ -152,6 +152,11 @@
+   using Ts::operator()...;
+ };
+ 
++#if defined(__clang__) && __clang_major__ <= 17
++template<class... Ts>
++URLVisitVariantHelper(Ts...) -> URLVisitVariantHelper<Ts...>;
++#endif
++
+ }  // namespace visited_url_ranking
+ 
+ #endif  // COMPONENTS_VISITED_URL_RANKING_PUBLIC_URL_VISIT_H_

@@ -1,4 +1,7 @@
 {
+  "add-missing-deduction-guide/6478.patch": {
+    "start": 6478
+  },
   "add-missing-typename/5672.patch": {
     "start": 5672,
     "end": 5789
@@ -582,6 +585,9 @@
     "start": 4389,
     "end": 4389
   },
+  "remove-usage-std-format/6478.patch": {
+    "start": 6478
+  },
   "remove-usage-vector-three_way_compare/6167.patch": {
     "start": 6167
   },
@@ -870,6 +876,9 @@
   "z-iwyu-chromium-include-ctime/4389.patch": {
     "start": 4389,
     "end": 4472
+  },
+  "z-iwyu-chromium-include-format/6478.patch": {
+    "start": 6478
   },
   "z-iwyu-chromium-include-vector/5735.patch": {
     "start": 5735,

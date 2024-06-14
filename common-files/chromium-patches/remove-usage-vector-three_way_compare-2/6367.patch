@@ -1,5 +1,5 @@
-The declaration of `operator<=>` in base::flat_tree is removed was deleted
-in the previous patch, so do not use `base::flat_tree::operator<=>` in the
+The declaration of `operator<=>` in base::flat_tree is removed in the
+previous patch, so do not use `base::flat_tree::operator<=>` in the
 class which uses `base::flat_tree`.
 
 --- a/components/autofill/core/browser/data_model/credit_card_benefit.h
