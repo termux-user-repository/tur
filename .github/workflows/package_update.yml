@@ -123,6 +123,7 @@ jobs:
           BUILD_PACKAGES: "false"
           GIT_COMMIT_PACKAGES: "false"
           GIT_PUSH_PACKAGES: "false"
+          CREATE_ISSUE: "false"
         run: |
           declare -a packages
           for repo_path in $(jq --raw-output 'del(.pkg_format) | keys | .[]' repo.json); do
@@ -164,6 +165,7 @@ jobs:
           BUILD_PACKAGES: "true"
           GIT_COMMIT_PACKAGES: "true"
           GIT_PUSH_PACKAGES: "true"
+          CREATE_ISSUE: "true"
         run: |
           git config --global user.name "TUR Github Actions"
           git config --global user.email "abc@example.com"
