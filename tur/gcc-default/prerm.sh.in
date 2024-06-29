@@ -2,7 +2,7 @@
 
 set -e
 
-if [ "$TERMUX_MAIN_PACKAGE_FORMAT" = "debian" ]; then
+if [ "$TERMUX_APP_PACKAGE_MANAGER" = "apt" ]; then
 	TERMUX_ARCH="$(dpkg --print-architecture)"
 else
 	TERMUX_ARCH="$(pacman-conf Architecture)"
