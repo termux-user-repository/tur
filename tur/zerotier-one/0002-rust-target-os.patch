@@ -1,0 +1,108 @@
+--- a/rustybits/zeroidc/src/ext.rs	2024-07-04 12:58:54.585698700 +0800
++++ b/rustybits/zeroidc/src/ext.rs	2024-07-04 13:00:01.053008000 +0800
+@@ -22,6 +22,7 @@
+     all(target_os = "linux", target_arch = "aarch64"),
+     target_os = "windows",
+     target_os = "macos",
++    target_os = "android",
+ ))]
+ #[no_mangle]
+ pub extern "C" fn zeroidc_new(
+@@ -76,6 +77,7 @@
+     all(target_os = "linux", target_arch = "aarch64"),
+     target_os = "windows",
+     target_os = "macos",
++    target_os = "android",
+ ))]
+ #[no_mangle]
+ pub extern "C" fn zeroidc_delete(ptr: *mut ZeroIDC) {
+@@ -99,6 +101,7 @@
+     all(target_os = "linux", target_arch = "aarch64"),
+     target_os = "windows",
+     target_os = "macos",
++    target_os = "android",
+ ))]
+ #[no_mangle]
+ pub extern "C" fn zeroidc_start(ptr: *mut ZeroIDC) {
+@@ -115,6 +118,7 @@
+     all(target_os = "linux", target_arch = "aarch64"),
+     target_os = "windows",
+     target_os = "macos",
++    target_os = "android",
+ ))]
+ #[no_mangle]
+ pub extern "C" fn zeroidc_stop(ptr: *mut ZeroIDC) {
+@@ -131,6 +135,7 @@
+     all(target_os = "linux", target_arch = "aarch64"),
+     target_os = "windows",
+     target_os = "macos",
++    target_os = "android",
+ ))]
+ #[no_mangle]
+ pub extern "C" fn zeroidc_is_running(ptr: *mut ZeroIDC) -> bool {
+@@ -158,6 +163,7 @@
+     all(target_os = "linux", target_arch = "aarch64"),
+     target_os = "windows",
+     target_os = "macos",
++    target_os = "android",
+ ))]
+ #[no_mangle]
+ pub extern "C" fn zeroidc_set_nonce_and_csrf(ptr: *mut ZeroIDC, csrf_token: *const c_char, nonce: *const c_char) {
+@@ -188,6 +194,7 @@
+     all(target_os = "linux", target_arch = "aarch64"),
+     target_os = "windows",
+     target_os = "macos",
++    target_os = "android",
+ ))]
+ #[no_mangle]
+ pub extern "C" fn free_cstr(s: *mut c_char) {
+@@ -207,6 +214,7 @@
+     all(target_os = "linux", target_arch = "aarch64"),
+     target_os = "windows",
+     target_os = "macos",
++    target_os = "android",
+ ))]
+ #[no_mangle]
+ pub extern "C" fn zeroidc_get_auth_url(ptr: *mut ZeroIDC) -> *mut c_char {
+@@ -226,6 +234,7 @@
+     all(target_os = "linux", target_arch = "aarch64"),
+     target_os = "windows",
+     target_os = "macos",
++    target_os = "android",
+ ))]
+ #[no_mangle]
+ pub extern "C" fn zeroidc_token_exchange(idc: *mut ZeroIDC, code: *const c_char) -> *mut c_char {
+@@ -316,6 +325,7 @@
+     all(target_os = "linux", target_arch = "aarch64"),
+     target_os = "windows",
+     target_os = "macos",
++    target_os = "android",
+ ))]
+ #[no_mangle]
+ pub extern "C" fn zeroidc_kick_refresh_thread(idc: *mut ZeroIDC) {
+--- a/rustybits/zeroidc/src/lib.rs	2024-07-04 13:00:48.940037800 +0800
++++ b/rustybits/zeroidc/src/lib.rs	2024-07-04 13:00:51.757868600 +0800
+@@ -45,6 +45,7 @@
+     all(target_os = "linux", target_arch = "aarch64"),
+     target_os = "windows",
+     target_os = "macos",
++    target_os = "android",
+ ))]
+ pub struct ZeroIDC {
+     inner: Arc<Mutex<Inner>>,
+@@ -56,6 +57,7 @@
+     all(target_os = "linux", target_arch = "aarch64"),
+     target_os = "windows",
+     target_os = "macos",
++    target_os = "android",
+ ))]
+ struct Inner {
+     running: bool,
+@@ -110,6 +112,7 @@
+     all(target_os = "linux", target_arch = "aarch64"),
+     target_os = "windows",
+     target_os = "macos",
++    target_os = "android",
+ ))]
+ impl ZeroIDC {
+     pub fn new(
