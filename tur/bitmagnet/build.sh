@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://github.com/bitmagnet-io/bitmagnet
 TERMUX_PKG_DESCRIPTION="Self-hosted BitTorrent indexer with web UI"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="0.9.3"
+TERMUX_PKG_VERSION="0.9.4"
 TERMUX_PKG_SRCURL=https://github.com/bitmagnet-io/bitmagnet/archive/refs/tags/v$TERMUX_PKG_VERSION.tar.gz
-TERMUX_PKG_SHA256=f5be5e8144cf6417415372e1ddabc1dddc358192ba8e751a22d98a3ce186e093
+TERMUX_PKG_SHA256=bb72fb57a54daf39d9a2e1aaff13b8e42d87e877599728d73df8ddef98363aa4
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_AUTO_UPDATE=true
 
