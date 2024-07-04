@@ -2,10 +2,12 @@
 
 set -e
 
-if [ "$TERMUX_APP_PACKAGE_MANAGER" = "apt" ]; then
-	TERMUX_ARCH="$(dpkg --print-architecture)"
-else
+PACMAN_INSTALLED="false"
+test -e @TERMUX_PREFIX@/bin/pacman-conf && PACMAN_INSTALLED="true"
+if [ "$PACMAN_INSTALLED" = "true" ]; then
 	TERMUX_ARCH="$(pacman-conf Architecture)"
+else
+	TERMUX_ARCH="$(dpkg --print-architecture)"
 fi
 TERMUX_PLATFORM="$TERMUX_ARCH-linux-android"
 test $TERMUX_ARCH = "arm" && TERMUX_PLATFORM="${TERMUX_PLATFORM}eabi"
