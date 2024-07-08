@@ -1,0 +1,11 @@
+--- a/lib/graphics_engine/src/ge_vulkan_driver.cpp
++++ b/lib/graphics_engine/src/ge_vulkan_driver.cpp
+@@ -47,7 +47,7 @@
+     std::string msg = callback_data->pMessage;
+     if (msg.find("UNASSIGNED-CoreValidation-Shader-OutputNotConsumed") != std::string::npos)
+         return VK_FALSE;
+-#ifdef __ANDROID__
++#if 0
+     android_LogPriority alp;
+     switch (message_severity)
+     {
