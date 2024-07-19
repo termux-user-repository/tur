@@ -1,0 +1,16 @@
+--- a/lib/angelscript/projects/cmake/CMakeLists.txt
++++ b/lib/angelscript/projects/cmake/CMakeLists.txt
+@@ -214,6 +214,7 @@
+ # Don't override the default runtime output path to avoid conflicts when building for multiple target platforms
+ #set(RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/../../bin)
+ 
++if(FLASE)
+ #See https://cmake.org/cmake/help/latest/manual/cmake-packages.7.html#creating-packages for a detailed explanation about this part
+ install(TARGETS ${ANGELSCRIPT_LIBRARY_NAME} EXPORT AngelscriptTargets
+ 	RUNTIME DESTINATION bin
+@@ -257,4 +258,5 @@
+ 	DESTINATION ${ConfigPackageLocation}
+ 	COMPONENT Devel
+ )
++endif()
+ 

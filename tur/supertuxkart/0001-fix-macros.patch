@@ -1,0 +1,31 @@
+--- a/lib/graphics_engine/src/ge_vulkan_driver.cpp
++++ b/lib/graphics_engine/src/ge_vulkan_driver.cpp
+@@ -47,7 +47,7 @@
+     std::string msg = callback_data->pMessage;
+     if (msg.find("UNASSIGNED-CoreValidation-Shader-OutputNotConsumed") != std::string::npos)
+         return VK_FALSE;
+-#ifdef __ANDROID__
++#if 0
+     android_LogPriority alp;
+     switch (message_severity)
+     {
+--- a/src/online/link_helper.cpp
++++ b/src/online/link_helper.cpp
+@@ -72,7 +72,7 @@
+         return false;
+ #else
+ 
+-#if defined(_WIN32) || defined(__APPLE__) || (!defined(__ANDROID__) && (defined(__linux__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__HAIKU__)))
++#if defined(_WIN32) || defined(__APPLE__) || ((!defined(__ANDROID__) || defined(__TERMUX__)) && (defined(__linux__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__HAIKU__)))
+         return true;
+ #elif SDL_VERSION_ATLEAST(2, 0, 14)
+         return true;
+@@ -97,7 +97,7 @@
+         {
+             Log::error("OpenURL", "Command returned non-zero exit status");
+         }
+-#elif !defined(__ANDROID__) && (defined(__linux__) || defined(__FreeBSD__) || defined(__NetBSD__))
++#elif (!defined(__ANDROID__) || defined(__TERMUX__)) && (defined(__linux__) || defined(__FreeBSD__) || defined(__NetBSD__))
+         std::string command = std::string("xdg-open ").append(url);
+ 
+         const char* lib_path = getenv("LD_LIBRARY_PATH");
