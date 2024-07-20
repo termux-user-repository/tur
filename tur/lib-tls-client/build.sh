@@ -4,9 +4,9 @@ TERMUX_PKG_DESCRIPTION="Shared library for catopen/catgets/catclose of Bionic Li
 TERMUX_PKG_LICENSE="custom"
 TERMUX_PKG_LICENSE_FILE="LICENSE"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="1.7.5"
+TERMUX_PKG_VERSION="1.7.6"
 TERMUX_PKG_SRCURL="https://github.com/bogdanfinn/tls-client/archive/refs/tags/v$TERMUX_PKG_VERSION.tar.gz"
-TERMUX_PKG_SHA256=6af3c50bf09937e0a32615dab2753fbbef845e7ffab5d67d4ba12fa03b2af956
+TERMUX_PKG_SHA256=550d7027cf4e91fa7e31a62691aa30f90a3bedcb351aac9b799d1d9a434df378
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_AUTO_UPDATE=true
 
