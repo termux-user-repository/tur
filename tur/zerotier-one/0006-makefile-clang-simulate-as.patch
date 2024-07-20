@@ -8,7 +8,7 @@ index 77ef8e8c..263c74a6 100644
  
  # Non-executable stack
 -override ASFLAGS+=--noexecstack
-+ASFLAGS+=-c $(CFLAGS)
++override ASFLAGS+=-c -Wa,--noexecstack
  
  .PHONY: all
  all:	one

@@ -7,8 +7,6 @@ TERMUX_PKG_MAINTAINER="@termux"
 TERMUX_PKG_VERSION="1.14.0"
 TERMUX_PKG_SRCURL=https://github.com/zerotier/ZeroTierOne/archive/refs/tags/${TERMUX_PKG_VERSION}.tar.gz
 TERMUX_PKG_DEPENDS="miniupnpc, natpmpc, openssl"
-# static is for arm, see step_conf
-TERMUX_PKG_BUILD_DEPENDS="natpmpc-static"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_SHA256=7191623a81b0d1b552b9431e8864dd3420783ee518394ac1376cee6aaf033291
@@ -18,12 +16,7 @@ TERMUX_PKG_SERVICE_SCRIPT=(
 
 termux_step_configure() {
 	termux_setup_rust
-	if [ "$TERMUX_ARCH" == "arm" ]; then
-		# the salsa2012 neon asm code cannot link by ld.lld with -pie
-		# ld.lld: error: relocation R_ARM_ABS32 cannot be used against local symbol; recompile with -fPIC
-		# https://stackoverflow.com/a/75048788: use static
-		TERMUX_PKG_EXTRA_MAKE_ARGS+="ZT_STATIC=1"
-	fi
+
 	sed \
 	-e 's/usr\///g' \
 	-e 's/sbin/bin/g' \
