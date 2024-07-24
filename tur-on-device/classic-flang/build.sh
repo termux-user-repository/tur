@@ -41,7 +41,7 @@ termux_step_pre_configure() {
 	pushd $TERMUX_PKG_SRCDIR/runtime/libpgmath
 	mkdir -p build && cd build
 	cmake -DCMAKE_INSTALL_PREFIX=$TERMUX_PREFIX ..
-	make -j$TERMUX_MAKE_PROCESSES
+	make -j$TERMUX_PKG_MAKE_PROCESSES
 	make install
 	cd .. && rm -rf build
 	popd

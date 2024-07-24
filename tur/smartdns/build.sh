@@ -27,7 +27,7 @@ termux_step_configure() {
 }
 
 termux_step_make() {
-	make -j $TERMUX_MAKE_PROCESSES \
+	make -j $TERMUX_PKG_MAKE_PROCESSES \
 			PREFIX="$PREFIX" \
 			SBINDIR="$PREFIX/bin" \
 			SYSCONFDIR="$PREFIX/etc" \
@@ -35,7 +35,7 @@ termux_step_make() {
 }
 
 termux_step_make_install() {
-	make install -j $TERMUX_MAKE_PROCESSES \
+	make install -j $TERMUX_PKG_MAKE_PROCESSES \
 			PREFIX="$PREFIX" \
 			SBINDIR="$PREFIX/bin" \
 			SYSCONFDIR="$PREFIX/etc" \

@@ -70,9 +70,9 @@ termux_step_configure() {
 
 termux_step_make() {
 	if [ "${TERMUX_DEBUG_BUILD}" = "true" ]; then
-		ninja -C out/Debug -j "${TERMUX_MAKE_PROCESSES}"
+		ninja -C out/Debug -j "${TERMUX_PKG_MAKE_PROCESSES}"
 	else
-		ninja -C out/Release -j "${TERMUX_MAKE_PROCESSES}"
+		ninja -C out/Release -j "${TERMUX_PKG_MAKE_PROCESSES}"
 	fi
 }
 

@@ -42,14 +42,14 @@ termux_step_host_build() {
 	./config --prefix=$TERMUX_PKG_HOSTBUILD_DIR/ruby-host-openssl \
 			--openssldir=$TERMUX_PKG_HOSTBUILD_DIR/ruby-host-openssl \
 			shared zlib
-	make -j $TERMUX_MAKE_PROCESSES
+	make -j $TERMUX_PKG_MAKE_PROCESSES
 	make install
 	popd
 
 	"$TERMUX_PKG_SRCDIR/configure" \
 			--prefix=$TERMUX_PKG_HOSTBUILD_DIR/ruby-host \
 			--with-openssl-dir=$TERMUX_PKG_HOSTBUILD_DIR/ruby-host-openssl
-	make -j $TERMUX_MAKE_PROCESSES
+	make -j $TERMUX_PKG_MAKE_PROCESSES
 	make install
 }
 

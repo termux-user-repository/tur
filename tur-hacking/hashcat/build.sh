@@ -22,7 +22,7 @@ termux_step_make() {
 	rm -rf $TERMUX_PREFIX/opt/hashcat/
 	mkdir -p $TERMUX_PREFIX/opt/hashcat/
 
-	make -j $TERMUX_MAKE_PROCESSES
+	make -j $TERMUX_PKG_MAKE_PROCESSES
 }
 
 termux_step_make_install() {

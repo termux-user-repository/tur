@@ -63,7 +63,7 @@ termux_step_host_build() {
 	cmake -G Ninja "-DCMAKE_BUILD_TYPE=Release" \
 				"-DLLVM_ENABLE_PROJECTS=clang;mlir" \
 				$TERMUX_PKG_SRCDIR/llvm
-	ninja -j $TERMUX_MAKE_PROCESSES clang-tblgen llvm-tblgen \
+	ninja -j $TERMUX_PKG_MAKE_PROCESSES clang-tblgen llvm-tblgen \
 						mlir-tblgen mlir-linalg-ods-yaml-gen
 }
 
