@@ -1,0 +1,31 @@
+diff --git a/make-linux.mk b/make-linux.mk
+index 263c74a6..9e7498e8 100644
+--- a/make-linux.mk
++++ b/make-linux.mk
+@@ -12,7 +12,7 @@ endif
+ INCLUDES?=-Irustybits/target -isystem ext -Iext/prometheus-cpp-lite-1.0/core/include -Iext-prometheus-cpp-lite-1.0/3rdparty/http-client-lite/include -Iext/prometheus-cpp-lite-1.0/simpleapi/include
+ DEFS?=
+ LDLIBS?=
+-DESTDIR?=
++DESTDIR?=/usr
+ EXTRA_DEPS?=
+ 
+ # FIXME: provide CARGO_TARGET_NAME or die
+@@ -29,6 +29,8 @@ TIMESTAMP=$(shell date +"%Y%m%d%H%M")
+ # otherwise build into binary as done on Mac and Windows.
+ ONE_OBJS+=osdep/PortMapper.o
+ override DEFS+=-DZT_USE_MINIUPNPC
++# TODO: current upnpc is too new (UPNP_GetValidIGD changed in 2.2.8), so
++# keep it unchanged until upstream fix it
+ MINIUPNPC_IS_NEW_ENOUGH=$(shell grep -sqr '.*define.*MINIUPNPC_VERSION.*"2..*"' /usr/include/miniupnpc/miniupnpc.h && echo 1)
+ #MINIUPNPC_IS_NEW_ENOUGH=$(shell grep -sqr '.*define.*MINIUPNPC_VERSION.*"2.."' /usr/include/miniupnpc/miniupnpc.h && echo 1)
+ ifeq ($(MINIUPNPC_IS_NEW_ENOUGH),1)
+@@ -38,7 +40,7 @@ else
+ 	override DEFS+=-DMINIUPNP_STATICLIB -DMINIUPNPC_SET_SOCKET_TIMEOUT -DMINIUPNPC_GET_SRC_ADDR -D_BSD_SOURCE -D_DEFAULT_SOURCE -D_XOPEN_SOURCE=600 -DOS_STRING="\"Linux\"" -DMINIUPNPC_VERSION_STRING="\"2.0\"" -DUPNP_VERSION_STRING="\"UPnP/1.1\"" -DENABLE_STRNATPMPERR
+ 	ONE_OBJS+=ext/miniupnpc/connecthostport.o ext/miniupnpc/igd_desc_parse.o ext/miniupnpc/minisoap.o ext/miniupnpc/minissdpc.o ext/miniupnpc/miniupnpc.o ext/miniupnpc/miniwget.o ext/miniupnpc/minixml.o ext/miniupnpc/portlistingparse.o ext/miniupnpc/receivedata.o ext/miniupnpc/upnpcommands.o ext/miniupnpc/upnpdev.o ext/miniupnpc/upnperrors.o ext/miniupnpc/upnpreplyparse.o
+ endif
+-ifeq ($(wildcard /usr/include/natpmp.h),)
++ifeq ($(wildcard $(DESTDIR)/include/natpmp.h),)
+ 	ONE_OBJS+=ext/libnatpmp/natpmp.o ext/libnatpmp/getgateway.o
+ else
+ 	LDLIBS+=-lnatpmp

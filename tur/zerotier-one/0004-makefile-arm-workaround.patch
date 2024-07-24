@@ -1,0 +1,32 @@
+diff --git a/make-linux.mk b/make-linux.mk
+index e232d93..ce8a934 100644
+--- a/make-linux.mk
++++ b/make-linux.mk
+@@ -199,6 +199,11 @@ ifeq ($(CC_MACH),armv7)
+ 	override DEFS+=-DZT_NO_TYPE_PUNNING
+ 	ZT_USE_ARM32_NEON_ASM_CRYPTO=1
+ endif
++ifeq ($(CC_MACH),armv7a)
++	ZT_ARCHITECTURE=3
++	override DEFS+=-DZT_NO_TYPE_PUNNING
++	ZT_USE_ARM32_NEON_ASM_CRYPTO=0
++endif
+ ifeq ($(CC_MACH),armv7l)
+ 	ZT_ARCHITECTURE=3
+ 	override DEFS+=-DZT_NO_TYPE_PUNNING
+@@ -347,6 +347,7 @@
+ 
+ # ARM32 hell -- use conservative CFLAGS
+ ifeq ($(ZT_ARCHITECTURE),3)
++ifneq ($(CC_MACH),armv7a)
+ 	ifeq ($(shell if [ -e /usr/bin/dpkg ]; then dpkg --print-architecture; fi),armel)
+ 		override CFLAGS+=-march=armv5t -mfloat-abi=soft -msoft-float -mno-unaligned-access -marm
+ 		override CXXFLAGS+=-march=armv5t -mfloat-abi=soft -msoft-float -mno-unaligned-access -marm
+@@ -357,6 +361,7 @@
+ 		ZT_USE_ARM32_NEON_ASM_CRYPTO=0
+ 	endif
+ endif
++endif
+ 
+ # Build faster crypto on some targets
+ ifeq ($(ZT_USE_X64_ASM_SALSA),1)

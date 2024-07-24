@@ -1,0 +1,47 @@
+diff --git a/make-linux.mk b/make-linux.mk
+index 68138617..efde7a1d 100644
+--- a/make-linux.mk
++++ b/make-linux.mk
+@@ -15,6 +15,9 @@ LDLIBS?=
+ DESTDIR?=
+ EXTRA_DEPS?=
+ 
++# FIXME: provide CARGO_TARGET_NAME or die
++CARGO_TARGET_NAME?=$(error set CARGO_TARGET_NAME in environment or make args)
++
+ include objects.mk
+ ONE_OBJS+=osdep/LinuxEthernetTap.o
+ ONE_OBJS+=osdep/LinuxNetLink.o
+@@ -75,6 +78,8 @@ else
+ 	ZT_CARGO_FLAGS=--release
+ endif
+ 
++ZT_CARGO_FLAGS+=--target $(CARGO_TARGET_NAME)
++
+ ifeq ($(ZT_QNAP), 1)
+ 	override DEFS+=-D__QNAP__
+ 	ZT_EMBEDDED=1
+@@ -301,9 +306,9 @@ ifeq ($(ZT_SSO_SUPPORTED), 1)
+ 	ifeq ($(ZT_EMBEDDED),)
+ 		override DEFS+=-DZT_SSO_SUPPORTED=1
+ 		ifeq ($(ZT_DEBUG),1)
+-			LDLIBS+=rustybits/target/debug/libzeroidc.a -ldl -lssl -lcrypto
++			LDLIBS+=rustybits/target/$(CARGO_TARGET_NAME)/debug/libzeroidc.a -ldl -lssl -lcrypto
+ 		else
+-			LDLIBS+=rustybits/target/release/libzeroidc.a -ldl -lssl -lcrypto
++			LDLIBS+=rustybits/target/$(CARGO_TARGET_NAME)/release/libzeroidc.a -ldl -lssl -lcrypto
+ 		endif
+ 	endif
+ endif
+@@ -331,9 +336,9 @@ ifeq ($(ZT_CONTROLLER),1)
+ 	override DEFS+=-DZT_CONTROLLER_USE_LIBPQ -DZT_NO_PEER_METRICS
+ 	override INCLUDES+=-I/usr/include/postgresql -Iext/libpqxx-7.7.3/install/ubuntu22.04/$(EXT_ARCH)/include -Iext/hiredis-1.0.2/include/ -Iext/redis-plus-plus-1.3.3/install/ubuntu22.04/$(EXT_ARCH)/include/sw/
+ 	ifeq ($(ZT_DEBUG),1)
+-		override LDLIBS+=rustybits/target/debug/libsmeeclient.a
++		override LDLIBS+=rustybits/target/$(CARGO_TARGET_NAME)/debug/libsmeeclient.a
+ 	else
+-		override LDLIBS+=rustybits/target/release/libsmeeclient.a
++		override LDLIBS+=rustybits/target/$(CARGO_TARGET_NAME)/release/libsmeeclient.a
+ 	endif
+ endif
+ 

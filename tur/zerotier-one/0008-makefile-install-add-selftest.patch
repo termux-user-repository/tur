@@ -1,0 +1,21 @@
+diff --git a/make-linux.mk b/make-linux.mk
+index 70a13911..c14e0114 100644
+--- a/make-linux.mk
++++ b/make-linux.mk
+@@ -376,7 +376,7 @@ override ASFLAGS+=-Wa,-noexecstack
+ all:	one
+ 
+ .PHONY: one
+-one: zerotier-one zerotier-idtool zerotier-cli
++one: zerotier-one zerotier-idtool zerotier-cli zerotier-selftest
+ 
+ from_builder:	FORCE
+ 	ln -sf zerotier-one zerotier-idtool
+@@ -465,6 +465,7 @@ install:	FORCE
+ 	mkdir -p $(DESTDIR)/usr/sbin
+ 	rm -f $(DESTDIR)/usr/sbin/zerotier-one
+ 	cp -f zerotier-one $(DESTDIR)/usr/sbin/zerotier-one
++	cp -f zerotier-selftest $(DESTDIR)/usr/sbin/zerotier-selftest
+ 	rm -f $(DESTDIR)/usr/sbin/zerotier-cli
+ 	rm -f $(DESTDIR)/usr/sbin/zerotier-idtool
+ 	ln -s zerotier-one $(DESTDIR)/usr/sbin/zerotier-cli
