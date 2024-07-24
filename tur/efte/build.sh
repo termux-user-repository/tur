@@ -18,7 +18,7 @@ TERMUX_PKG_HOSTBUILD=true
 termux_step_host_build() {
 	termux_setup_cmake
 	cmake "$TERMUX_PKG_SRCDIR" -DBUILD_X=OFF -DBUILD_CONSOLE=OFF
-	make -j $TERMUX_MAKE_PROCESSES bin2c
+	make -j $TERMUX_PKG_MAKE_PROCESSES bin2c
 }
 
 termux_step_pre_configure() {

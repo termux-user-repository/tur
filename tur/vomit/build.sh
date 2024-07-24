@@ -13,7 +13,7 @@ TERMUX_PKG_UPDATE_VERSION_REGEXP="^0\.[0-9]+(\.[0-9]+)*$" ## 0.xx
 
 termux_step_make() {
 	termux_setup_rust
-	cargo build --jobs $TERMUX_MAKE_PROCESSES --target $CARGO_TARGET_NAME --release --locked
+	cargo build --jobs $TERMUX_PKG_MAKE_PROCESSES --target $CARGO_TARGET_NAME --release --locked
 
 	printf '%s\n' "Generate document file of vomit-config..." >&2
 	local vomitConfigVer="$(sed -nEe '/^vomit-config = "([0-9.]+)"$/ s%.* = "([0-9.]+)"%\1%p' Cargo.toml | head -n 1)"

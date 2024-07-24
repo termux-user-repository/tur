@@ -19,7 +19,7 @@ termux_step_host_build() {
 	. "$TERMUX_PREFIX/opt/qbe/cross/setup.sh"
 
 	"$TERMUX_PKG_SRCDIR/configure" --prefix="$_CROSS_PREFIX"
-	make -j $TERMUX_MAKE_PROCESSES
+	make -j $TERMUX_PKG_MAKE_PROCESSES
 	make install
 	cp "$TERMUX_PKG_BUILDER_DIR/cross_setup.sh" "$_CROSS_PREFIX/setup.sh"
 }

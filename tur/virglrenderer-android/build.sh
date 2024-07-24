@@ -55,7 +55,7 @@ termux_step_host_build() {
 		--prefix=$_INSTALL_PREFIX \
 		--libdir lib \
 		-Degl=yes -Dglx=no -Dx11=false
-	ninja -C libepoxy-build install -j $TERMUX_MAKE_PROCESSES
+	ninja -C libepoxy-build install -j $TERMUX_PKG_MAKE_PROCESSES
 
 	# Compile virglrenderer
 	mkdir -p virglrenderer-build
@@ -65,7 +65,7 @@ termux_step_host_build() {
 		--libdir lib \
 		-Degl_without_gbm=true \
 		-Dplatforms=egl
-	ninja -C virglrenderer-build install -j $TERMUX_MAKE_PROCESSES
+	ninja -C virglrenderer-build install -j $TERMUX_PKG_MAKE_PROCESSES
 }
 
 termux_step_configure() {

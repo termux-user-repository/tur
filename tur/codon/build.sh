@@ -31,7 +31,7 @@ termux_step_host_build() {
 
 	termux_setup_cmake
 	cmake "$TERMUX_PKG_SRCDIR"
-	make -j $TERMUX_MAKE_PROCESSES peg2cpp
+	make -j $TERMUX_PKG_MAKE_PROCESSES peg2cpp
 }
 
 termux_step_pre_configure() {

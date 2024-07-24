@@ -37,7 +37,7 @@ termux_step_configure() {
 termux_step_make() {
 	export CXXFLAGS+=" -lz"
 	RUSTFLAGS="--cfg surrealdb_unstable $RUSTFLAGS"
-	cargo build --jobs $TERMUX_MAKE_PROCESSES --target $CARGO_TARGET_NAME --release
+	cargo build --jobs $TERMUX_PKG_MAKE_PROCESSES --target $CARGO_TARGET_NAME --release
 }
 
 termux_step_make_install() {
