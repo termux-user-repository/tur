@@ -1,0 +1,14 @@
+--- a/Source/Tools/FEXLoader/VDSO_Emulation.cpp
++++ b/Source/Tools/FEXLoader/VDSO_Emulation.cpp
+@@ -253,7 +253,11 @@
+           int rv;
+         } *args = reinterpret_cast<ArgsRV_t*>(ArgsRV);
+ 
++#ifndef __ANDROID__
+         int Result = ::getcpu(args->cpu, args->node);
++#else
++        int Result = ::syscall(SYS_getcpu, args->cpu, args->node, nullptr);
++#endif
+         args->rv = SyscallRet(Result);
+       }
+     }

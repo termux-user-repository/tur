@@ -1,0 +1,20 @@
+https://github.com/llvm/llvm-project/issues/58145
+
+--- a/FEXCore/CMakeLists.txt
++++ b/FEXCore/CMakeLists.txt
+@@ -26,6 +26,7 @@
+ include(CheckIncludeFileCXX)
+ include(CheckCXXSourceCompiles)
+ 
++if(NOT ENABLE_TERMUX_BUILD)
+ set(CMAKE_REQUIRED_FLAGS "-std=c++11 -Wattributes -Werror=attributes")
+ check_cxx_source_compiles(
+   "
+@@ -40,6 +41,7 @@
+ if (HAS_CLANG_PRESERVE_ALL)
+   message(STATUS "Has clang::preserve_all")
+ endif ()
++endif()
+ 
+ if (EXISTS ${CMAKE_CURRENT_DIR}/External/vixl/)
+     # Useful to have for freestanding libFEXCore

@@ -1,0 +1,13 @@
+--- a/Source/Tools/FEXLoader/VDSO_Emulation.cpp
++++ b/Source/Tools/FEXLoader/VDSO_Emulation.cpp
+@@ -18,6 +18,10 @@
+ #include <sys/time.h>
+ #include <unistd.h>
+ 
++#ifndef ELF32_ST_VISIBILITY
++#define ELF32_ST_VISIBILITY(o) ((o) & 0x3)
++#endif
++
+ namespace FEX::VDSO {
+   FEXCore::Context::VDSOSigReturn VDSOPointers{};
+   namespace VDSOHandlers {
