@@ -220,7 +220,7 @@ jobs:
         path: ./artifacts
 
   build-arm:
-    runs-on: self-hosted
+    runs-on: ubuntu-20.04-arm
     strategy:
       matrix:
         target_arch: [arm, aarch64]
