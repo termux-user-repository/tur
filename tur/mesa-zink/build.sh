@@ -40,6 +40,7 @@ termux_step_pre_configure() {
 
 	CPPFLAGS+=" -D__USE_GNU"
 	LDFLAGS+=" -landroid-shmem -ltinfo"
+	LDFLAGS+=" -Wl,--undefined-version"
 
 	_WRAPPER_BIN=$TERMUX_PKG_BUILDDIR/_wrapper/bin
 	mkdir -p $_WRAPPER_BIN
