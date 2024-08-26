@@ -20,6 +20,8 @@ on:
   push:
     branches:
     - master
+    - dev
+    - 'dev/**'
     paths:
     - 'tur/**'
     - 'tur-multilib/**'
@@ -231,7 +233,7 @@ jobs:
         path: ./artifacts
 
   upload:
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && github.ref != 'refs/heads/dev' && !startsWith(github.ref, 'refs/heads/dev/')
     needs: build
     runs-on: ubuntu-latest
     steps:

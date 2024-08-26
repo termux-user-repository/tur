@@ -20,6 +20,8 @@ on:
   push:
     branches:
     - master
+    - dev
+    - 'dev/**'
     paths:
     - 'tur-continuous/**'
   pull_request:
@@ -863,7 +865,7 @@ jobs:
 
   trigeer:
     runs-on: ubuntu-22.04
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && github.ref != 'refs/heads/dev' && !startsWith(github.ref, 'refs/heads/dev/')
     needs: finished-build
     steps:
     - name: Trigger workflow in dists repository
