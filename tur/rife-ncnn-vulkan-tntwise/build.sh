@@ -2,7 +2,7 @@ TERMUX_PKG_HOMEPAGE=https://github.com/TNTwise/rife-ncnn-vulkan
 TERMUX_PKG_DESCRIPTION="TNTwise's fork of rife-ncnn-vulkan: RIFE, Real-Time Intermediate Flow Estimation for Video Frame Interpolation implemented with ncnn library"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="20240808"
+TERMUX_PKG_VERSION="20240819"
 TERMUX_PKG_SRCURL=git+https://github.com/TNTwise/rife-ncnn-vulkan
 TERMUX_PKG_DEPENDS="libwebp"
 TERMUX_PKG_BUILD_DEPENDS="vulkan-headers, vulkan-loader-android"
@@ -12,7 +12,7 @@ TERMUX_PKG_UPDATE_TAG_TYPE="newest-tag"
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="-DUSE_SYSTEM_WEBP=ON"
 
 termux_step_pre_configure() {
-	LDFLAGS+=" -llog -landroid"
+	LDFLAGS+=" -llog -landroid -fopenmp -static-openmp"
 
 	local _RPATH_FLAG="-Wl,-rpath=$TERMUX_PREFIX/lib"
 	local _RPATH_FLAG_ADD="-Wl,-rpath='\$ORIGIN' -Wl,-rpath=$TERMUX_PREFIX/lib"
