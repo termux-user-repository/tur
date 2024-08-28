@@ -21,6 +21,8 @@ on:
   push:
     branches:
     - master
+    - dev
+    - 'dev/**'
     paths:
     - 'tur-on-device/**'
   pull_request:
@@ -405,7 +407,7 @@ jobs:
         rm -rf ./artifacts ./debs
 
   upload:
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && github.ref != 'refs/heads/dev' && !startsWith(github.ref, 'refs/heads/dev/')
     needs: [ build-x86, build-arm ]
     runs-on: ubuntu-latest
     steps:
