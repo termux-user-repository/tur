@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="RIFE, Real-Time Intermediate Flow Estimation for Video F
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION=20221029
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=git+https://github.com/nihui/rife-ncnn-vulkan
 TERMUX_PKG_DEPENDS="libwebp"
 TERMUX_PKG_BUILD_DEPENDS="vulkan-headers, vulkan-loader-android"
@@ -12,7 +13,7 @@ TERMUX_PKG_UPDATE_TAG_TYPE="newest-tag"
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="-DUSE_SYSTEM_WEBP=ON"
 
 termux_step_pre_configure() {
-	LDFLAGS+=" -llog -landroid"
+	LDFLAGS+=" -llog -landroid -fopenmp -static-openmp"
 
 	local _RPATH_FLAG="-Wl,-rpath=$TERMUX_PREFIX/lib"
 	local _RPATH_FLAG_ADD="-Wl,-rpath='\$ORIGIN' -Wl,-rpath=$TERMUX_PREFIX/lib"
