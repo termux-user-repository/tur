@@ -1,14 +1,13 @@
 TERMUX_PKG_HOMEPAGE=https://github.com/exaloop/llvm-project
-TERMUX_PKG_DESCRIPTION="Modular compiler and toolchain technologies library (Version 15, Codon Fork)"
+TERMUX_PKG_DESCRIPTION="Modular compiler and toolchain technologies library (Version 17, Codon Fork)"
 TERMUX_PKG_LICENSE="Apache-2.0"
 TERMUX_PKG_LICENSE_FILE="llvm/LICENSE.TXT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-_DATE=2022.10.23
+_DATE=2024.01.21
 TERMUX_PKG_VERSION=${_DATE//./}
-TERMUX_PKG_REVISION=3
-_LLVM_COMMIT=55b0b8fa1c9f9082b535628fc9fa6313280c0b9a
+_LLVM_COMMIT=c5a1d86495d28ab045258f120a8e2c9f3ef67a3b
 TERMUX_PKG_SRCURL=https://github.com/exaloop/llvm-project/archive/${_LLVM_COMMIT}.zip
-TERMUX_PKG_SHA256=fc703de7aed466aa76f0bc113946c3e9263887f7722bdea592fb9a10e302edac
+TERMUX_PKG_SHA256=db37e218bb62b261f9debb4bb526a4abb37af8ac9a7973099c6d9a99a3e424c6
 TERMUX_PKG_HOSTBUILD=true
 TERMUX_PKG_DEPENDS="libc++, ndk-sysroot, libffi"
 TERMUX_PKG_SUGGESTS="codon"
@@ -23,7 +22,8 @@ TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 -DLLVM_ENABLE_LIBEDIT=OFF
 -DDEFAULT_SYSROOT=$(dirname $TERMUX_PREFIX)
 -DLLVM_LINK_LLVM_DYLIB=on
--DLLVM_TABLEGEN=$TERMUX_PKG_HOSTBUILD_DIR/bin/llvm-tblgen
+-DLLVM_NATIVE_TOOL_DIR=$TERMUX_PKG_HOSTBUILD_DIR/bin
+-DCROSS_TOOLCHAIN_FLAGS_LLVM_NATIVE=-DLLVM_NATIVE_TOOL_DIR=$TERMUX_PKG_HOSTBUILD_DIR/bin
 -DLIBOMP_ENABLE_SHARED=FALSE
 -DLLVM_ENABLE_SPHINX=ON
 -DSPHINX_OUTPUT_MAN=ON
@@ -53,7 +53,7 @@ termux_step_host_build() {
 
 	cmake -G Ninja "-DCMAKE_BUILD_TYPE=Release" \
 					$TERMUX_PKG_SRCDIR/llvm
-	ninja -j $TERMUX_PKG_MAKE_PROCESSES llvm-tblgen
+	ninja -j $TERMUX_PKG_MAKE_PROCESSES llvm-tblgen llvm-min-tblgen
 }
 
 termux_step_pre_configure() {
