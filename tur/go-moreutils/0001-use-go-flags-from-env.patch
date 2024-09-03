@@ -1,0 +1,11 @@
+--- a/build.sh
++++ b/build.sh
+@@ -14,8 +14,6 @@
+ # default output bin name
+ # use `go tool dist list` to see all platform and architecture options (*Note* that some tools will currently not build outside of linux)
+ bin="$SCRIPT_DIR/bin"
+-GOOS=linux
+-GOARCH=amd64
+ 
+ export GOOS
+ export GOARCH
