@@ -5,10 +5,9 @@ TERMUX_PKG_DESCRIPTION="A high-performance, zero-overhead, extensible Python com
 TERMUX_PKG_LICENSE="non-free"
 TERMUX_PKG_LICENSE_FILE="LICENSE"
 TERMUX_PKG_MAINTAINER="@termux"
-TERMUX_PKG_VERSION=0.16.3
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_VERSION=0.17.0
 TERMUX_PKG_SRCURL=https://github.com/exaloop/codon/archive/refs/tags/v$TERMUX_PKG_VERSION.tar.gz
-TERMUX_PKG_SHA256=f28b9d8fd5349257aab47154703e9bc744a4884d5975c55776f4b0a72302eb31
+TERMUX_PKG_SHA256=1e4a56c139adc63584a1de0a4141b9174b9f0d0d764ebe81d164e12fa275b7e0
 TERMUX_PKG_DEPENDS="libc++, libxml2, zlib, zstd"
 TERMUX_PKG_BUILD_DEPENDS="libllvm-codon"
 TERMUX_PKG_NO_STATICSPLIT=true
@@ -20,17 +19,19 @@ TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 -DCMAKE_INSTALL_PREFIX=$TERMUX_PREFIX/opt/codon
 "
 
+# codon ships its own libomp.so
+TERMUX_PKG_NO_OPENMP_CHECK=true
+
 # On ARM and i686, codon crashes:
 # JIT session error: Unsupported target machine architecture in ELF object codon-jitted-objectbuffer
 # Failure value returned from cantFail wrapped call
 TERMUX_PKG_BLACKLISTED_ARCHES="arm, i686"
 
 termux_step_host_build() {
-	env -i PATH="$PATH" sudo apt update
-	env -i PATH="$PATH" sudo apt install -y libzstd-dev
-
 	termux_setup_cmake
-	cmake "$TERMUX_PKG_SRCDIR"
+	cp -f "$TERMUX_PKG_SRCDIR"/codon/util/peg2cpp.cpp ./peg2cpp.cpp
+	cp -f "$TERMUX_PKG_BUILDER_DIR"/host-peg2cpp-CMakeLists.txt ./CMakeLists.txt
+	cmake .
 	make -j $TERMUX_PKG_MAKE_PROCESSES peg2cpp
 }
 
