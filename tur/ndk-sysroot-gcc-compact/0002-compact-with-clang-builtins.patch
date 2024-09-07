@@ -11,20 +11,11 @@ diff -uNr a/bits/ioctl.h b/bits/ioctl.h
 +#if defined(__clang__) && __has_extension(overloadable_unmarked) && \
 +  !defined(BIONIC_IOCTL_NO_SIGNEDNESS_OVERLOAD)
  /* enable_if(1) just exists to break overloading ties. */
- int ioctl(int __fd, unsigned __request, ...) __overloadable __enable_if(1, "") __RENAME(ioctl);
+ int ioctl(int __fd, unsigned __op, ...) __overloadable __enable_if(1, "") __RENAME(ioctl);
  #endif
 diff -uNr a/bits/stdatomic.h b/bits/stdatomic.h
 --- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/bits/stdatomic.h
 +++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/bits/stdatomic.h
-@@ -41,7 +41,7 @@
-  */
- 
- #include <stddef.h>  /* For ptrdiff_t. */
--#include <stdint.h>
-+#include <stdint.h>  /* TODO: don't drag in all the macros, just the types. */
- // Include uchar.h only when available.  Bionic's stdatomic.h is also used for
- // the host (via a copy in prebuilts/clang) and uchar.h is not available in the
- // glibc used for the host.
 @@ -49,6 +49,20 @@
  # include <uchar.h>  /* For char16_t and char32_t.              */
  #endif
@@ -60,15 +51,10 @@ diff -uNr a/bits/stdatomic.h b/bits/stdatomic.h
  
  /*
   * Clang and recent GCC both provide predefined macros for the memory
-@@ -138,24 +157,63 @@
-  * 7.17.4 Fences.
+@@ -139,23 +158,56 @@
   */
  
--static __inline void atomic_thread_fence(memory_order __order __attribute__((unused))) {
-+static __inline void
-+atomic_thread_fence(memory_order __order __attribute__((unused)))
-+{
-+
+ static __inline void atomic_thread_fence(memory_order __order __attribute__((__unused__))) {
 +#ifdef __CLANG_ATOMICS
  	__c11_atomic_thread_fence(__order);
 +#elif defined(__GNUC_ATOMICS)
@@ -78,11 +64,7 @@ diff -uNr a/bits/stdatomic.h b/bits/stdatomic.h
 +#endif
  }
  
--static __inline void atomic_signal_fence(memory_order __order __attribute__((unused))) {
-+static __inline void
-+atomic_signal_fence(memory_order __order __attribute__((unused)))
-+{
-+
+ static __inline void atomic_signal_fence(memory_order __order __attribute__((__unused__))) {
 +#ifdef __CLANG_ATOMICS
  	__c11_atomic_signal_fence(__order);
 +#elif defined(__GNUC_ATOMICS)
@@ -127,7 +109,7 @@ diff -uNr a/bits/stdatomic.h b/bits/stdatomic.h
  typedef _Atomic(bool)			atomic_bool;
  typedef _Atomic(char)			atomic_char;
  typedef _Atomic(signed char)		atomic_schar;
-@@ -204,6 +262,7 @@
+@@ -204,6 +256,7 @@
   * Compiler-specific operations.
   */
  
@@ -135,7 +117,7 @@ diff -uNr a/bits/stdatomic.h b/bits/stdatomic.h
  #define	atomic_compare_exchange_strong_explicit(object, expected,	\
      desired, success, failure)						\
  	__c11_atomic_compare_exchange_strong(object, expected, desired,	\
-@@ -228,11 +287,91 @@
+@@ -228,11 +281,91 @@
  	__c11_atomic_load(object, order)
  #define	atomic_store_explicit(object, desired, order)			\
  	__c11_atomic_store(object, desired, order)
@@ -227,7 +209,7 @@ diff -uNr a/bits/stdatomic.h b/bits/stdatomic.h
  #define	atomic_compare_exchange_strong(object, expected, desired)	\
  	atomic_compare_exchange_strong_explicit(object, expected,	\
  	    desired, memory_order_seq_cst, memory_order_seq_cst)
-@@ -255,6 +394,7 @@
+@@ -255,6 +388,7 @@
  	atomic_load_explicit(object, memory_order_seq_cst)
  #define	atomic_store(object, desired)					\
  	atomic_store_explicit(object, desired, memory_order_seq_cst)
@@ -235,45 +217,6 @@ diff -uNr a/bits/stdatomic.h b/bits/stdatomic.h
  
  /*
   * 7.17.8 Atomic flag type and operations.
-@@ -269,18 +409,33 @@
- 
- #define	ATOMIC_FLAG_INIT		{ ATOMIC_VAR_INIT(false) }
- 
--static __inline bool atomic_flag_test_and_set_explicit(volatile atomic_flag *__object, memory_order __order) {
-+static __inline bool
-+atomic_flag_test_and_set_explicit(volatile atomic_flag *__object,
-+    memory_order __order)
-+{
- 	return (atomic_exchange_explicit(&__object->__flag, 1, __order));
- }
- 
--static __inline void atomic_flag_clear_explicit(volatile atomic_flag *__object, memory_order __order) {
-+static __inline void
-+atomic_flag_clear_explicit(volatile atomic_flag *__object, memory_order __order)
-+{
-+
- 	atomic_store_explicit(&__object->__flag, 0, __order);
- }
- 
--static __inline bool atomic_flag_test_and_set(volatile atomic_flag *__object) {
--	return (atomic_flag_test_and_set_explicit(__object, memory_order_seq_cst));
-+#ifndef _KERNEL
-+static __inline bool
-+atomic_flag_test_and_set(volatile atomic_flag *__object)
-+{
-+
-+	return (atomic_flag_test_and_set_explicit(__object,
-+	    memory_order_seq_cst));
- }
- 
--static __inline void atomic_flag_clear(volatile atomic_flag *__object) {
-+static __inline void
-+atomic_flag_clear(volatile atomic_flag *__object)
-+{
-+
- 	atomic_flag_clear_explicit(__object, memory_order_seq_cst);
- }
-+#endif /* !_KERNEL */
 diff -uNr a/complex.h b/complex.h
 --- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/complex.h
 +++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/complex.h

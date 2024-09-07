@@ -195,8 +195,6 @@ _setup_standalone_toolchain_current_ndk_newer_gcc() {
 			echo "Applying patch: $(basename $f)"
 			patch -d "$GCC_STANDALONE_TOOLCHAIN_TMP/sysroot/usr/include/" -p8 < "$f";
 		done
-		# Revert the math header patch
-		patch -d "$GCC_STANDALONE_TOOLCHAIN_TMP/sysroot/usr/include/" -p8 -R < "$TERMUX_SCRIPTDIR/tur/ndk-sysroot-gcc-compact/0001-c++-v1-math-headers.patch"
 		cp -R $TERMUX_STANDALONE_TOOLCHAIN/sysroot/usr/lib/$TERMUX_HOST_PLATFORM/$TERMUX_PKG_API_LEVEL/* \
 			$GCC_STANDALONE_TOOLCHAIN_TMP/sysroot/usr/lib/
 		# Use libc++_shared as libstdc++
