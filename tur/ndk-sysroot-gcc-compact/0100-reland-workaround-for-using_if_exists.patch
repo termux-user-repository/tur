@@ -7,8 +7,8 @@ true when targetting Android API 24.
 
 --- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__config
 +++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__config
-@@ -409,6 +409,18 @@
- #    define _LIBCPP_NO_CFI
+@@ -552,6 +552,18 @@
+ #    define _LIBCPP_USING_DEV_RANDOM
  #  endif
  
 +#if __has_attribute(using_if_exists)
@@ -28,12 +28,12 @@ true when targetting Android API 24.
  #    define _LIBCPP_ALIGNOF(_Tp) alignof(_Tp)
 --- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/cstdlib
 +++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/cstdlib
-@@ -144,7 +144,7 @@
+@@ -146,7 +146,7 @@
  using ::at_quick_exit _LIBCPP_USING_IF_EXISTS;
  using ::quick_exit _LIBCPP_USING_IF_EXISTS;
  #endif
--#if _LIBCPP_STD_VER > 14
-+#if _LIBCPP_STD_VER > 14 && defined(_LIBCPP_HAS_ALIGNED_ALLOC)
+-#if _LIBCPP_STD_VER >= 17
++#if _LIBCPP_STD_VER >= 17 && defined(_LIBCPP_HAS_ALIGNED_ALLOC)
  using ::aligned_alloc _LIBCPP_USING_IF_EXISTS;
  #endif
  
@@ -43,8 +43,8 @@ true when targetting Android API 24.
  using ::size_t _LIBCPP_USING_IF_EXISTS;
  using ::time_t _LIBCPP_USING_IF_EXISTS;
  using ::tm _LIBCPP_USING_IF_EXISTS;
--#if _LIBCPP_STD_VER > 14
-+#if _LIBCPP_STD_VER > 14 && defined(_LIBCPP_HAS_TIMESPEC_GET)
+-#if _LIBCPP_STD_VER >= 17
++#if _LIBCPP_STD_VER >= 17 && defined(_LIBCPP_HAS_TIMESPEC_GET)
  using ::timespec _LIBCPP_USING_IF_EXISTS;
  #endif
  using ::clock _LIBCPP_USING_IF_EXISTS;
@@ -52,8 +52,8 @@ true when targetting Android API 24.
  using ::gmtime _LIBCPP_USING_IF_EXISTS;
  using ::localtime _LIBCPP_USING_IF_EXISTS;
  using ::strftime _LIBCPP_USING_IF_EXISTS;
--#if _LIBCPP_STD_VER > 14
-+#if _LIBCPP_STD_VER > 14 && defined(_LIBCPP_HAS_TIMESPEC_GET)
+-#if _LIBCPP_STD_VER >= 17
++#if _LIBCPP_STD_VER >= 17 && defined(_LIBCPP_HAS_TIMESPEC_GET)
  using ::timespec_get _LIBCPP_USING_IF_EXISTS;
  #endif
  

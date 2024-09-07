@@ -10,7 +10,7 @@ attribute is not available in GCC.
  // The `annotate` attribute always pulls the annotated (inline) function into the object files, thus
  // we should only annotate headers when we are running versioner.
 -#if defined(__BIONIC_VERSIONER)
-+#if defined(__BIONIC_VERSIONER) || ! defined(__clang__)
++#if defined(__BIONIC_VERSIONER) || !defined(__clang__)
  
- #define __INTRODUCED_IN(api_level) __attribute__((annotate("introduced_in=" #api_level)))
- #define __INTRODUCED_IN_NO_GUARD_FOR_NDK(api_level) __attribute__((annotate("introduced_in=" #api_level))) __VERSIONER_NO_GUARD
+ #define __INTRODUCED_IN(api_level) __attribute__((__annotate__("introduced_in=" #api_level)))
+ #define __INTRODUCED_IN_NO_GUARD_FOR_NDK(api_level) __attribute__((__annotate__("introduced_in=" #api_level))) __VERSIONER_NO_GUARD

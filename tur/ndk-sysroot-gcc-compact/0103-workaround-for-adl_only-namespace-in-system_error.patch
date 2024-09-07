@@ -1,0 +1,33 @@
+Since commit [1], libcxx implements LWG 3629 for `system_error` header, 
+but this breaks compile on gcc-9, gcc-10 and gcc-11.
+
+[1]: https://github.com/llvm/llvm-project/commit/ef843c8271027b89419d07ffc2aaa3abf91438ef
+
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__system_error/error_code.h
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__system_error/error_code.h
+@@ -37,7 +37,11 @@
+ namespace __adl_only {
+ // Those cause ADL to trigger but they are not viable candidates,
+ // so they are never actually selected.
++#if defined(_LIBCPP_COMPILER_GCC) && __GNUC__ < 12
++void make_error_code();
++#else
+ void make_error_code() = delete;
++#endif
+ } // namespace __adl_only
+ 
+ class _LIBCPP_EXPORTED_FROM_ABI error_code {
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__system_error/error_condition.h
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__system_error/error_condition.h
+@@ -44,7 +44,11 @@
+ namespace __adl_only {
+ // Those cause ADL to trigger but they are not viable candidates,
+ // so they are never actually selected.
++#if defined(_LIBCPP_COMPILER_GCC) && __GNUC__ < 12
++void make_error_condition();
++#else
+ void make_error_condition() = delete;
++#endif
+ } // namespace __adl_only
+ 
+ class _LIBCPP_EXPORTED_FROM_ABI error_condition {

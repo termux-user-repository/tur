@@ -1,0 +1,32 @@
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/bits/bionic_multibyte_result.h
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/bits/bionic_multibyte_result.h
+@@ -45,6 +45,7 @@
+  * Refer to C23 7.30.1 Restartable multibyte/wide character conversion functions
+  * for more details.
+  */
++#ifdef __clang__
+ enum : size_t {
+   /// @brief An encoding error occurred. The bytes read are not a valid unicode
+   /// character, nor are they a partially valid character.
+@@ -64,5 +65,21 @@
+   BIONIC_MULTIBYTE_RESULT_NO_BYTES_CONSUMED = -3UL,
+ #define BIONIC_MULTIBYTE_RESULT_NO_BYTES_CONSUMED BIONIC_MULTIBYTE_RESULT_NO_BYTES_CONSUMED
+ };
++#else
++/// @brief An encoding error occurred. The bytes read are not a valid unicode
++/// character, nor are they a partially valid character.
++#define BIONIC_MULTIBYTE_RESULT_ILLEGAL_SEQUENCE (size_t(-1UL))
++
++/// @brief The bytes read may produce a valid unicode character, but the
++/// sequence is incomplete. Future calls may complete the character.
++#define BIONIC_MULTIBYTE_RESULT_INCOMPLETE_SEQUENCE (size_t(-2UL))
++
++/// @brief The output of the call was the result of a previous successful
++/// decoding. No new bytes were consumed.
++///
++/// The common case for this return value is when mbrtoc16 returns the low
++/// surrogate of a pair.
++#define BIONIC_MULTIBYTE_RESULT_NO_BYTES_CONSUMED (size_t(-3UL))
++#endif
+ 
+ __END_DECLS

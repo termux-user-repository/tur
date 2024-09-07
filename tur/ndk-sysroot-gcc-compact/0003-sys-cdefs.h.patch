@@ -33,23 +33,17 @@ diff -uNr a/sys/cdefs.h b/sys/cdefs.h
  #if defined(__cplusplus)
  #define __BEGIN_DECLS extern "C" {
  #define __END_DECLS }
-@@ -139,12 +162,25 @@
+@@ -142,12 +165,25 @@
  
  #define __wur __attribute__((__warn_unused_result__))
  
--#define __errorattr(msg) __attribute__((unavailable(msg)))
--#define __warnattr(msg) __attribute__((deprecated(msg)))
--#define __warnattr_real(msg) __attribute__((deprecated(msg)))
--#define __enable_if(cond, msg) __attribute__((enable_if(cond, msg)))
--#define __clang_error_if(cond, msg) __attribute__((diagnose_if(cond, msg, "error")))
--#define __clang_warning_if(cond, msg) __attribute__((diagnose_if(cond, msg, "warning")))
 +#ifdef __clang__
-+#  define __errorattr(msg) __attribute__((unavailable(msg)))
-+#  define __warnattr(msg) __attribute__((deprecated(msg)))
-+#  define __warnattr_real(msg) __attribute__((deprecated(msg)))
-+#  define __enable_if(cond, msg) __attribute__((enable_if(cond, msg)))
-+#  define __clang_error_if(cond, msg) __attribute__((diagnose_if(cond, msg, "error")))
-+#  define __clang_warning_if(cond, msg) __attribute__((diagnose_if(cond, msg, "warning")))
+ #define __errorattr(msg) __attribute__((__unavailable__(msg)))
+ #define __warnattr(msg) __attribute__((__deprecated__(msg)))
+ #define __warnattr_real(msg) __attribute__((__deprecated__(msg)))
+ #define __enable_if(cond, msg) __attribute__((__enable_if__(cond, msg)))
+ #define __clang_error_if(cond, msg) __attribute__((__diagnose_if__(cond, msg, "error")))
+ #define __clang_warning_if(cond, msg) __attribute__((__diagnose_if__(cond, msg, "warning")))
 +#else
 +#  define __errorattr(msg) __attribute__((__error__(msg)))
 +#  define __warnattr(msg) __attribute__((__warning__(msg)))
@@ -65,82 +59,60 @@ diff -uNr a/sys/cdefs.h b/sys/cdefs.h
  
  #if defined(ANDROID_STRICT)
  /*
-@@ -281,19 +317,20 @@
+@@ -251,6 +287,7 @@
  
  #if defined(__BIONIC_FORTIFY)
  #  define __bos0(s) __bosn((s), 0)
--#  define __pass_object_size_n(n) __attribute__((pass_object_size(n)))
-+#  if defined(__clang__)
-+#    define __pass_object_size_n(n) __attribute__((pass_object_size(n)))
++#if defined(__clang__)
+ #  define __pass_object_size_n(n) __attribute__((__pass_object_size__(n)))
  /*
   * FORTIFY'ed functions all have either enable_if or pass_object_size, which
-  * makes taking their address impossible. Saying (&read)(foo, bar, baz); will
-  * therefore call the unFORTIFYed version of read.
-  */
--#  define __call_bypassing_fortify(fn) (&fn)
-+#    define __call_bypassing_fortify(fn) (&fn)
- /*
-  * Because clang-FORTIFY uses overloads, we can't mark functions as `extern inline` without making
-  * them available externally. FORTIFY'ed functions try to be as close to possible as 'invisible';
-  * having stack protectors detracts from that (b/182948263).
-  */
--#  define __BIONIC_FORTIFY_INLINE static __inline__ __attribute__((no_stack_protector)) \
-+#    define __BIONIC_FORTIFY_INLINE static __inline__ __attribute__((no_stack_protector)) \
-       __always_inline __VERSIONER_FORTIFY_INLINE
- /*
-  * We should use __BIONIC_FORTIFY_VARIADIC instead of __BIONIC_FORTIFY_INLINE
-@@ -301,9 +338,21 @@
-  * The __always_inline attribute is useless, misleading, and could trigger
-  * clang compiler bug to incorrectly inline variadic functions.
-  */
--#  define __BIONIC_FORTIFY_VARIADIC static __inline__
-+#    define __BIONIC_FORTIFY_VARIADIC static __inline__
+@@ -275,6 +312,18 @@
  /* Error functions don't have bodies, so they can just be static. */
--#  define __BIONIC_ERROR_FUNCTION_VISIBILITY static __attribute__((unused))
-+#    define __BIONIC_ERROR_FUNCTION_VISIBILITY static __attribute__((unused))
-+#  else
+ #  define __BIONIC_ERROR_FUNCTION_VISIBILITY static __unused
+ #else
 +/*
 + * Where they can, GCC and clang-style FORTIFY share implementations.
 + * So, make these nops in GCC.
 + */
-+#    define __pass_object_size_n(n)
-+#    define __call_bypassing_fortify(fn) (fn)
++#  define __pass_object_size_n(n)
++#  define __call_bypassing_fortify(fn) (fn)
 +/* __BIONIC_FORTIFY_NONSTATIC_INLINE is pointless in GCC's FORTIFY */
-+#    define __BIONIC_FORTIFY_INLINE extern __inline__ __always_inline __attribute__((gnu_inline)) __attribute__((__artificial__))
++#  define __BIONIC_FORTIFY_INLINE extern __inline__ __always_inline __attribute__((gnu_inline)) __attribute__((__artificial__))
 +/* __always_inline is probably okay and ignored by gcc in __BIONIC_FORTIFY_VARIADIC */
-+#    define __BIONIC_FORTIFY_VARIADIC __BIONIC_FORTIFY_INLINE
-+#  endif
- #else
++#  define __BIONIC_FORTIFY_VARIADIC __BIONIC_FORTIFY_INLINE
++#endif
++#else
  /* Further increase sharing for some inline functions */
  #  define __pass_object_size_n(n)
-@@ -333,7 +382,16 @@
+ #endif
+@@ -303,7 +352,16 @@
  #  define __BIONIC_INCLUDE_FORTIFY_HEADERS 1
  #endif
  
--#define __overloadable __attribute__((overloadable))
 +#if !defined(__clang__) && defined(__BIONIC_INCLUDE_FORTIFY_HEADERS)
 +#undef __BIONIC_INCLUDE_FORTIFY_HEADERS
 +#warning "Fortify headers are not supported and will not used without clang."
 +#endif
 +
 +#if defined(__clang__)
-+#  define __overloadable __attribute__((overloadable))
+ #define __overloadable __attribute__((__overloadable__))
 +#else
-+#  define __overloadable
++#define __overloadable
 +#endif
  
- #define __diagnose_as_builtin(...) __attribute__((diagnose_as_builtin(__VA_ARGS__)))
+ #define __diagnose_as_builtin(...) __attribute__((__diagnose_as_builtin__(__VA_ARGS__)))
  
-@@ -368,6 +426,7 @@
- }
- #endif
+@@ -323,6 +381,7 @@
+ /* Used to rename functions so that the compiler emits a call to 'x' rather than the function this was applied to. */
+ #define __RENAME(x) __asm__(#x)
  
 +#if defined(__clang__)
  /*
   * Used when we need to check for overflow when multiplying x and y. This
-  * should only be used where __size_mul_overflow can not work, because it makes
-@@ -376,6 +435,7 @@
-  * __size_mul_overflow.
+  * should only be used where __builtin_umull_overflow can not work, because it makes
+@@ -331,6 +390,7 @@
+  * __builtin_umull_overflow.
   */
  #define __unsafe_check_mul_overflow(x, y) ((__SIZE_TYPE__)-1 / (x) < (y))
 +#endif
