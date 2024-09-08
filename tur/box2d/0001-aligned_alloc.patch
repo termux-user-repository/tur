@@ -1,0 +1,40 @@
+diff --git a/samples/main.cpp b/samples/main.cpp
+index 576b4d1..d28fbbb 100644
+--- a/samples/main.cpp
++++ b/samples/main.cpp
+@@ -22,6 +22,15 @@
+ #include <stdio.h>
+ #include <stdlib.h>
+ 
++#if defined(__ANDROID__) && __ANDROID_API__ < 26
++void *aligned_alloc(size_t align, size_t size)
++{
++	void *result = NULL;
++	posix_memalign(&result, align, size);
++	return result;
++}
++#endif
++
+ #ifdef BOX2D_PROFILE
+ 	#include <tracy/Tracy.hpp>
+ #else
+diff --git a/src/allocate.c b/src/allocate.c
+index 5e832ef..fe8320d 100644
+--- a/src/allocate.c
++++ b/src/allocate.c
+@@ -15,6 +15,15 @@
+ 	#include <stdlib.h>
+ #endif
+ 
++#if defined(__ANDROID__) && __ANDROID_API__ < 26
++void *aligned_alloc(size_t align, size_t size)
++{
++	void *result = NULL;
++	posix_memalign(&result, align, size);
++	return result;
++}
++#endif
++
+ #include <stdatomic.h>
+ #include <stdint.h>
+ 
