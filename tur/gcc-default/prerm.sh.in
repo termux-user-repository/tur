@@ -2,7 +2,7 @@
 
 set -e
 
-if [ "$TERMUX_APP_PACKAGE_MANAGER" = "apt" ]; then
+if [ "$(command -v pacman-conf || true)" = "" ]; then
 	TERMUX_ARCH="$(dpkg --print-architecture)"
 else
 	TERMUX_ARCH="$(pacman-conf Architecture)"
