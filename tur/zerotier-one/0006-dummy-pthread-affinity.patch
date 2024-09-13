@@ -1,0 +1,14 @@
+--- a/osdep/LinuxEthernetTap.cpp
++++ b/osdep/LinuxEthernetTap.cpp
+@@ -232,7 +232,11 @@
+ 				cpu_set_t cpuset;
+ 				CPU_ZERO(&cpuset);
+ 				CPU_SET(pinCore, &cpuset);
++#ifndef __ANDROID__
+ 				int rc = pthread_setaffinity_np(self, sizeof(cpu_set_t), &cpuset);
++#else
++				int rc = sched_setaffinity(pthread_gettid_np(self), sizeof(cpu_set_t), &cpuset);
++#endif
+ 				if (rc != 0)
+ 				{
+ 					fprintf(stderr, "Failed to pin tap thread %d to core %d: %s\n", i, pinCore, strerror(errno));
