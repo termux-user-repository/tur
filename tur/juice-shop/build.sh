@@ -1,5 +1,5 @@
 TERMUX_PKG_HOMEPAGE=https://owasp.org/www-project-juice-shop/
-TERMUX_PKG_DESCRIPTION="A modern and sophisticated insecure web application. "
+TERMUX_PKG_DESCRIPTION="A modern and sophisticated insecure web application"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="17.1.0"
@@ -9,13 +9,31 @@ TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_DEPENDS="nodejs-lts"
 TERMUX_PKG_BLACKLISTED_ARCHES="arm, i686"
+
 TERMUX_PKG_NO_SHEBANG_FIX=true
 
-termux_step_make() {
+termux_step_configure() {
+	termux_setup_nodejs
+
 	sed -i 's/"win32",/"android",/' package.json
+}
+
+termux_step_make() {
+	if [ $TERMUX_ARCH = "arm" ]; then
+		export NPM_CONFIG_ARCH=armv7l
+	elif [ $TERMUX_ARCH = "x86_64" ]; then
+		export NPM_CONFIG_ARCH=amd64
+	elif [ $TERMUX_ARCH = "aarch64" ]; then
+		export NPM_CONFIG_ARCH=arm64
+	else
+		termux_error_exit "Unsupported arch: $TERMUX_ARCH"
+	fi
+
+	export npm_config_arch=$NPM_CONFIG_ARCH
+	export npm_config_build_from_source=true
+
 	export GYP_DEFINES="android_ndk_path=''"
-	NODEJS_ORG_MIRROR=https://npmmirror.com/mirrors/node npm install --jobs -1 --omit=dev \
-	--registry https://registry.npmmirror.com --disturl=https://npmmirror.com/mirrors/node
+	npm install --jobs -1 --omit=dev
 }
 
 termux_step_make_install() {
