@@ -8,7 +8,7 @@ TERMUX_PKG_SHA256=1483d90cefb8aa4563c4d0a85cb7b243aa95217d235d422e9ca6722fd5b97e
 TERMUX_PKG_AUTO_UPDATE=true
 
 termux_pkg_auto_update() {
-    local latest_tag
+	local latest_tag
 	latest_tag="$(
 		termux_gitlab_api_get_tag \
 			"${TERMUX_PKG_HOMEPAGE}" "${TERMUX_PKG_UPDATE_TAG_TYPE}" "${TERMUX_GITLAB_API_HOST}"
