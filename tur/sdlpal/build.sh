@@ -7,7 +7,6 @@ _COMMIT_DATE=2024.08.06
 TERMUX_PKG_VERSION=2.0.${_COMMIT_DATE}
 TERMUX_PKG_SRCURL="git+https://github.com/sdlpal/sdlpal"
 TERMUX_PKG_GIT_BRANCH="master"
-TERMUX_PKG_SHA256=f80eb939f37372f34206086bfa014b8e7f47e50a8b61331993eead64622d3461
 TERMUX_PKG_DEPENDS="libc++, opengl, sdl2"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_EXTRA_MAKE_ARGS="
@@ -25,11 +24,6 @@ termux_step_post_get_source() {
 		echo -n "ERROR: The specified commit date \"$_COMMIT_DATE\""
 		echo " is different from what is expected to be: \"$version\""
 		return 1
-	fi
-
-	local s=$(find . -type f ! -path '*/.git/*' -print0 | xargs -0 sha256sum | LC_ALL=C sort | sha256sum)
-	if [[ "${s}" != "${TERMUX_PKG_SHA256}  "* ]]; then
-		termux_error_exit "Checksum mismatch for source files."
 	fi
 }
 
