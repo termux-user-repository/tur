@@ -2,10 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://www.darktable.org/
 TERMUX_PKG_DESCRIPTION="virtual lighttable and darkroom for photographers"
 TERMUX_PKG_LICENSE="GPL-3.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="4.6.1"
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_VERSION="4.8.1"
 TERMUX_PKG_SRCURL=https://github.com/darktable-org/darktable/releases/download/release-${TERMUX_PKG_VERSION}/darktable-${TERMUX_PKG_VERSION}.tar.xz
-TERMUX_PKG_SHA256=16edc0a070293e2d3cda4ea10e49bda9bde932e23f9e62e2fa2e7ac74acf7afd
+TERMUX_PKG_SHA256=901b0e2caed36fb8619fdf4c60edfb8d31134b947d3054b5c66fd55c38af5991
 TERMUX_PKG_DEPENDS="exiv2, gdk-pixbuf, glib, graphicsmagick, gtk3, imath, json-glib, lensfun, libandroid-glob, libc++, libcairo, libcurl, libheif, libicu, libjpeg-turbo, libjxl, libllvm, liblua54, libpng, libpugixml, librsvg, libsqlite, libtiff, libwebp, libxml2, littlecms, ltrace, openexr, openjpeg, pango, portmidi, zlib"
 TERMUX_PKG_BUILD_DEPENDS="libllvm-static"
 TERMUX_PKG_BLACKLISTED_ARCHES="arm, i686"
@@ -15,6 +14,7 @@ TERMUX_PKG_UPDATE_TAG_TYPE="latest-release-tag"
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 -DBINARY_PACKAGE_BUILD=ON
 -DUSE_OPENCL=OFF
+-DUSE_OPENMP=OFF
 "
 
 termux_pkg_auto_update() {
