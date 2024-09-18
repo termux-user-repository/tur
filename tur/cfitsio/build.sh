@@ -8,3 +8,12 @@ TERMUX_PKG_SRCURL=https://heasarc.gsfc.nasa.gov/FTP/software/fitsio/c/cfitsio-${
 TERMUX_PKG_SHA256=47a7c8ee05687be1e1d8eeeb94fb88f060fbf3cd8a4df52ccb88d5eb0f5062be
 TERMUX_PKG_DEPENDS="curl, zlib"
 TERMUX_PKG_FORCE_CMAKE=true
+TERMUX_PKG_AUTO_UPDATE=true
+
+termux_step_pre_configure() {
+	LDFLAGS+=" -lm"
+
+	if [ -e licenses/License.txt ]; then
+		cp licenses/License.txt License.txt
+	fi
+}
