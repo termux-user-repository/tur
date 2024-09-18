@@ -2,15 +2,53 @@ TERMUX_PKG_HOMEPAGE=https://www.torproject.org/
 TERMUX_PKG_DESCRIPTION="Tor Browser Bundle: anonymous browsing using Firefox and Tor"
 TERMUX_PKG_LICENSE="MPL-2.0"
 TERMUX_PKG_MAINTAINER="@termux"
-TERMUX_PKG_VERSION="128.2.0esr-14.0-1-build3"
+TERMUX_PKG_GIT_BRANCH="tor-browser-128.2.0esr-14.0-1-build5"
+TERMUX_PKG_VERSION="14.0a5"
 TERMUX_PKG_SRCURL=git+https://gitlab.torproject.org/tpo/applications/tor-browser
 # ffmpeg and pulseaudio are dependencies through dlopen(3):
 TERMUX_PKG_DEPENDS="ffmpeg, fontconfig, freetype, gdk-pixbuf, glib, gtk3, libandroid-shmem, libandroid-spawn, libc++, libcairo, libevent, libffi, libice, libicu, libjpeg-turbo, libnspr, libnss, libpixman, libsm, libvpx, libwebp, libx11, libxcb, libxcomposite, libxdamage, libxext, libxfixes, libxrandr, libxtst, pango, pulseaudio, tor, zlib"
 TERMUX_PKG_BUILD_DEPENDS="libcpufeatures, libice, libsm"
 TERMUX_PKG_BUILD_IN_SRC=true
-TERMUX_PKG_AUTO_UPDATE=true
-TERMUX_PKG_GIT_BRANCH="tor-browser-$TERMUX_PKG_VERSION"
-TERMUX_PKG_UPDATE_TAG_TYPE="newest-tag"
+# TERMUX_PKG_AUTO_UPDATE=true
+# TODO: termux_pkg_auto_update() to detect the appropriate TERMUX_PKG_GIT_BRANCH
+# perhaps can be done by searching the directory of https://dist.torproject.org/torbrowser/$TERMUX_PKG_VERSION/
+
+
+# tor-browser needed components beside the firefox browser itself
+# for more details, see the relationship between tor-browser and tor-browser-build
+# https://gitlab.torproject.org/tpo/applications/team/-/wikis/Development-Information/Tor-Browser/Tor-Browser-Repository-Overview
+# also https://gitlab.torproject.org/tpo/applications/tor-browser-build
+# Here, we skip the hassle and extract directly from a release file.
+termux_step_handle_host_build() {
+	# app logo
+	mkdir -p "$TERMUX_PREFIX/share/pixmaps"
+	cp "browser/branding/tb-release/content/about-logo.svg" "$TERMUX_PREFIX/share/pixmaps/tor-browser.svg"
+	# component files
+	local install_dir="$TERMUX_PREFIX/lib/tor-browser"
+	mkdir -p "$install_dir"
+	wget https://dist.torproject.org/torbrowser/${TERMUX_PKG_VERSION}/tor-browser-linux-x86_64-${TERMUX_PKG_VERSION}.tar.xz -O ./tor-browser-bin.tar.xz
+	if [[ "$(tar -tf ./tor-browser-bin.tar.xz | grep -E '^([^/]+/){2}[^/]+/$' | wc -l)" -ne 8 ]]; then
+		termux_error_exit "The number of folders in tor-browser has changed and please recheck the official release file.
+If still in doubt, check the official tor-browser-build repo.
+In particular, https://gitlab.torproject.org/tpo/applications/tor-browser-build/-/tree/main/projects/browser."
+	fi
+	for folder in .config TorBrowser distribution fontconfig fonts icons; do
+		tar -C "$install_dir/" -xvf ./tor-browser-bin.tar.xz tor-browser/Browser/${folder} --strip-components=2
+	done
+	rm ./tor-browser-bin.tar.xz
+	# handle architecture-dependent binaries
+	rm -rf "$install_dir/TorBrowser/Tor/"*
+	ln -s "$TERMUX_PREFIX/bin/tor" "$install_dir/TorBrowser/Tor/tor"
+	# TODO: TorBrowser/Tor/pluggable-transports, probably can be copied from
+	# https://dist.torproject.org/torbrowser/${TERMUX_PKG_VERSION}/tor-expert-bundle-android-${TERMUX_ARCH}-${TERMUX_PKG_VERSION}.tar.xz
+	# but not familiar how to test it, therefore not implemented.
+}
+
+
+##############################
+# Firefox build script below #
+#    update when rebased     #
+##############################
 
 termux_step_post_get_source() {
 	local f="media/ffvpx/config_unix_aarch64.h"
