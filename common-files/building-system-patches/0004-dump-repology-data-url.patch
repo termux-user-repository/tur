@@ -1,0 +1,16 @@
+diff --git a/scripts/updates/api/dump-repology-data b/scripts/updates/api/dump-repology-data
+index 1b431cec3..ae8e807e6 100755
+--- a/scripts/updates/api/dump-repology-data
++++ b/scripts/updates/api/dump-repology-data
+@@ -29,9 +29,9 @@ from requests import get as requests_get
+ def get_repology_data(last_project, project):
+     url = f"https://repology.org/api/v1"
+     if project != "":
+-        url = f"{url}/projects/{project}?inrepo=termux&outdated=1"
++        url = f"{url}/projects/{project}?inrepo=tur&outdated=1"
+     else:
+-        url = f"{url}/projects/{last_project}?inrepo=termux&outdated=1&families_newest=2-"
++        url = f"{url}/projects/{last_project}?inrepo=tur&outdated=1&families_newest=2-"
+ 
+     repology_data = requests_get(url, timeout=60).json()
+     # NOTE: We are using `families_newest=2-` so that api will return a
