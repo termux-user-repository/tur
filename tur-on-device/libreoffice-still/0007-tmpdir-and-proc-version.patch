@@ -1,0 +1,51 @@
+From 8e1e644f2db77b8b6278daf66a63560c4563215f Mon Sep 17 00:00:00 2001
+From: Ronald Y <knyipab@gmail.com>
+Date: Sun, 22 Sep 2024 20:00:47 +0800
+Subject: [PATCH 7/8] tmpdir and /proc/version
+
+Change-Id: If2f56ac807fbfcf80c27463da9c526419abdd1f8
+---
+ desktop/unx/source/start.c      | 6 +++---
+ vcl/unx/generic/app/geninst.cxx | 2 +-
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/desktop/unx/source/start.c b/desktop/unx/source/start.c
+index 0bb009d9c..5e7a73f78 100644
+--- a/desktop/unx/source/start.c
++++ b/desktop/unx/source/start.c
+@@ -38,8 +38,8 @@
+ #include "pagein.h"
+ #include "splashx.h"
+ 
+-#define PIPEDEFAULTPATH      "/tmp"
+-#define PIPEALTERNATEPATH    "/var/tmp"
++#define PIPEDEFAULTPATH      "/data/data/com.termux/files/usr/tmp"
++#define PIPEALTERNATEPATH    "/data/data/com.termux/files/usr/var/tmp"
+ 
+ /* Easier conversions: rtl_uString to rtl_String */
+ static rtl_String *ustr_to_str(rtl_uString *pStr)
+@@ -556,7 +556,7 @@ static ProgressStatus read_percent(ChildInfo const *info, int *pPercent)
+ /* Simple system check. */
+ static void system_checks(void)
+ {
+-#ifdef LINUX
++#if defined LINUX && !defined __ANDROID__
+     struct stat buf;
+ 
+     /* check proc is mounted - lots of things fail otherwise */
+diff --git a/vcl/unx/generic/app/geninst.cxx b/vcl/unx/generic/app/geninst.cxx
+index 191d87ca7..a40505345 100644
+--- a/vcl/unx/generic/app/geninst.cxx
++++ b/vcl/unx/generic/app/geninst.cxx
+@@ -53,7 +53,7 @@ SalGenericInstance::~SalGenericInstance()
+ OUString SalGenericInstance::getOSVersion()
+ {
+     OUString aKernelVer = "unknown";
+-#if defined(LINUX)
++#if defined(LINUX) && !defined(__ANDROID__)
+     FILE* pVersion = fopen( "/proc/version", "r" );
+     if ( pVersion )
+     {
+-- 
+2.46.1
+

@@ -1,0 +1,30 @@
+From 2166ab3cc0c5c0f9130b440bef3c0b7e75a64f49 Mon Sep 17 00:00:00 2001
+From: Ronald Y <knyipab@gmail.com>
+Date: Sun, 22 Sep 2024 09:25:14 +0800
+Subject: [PATCH 3/8] no-static_cast-__fsword_t
+
+Change-Id: I61efb86c0aeda762acd7d32d9a5bd770a682ab5a
+---
+ sal/osl/unx/file.cxx | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/sal/osl/unx/file.cxx b/sal/osl/unx/file.cxx
+index ee7412dd1..0ca882201 100644
+--- a/sal/osl/unx/file.cxx
++++ b/sal/osl/unx/file.cxx
+@@ -67,9 +67,9 @@
+ #ifdef LINUX
+ #include <sys/vfs.h>
+ // As documented by the kernel
+-#define SMB_SUPER_MAGIC  static_cast<__fsword_t>(0x517B)
+-#define CIFS_SUPER_MAGIC static_cast<__fsword_t>(0xFF534D42)
+-#define SMB2_SUPER_MAGIC static_cast<__fsword_t>(0xFE534D42)
++#define SMB_SUPER_MAGIC  0x517B
++#define CIFS_SUPER_MAGIC 0xFF534D42
++#define SMB2_SUPER_MAGIC 0xFE534D42
+ #endif
+ 
+ namespace {
+-- 
+2.46.1
+

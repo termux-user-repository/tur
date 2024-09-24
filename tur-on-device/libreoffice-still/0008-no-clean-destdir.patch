@@ -1,0 +1,28 @@
+From 0e600fd4dc02d7250efea7389eecd57664ba8ea0 Mon Sep 17 00:00:00 2001
+From: Ronald Y <knyipab@gmail.com>
+Date: Tue, 24 Sep 2024 12:49:59 +0800
+Subject: [PATCH 8/8] no clean destdir
+
+Change-Id: Id9da2e78cb9aaa739823029467b68d0cdae221b4
+---
+ solenv/bin/ooinstall | 4 ----
+ 1 file changed, 4 deletions(-)
+
+diff --git a/solenv/bin/ooinstall b/solenv/bin/ooinstall
+index 71f10c739..39a959ef6 100755
+--- a/solenv/bin/ooinstall
++++ b/solenv/bin/ooinstall
+@@ -81,10 +81,6 @@ if ($is_windows) {
+ # make distro-pack-install shuffle with the SDK installation to make it LSB compliant
+ # it creates symlinks from the original path to /usr/share; they are not valid with $DESTDIR
+ # and potential second ooinstall call fails with strange error messages if the old tree is still there
+-if ($destdir && "$ENV{DESTDIR}" ne "/" && -d "$ENV{DESTDIR}") {
+-    print "Cleaning destdir...\n";
+-    system ("rm -rf \"$ENV{DESTDIR}\"") && die "Failed to clean up destdir: $!";
+-}
+ 
+ print "Running LibreOffice installer\n";
+ 
+-- 
+2.46.1
+
