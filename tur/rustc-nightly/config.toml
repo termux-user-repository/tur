@@ -1,41 +1,77 @@
 # See documentation at
-# https://github.com/rust-lang/rust/blob/master/config.toml.example
+# https://github.com/rust-lang/rust/blob/master/config.example.toml
 
 [llvm]
 link-shared = true
+download-ci-llvm = false
 
 [build]
-host = ["@RUST_TARGET_TRIPLE@"]
-target = ["@RUST_TARGET_TRIPLE@", "wasm32-unknown-unknown"]
-docs = false
+host = ["@CARGO_TARGET_NAME@"]
+target = [
+    "aarch64-linux-android",
+    "armv7-linux-androideabi",
+    "i686-linux-android",
+    "x86_64-linux-android",
+]
+rustc = "@RUSTC@"
+cargo = "@CARGO@"
+python = "python3"
 extended = true
+tools = [
+    "cargo",
+    "clippy",
+    "rustdoc",
+    "rustfmt",
+    "rust-analyzer-proc-macro-srv",
+    "analysis",
+    "src",
+    "rust-demangler",
+]
 sanitizers = false
-tools = ["cargo", "src"]
+android-ndk = "@TERMUX_STANDALONE_TOOLCHAIN@"
 
 [install]
 prefix = "@RUST_PREFIX@"
 sysconfdir = "etc"
+docdir = "share/doc/rust"
 
 [rust]
-channel = "nightly"
 optimize = true
 debug = false
-optimize-tests = false
-codegen-tests = false
 codegen-units = 0
-deny-warnings = false
 jemalloc = false
+channel = "stable"
 rpath = false
 
 [target.x86_64-unknown-linux-gnu]
-llvm-config = "@BUILD_LLVM_CONFIG@"
+llvm-config = "/usr/bin/llvm-config-18"
 
-[target.@RUST_TARGET_TRIPLE@]
-android-ndk = "@TERMUX_STANDALONE_TOOLCHAIN@"
+[target.aarch64-linux-android]
 llvm-config = "@TERMUX_PREFIX@/bin/llvm-config"
-ar = "llvm-ar"
 profiler = true
+
+[target.armv7-linux-androideabi]
+llvm-config = "@TERMUX_PREFIX@/bin/llvm-config"
+profiler = true
+
+[target.i686-linux-android]
+llvm-config = "@TERMUX_PREFIX@/bin/llvm-config"
+profiler = true
+
+[target.x86_64-linux-android]
+llvm-config = "@TERMUX_PREFIX@/bin/llvm-config"
+profiler = true
+
+[target.wasm32-wasi]
+wasi-root = "@TERMUX_PREFIX@/share/wasi-sysroot"
+
+[target.wasm32-wasip1]
+wasi-root = "@TERMUX_PREFIX@/share/wasi-sysroot"
+
+[target.wasm32-wasip2]
+wasi-root = "@TERMUX_PREFIX@/share/wasi-sysroot"
 
 [dist]
 src-tarball = false
-missing-tools = true
+compression-formats = ["gz"]
+#missing-tools = true

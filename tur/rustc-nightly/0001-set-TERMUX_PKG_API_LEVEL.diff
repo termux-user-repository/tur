@@ -1,0 +1,11 @@
+--- a/src/bootstrap/src/utils/cc_detect.rs
++++ b/src/bootstrap/src/utils/cc_detect.rs
+@@ -244,7 +244,7 @@
+     };
+ 
+     // The earliest API supported by NDK r26d is 21.
+-    let api_level = "21";
++    let api_level = "@TERMUX_PKG_API_LEVEL@";
+     let compiler = format!("{}{}-{}", triple_translated, api_level, compiler.clang());
+     let host_tag = if cfg!(target_os = "macos") {
+         // The NDK uses universal binaries, so this is correct even on ARM.
