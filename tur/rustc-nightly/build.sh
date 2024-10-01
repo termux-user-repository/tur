@@ -1,89 +1,154 @@
 TERMUX_PKG_HOMEPAGE=https://www.rust-lang.org
 TERMUX_PKG_DESCRIPTION="Rust compiler and utilities (nightly version)"
-TERMUX_PKG_DEPENDS="libc++, clang, openssl, lld, zlib, libllvm"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-_DATE="2023-02-27"
-TERMUX_PKG_VERSION="1.67.1-${_DATE//-/.}-nightly"
+_RUST_VERSION=1.83.0
+_DATE="2024-09-27"
+TERMUX_PKG_VERSION="$_RUST_VERSION-${_DATE//-/.}-nightly"
+_LLVM_MAJOR_VERSION=$(. $TERMUX_SCRIPTDIR/packages/libllvm/build.sh; echo $LLVM_MAJOR_VERSION)
+_LLVM_MAJOR_VERSION_NEXT=$((_LLVM_MAJOR_VERSION + 1))
+_LZMA_VERSION=$(. $TERMUX_SCRIPTDIR/packages/liblzma/build.sh; echo $TERMUX_PKG_VERSION)
 TERMUX_PKG_SRCURL=https://static.rust-lang.org/dist/$_DATE/rustc-nightly-src.tar.xz
-TERMUX_PKG_SHA256=ceb53d6a8cc18434efa3093e3debe5484dde8201dcba4fdbe83e83f32b8dad74
-TERMUX_PKG_RM_AFTER_INSTALL="bin/llvm-* bin/llc bin/opt"
+TERMUX_PKG_SHA256=60ac36891a6c1a6d38c477f126af66297407963b3ab70ab355755d83bc6a1d42
+TERMUX_PKG_DEPENDS="clang, libc++, libllvm (<< ${_LLVM_MAJOR_VERSION_NEXT}), lld, openssl, zlib"
+TERMUX_PKG_BUILD_DEPENDS="wasi-libc"
+TERMUX_PKG_NO_STATICSPLIT=true
+TERMUX_PKG_RM_AFTER_INSTALL="
+bin/llvm-*
+bin/llc
+bin/opt
+bin/sh
+lib/liblzma.a
+lib/liblzma.so
+lib/liblzma.so.${_LZMA_VERSION}
+lib/libtinfo.so.6
+lib/libz.so
+lib/libz.so.1
+share/wasi-sysroot
+"
+
+__sudo() {
+	env -i PATH="$PATH" sudo "$@"
+}
+
+termux_step_post_get_source() {
+	local _rust_version="$(cat version | cut -d- -f1)"
+	if [ "$_rust_version" != "$_RUST_VERSION" ]; then
+		termux_error_exit "Version mismatch: Expected $_RUST_VERSION, got $_rust_version."
+	fi
+}
 
 termux_step_pre_configure() {
 	termux_setup_cmake
+	termux_setup_rust
+
+	# default rust-nightly-std package to be installed
+	TERMUX_PKG_DEPENDS+=", rust-nightly-std-${CARGO_TARGET_NAME/_/-}"
+
+	local p="${TERMUX_PKG_BUILDER_DIR}/0001-set-TERMUX_PKG_API_LEVEL.diff"
+	echo "Applying patch: $(basename "${p}")"
+	sed "s|@TERMUX_PKG_API_LEVEL@|${TERMUX_PKG_API_LEVEL}|g" "${p}" \
+		| patch --silent -p1
 
 	export RUST_LIBDIR=$TERMUX_PKG_BUILDDIR/_lib
 	mkdir -p $RUST_LIBDIR
 
-	export LLVM_VERSION=$(. $TERMUX_SCRIPTDIR/packages/libllvm/build.sh; echo $TERMUX_PKG_VERSION)
-	export LZMA_VERSION=$(. $TERMUX_SCRIPTDIR/packages/liblzma/build.sh; echo $TERMUX_PKG_VERSION)
-
 	# we can't use -L$PREFIX/lib since it breaks things but we need to link against libLLVM-9.so
-	ln -sf $PREFIX/lib/libLLVM-${LLVM_VERSION/.*/}.so $RUST_LIBDIR
-	ln -sf $PREFIX/lib/libLLVM-$LLVM_VERSION.so $RUST_LIBDIR
+	ln -vfst "${RUST_LIBDIR}" \
+		${TERMUX_PREFIX}/lib/libLLVM-${_LLVM_MAJOR_VERSION}.so
 
 	# rust tries to find static library 'c++_shared'
-	ln -sf $TERMUX_STANDALONE_TOOLCHAIN/sysroot/usr/lib/$TERMUX_HOST_PLATFORM/libc++_static.a \
+	ln -vfs $TERMUX_STANDALONE_TOOLCHAIN/sysroot/usr/lib/$TERMUX_HOST_PLATFORM/libc++_static.a \
 		$RUST_LIBDIR/libc++_shared.a
+
+	# https://github.com/termux/termux-packages/issues/18379
+	# NDK r26 multiple ld.lld: error: undefined symbol: __cxa_*
+	ln -vfst "${RUST_LIBDIR}" "${TERMUX_PREFIX}"/lib/libc++_shared.so
 
 	# https://github.com/termux/termux-packages/issues/11640
 	# https://github.com/termux/termux-packages/issues/11658
 	# The build system somehow tries to link binaries against a wrong libc,
 	# leading to build failures for arm and runtime errors for others.
 	# The following command is equivalent to
-	#	ln -sft $RUST_LIBDIR \
+	#	ln -vfst $RUST_LIBDIR \
 	#		$TERMUX_STANDALONE_TOOLCHAIN/sysroot/usr/lib/$TERMUX_HOST_PLATFORM/$TERMUX_PKG_API_LEVEL/lib{c,dl}.so
 	# but written in a future-proof manner.
-	ln -sft $RUST_LIBDIR $(echo | $CC -x c - -Wl,-t -shared | grep '\.so$')
+	ln -vfst $RUST_LIBDIR $(echo | $CC -x c - -Wl,-t -shared | grep '\.so$')
 
 	# rust checks libs in PREFIX/lib. It then can't find libc.so and libdl.so because rust program doesn't
 	# know where those are. Putting them temporarly in $PREFIX/lib prevents that failure
-	mv $TERMUX_PREFIX/lib/libtinfo.so.6 $TERMUX_PREFIX/lib/libtinfo.so.6.tmp
-	mv $TERMUX_PREFIX/lib/libz.so.1 $TERMUX_PREFIX/lib/libz.so.1.tmp
-	mv $TERMUX_PREFIX/lib/libz.so $TERMUX_PREFIX/lib/libz.so.tmp
-	mv $TERMUX_PREFIX/lib/liblzma.so.$LZMA_VERSION $TERMUX_PREFIX/lib/liblzma.so.tmp
-
 	# https://github.com/termux/termux-packages/issues/11427
-	# Fresh build conflict: liblzma -> rust
-	# ld: error: /data/data/com.termux/files/usr/lib/liblzma.a(liblzma_la-common.o) is incompatible with elf64-x86-64
-	mv $TERMUX_PREFIX/lib/liblzma.a $TERMUX_PREFIX/lib/liblzma.a.tmp || true
-
-	# ld: error: undefined symbol: getloadavg
-	# >>> referenced by rand.c
-	$CC $CPPFLAGS -c $TERMUX_PKG_BUILDER_DIR/getloadavg.c
-	$AR rcu $RUST_LIBDIR/libgetloadavg.a getloadavg.o
+	[[ "${TERMUX_ON_DEVICE_BUILD}" == "true" ]] && return
+	mv $TERMUX_PREFIX/lib/liblzma.a{,.tmp} || :
+	mv $TERMUX_PREFIX/lib/liblzma.so{,.tmp} || :
+	mv $TERMUX_PREFIX/lib/liblzma.so.${_LZMA_VERSION}{,.tmp} || :
+	mv $TERMUX_PREFIX/lib/libtinfo.so.6{,.tmp} || :
+	mv $TERMUX_PREFIX/lib/libz.so.1{,.tmp} || :
+	mv $TERMUX_PREFIX/lib/libz.so{,.tmp} || :
 }
 
-
 termux_step_configure() {
-	env -i PATH="$PATH" sudo apt update
-	env -i PATH="$PATH" sudo apt install llvm-14 -yq
+	# Install llvm-18
+	local _line="deb [arch=amd64] http://apt.llvm.org/noble/ llvm-toolchain-noble-18 main"
+	local _file="/etc/apt/sources.list.d/apt-llvm-org.list"
+	__sudo grep -qF -- "$_line" "$_file" || \
+		echo "$_line" | __sudo tee -a "$_file"
+	__sudo apt update
+	__sudo apt install -y llvm-18-dev llvm-18-tools
 
-	case $TERMUX_ARCH in
-		"aarch64" ) CARGO_TARGET_NAME=aarch64-linux-android ;;
-		"arm" ) CARGO_TARGET_NAME=armv7-linux-androideabi ;;
-		"i686" ) CARGO_TARGET_NAME=i686-linux-android ;;
-		"x86_64" ) CARGO_TARGET_NAME=x86_64-linux-android ;;
-	esac
+	if [[ "${TERMUX_ON_DEVICE_BUILD}" == "false" ]]; then
+		rustup install nightly
+		export PATH="${HOME}/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/bin:${PATH}"
+	fi
+	local RUSTC=$(command -v rustc)
+	local CARGO=$(command -v cargo)
+
+	if [[ "${TERMUX_ON_DEVICE_BUILD}" == "true" ]]; then
+		local dir="${TERMUX_STANDALONE_TOOLCHAIN}/toolchains/llvm/prebuilt/linux-x86_64/bin"
+		mkdir -p "${dir}"
+		local target clang
+		for target in aarch64-linux-android armv7a-linux-androideabi i686-linux-android x86_64-linux-android; do
+			for clang in clang clang++; do
+				ln -fsv "${TERMUX_PREFIX}/bin/clang" "${dir}/${target}${TERMUX_PKG_API_LEVEL}-${clang}"
+			done
+		done
+	fi
 
 	export RUST_BACKTRACE=1
-	mkdir -p $TERMUX_PREFIX/opt/rust-nightly
-	RUST_PREFIX=$TERMUX_PREFIX/opt/rust-nightly
-	export PATH=$TERMUX_PKG_TMPDIR/bin:$PATH
-	sed $TERMUX_PKG_BUILDER_DIR/config.toml \
-		-e "s|@RUST_PREFIX@|$RUST_PREFIX|g" \
-		-e "s|@TERMUX_PREFIX@|$TERMUX_PREFIX|g" \
-		-e "s|@TERMUX_HOST_PLATFORM@|$TERMUX_HOST_PLATFORM|g" \
-		-e "s|@TERMUX_STANDALONE_TOOLCHAIN@|$TERMUX_STANDALONE_TOOLCHAIN|g" \
-		-e "s|@BUILD_LLVM_CONFIG@|$(command -v llvm-config-14)|g" \
-		-e "s|@RUST_TARGET_TRIPLE@|$CARGO_TARGET_NAME|g" > $TERMUX_PKG_BUILDDIR/config.toml
 
-	local ENV_NAME=CARGO_TARGET_${CARGO_TARGET_NAME^^}_LINKER
-	ENV_NAME=${ENV_NAME//-/_}
-	export $ENV_NAME=$CC
-	export TARGET_CFLAGS="--target=$CCTERMUX_HOST_PLATFORM ${CFLAGS-} $CPPFLAGS"
+	RUST_NIGHTLY_PREFIX="$TERMUX_PREFIX"/opt/rust-nightly
+	mkdir -p "$RUST_NIGHTLY_PREFIX"
 
-	export RUSTFLAGS="-C link-arg=-Wl,-rpath=$RUST_PREFIX/lib $RUSTFLAGS"
+	sed \
+		-e "s|@RUST_PREFIX@|${RUST_NIGHTLY_PREFIX}|g" \
+		-e "s|@TERMUX_PREFIX@|${TERMUX_PREFIX}|g" \
+		-e "s|@TERMUX_STANDALONE_TOOLCHAIN@|${TERMUX_STANDALONE_TOOLCHAIN}|g" \
+		-e "s|@CARGO_TARGET_NAME@|${CARGO_TARGET_NAME}|g" \
+		-e "s|@RUSTC@|${RUSTC}|g" \
+		-e "s|@CARGO@|${CARGO}|g" \
+		"${TERMUX_PKG_BUILDER_DIR}"/config.toml > config.toml
+
+	local env_host=$(printf $CARGO_TARGET_NAME | tr a-z A-Z | sed s/-/_/g)
+	export ${env_host}_OPENSSL_DIR=$TERMUX_PREFIX
+	export RUST_LIBDIR=$TERMUX_PKG_BUILDDIR/_lib
+	# Add rpath
+	export RUSTFLAGS="-C link-arg=-Wl,-rpath=$RUST_NIGHTLY_PREFIX/lib $RUSTFLAGS"
+	export CARGO_TARGET_${env_host}_RUSTFLAGS="-C link-arg=-Wl,-rpath=$RUST_NIGHTLY_PREFIX/lib -L${RUST_LIBDIR}"
+
+	# x86_64: __lttf2
+	case "${TERMUX_ARCH}" in
+	x86_64)
+		export CARGO_TARGET_${env_host}_RUSTFLAGS+=" -C link-arg=$(${CC} -print-libgcc-file-name)" ;;
+	esac
+
+	# NDK r26
+	export CARGO_TARGET_${env_host}_RUSTFLAGS+=" -C link-arg=-lc++_shared"
+
+	# rust 1.79.0
+	# note: ld.lld: error: undefined reference due to --no-allow-shlib-undefined: syncfs
+	"${CC}" ${CPPFLAGS} -c "${TERMUX_PKG_BUILDER_DIR}/syncfs.c"
+	"${AR}" rcu "${RUST_LIBDIR}/libsyncfs.a" syncfs.o
+	export CARGO_TARGET_${env_host}_RUSTFLAGS+=" -C link-arg=-l:libsyncfs.a"
 
 	export X86_64_UNKNOWN_LINUX_GNU_OPENSSL_LIB_DIR=/usr/lib/x86_64-linux-gnu
 	export X86_64_UNKNOWN_LINUX_GNU_OPENSSL_INCLUDE_DIR=/usr/include
@@ -92,7 +157,7 @@ termux_step_configure() {
 	# for backtrace-sys
 	export CC_x86_64_unknown_linux_gnu=gcc
 	export CFLAGS_x86_64_unknown_linux_gnu="-O2"
-	export LLVM_VERSION=$(. $TERMUX_SCRIPTDIR/packages/libllvm/build.sh; echo $TERMUX_PKG_VERSION)
+	export RUST_BACKTRACE=full
 }
 
 termux_step_make() {
@@ -100,26 +165,109 @@ termux_step_make() {
 }
 
 termux_step_make_install() {
-	unset CC CXX CPP LD CFLAGS CXXFLAGS CPPFLAGS LDFLAGS PKG_CONFIG AR RANLIB
-	../src/x.py install --host $CARGO_TARGET_NAME --target $CARGO_TARGET_NAME --target wasm32-unknown-unknown
+	unset CC CFLAGS CPP CPPFLAGS CXX CXXFLAGS LD LDFLAGS PKG_CONFIG RANLIB
+
+	# needed to workaround build issue that only happens on x86_64
+	# /home/runner/.termux-build/rust/build/build/bootstrap/debug/bootstrap: error while loading shared libraries: /lib/x86_64-linux-gnu/libc.so: invalid ELF header
+	if [[ "${TERMUX_ON_DEVICE_BUILD}" == "false" ]] && [[ "${TERMUX_ARCH}" == "x86_64" ]]; then
+		mv -v ${TERMUX_PREFIX}{,.tmp}
+		${TERMUX_PKG_SRCDIR}/x.py build -j ${TERMUX_PKG_MAKE_PROCESSES} --host x86_64-unknown-linux-gnu --stage 1 cargo
+		[[ -d "${TERMUX_PREFIX}" ]] && termux_error_exit "Contaminated PREFIX found:\n$(find ${TERMUX_PREFIX} | sort)"
+		mv -v ${TERMUX_PREFIX}{.tmp,}
+	fi
+
+	# install causes on device build fail to continue
+	# dist uses a lot of spaces on CI
+	local job="install"
+	[[ "${TERMUX_ON_DEVICE_BUILD}" == "true" ]] && job="dist"
+
+	"${TERMUX_PKG_SRCDIR}/x.py" ${job} -j ${TERMUX_PKG_MAKE_PROCESSES} --stage 1
+
+	# Not putting wasm32-* into config.toml
+	# CI and on device (wasm32*):
+	# error: could not document `std`
+	"${TERMUX_PKG_SRCDIR}/x.py" install -j ${TERMUX_PKG_MAKE_PROCESSES} --target wasm32-unknown-unknown --stage 1 std
+	[[ ! -e "${TERMUX_PREFIX}/share/wasi-sysroot" ]] && termux_error_exit "wasi-sysroot not found"
+	"${TERMUX_PKG_SRCDIR}/x.py" install -j ${TERMUX_PKG_MAKE_PROCESSES} --target wasm32-wasi --stage 1 std
+	"${TERMUX_PKG_SRCDIR}/x.py" install -j ${TERMUX_PKG_MAKE_PROCESSES} --target wasm32-wasip1 --stage 1 std
+	"${TERMUX_PKG_SRCDIR}/x.py" install -j ${TERMUX_PKG_MAKE_PROCESSES} --target wasm32-wasip2 --stage 1 std
+
+	"${TERMUX_PKG_SRCDIR}/x.py" dist -j ${TERMUX_PKG_MAKE_PROCESSES} rustc-dev
+
+	# remove version suffix: beta, nightly
+	local VERSION=${TERMUX_PKG_VERSION//-*}
+
+	if [[ "${TERMUX_ON_DEVICE_BUILD}" == "true" ]]; then
+		echo "WARN: Replacing on device rust! Caveat emptor!"
+		rm -fr ${RUST_NIGHTLY_PREFIX}/lib/rustlib/${CARGO_TARGET_NAME}
+		rm -fv $(find ${RUST_NIGHTLY_PREFIX}/lib -maxdepth 1 -type l -exec ls -l "{}" \; | grep rustlib | sed -e "s|.* ${RUST_NIGHTLY_PREFIX}/lib|${RUST_NIGHTLY_PREFIX}/lib|" -e "s| -> .*||")
+	fi
+	ls build/dist/*-${VERSION}*.tar.gz | xargs -P${TERMUX_PKG_MAKE_PROCESSES} -n1 -t -r tar -xf
+	local tgz
+	for tgz in $(ls build/dist/*-${VERSION}*.tar.gz); do
+		echo "INFO: ${tgz}"
+		./$(basename "${tgz}" | sed -e "s|.tar.gz$||")/install.sh --prefix=${RUST_NIGHTLY_PREFIX}
+	done
+
+	cd "$TERMUX_PREFIX/lib"
+	rm -f libc.so libdl.so
+	mv liblzma.a{.tmp,} || :
+	mv liblzma.so{.tmp,} || :
+	mv liblzma.so.${_LZMA_VERSION}{.tmp,} || :
+	mv libtinfo.so.6{.tmp,} || :
+	mv libz.so.1{.tmp,} || :
+	mv libz.so{.tmp,} || :
+
+	cd "$RUST_NIGHTLY_PREFIX/lib"
+	ln -vfs rustlib/${CARGO_TARGET_NAME}/lib/*.so .
+	ln -vfs "$TERMUX_PREFIX"/bin/lld ${RUST_NIGHTLY_PREFIX}/bin/rust-lld
+
+	cd "$RUST_NIGHTLY_PREFIX/lib/rustlib"
+	rm -fr \
+		components \
+		install.log \
+		uninstall.sh \
+		rust-installer-version \
+		manifest-* \
+		x86_64-unknown-linux-gnu
+
+	cd "${RUST_NIGHTLY_PREFIX}/lib/rustlib/${CARGO_TARGET_NAME}/lib"
+	echo "INFO: ${TERMUX_PKG_BUILDDIR}/rustlib-rlib.txt"
+	ls *.rlib | tee "${TERMUX_PKG_BUILDDIR}/rustlib-rlib.txt"
+
+	echo "INFO: ${TERMUX_PKG_BUILDDIR}/rustlib-so.txt"
+	ls *.so | tee "${TERMUX_PKG_BUILDDIR}/rustlib-so.txt"
+
+	echo "INFO: ${TERMUX_PKG_BUILDDIR}/rustc-dev-${VERSION}-${CARGO_TARGET_NAME}/rustc-dev/manifest.in"
+	cat "${TERMUX_PKG_BUILDDIR}/rustc-dev-${VERSION}-${CARGO_TARGET_NAME}/rustc-dev/manifest.in" | tee "${TERMUX_PKG_BUILDDIR}/manifest.in"
+
+	sed -e 's/^.....//' -i "${TERMUX_PKG_BUILDDIR}/manifest.in"
+	local _included=$(cat "${TERMUX_PKG_BUILDDIR}/manifest.in")
+	local _included_rlib=$(echo "${_included}" | grep '\.rlib$')
+	local _included_so=$(echo "${_included}" | grep '\.so$')
+	local _included=$(echo "${_included}" | grep -v "/rustc-src/")
+	local _included=$(echo "${_included}" | grep -v '\.rlib$')
+	local _included=$(echo "${_included}" | grep -v '\.so$')
+
+	echo "INFO: _rlib"
+	while IFS= read -r _rlib; do
+		echo "${_rlib}"
+		local _included_rlib=$(echo "${_included_rlib}" | grep -v "${_rlib}")
+	done < "${TERMUX_PKG_BUILDDIR}/rustlib-rlib.txt"
+	echo "INFO: _so"
+	while IFS= read -r _so; do
+		echo "${_so}"
+		local _included_so=$(echo "${_included_so}" | grep -v "${_so}")
+	done < "${TERMUX_PKG_BUILDDIR}/rustlib-so.txt"
+
+	export _INCLUDED="$(echo -e "${_included}\n${_included_rlib}\n${_included_so}" | xargs -I {} echo "opt/rust-nightly/{}")"
+	echo -e "INFO: _INCLUDED:\n${_INCLUDED}"
 }
 
 termux_step_post_make_install() {
 	mkdir -p $TERMUX_PREFIX/etc/profile.d
-	mkdir -p $TERMUX_PREFIX/lib
 	echo "#!$TERMUX_PREFIX/bin/sh" > $TERMUX_PREFIX/etc/profile.d/rust-nightly.sh
-	echo "export PATH=$RUST_PREFIX/bin:\$PATH" >> $TERMUX_PREFIX/etc/profile.d/rust-nightly.sh
-
-	ln -sf $TERMUX_PREFIX/bin/lld $RUST_PREFIX/bin/rust-lld
-}
-
-termux_step_post_massage() {
-	rm -f lib/libtinfo.so.6
-	rm -f lib/libz.so
-	rm -f lib/libz.so.1
-	rm -f lib/liblzma.so.$LZMA_VERSION
-	rm -f lib/liblzma.a
-	rm -f lib/*.tmp
+	echo "export PATH=$RUST_NIGHTLY_PREFIX/bin:\$PATH" >> $TERMUX_PREFIX/etc/profile.d/rust-nightly.sh
 }
 
 termux_step_create_debscripts() {
