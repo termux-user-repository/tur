@@ -499,6 +499,12 @@
   "dawn-no-android-jni/5359.patch": {
     "start": 5359
   },
+  "debug-build-stack_trace/6422.patch": {
+    "start": 6422
+  },
+  "dummy-hid-service/6422.patch": {
+    "start": 6422
+  },
   "egl-fix-include/4389.patch": {
     "start": 4389,
     "end": 5248
