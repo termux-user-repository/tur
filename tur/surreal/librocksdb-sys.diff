@@ -1,5 +1,5 @@
---- a/util/compression.h
-+++ b/util/compression.h
+--- a/rocksdb/util/compression.h
++++ b/rocksdb/util/compression.h
 @@ -33,9 +33,7 @@
  #include <snappy.h>
  #endif

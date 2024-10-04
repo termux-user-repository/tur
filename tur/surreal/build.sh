@@ -4,9 +4,9 @@ TERMUX_PKG_DESCRIPTION="A scalable, distributed, collaborative, document-graph d
 TERMUX_PKG_LICENSE="non-free"
 TERMUX_PKG_LICENSE_FILE="LICENSE"
 TERMUX_PKG_MAINTAINER="@SunPodder"
-TERMUX_PKG_VERSION="2.0.2"
+TERMUX_PKG_VERSION="2.0.3"
 TERMUX_PKG_SRCURL="https://github.com/surrealdb/surrealdb/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz"
-TERMUX_PKG_SHA256=fa0e1ba30bf32e4ce62a9ff96655670455999e181c29a9167ff1011b43e17519
+TERMUX_PKG_SHA256=5f5d096f89502ddd667e638528fc46370c8490bf6e159a357cdf656fd9c7f53b
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_BUILD_DEPENDS="openssl, zlib"
@@ -20,14 +20,14 @@ termux_step_configure() {
 	export CARGO_HOME="${HOME}/.cargo"
 	cargo fetch --target $CARGO_TARGET_NAME
 
-	rm -rf $CARGO_HOME/registry/src/index.crates.io-*/librocksdb-sys-0.11.0*/
-	rm -rf $CARGO_HOME/registry/src/index.crates.io-*/jemalloc-sys*/
+	rm -rf $CARGO_HOME/registry/src/index.crates.io-*/librocksdb-sys-*/
+	rm -rf $CARGO_HOME/registry/src/index.crates.io-*/jemalloc-sys-*/
 	cargo fetch --target $CARGO_TARGET_NAME
 
 	sed -e "s|@TERMUX_PREFIX@|$TERMUX_PREFIX|" \
 		$TERMUX_PKG_BUILDER_DIR/librocksdb-sys.diff \
 		| patch --silent -p1 \
-			-d $CARGO_HOME/registry/src/index.crates.io-*/librocksdb-sys-0.11.0*/rocksdb
+			-d $CARGO_HOME/registry/src/index.crates.io-*/librocksdb-sys-*/
 
 	cat $TERMUX_PKG_BUILDER_DIR/jemalloc-sys.diff \
 		| patch --silent -p1 \
@@ -42,4 +42,9 @@ termux_step_make() {
 
 termux_step_make_install() {
 	install -Dm755 -t $TERMUX_PREFIX/bin target/${CARGO_TARGET_NAME}/release/surreal
+}
+
+termux_step_post_make_install() {
+	rm -rf $CARGO_HOME/registry/src/index.crates.io-*/librocksdb-sys-*/
+	rm -rf $CARGO_HOME/registry/src/index.crates.io-*/jemalloc-sys*/
 }
