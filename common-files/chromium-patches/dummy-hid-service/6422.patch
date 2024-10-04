@@ -1,15 +1,14 @@
 --- a/services/device/hid/hid_service.cc
 +++ b/services/device/hid/hid_service.cc
-@@ -26,8 +26,40 @@
+@@ -26,6 +26,39 @@
  #include "services/device/hid/hid_service_win.h"
  #elif BUILDFLAG(IS_FUCHSIA)
  #include "services/device/hid/hid_service_fuchsia.h"
--#endif
 +#elif defined(__TERMUX__)
 +
 +#include "base/notreached.h"
 +#include "services/device/hid/hid_connection.h"
- 
++ 
 +namespace device {
 +
 +class HidServiceDummy : public HidService {
@@ -38,11 +37,10 @@
 +};
 +
 +}  // namespace device
-+#endif
+ #endif
  
  namespace device {
- 
-@@ -75,6 +107,8 @@
+@@ -74,6 +107,8 @@
    return std::make_unique<HidServiceWin>();
  #elif BUILDFLAG(IS_FUCHSIA)
    return std::make_unique<HidServiceFuchsia>();
