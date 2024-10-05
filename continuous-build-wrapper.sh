@@ -79,7 +79,7 @@ mkdir -p ./build-status ./build-deps
 if [[ $EXIT_CODE == 0 ]]; then
 	echo "==> Build successful"
 	echo "true" > ./build-status/tur-continuous-finished-flag
-	touch ./build-deps/.placeholder
+	echo "true" > ./build-deps/.placeholder
 	# XXX: Seems that action artifacts will not delete the uploaded files automatically.
 	touch ./build-status/tur-continuous-status.tar.zst
 elif [[ $EXIT_CODE == 124 ]]; then # https://www.gnu.org/software/coreutils/manual/html_node/timeout-invocation.html#timeout-invocation
