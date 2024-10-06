@@ -1,9 +1,9 @@
 TERMUX_PKG_HOMEPAGE=https://python.org/
-TERMUX_PKG_DESCRIPTION="Python 3 programming language intended to enable clear programs"
+TERMUX_PKG_DESCRIPTION="Python programming language intended to enable clear programs (version 3.11)"
 # License: PSF-2.0
 TERMUX_PKG_LICENSE="custom"
 TERMUX_PKG_LICENSE_FILE="LICENSE"
-TERMUX_PKG_MAINTAINER="@termux"
+TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION=3.11.10
 TERMUX_PKG_SRCURL=https://www.python.org/ftp/python/${TERMUX_PKG_VERSION}/Python-${TERMUX_PKG_VERSION}.tar.xz
 TERMUX_PKG_SHA256=07a4356e912900e61a15cb0949a06c4a05012e213ecd6b4e84d0f67aabbee372
