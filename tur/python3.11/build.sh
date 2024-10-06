@@ -10,10 +10,9 @@ TERMUX_PKG_SHA256=07a4356e912900e61a15cb0949a06c4a05012e213ecd6b4e84d0f67aabbee3
 TERMUX_PKG_AUTO_UPDATE=false
 TERMUX_PKG_DEPENDS="gdbm, libandroid-posix-semaphore, libandroid-support, libbz2, libcrypt, libexpat, libffi, liblzma, libsqlite, ncurses, ncurses-ui-libs, openssl, readline, zlib"
 TERMUX_PKG_BUILD_DEPENDS="tk"
-TERMUX_PKG_RECOMMENDS="python-ensurepip-wheels, python-pip"
-TERMUX_PKG_SUGGESTS="python-tkinter"
-TERMUX_PKG_BREAKS="python2 (<= 2.7.15), python-dev"
-TERMUX_PKG_REPLACES="python-dev"
+TERMUX_PKG_RECOMMENDS="python3.11-ensurepip-wheels"
+TERMUX_PKG_SUGGESTS="python3.11-tkinter"
+TERMUX_PKG_MAKE_INSTALL_TARGET=altinstall
 
 # https://github.com/termux/termux-packages/issues/15908
 TERMUX_PKG_MAKE_PROCESSES=1
@@ -50,6 +49,7 @@ lib/python${_MAJOR_VERSION}/test
 lib/python${_MAJOR_VERSION}/*/test
 lib/python${_MAJOR_VERSION}/*/tests
 lib/python${_MAJOR_VERSION}/site-packages/*/
+lib/libpython3.so
 "
 
 termux_step_pre_configure() {
@@ -76,16 +76,6 @@ termux_step_pre_configure() {
 	export LIBCRYPT_LIBS="-lcrypt"
 }
 
-termux_step_post_make_install() {
-	(cd $TERMUX_PREFIX/bin
-	ln -sf idle${_MAJOR_VERSION} idle
-	ln -sf python${_MAJOR_VERSION} python
-	ln -sf python${_MAJOR_VERSION}-config python-config
-	ln -sf pydoc${_MAJOR_VERSION} pydoc)
-	(cd $TERMUX_PREFIX/share/man/man1
-	ln -sf python${_MAJOR_VERSION}.1 python.1)
-}
-
 termux_step_post_massage() {
 	# Verify that desired modules have been included:
 	for module in _bz2 _curses _lzma _sqlite3 _ssl _tkinter zlib; do
@@ -96,26 +86,13 @@ termux_step_post_massage() {
 }
 
 termux_step_create_debscripts() {
-	# This is a temporary script and will therefore be removed when python is updated to 3.12
+	# Post-installation script for setting up pip.
 	cat <<- POSTINST_EOF > ./postinst
 	#!$TERMUX_PREFIX/bin/bash
 
-	if [[ -f "$TERMUX_PREFIX/bin/pip" && \
-	 ! (("$TERMUX_PACKAGE_FORMAT" = "debian" && -f $TERMUX_PREFIX/var/lib/dpkg/info/python-pip.list) || \
-	    ("$TERMUX_PACKAGE_FORMAT" = "pacman" && \$(ls $TERMUX_PREFIX/var/lib/pacman/local/python-pip-* 2>/dev/null))) ]]; then
-		echo "Removing pip..."
-		rm -f $TERMUX_PREFIX/bin/pip $TERMUX_PREFIX/bin/pip3* $TERMUX_PREFIX/bin/easy_install $TERMUX_PREFIX/bin/easy_install-3*
-		rm -Rf $TERMUX_PREFIX/lib/python${_MAJOR_VERSION}/site-packages/pip
-		rm -Rf ${TERMUX_PREFIX}/lib/python${_MAJOR_VERSION}/site-packages/pip-*.dist-info
-	fi
+	echo "Setting up pip..."
 
-	if [ ! -f "$TERMUX_PREFIX/bin/pip" ]; then
-		echo
-		echo "== Note: pip is now separate from python =="
-		echo "To install, enter the following command:"
-		echo "   pkg install python-pip"
-		echo
-	fi
+	${TERMUX_PREFIX}/bin/python${_MAJOR_VERSION} -m ensurepip --altinstall --upgrade
 
 	exit 0
 	POSTINST_EOF
