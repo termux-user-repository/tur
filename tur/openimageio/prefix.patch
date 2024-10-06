@@ -5,7 +5,7 @@
  static const char* font_dir_prefixes[]
      = { "/Library/Fonts", "/System/Library/Fonts",
 -        "C:/Windows",     "/usr",
-+        "C:/Windows",     "@TERMUX_PREFIX",
++        "C:/Windows",     "@TERMUX_PREFIX@",
          "/usr/local",     "/opt/local" };
  static const char* font_dir_suffixes[]
      = { "fonts",       "Fonts",       "Library/Fonts",
