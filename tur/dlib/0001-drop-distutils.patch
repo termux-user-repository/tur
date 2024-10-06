@@ -1,0 +1,17 @@
+--- a/setup.py
++++ b/setup.py
+@@ -32,12 +32,12 @@
+ import platform
+ import subprocess
+ import multiprocessing
+-from distutils import log
++import logging as log
+ from math import ceil,floor
+ 
+ from setuptools import find_packages, setup, Extension
+ from setuptools.command.build_ext import build_ext
+-from distutils.version import LooseVersion
++from looseversion import LooseVersion
+ 
+ 
+ def get_extra_cmake_options():
