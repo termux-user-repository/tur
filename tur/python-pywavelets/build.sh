@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="Wavelet Transforms in Python"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="1.7.0"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://github.com/PyWavelets/pywt/archive/refs/tags/v$TERMUX_PKG_VERSION.tar.gz
 TERMUX_PKG_SHA256=cd1893547ee1cfa990da6b1dda322d17b8b318a2b801945c609d5a3d9eb53bef
 TERMUX_PKG_AUTO_UPDATE=true
@@ -29,7 +30,7 @@ termux_step_configure() {
 	cp -f $TERMUX_MESON_CROSSFILE $TERMUX_MESON_WHEEL_CROSSFILE
 	sed -i 's|^\(\[binaries\]\)$|\1\npython = '\'$(command -v python)\''|g' \
 		$TERMUX_MESON_WHEEL_CROSSFILE
-	sed -i 's|^\(\[properties\]\)$|\1\nnumpy-include-dir = '\'$PYTHON_SITE_PKG/numpy/core/include\''|g' \
+	sed -i 's|^\(\[properties\]\)$|\1\nnumpy-include-dir = '\'$PYTHON_SITE_PKG/numpy/_core/include\''|g' \
 		$TERMUX_MESON_WHEEL_CROSSFILE
 
 	termux_step_configure_meson
