@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="Fast State-of-the-Art Tokenizers optimized for Research 
 TERMUX_PKG_LICENSE="Apache-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="0.20.0"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://github.com/huggingface/tokenizers/archive/refs/tags/v$TERMUX_PKG_VERSION.tar.gz
 TERMUX_PKG_SHA256=ea027dbebbca61b28e1a4512eb447e513af3004bd268bcf139b51a384c073cb5
 TERMUX_PKG_AUTO_UPDATE=true
@@ -49,10 +50,11 @@ termux_step_make_install() {
 
 	build-python -m maturin build --release --skip-auditwheel --target $CARGO_BUILD_TARGET -Z build-std
 
+	local _pyver="${TERMUX_PYTHON_VERSION/./}"
 	# Fix wheel name for arm
 	if [ "$TERMUX_ARCH" = "arm" ]; then
-		mv ./target/wheels/tokenizers-$TERMUX_PKG_VERSION-cp311-cp311-linux_armv7l.whl \
-			./target/wheels/tokenizers-$TERMUX_PKG_VERSION-py311-none-any.whl
+		mv ./target/wheels/tokenizers-$TERMUX_PKG_VERSION-cp$_pyver-cp$_pyver-linux_armv7l.whl \
+			./target/wheels/tokenizers-$TERMUX_PKG_VERSION-py$_pyver-none-any.whl
 	fi
 
 	pip install --no-deps ./target/wheels/*.whl --prefix $TERMUX_PREFIX
