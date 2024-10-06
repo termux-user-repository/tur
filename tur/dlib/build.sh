@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="a modern C++ toolkit containing machine learning algorit
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="19.24.6"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://github.com/davisking/dlib/archive/refs/tags/v$TERMUX_PKG_VERSION.tar.gz
 TERMUX_PKG_SHA256=22513c353ec9c153300c394050c96ca9d088e02966ac0f639e989e50318c82d6
 TERMUX_PKG_DEPENDS="libx11, libxcb, libopenblas, python"
@@ -13,16 +14,14 @@ termux_step_pre_configure() {
 	termux_setup_cmake
 	termux_setup_ninja
 
-	_PYTHON_VERSION=$(. $TERMUX_SCRIPTDIR/packages/python/build.sh; echo $_MAJOR_VERSION)
-
 	if $TERMUX_ON_DEVICE_BUILD; then
 		termux_error_exit "Package '$TERMUX_PKG_NAME' is not available for on-device builds."
 	fi
 
 	termux_setup_python_pip
 
-	LDFLAGS+=" -lpython${_PYTHON_VERSION}"
-	build-pip install wheel
+	LDFLAGS+=" -lpython${TERMUX_PYTHON_VERSION}"
+	build-pip install wheel looseversion
 }
 
 termux_step_configure() {
@@ -66,6 +65,6 @@ termux_step_make() {
 }
 
 termux_step_make_install() {
-	export PYTHONPATH=$TERMUX_PREFIX/lib/python${_PYTHON_VERSION}/site-packages
+	export PYTHONPATH=$TERMUX_PREFIX/lib/python${TERMUX_PYTHON_VERSION}/site-packages
 	pip install --no-deps ./dist/*.whl --prefix=$TERMUX_PREFIX
 }
