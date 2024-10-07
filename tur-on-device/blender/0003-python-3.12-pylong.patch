@@ -1,0 +1,270 @@
+https://github.com/blender/blender/commit/252ae7029db3bc61a2740bb2cabeda8328b70f30
+
+diff --git a/source/blender/freestyle/intern/python/BPy_Convert.cpp b/source/blender/freestyle/intern/python/BPy_Convert.cpp
+index 668f654..6336a35 100644
+--- a/source/blender/freestyle/intern/python/BPy_Convert.cpp
++++ b/source/blender/freestyle/intern/python/BPy_Convert.cpp
+@@ -61,6 +61,32 @@ PyObject *PyBool_from_bool(bool b)
+   return PyBool_FromLong(b ? 1 : 0);
+ }
+ 
++PyObject *PyLong_subtype_new(PyTypeObject *ty, long value)
++{
++  BLI_assert(ty->tp_basicsize == sizeof(PyLongObject));
++  PyLongObject *result = PyObject_NewVar(PyLongObject, ty, 1);
++#if PY_VERSION_HEX >= 0x030c0000
++  {
++    /* Account for change in `PyLongObject` in Python 3.12+.
++     * The values of longs are no longer accessible via public API's, copy the value instead. */
++    PyLongObject *value_py = (PyLongObject *)PyLong_FromLong(value);
++    memcpy(&result->long_value, &value_py->long_value, sizeof(result->long_value));
++    Py_DECREF(value_py);
++  }
++#else
++  result->ob_digit[0] = value;
++#endif
++  return (PyObject *)result;
++}
++
++void PyLong_subtype_add_to_dict(PyObject *dict, PyTypeObject *ty, const char *attr, long value)
++{
++  PyObject *result = PyLong_subtype_new(ty, value);
++  PyDict_SetItemString(dict, attr, result);
++  /* Owned by the dictionary. */
++  Py_DECREF(result);
++}
++
+ PyObject *Vector_from_Vec2f(Vec2f &vec)
+ {
+   float vec_data[2];  // because vec->_coord is protected
+diff --git a/source/blender/freestyle/intern/python/BPy_Convert.h b/source/blender/freestyle/intern/python/BPy_Convert.h
+index 46665cd..a928667 100644
+--- a/source/blender/freestyle/intern/python/BPy_Convert.h
++++ b/source/blender/freestyle/intern/python/BPy_Convert.h
+@@ -76,6 +76,9 @@ extern "C" {
+ // C++ => Python
+ //==============================
+ 
++PyObject *PyLong_subtype_new(PyTypeObject *ty, long value);
++void PyLong_subtype_add_to_dict(PyObject *dict, PyTypeObject *ty, const char *attr, long value);
++
+ PyObject *PyBool_from_bool(bool b);
+ PyObject *Vector_from_Vec2f(Freestyle::Geometry::Vec2f &v);
+ PyObject *Vector_from_Vec3f(Freestyle::Geometry::Vec3f &v);
+diff --git a/source/blender/freestyle/intern/python/BPy_IntegrationType.cpp b/source/blender/freestyle/intern/python/BPy_IntegrationType.cpp
+index 181549b..15f99ef 100644
+--- a/source/blender/freestyle/intern/python/BPy_IntegrationType.cpp
++++ b/source/blender/freestyle/intern/python/BPy_IntegrationType.cpp
+@@ -186,21 +186,6 @@ PyTypeObject IntegrationType_Type = {
+ 
+ /*-----------------------BPy_IntegrationType instance definitions -------------------------*/
+ 
+-static PyLongObject _IntegrationType_MEAN = {
+-    PyVarObject_HEAD_INIT(&IntegrationType_Type, 1){MEAN}};
+-static PyLongObject _IntegrationType_MIN = {PyVarObject_HEAD_INIT(&IntegrationType_Type, 1){MIN}};
+-static PyLongObject _IntegrationType_MAX = {PyVarObject_HEAD_INIT(&IntegrationType_Type, 1){MAX}};
+-static PyLongObject _IntegrationType_FIRST = {
+-    PyVarObject_HEAD_INIT(&IntegrationType_Type, 1){FIRST}};
+-static PyLongObject _IntegrationType_LAST = {
+-    PyVarObject_HEAD_INIT(&IntegrationType_Type, 1){LAST}};
+-
+-#define BPy_IntegrationType_MEAN ((PyObject *)&_IntegrationType_MEAN)
+-#define BPy_IntegrationType_MIN ((PyObject *)&_IntegrationType_MIN)
+-#define BPy_IntegrationType_MAX ((PyObject *)&_IntegrationType_MAX)
+-#define BPy_IntegrationType_FIRST ((PyObject *)&_IntegrationType_FIRST)
+-#define BPy_IntegrationType_LAST ((PyObject *)&_IntegrationType_LAST)
+-
+ //-------------------MODULE INITIALIZATION--------------------------------
+ int IntegrationType_Init(PyObject *module)
+ {
+@@ -216,11 +201,17 @@ int IntegrationType_Init(PyObject *module)
+   Py_INCREF(&IntegrationType_Type);
+   PyModule_AddObject(module, "IntegrationType", (PyObject *)&IntegrationType_Type);
+ 
+-  PyDict_SetItemString(IntegrationType_Type.tp_dict, "MEAN", BPy_IntegrationType_MEAN);
+-  PyDict_SetItemString(IntegrationType_Type.tp_dict, "MIN", BPy_IntegrationType_MIN);
+-  PyDict_SetItemString(IntegrationType_Type.tp_dict, "MAX", BPy_IntegrationType_MAX);
+-  PyDict_SetItemString(IntegrationType_Type.tp_dict, "FIRST", BPy_IntegrationType_FIRST);
+-  PyDict_SetItemString(IntegrationType_Type.tp_dict, "LAST", BPy_IntegrationType_LAST);
++#define ADD_TYPE_CONST(id) \
++  PyLong_subtype_add_to_dict( \
++      IntegrationType_Type.tp_dict, &IntegrationType_Type, STRINGIFY(id), id)
++
++  ADD_TYPE_CONST(MEAN);
++  ADD_TYPE_CONST(MIN);
++  ADD_TYPE_CONST(MAX);
++  ADD_TYPE_CONST(FIRST);
++  ADD_TYPE_CONST(LAST);
++
++#undef ADD_TYPE_CONST
+ 
+   m = PyModule_Create(&module_definition);
+   if (m == nullptr) {
+diff --git a/source/blender/freestyle/intern/python/BPy_Interface1D.cpp b/source/blender/freestyle/intern/python/BPy_Interface1D.cpp
+index 992d69a..2273704 100644
+--- a/source/blender/freestyle/intern/python/BPy_Interface1D.cpp
++++ b/source/blender/freestyle/intern/python/BPy_Interface1D.cpp
+@@ -74,9 +74,12 @@ int Interface1D_Init(PyObject *module)
+   Py_INCREF(&Stroke_Type);
+   PyModule_AddObject(module, "Stroke", (PyObject *)&Stroke_Type);
+ 
+-  PyDict_SetItemString(Stroke_Type.tp_dict, "DRY_MEDIUM", BPy_MediumType_DRY_MEDIUM);
+-  PyDict_SetItemString(Stroke_Type.tp_dict, "HUMID_MEDIUM", BPy_MediumType_HUMID_MEDIUM);
+-  PyDict_SetItemString(Stroke_Type.tp_dict, "OPAQUE_MEDIUM", BPy_MediumType_OPAQUE_MEDIUM);
++#define ADD_TYPE_CONST(id) \
++  PyLong_subtype_add_to_dict(Stroke_Type.tp_dict, &MediumType_Type, STRINGIFY(id), Stroke::id)
++  ADD_TYPE_CONST(DRY_MEDIUM);
++  ADD_TYPE_CONST(HUMID_MEDIUM);
++  ADD_TYPE_CONST(OPAQUE_MEDIUM);
++#undef ADD_TYPE_CONST
+ 
+   if (PyType_Ready(&ViewEdge_Type) < 0) {
+     return -1;
+diff --git a/source/blender/freestyle/intern/python/BPy_MediumType.cpp b/source/blender/freestyle/intern/python/BPy_MediumType.cpp
+index 72bb820..8a952eb 100644
+--- a/source/blender/freestyle/intern/python/BPy_MediumType.cpp
++++ b/source/blender/freestyle/intern/python/BPy_MediumType.cpp
+@@ -71,16 +71,6 @@ PyTypeObject MediumType_Type = {
+ 
+ /*-----------------------BPy_IntegrationType instance definitions -------------------------*/
+ 
+-PyLongObject _BPy_MediumType_DRY_MEDIUM = {
+-    PyVarObject_HEAD_INIT(&MediumType_Type, 1){Stroke::DRY_MEDIUM},
+-};
+-PyLongObject _BPy_MediumType_HUMID_MEDIUM = {
+-    PyVarObject_HEAD_INIT(&MediumType_Type, 1){Stroke::HUMID_MEDIUM},
+-};
+-PyLongObject _BPy_MediumType_OPAQUE_MEDIUM = {
+-    PyVarObject_HEAD_INIT(&MediumType_Type, 1){Stroke::OPAQUE_MEDIUM},
+-};
+-
+ //-------------------MODULE INITIALIZATION--------------------------------
+ 
+ int MediumType_Init(PyObject *module)
+diff --git a/source/blender/freestyle/intern/python/BPy_MediumType.h b/source/blender/freestyle/intern/python/BPy_MediumType.h
+index 3c7e9f0..18e2a8e 100644
+--- a/source/blender/freestyle/intern/python/BPy_MediumType.h
++++ b/source/blender/freestyle/intern/python/BPy_MediumType.h
+@@ -31,15 +31,6 @@ typedef struct {
+ 
+ int MediumType_Init(PyObject *module);
+ 
+-// internal constants
+-extern PyLongObject _BPy_MediumType_DRY_MEDIUM;
+-extern PyLongObject _BPy_MediumType_HUMID_MEDIUM;
+-extern PyLongObject _BPy_MediumType_OPAQUE_MEDIUM;
+-// public constants
+-#define BPy_MediumType_DRY_MEDIUM ((PyObject *)&_BPy_MediumType_DRY_MEDIUM)
+-#define BPy_MediumType_HUMID_MEDIUM ((PyObject *)&_BPy_MediumType_HUMID_MEDIUM)
+-#define BPy_MediumType_OPAQUE_MEDIUM ((PyObject *)&_BPy_MediumType_OPAQUE_MEDIUM)
+-
+ ///////////////////////////////////////////////////////////////////////////////////////////
+ 
+ #ifdef __cplusplus
+diff --git a/source/blender/freestyle/intern/python/BPy_Nature.cpp b/source/blender/freestyle/intern/python/BPy_Nature.cpp
+index fbabcd1..e5b7933 100644
+--- a/source/blender/freestyle/intern/python/BPy_Nature.cpp
++++ b/source/blender/freestyle/intern/python/BPy_Nature.cpp
+@@ -135,45 +135,6 @@ PyTypeObject Nature_Type = {
+ 
+ /*-----------------------BPy_Nature instance definitions ----------------------------------*/
+ 
+-static PyLongObject _Nature_POINT = {PyVarObject_HEAD_INIT(&Nature_Type, 0){Nature::POINT}};
+-static PyLongObject _Nature_S_VERTEX = {PyVarObject_HEAD_INIT(&Nature_Type, 1){Nature::S_VERTEX}};
+-static PyLongObject _Nature_VIEW_VERTEX = {
+-    PyVarObject_HEAD_INIT(&Nature_Type, 1){Nature::VIEW_VERTEX}};
+-static PyLongObject _Nature_NON_T_VERTEX = {
+-    PyVarObject_HEAD_INIT(&Nature_Type, 1){Nature::NON_T_VERTEX}};
+-static PyLongObject _Nature_T_VERTEX = {PyVarObject_HEAD_INIT(&Nature_Type, 1){Nature::T_VERTEX}};
+-static PyLongObject _Nature_CUSP = {PyVarObject_HEAD_INIT(&Nature_Type, 1){Nature::CUSP}};
+-static PyLongObject _Nature_NO_FEATURE = {
+-    PyVarObject_HEAD_INIT(&Nature_Type, 0){Nature::NO_FEATURE}};
+-static PyLongObject _Nature_SILHOUETTE = {
+-    PyVarObject_HEAD_INIT(&Nature_Type, 1){Nature::SILHOUETTE}};
+-static PyLongObject _Nature_BORDER = {PyVarObject_HEAD_INIT(&Nature_Type, 1){Nature::BORDER}};
+-static PyLongObject _Nature_CREASE = {PyVarObject_HEAD_INIT(&Nature_Type, 1){Nature::CREASE}};
+-static PyLongObject _Nature_RIDGE = {PyVarObject_HEAD_INIT(&Nature_Type, 1){Nature::RIDGE}};
+-static PyLongObject _Nature_VALLEY = {PyVarObject_HEAD_INIT(&Nature_Type, 1){Nature::VALLEY}};
+-static PyLongObject _Nature_SUGGESTIVE_CONTOUR = {
+-    PyVarObject_HEAD_INIT(&Nature_Type, 1){Nature::SUGGESTIVE_CONTOUR}};
+-static PyLongObject _Nature_MATERIAL_BOUNDARY = {
+-    PyVarObject_HEAD_INIT(&Nature_Type, 1){Nature::MATERIAL_BOUNDARY}};
+-static PyLongObject _Nature_EDGE_MARK = {
+-    PyVarObject_HEAD_INIT(&Nature_Type, 1){Nature::EDGE_MARK}};
+-
+-#define BPy_Nature_POINT ((PyObject *)&_Nature_POINT)
+-#define BPy_Nature_S_VERTEX ((PyObject *)&_Nature_S_VERTEX)
+-#define BPy_Nature_VIEW_VERTEX ((PyObject *)&_Nature_VIEW_VERTEX)
+-#define BPy_Nature_NON_T_VERTEX ((PyObject *)&_Nature_NON_T_VERTEX)
+-#define BPy_Nature_T_VERTEX ((PyObject *)&_Nature_T_VERTEX)
+-#define BPy_Nature_CUSP ((PyObject *)&_Nature_CUSP)
+-#define BPy_Nature_NO_FEATURE ((PyObject *)&_Nature_NO_FEATURE)
+-#define BPy_Nature_SILHOUETTE ((PyObject *)&_Nature_SILHOUETTE)
+-#define BPy_Nature_BORDER ((PyObject *)&_Nature_BORDER)
+-#define BPy_Nature_CREASE ((PyObject *)&_Nature_CREASE)
+-#define BPy_Nature_RIDGE ((PyObject *)&_Nature_RIDGE)
+-#define BPy_Nature_VALLEY ((PyObject *)&_Nature_VALLEY)
+-#define BPy_Nature_SUGGESTIVE_CONTOUR ((PyObject *)&_Nature_SUGGESTIVE_CONTOUR)
+-#define BPy_Nature_MATERIAL_BOUNDARY ((PyObject *)&_Nature_MATERIAL_BOUNDARY)
+-#define BPy_Nature_EDGE_MARK ((PyObject *)&_Nature_EDGE_MARK)
+-
+ //-------------------MODULE INITIALIZATION--------------------------------
+ int Nature_Init(PyObject *module)
+ {
+@@ -187,24 +148,29 @@ int Nature_Init(PyObject *module)
+   Py_INCREF(&Nature_Type);
+   PyModule_AddObject(module, "Nature", (PyObject *)&Nature_Type);
+ 
++#define ADD_TYPE_CONST(id) \
++  PyLong_subtype_add_to_dict(Nature_Type.tp_dict, &Nature_Type, STRINGIFY(id), Nature::id)
++
+   // VertexNature
+-  PyDict_SetItemString(Nature_Type.tp_dict, "POINT", BPy_Nature_POINT);
+-  PyDict_SetItemString(Nature_Type.tp_dict, "S_VERTEX", BPy_Nature_S_VERTEX);
+-  PyDict_SetItemString(Nature_Type.tp_dict, "VIEW_VERTEX", BPy_Nature_VIEW_VERTEX);
+-  PyDict_SetItemString(Nature_Type.tp_dict, "NON_T_VERTEX", BPy_Nature_NON_T_VERTEX);
+-  PyDict_SetItemString(Nature_Type.tp_dict, "T_VERTEX", BPy_Nature_T_VERTEX);
+-  PyDict_SetItemString(Nature_Type.tp_dict, "CUSP", BPy_Nature_CUSP);
++  ADD_TYPE_CONST(POINT);
++  ADD_TYPE_CONST(S_VERTEX);
++  ADD_TYPE_CONST(VIEW_VERTEX);
++  ADD_TYPE_CONST(NON_T_VERTEX);
++  ADD_TYPE_CONST(T_VERTEX);
++  ADD_TYPE_CONST(CUSP);
+ 
+   // EdgeNature
+-  PyDict_SetItemString(Nature_Type.tp_dict, "NO_FEATURE", BPy_Nature_NO_FEATURE);
+-  PyDict_SetItemString(Nature_Type.tp_dict, "SILHOUETTE", BPy_Nature_SILHOUETTE);
+-  PyDict_SetItemString(Nature_Type.tp_dict, "BORDER", BPy_Nature_BORDER);
+-  PyDict_SetItemString(Nature_Type.tp_dict, "CREASE", BPy_Nature_CREASE);
+-  PyDict_SetItemString(Nature_Type.tp_dict, "RIDGE", BPy_Nature_RIDGE);
+-  PyDict_SetItemString(Nature_Type.tp_dict, "VALLEY", BPy_Nature_VALLEY);
+-  PyDict_SetItemString(Nature_Type.tp_dict, "SUGGESTIVE_CONTOUR", BPy_Nature_SUGGESTIVE_CONTOUR);
+-  PyDict_SetItemString(Nature_Type.tp_dict, "MATERIAL_BOUNDARY", BPy_Nature_MATERIAL_BOUNDARY);
+-  PyDict_SetItemString(Nature_Type.tp_dict, "EDGE_MARK", BPy_Nature_EDGE_MARK);
++  ADD_TYPE_CONST(NO_FEATURE);
++  ADD_TYPE_CONST(SILHOUETTE);
++  ADD_TYPE_CONST(BORDER);
++  ADD_TYPE_CONST(CREASE);
++  ADD_TYPE_CONST(RIDGE);
++  ADD_TYPE_CONST(VALLEY);
++  ADD_TYPE_CONST(SUGGESTIVE_CONTOUR);
++  ADD_TYPE_CONST(MATERIAL_BOUNDARY);
++  ADD_TYPE_CONST(EDGE_MARK);
++
++#undef ADD_TYPE_CONST
+ 
+   return 0;
+ }
+@@ -245,10 +211,7 @@ static PyObject *BPy_Nature_bitwise(PyObject *a, int op, PyObject *b)
+     result = PyObject_NewVar(BPy_Nature, &Nature_Type, 0);
+   }
+   else {
+-    result = PyObject_NewVar(BPy_Nature, &Nature_Type, 1);
+-    if (result) {
+-      result->i.ob_digit[0] = v;
+-    }
++    result = (BPy_Nature *)PyLong_subtype_new(&Nature_Type, v);
+   }
+   return (PyObject *)result;
+ }
