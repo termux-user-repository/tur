@@ -1,11 +1,10 @@
 TERMUX_PKG_HOMEPAGE=https://www.blender.org
 TERMUX_PKG_DESCRIPTION="A fully integrated 3D graphics creation suite"
 TERMUX_PKG_LICENSE="GPL-2.0"
-TERMUX_PKG_MAINTAINER="@T-Dynamos"
-TERMUX_PKG_VERSION=1:3.6.11
-TERMUX_PKG_REVISION=2
+TERMUX_PKG_MAINTAINER="@termux-user-repository"
+TERMUX_PKG_VERSION=1:3.6.16
 TERMUX_PKG_SRCURL=git+https://github.com/blender/blender.git
-TERMUX_PKG_GIT_BRANCH=blender-v3.6-release
+TERMUX_PKG_GIT_BRANCH="v${TERMUX_PKG_VERSION#*:}"
 
 # Blender does not support 32bit
 TERMUX_PKG_BLACKLISTED_ARCHES="arm, i686"
@@ -16,7 +15,7 @@ TERMUX_PKG_PYTHON_COMMON_DEPS="Cython"
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 -DPYTHON_LIBRARY=$TERMUX_PREFIX/lib/python$TERMUX_PYTHON_VERSION
 -DPYTHON_INCLUDE_DIR=$TERMUX_PREFIX/include/python$TERMUX_PYTHON_VERSION
--DPYTHON_VERSION=3.11
+-DPYTHON_VERSION=$TERMUX_PYTHON_VERSION
 -DPYTHON_SITE_PACKAGES=$TERMUX_PREFIX/lib/python$TERMUX_PYTHON_VERSION/site-packages
 -DPYTHON_EXECUTABLE=$TERMUX_PREFIX/bin/python$TERMUX_PYTHON_VERSION
 -DWITH_CYCLES_NATIVE_ONLY=ON
@@ -50,4 +49,12 @@ termux_step_pre_configure(){
 		_ARCH=$TERMUX_ARCH
 	fi
 	python3 ./build_files/utils/make_update.py --architecture $_ARCH
+}
+
+termux_step_make() {
+	# ld.lld: error: undefined symbol: backtrace
+	LDFLAGS+=" -landroid-execinfo"
+	# ld.lld: error: version script assignment
+	LDFLAGS+=" -Wl,--undefined-version"
+	ninja -j $(nproc) || bash
 }

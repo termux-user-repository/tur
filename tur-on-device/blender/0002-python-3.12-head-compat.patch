@@ -1,0 +1,1008 @@
+https://github.com/blender/blender/commit/a6837ac517b38a7fa535e0dda961334bee71323d
+
+diff --git a/source/blender/python/generic/CMakeLists.txt b/source/blender/python/generic/CMakeLists.txt
+index 40e7f6f..e911bd7 100644
+--- a/source/blender/python/generic/CMakeLists.txt
++++ b/source/blender/python/generic/CMakeLists.txt
+@@ -38,6 +38,7 @@ set(SRC
+ 
+   # header-only
+   python_utildefines.h
++  python_compat.h
+ )
+ 
+ set(LIB
+diff --git a/source/blender/python/generic/imbuf_py_api.c b/source/blender/python/generic/imbuf_py_api.c
+index bf001f0..1bd01b3 100644
+--- a/source/blender/python/generic/imbuf_py_api.c
++++ b/source/blender/python/generic/imbuf_py_api.c
+@@ -14,6 +14,7 @@
+ 
+ #include "py_capi_utils.h"
+ 
++#include "python_compat.h"
+ #include "python_utildefines.h"
+ 
+ #include "imbuf_py_api.h" /* own include */
+@@ -93,6 +94,7 @@ static PyObject *py_imbuf_resize(Py_ImBuf *self, PyObject *args, PyObject *kw)
+ 
+   static const char *_keywords[] = {"size", "method", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "(ii)" /* `size` */
+       "|$"   /* Optional keyword only arguments. */
+       "O&"   /* `method` */
+@@ -139,6 +141,7 @@ static PyObject *py_imbuf_crop(Py_ImBuf *self, PyObject *args, PyObject *kw)
+ 
+   static const char *_keywords[] = {"min", "max", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "(II)" /* `min` */
+       "(II)" /* `max` */
+       ":crop",
+@@ -431,6 +434,7 @@ static PyObject *M_imbuf_new(PyObject *UNUSED(self), PyObject *args, PyObject *k
+   int size[2];
+   static const char *_keywords[] = {"size", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "(ii)" /* `size` */
+       ":new",
+       _keywords,
+@@ -471,6 +475,7 @@ static PyObject *M_imbuf_load(PyObject *UNUSED(self), PyObject *args, PyObject *
+ 
+   static const char *_keywords[] = {"filepath", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "s" /* `filepath` */
+       ":load",
+       _keywords,
+@@ -518,6 +523,7 @@ static PyObject *M_imbuf_write(PyObject *UNUSED(self), PyObject *args, PyObject
+ 
+   static const char *_keywords[] = {"image", "filepath", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "O!" /* `image` */
+       "|$" /* Optional keyword only arguments. */
+       "s"  /* `filepath` */
+diff --git a/source/blender/python/generic/python_compat.h b/source/blender/python/generic/python_compat.h
+new file mode 100644
+index 0000000..df4eedc
+--- /dev/null
++++ b/source/blender/python/generic/python_compat.h
+@@ -0,0 +1,25 @@
++/* SPDX-FileCopyrightText: 2023 Blender Authors
++ *
++ * SPDX-License-Identifier: GPL-2.0-or-later */
++
++/** \file
++ * \ingroup pygen
++ * \brief header-only compatibility defines.
++ */
++
++#pragma once
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++/* Add `intialized` member for Python 3.12+. */
++#if PY_VERSION_HEX >= 0x030c0000
++#  define PY_ARG_PARSER_HEAD_COMPAT() 0,
++#else
++#  define PY_ARG_PARSER_HEAD_COMPAT()
++#endif
++
++#ifdef __cplusplus
++}
++#endif
+diff --git a/source/blender/python/gpu/gpu_py_batch.c b/source/blender/python/gpu/gpu_py_batch.c
+index 9c3d4ad..225cb24 100644
+--- a/source/blender/python/gpu/gpu_py_batch.c
++++ b/source/blender/python/gpu/gpu_py_batch.c
+@@ -18,6 +18,7 @@
+ #include "GPU_batch.h"
+ 
+ #include "../generic/py_capi_utils.h"
++#include "../generic/python_compat.h"
+ 
+ #include "gpu_py.h"
+ #include "gpu_py_element.h"
+@@ -55,6 +56,7 @@ static PyObject *pygpu_batch__tp_new(PyTypeObject *UNUSED(type), PyObject *args,
+ 
+   static const char *_keywords[] = {"type", "buf", "elem", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "|$" /* Optional keyword only arguments. */
+       "O&" /* `type` */
+       "O!" /* `buf` */
+@@ -256,6 +258,7 @@ static PyObject *pygpu_batch_draw_instanced(BPyGPUBatch *self, PyObject *args, P
+ 
+   static const char *_keywords[] = {"program", "instance_start", "instance_count", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "O!" /* `program` */
+       "|$" /* Optional keyword only arguments. */
+       "i"  /* `instance_start` */
+@@ -298,6 +301,7 @@ static PyObject *pygpu_batch_draw_range(BPyGPUBatch *self, PyObject *args, PyObj
+ 
+   static const char *_keywords[] = {"program", "elem_start", "elem_count", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "O!" /* `program` */
+       "|$" /* Optional keyword only arguments. */
+       "i"  /* `elem_start' */
+diff --git a/source/blender/python/gpu/gpu_py_element.c b/source/blender/python/gpu/gpu_py_element.c
+index e559e6c..9047ff9 100644
+--- a/source/blender/python/gpu/gpu_py_element.c
++++ b/source/blender/python/gpu/gpu_py_element.c
+@@ -16,6 +16,8 @@
+ #include "MEM_guardedalloc.h"
+ 
+ #include "../generic/py_capi_utils.h"
++#include "../generic/python_compat.h"
++#include "../generic/python_utildefines.h"
+ 
+ #include "gpu_py.h"
+ #include "gpu_py_element.h" /* own include */
+@@ -38,6 +40,7 @@ static PyObject *pygpu_IndexBuf__tp_new(PyTypeObject *UNUSED(type), PyObject *ar
+ 
+   static const char *_keywords[] = {"type", "seq", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "$O" /* `type` */
+       "&O" /* `seq` */
+       ":IndexBuf.__new__",
+diff --git a/source/blender/python/gpu/gpu_py_framebuffer.c b/source/blender/python/gpu/gpu_py_framebuffer.c
+index b89ca24..fe9adf2 100644
+--- a/source/blender/python/gpu/gpu_py_framebuffer.c
++++ b/source/blender/python/gpu/gpu_py_framebuffer.c
+@@ -17,7 +17,9 @@
+ #include "GPU_init_exit.h"
+ 
+ #include "../generic/py_capi_utils.h"
++#include "../generic/python_compat.h"
+ #include "../generic/python_utildefines.h"
++
+ #include "../mathutils/mathutils.h"
+ 
+ #include "gpu_py.h"
+@@ -276,6 +278,7 @@ static PyObject *pygpu_framebuffer__tp_new(PyTypeObject *UNUSED(self),
+   PyObject *color_attachements = NULL;
+   static const char *_keywords[] = {"depth_slot", "color_slots", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "|$" /* Optional keyword only arguments. */
+       "O"  /* `depth_slot` */
+       "O"  /* `color_slots` */
+@@ -371,6 +374,7 @@ static PyObject *pygpu_framebuffer_clear(BPyGPUFrameBuffer *self, PyObject *args
+ 
+   static const char *_keywords[] = {"color", "depth", "stencil", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "|$" /* Optional keyword only arguments. */
+       "O"  /* `color` */
+       "O"  /* `depth` */
+@@ -490,6 +494,7 @@ static PyObject *pygpu_framebuffer_read_color(BPyGPUFrameBuffer *self,
+   static const char *_keywords[] = {
+       "x", "y", "xsize", "ysize", "channels", "slot", "format", "data", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "i"  /* `x` */
+       "i"  /* `y` */
+       "i"  /* `xsize` */
+@@ -589,6 +594,7 @@ static PyObject *pygpu_framebuffer_read_depth(BPyGPUFrameBuffer *self,
+ 
+   static const char *_keywords[] = {"x", "y", "xsize", "ysize", "data", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "i"  /* `x` */
+       "i"  /* `y` */
+       "i"  /* `xsize` */
+diff --git a/source/blender/python/gpu/gpu_py_offscreen.c b/source/blender/python/gpu/gpu_py_offscreen.c
+index dfbdd3f..e187106 100644
+--- a/source/blender/python/gpu/gpu_py_offscreen.c
++++ b/source/blender/python/gpu/gpu_py_offscreen.c
+@@ -34,6 +34,7 @@
+ #include "../mathutils/mathutils.h"
+ 
+ #include "../generic/py_capi_utils.h"
++#include "../generic/python_compat.h"
+ 
+ #include "gpu_py.h"
+ #include "gpu_py_texture.h"
+@@ -186,6 +187,7 @@ static PyObject *pygpu_offscreen_unbind(BPyGPUOffScreen *self, PyObject *args, P
+ 
+   static const char *_keywords[] = {"restore", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "|$" /* Optional keyword only arguments. */
+       "O&" /* `restore` */
+       ":unbind",
+@@ -218,6 +220,7 @@ static PyObject *pygpu_offscreen__tp_new(PyTypeObject *UNUSED(self),
+ 
+   static const char *_keywords[] = {"width", "height", "format", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "i"  /* `width` */
+       "i"  /* `height` */
+       "|$" /* Optional keyword only arguments. */
+@@ -339,6 +342,7 @@ static PyObject *pygpu_offscreen_draw_view3d(BPyGPUOffScreen *self, PyObject *ar
+       NULL,
+   };
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "O"  /* `scene` */
+       "O"  /* `view_layer` */
+       "O"  /* `view3d` */
+diff --git a/source/blender/python/gpu/gpu_py_shader.c b/source/blender/python/gpu/gpu_py_shader.c
+index 1b737fa..5c1bd87 100644
+--- a/source/blender/python/gpu/gpu_py_shader.c
++++ b/source/blender/python/gpu/gpu_py_shader.c
+@@ -16,7 +16,9 @@
+ #include "GPU_uniform_buffer.h"
+ 
+ #include "../generic/py_capi_utils.h"
++#include "../generic/python_compat.h"
+ #include "../generic/python_utildefines.h"
++
+ #include "../mathutils/mathutils.h"
+ 
+ #include "gpu_py.h"
+@@ -107,6 +109,7 @@ static PyObject *pygpu_shader__tp_new(PyTypeObject *UNUSED(type), PyObject *args
+   static const char *_keywords[] = {
+       "vertexcode", "fragcode", "geocode", "libcode", "defines", "name", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "s"  /* `vertexcode` */
+       "s"  /* `fragcode` */
+       "|$" /* Optional keyword only arguments. */
+@@ -841,6 +844,7 @@ static PyObject *pygpu_shader_from_builtin(PyObject *UNUSED(self), PyObject *arg
+ 
+   static const char *_keywords[] = {"shader_name", "config", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "O&" /* `shader_name` */
+       "|$" /* Optional keyword only arguments. */
+       "O&" /* `config` */
+diff --git a/source/blender/python/gpu/gpu_py_shader_create_info.cc b/source/blender/python/gpu/gpu_py_shader_create_info.cc
+index 02725e3..fa0c083 100644
+--- a/source/blender/python/gpu/gpu_py_shader_create_info.cc
++++ b/source/blender/python/gpu/gpu_py_shader_create_info.cc
+@@ -15,6 +15,7 @@
+ #include "intern/gpu_shader_create_info.hh"
+ 
+ #include "../generic/py_capi_utils.h"
++#include "../generic/python_compat.h"
+ 
+ #include "gpu_py_shader.h" /* own include */
+ 
+@@ -482,6 +483,7 @@ static PyObject *pygpu_shader_info_fragment_out(BPyGPUShaderCreateInfo *self,
+ 
+   static const char *_keywords[] = {"slot", "type", "name", "blend", nullptr};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "i"  /* `slot` */
+       "O&" /* `type` */
+       "s"  /* `name` */
+@@ -586,6 +588,7 @@ static PyObject *pygpu_shader_info_image(BPyGPUShaderCreateInfo *self,
+ 
+   static const char *_keywords[] = {"slot", "format", "type", "name", "qualifiers", nullptr};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "i"  /* `slot` */
+       "O&" /* `format` */
+       "O&" /* `type` */
+@@ -769,6 +772,7 @@ static PyObject *pygpu_shader_info_push_constant(BPyGPUShaderCreateInfo *self,
+ 
+   static const char *_keywords[] = {"type", "name", "size", nullptr};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "O&" /* `type` */
+       "s"  /* `name` */
+       "|"  /* Optional arguments. */
+diff --git a/source/blender/python/gpu/gpu_py_texture.c b/source/blender/python/gpu/gpu_py_texture.c
+index be2e19f..a6880bb 100644
+--- a/source/blender/python/gpu/gpu_py_texture.c
++++ b/source/blender/python/gpu/gpu_py_texture.c
+@@ -21,6 +21,7 @@
+ #include "BKE_image.h"
+ 
+ #include "../generic/py_capi_utils.h"
++#include "../generic/python_compat.h"
+ 
+ #include "gpu_py.h"
+ #include "gpu_py_buffer.h"
+@@ -121,6 +122,7 @@ static PyObject *pygpu_texture__tp_new(PyTypeObject *UNUSED(self), PyObject *arg
+ 
+   static const char *_keywords[] = {"size", "layers", "is_cubemap", "format", "data", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "O"  /* `size` */
+       "|$" /* Optional keyword only arguments. */
+       "i"  /* `layers` */
+@@ -294,6 +296,7 @@ static PyObject *pygpu_texture_clear(BPyGPUTexture *self, PyObject *args, PyObje
+ 
+   static const char *_keywords[] = {"format", "value", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "$"  /* Keyword only arguments. */
+       "O&" /* `format` */
+       "O"  /* `value` */
+diff --git a/source/blender/python/gpu/gpu_py_uniformbuffer.c b/source/blender/python/gpu/gpu_py_uniformbuffer.c
+index cfa01d5..08e194b 100644
+--- a/source/blender/python/gpu/gpu_py_uniformbuffer.c
++++ b/source/blender/python/gpu/gpu_py_uniformbuffer.c
+@@ -17,6 +17,7 @@
+ #include "GPU_uniform_buffer.h"
+ 
+ #include "../generic/py_capi_utils.h"
++#include "../generic/python_compat.h"
+ 
+ #include "gpu_py.h"
+ 
+@@ -65,6 +66,7 @@ static PyObject *pygpu_uniformbuffer__tp_new(PyTypeObject *UNUSED(self),
+ 
+   static const char *_keywords[] = {"data", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "O" /* `data` */
+       ":GPUUniformBuf.__new__",
+       _keywords,
+diff --git a/source/blender/python/gpu/gpu_py_vertex_buffer.c b/source/blender/python/gpu/gpu_py_vertex_buffer.c
+index 827feb7..1d81481 100644
+--- a/source/blender/python/gpu/gpu_py_vertex_buffer.c
++++ b/source/blender/python/gpu/gpu_py_vertex_buffer.c
+@@ -16,6 +16,7 @@
+ #include "MEM_guardedalloc.h"
+ 
+ #include "../generic/py_capi_utils.h"
++#include "../generic/python_compat.h"
+ #include "../generic/python_utildefines.h"
+ 
+ #include "gpu_py_vertex_buffer.h" /* own include */
+@@ -237,6 +238,7 @@ static PyObject *pygpu_vertbuf__tp_new(PyTypeObject *UNUSED(type), PyObject *arg
+ 
+   static const char *_keywords[] = {"format", "len", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "O!" /* `format` */
+       "I"  /* `len` */
+       ":GPUVertBuf.__new__",
+@@ -273,6 +275,7 @@ static PyObject *pygpu_vertbuf_attr_fill(BPyGPUVertBuf *self, PyObject *args, Py
+ 
+   static const char *_keywords[] = {"id", "data", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "O" /* `id` */
+       "O" /* `data` */
+       ":attr_fill",
+diff --git a/source/blender/python/gpu/gpu_py_vertex_format.c b/source/blender/python/gpu/gpu_py_vertex_format.c
+index 128ef08..a92e4cb 100644
+--- a/source/blender/python/gpu/gpu_py_vertex_format.c
++++ b/source/blender/python/gpu/gpu_py_vertex_format.c
+@@ -10,6 +10,7 @@
+ #include <Python.h>
+ 
+ #include "../generic/py_capi_utils.h"
++#include "../generic/python_compat.h"
+ #include "../generic/python_utildefines.h"
+ 
+ #include "gpu_py_vertex_format.h" /* own include */
+@@ -91,6 +92,7 @@ static PyObject *pygpu_vertformat_attr_add(BPyGPUVertFormat *self, PyObject *arg
+ 
+   static const char *_keywords[] = {"id", "comp_type", "len", "fetch_mode", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "$"  /* Keyword only arguments. */
+       "s"  /* `id` */
+       "O&" /* `comp_type` */
+diff --git a/source/blender/python/intern/bpy.c b/source/blender/python/intern/bpy.c
+index 2e7653f..b92a899 100644
+--- a/source/blender/python/intern/bpy.c
++++ b/source/blender/python/intern/bpy.c
+@@ -47,6 +47,7 @@
+ #include "bpy_utils_units.h"
+ 
+ #include "../generic/py_capi_utils.h"
++#include "../generic/python_compat.h"
+ #include "../generic/python_utildefines.h"
+ 
+ /* external util modules */
+@@ -118,6 +119,7 @@ static PyObject *bpy_blend_paths(PyObject *UNUSED(self), PyObject *args, PyObjec
+ 
+   static const char *_keywords[] = {"absolute", "packed", "local", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "|$" /* Optional keyword only arguments. */
+       "O&" /* `absolute` */
+       "O&" /* `packed` */
+@@ -181,6 +183,7 @@ static PyObject *bpy_flip_name(PyObject *UNUSED(self), PyObject *args, PyObject
+ 
+   static const char *_keywords[] = {"", "strip_digits", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "s#" /* `name` */
+       "|$" /* Optional, keyword only arguments. */
+       "O&" /* `strip_digits` */
+@@ -225,6 +228,7 @@ static PyObject *bpy_user_resource(PyObject *UNUSED(self), PyObject *args, PyObj
+ 
+   static const char *_keywords[] = {"type", "path", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "O&" /* `type` */
+       "|$" /* Optional keyword only arguments. */
+       "s"  /* `path` */
+@@ -268,6 +272,7 @@ static PyObject *bpy_system_resource(PyObject *UNUSED(self), PyObject *args, PyO
+ 
+   static const char *_keywords[] = {"type", "path", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "O&" /* `type` */
+       "|$" /* Optional keyword only arguments. */
+       "s"  /* `path` */
+@@ -313,6 +318,7 @@ static PyObject *bpy_resource_path(PyObject *UNUSED(self), PyObject *args, PyObj
+ 
+   static const char *_keywords[] = {"type", "major", "minor", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "O&" /* `type` */
+       "|$" /* Optional keyword only arguments. */
+       "i"  /* `major` */
+@@ -353,6 +359,7 @@ static PyObject *bpy_driver_secure_code_test(PyObject *UNUSED(self), PyObject *a
+   const bool verbose = false;
+   static const char *_keywords[] = {"code", "namespace", "verbose", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "O!" /* `expression` */
+       "|$" /* Optional keyword only arguments. */
+       "O!" /* `namespace` */
+diff --git a/source/blender/python/intern/bpy_app.c b/source/blender/python/intern/bpy_app.c
+index e93d975..79c0a8c 100644
+--- a/source/blender/python/intern/bpy_app.c
++++ b/source/blender/python/intern/bpy_app.c
+@@ -50,6 +50,7 @@
+ 
+ #include "../generic/py_capi_rna.h"
+ #include "../generic/py_capi_utils.h"
++#include "../generic/python_compat.h"
+ #include "../generic/python_utildefines.h"
+ 
+ #ifdef BUILD_DATE
+@@ -502,6 +503,7 @@ static PyObject *bpy_app_is_job_running(PyObject *UNUSED(self), PyObject *args,
+   };
+   static const char *_keywords[] = {"job_type", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "O&" /* `job_type` */
+       ":is_job_running",
+       _keywords,
+diff --git a/source/blender/python/intern/bpy_app_icons.c b/source/blender/python/intern/bpy_app_icons.c
+index fc34b18..51e771f 100644
+--- a/source/blender/python/intern/bpy_app_icons.c
++++ b/source/blender/python/intern/bpy_app_icons.c
+@@ -15,6 +15,7 @@
+ #include "BKE_icons.h"
+ 
+ #include "../generic/py_capi_utils.h"
++#include "../generic/python_compat.h"
+ 
+ #include "bpy_app_icons.h"
+ 
+@@ -41,6 +42,7 @@ static PyObject *bpy_app_icons_new_triangles(PyObject *UNUSED(self), PyObject *a
+ 
+   static const char *_keywords[] = {"range", "coords", "colors", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "(BB)" /* `range` */
+       "S"    /* `coords` */
+       "S"    /* `colors` */
+@@ -102,6 +104,7 @@ static PyObject *bpy_app_icons_new_triangles_from_file(PyObject *UNUSED(self),
+ 
+   static const char *_keywords[] = {"filename", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "s" /* `filename` */
+       ":new_triangles_from_file",
+       _keywords,
+@@ -129,6 +132,7 @@ static PyObject *bpy_app_icons_release(PyObject *UNUSED(self), PyObject *args, P
+   int icon_id;
+   static const char *_keywords[] = {"icon_id", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "i" /* `icon_id` */
+       ":release",
+       _keywords,
+diff --git a/source/blender/python/intern/bpy_app_timers.c b/source/blender/python/intern/bpy_app_timers.c
+index e5de512..2566683 100644
+--- a/source/blender/python/intern/bpy_app_timers.c
++++ b/source/blender/python/intern/bpy_app_timers.c
+@@ -13,6 +13,7 @@
+ #include "bpy_app_timers.h"
+ 
+ #include "../generic/py_capi_utils.h"
++#include "../generic/python_compat.h"
+ #include "../generic/python_utildefines.h"
+ 
+ static double handle_returned_value(PyObject *function, PyObject *ret)
+@@ -94,6 +95,7 @@ static PyObject *bpy_app_timers_register(PyObject *UNUSED(self), PyObject *args,
+ 
+   static const char *_keywords[] = {"function", "first_interval", "persistent", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "O"  /* `function` */
+       "|$" /* Optional keyword only arguments. */
+       "d"  /* `first_interval` */
+diff --git a/source/blender/python/intern/bpy_driver.c b/source/blender/python/intern/bpy_driver.c
+index ba28891..bb6cc38 100644
+--- a/source/blender/python/intern/bpy_driver.c
++++ b/source/blender/python/intern/bpy_driver.c
+@@ -314,13 +314,17 @@ static const bool secure_opcodes[255] = {
+     OK_OP(POP_TOP),
+     OK_OP(PUSH_NULL),
+     OK_OP(NOP),
++#    if PY_VERSION_HEX < 0x030c0000
+     OK_OP(UNARY_POSITIVE),
++#    endif
+     OK_OP(UNARY_NEGATIVE),
+     OK_OP(UNARY_NOT),
+     OK_OP(UNARY_INVERT),
+     OK_OP(BINARY_SUBSCR),
+     OK_OP(GET_LEN),
++#    if PY_VERSION_HEX < 0x030c0000
+     OK_OP(LIST_TO_TUPLE),
++#    endif
+     OK_OP(RETURN_VALUE),
+     OK_OP(SWAP),
+     OK_OP(BUILD_TUPLE),
+@@ -329,10 +333,12 @@ static const bool secure_opcodes[255] = {
+     OK_OP(BUILD_MAP),
+     OK_OP(COMPARE_OP),
+     OK_OP(JUMP_FORWARD),
++#    if PY_VERSION_HEX < 0x030c0000
+     OK_OP(JUMP_IF_FALSE_OR_POP),
+     OK_OP(JUMP_IF_TRUE_OR_POP),
+     OK_OP(POP_JUMP_FORWARD_IF_FALSE),
+     OK_OP(POP_JUMP_FORWARD_IF_TRUE),
++#    endif
+     OK_OP(LOAD_GLOBAL),
+     OK_OP(IS_OP),
+     OK_OP(CONTAINS_OP),
+@@ -340,8 +346,10 @@ static const bool secure_opcodes[255] = {
+     OK_OP(LOAD_FAST),
+     OK_OP(STORE_FAST),
+     OK_OP(DELETE_FAST),
++#    if PY_VERSION_HEX < 0x030c0000
+     OK_OP(POP_JUMP_FORWARD_IF_NOT_NONE),
+     OK_OP(POP_JUMP_FORWARD_IF_NONE),
++#    endif
+     OK_OP(BUILD_SLICE),
+     OK_OP(LOAD_DEREF),
+     OK_OP(STORE_DEREF),
+@@ -354,17 +362,21 @@ static const bool secure_opcodes[255] = {
+     OK_OP(DICT_MERGE),
+     OK_OP(DICT_UPDATE),
+ #    endif
++#    if PY_VERSION_HEX < 0x030c0000
+     OK_OP(POP_JUMP_BACKWARD_IF_NOT_NONE),
+     OK_OP(POP_JUMP_BACKWARD_IF_NONE),
+     OK_OP(POP_JUMP_BACKWARD_IF_FALSE),
+     OK_OP(POP_JUMP_BACKWARD_IF_TRUE),
++#    endif
+ 
+     /* Special cases. */
+     OK_OP(LOAD_CONST), /* Ok because constants are accepted. */
+     OK_OP(LOAD_NAME),  /* Ok, because `PyCodeObject.names` is checked. */
+     OK_OP(CALL),       /* Ok, because we check its "name" before calling. */
+     OK_OP(KW_NAMES),   /* Ok, because it's used for calling functions with keyword arguments. */
++#    if PY_VERSION_HEX < 0x030c0000
+     OK_OP(PRECALL),    /* Ok, because it's used for calling. */
++#    endif
+ 
+ #  else /* Python 3.10 and older. */
+ 
+diff --git a/source/blender/python/intern/bpy_gizmo_wrap.c b/source/blender/python/intern/bpy_gizmo_wrap.c
+index 84f90d2..e88e11e 100644
+--- a/source/blender/python/intern/bpy_gizmo_wrap.c
++++ b/source/blender/python/intern/bpy_gizmo_wrap.c
+@@ -28,6 +28,7 @@
+ #include "bpy_rna.h"
+ 
+ #include "../generic/py_capi_rna.h"
++#include "../generic/python_compat.h"
+ 
+ /* we may want to add, but not now */
+ 
+@@ -52,6 +53,7 @@ static bool bpy_gizmotype_target_property_def(wmGizmoType *gzt, PyObject *item)
+ 
+   static const char *const _keywords[] = {"id", "type", "array_length", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "|$" /* Optional keyword only arguments. */
+       "s"  /* `id` */
+       "O&" /* `type` */
+diff --git a/source/blender/python/intern/bpy_library_load.c b/source/blender/python/intern/bpy_library_load.c
+index 3322d9a..5693450 100644
+--- a/source/blender/python/intern/bpy_library_load.c
++++ b/source/blender/python/intern/bpy_library_load.c
+@@ -37,6 +37,7 @@
+ #include "bpy_library.h"
+ 
+ #include "../generic/py_capi_utils.h"
++#include "../generic/python_compat.h"
+ #include "../generic/python_utildefines.h"
+ 
+ /* nifty feature. swap out strings for RNA data */
+@@ -191,6 +192,7 @@ static PyObject *bpy_lib_load(BPy_PropertyRNA *self, PyObject *args, PyObject *k
+       NULL,
+   };
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "s" /* `filepath` */
+       /* Optional keyword only arguments. */
+       "|$"
+diff --git a/source/blender/python/intern/bpy_library_write.c b/source/blender/python/intern/bpy_library_write.c
+index 6e71b22..d18816c 100644
+--- a/source/blender/python/intern/bpy_library_write.c
++++ b/source/blender/python/intern/bpy_library_write.c
+@@ -30,6 +30,7 @@
+ #include "bpy_rna.h"
+ 
+ #include "../generic/py_capi_utils.h"
++#include "../generic/python_compat.h"
+ 
+ PyDoc_STRVAR(
+     bpy_lib_write_doc,
+@@ -84,6 +85,7 @@ static PyObject *bpy_lib_write(BPy_PropertyRNA *self, PyObject *args, PyObject *
+       NULL,
+   };
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "s"  /* `filepath` */
+       "O!" /* `datablocks` */
+       "|$" /* Optional keyword only arguments. */
+diff --git a/source/blender/python/intern/bpy_msgbus.c b/source/blender/python/intern/bpy_msgbus.c
+index 2d7a293..8d6e53d 100644
+--- a/source/blender/python/intern/bpy_msgbus.c
++++ b/source/blender/python/intern/bpy_msgbus.c
+@@ -9,7 +9,9 @@
+ 
+ #include "../generic/py_capi_rna.h"
+ #include "../generic/py_capi_utils.h"
++#include "../generic/python_compat.h"
+ #include "../generic/python_utildefines.h"
++
+ #include "../mathutils/mathutils.h"
+ 
+ #include "BLI_utildefines.h"
+@@ -241,6 +243,7 @@ static PyObject *bpy_msgbus_subscribe_rna(PyObject *UNUSED(self), PyObject *args
+       NULL,
+   };
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "O"  /* `key` */
+       "O"  /* `owner` */
+       "O!" /* `args` */
+@@ -342,6 +345,7 @@ static PyObject *bpy_msgbus_publish_rna(PyObject *UNUSED(self), PyObject *args,
+       NULL,
+   };
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "O" /* `key` */
+       ":publish_rna",
+       _keywords,
+diff --git a/source/blender/python/intern/bpy_props.c b/source/blender/python/intern/bpy_props.c
+index aaf040d..c0ad700 100644
+--- a/source/blender/python/intern/bpy_props.c
++++ b/source/blender/python/intern/bpy_props.c
+@@ -35,6 +35,7 @@
+ 
+ #include "../generic/py_capi_rna.h"
+ #include "../generic/py_capi_utils.h"
++#include "../generic/python_compat.h"
+ 
+ /* Disabled duplicating strings because the array can still be freed and
+  * the strings from it referenced, for now we can't support dynamically
+@@ -1579,6 +1580,7 @@ static bool bpy_prop_string_visit_fn_call(PyObject *py_func,
+         NULL,
+     };
+     static _PyArg_Parser _parser = {
++        PY_ARG_PARSER_HEAD_COMPAT()
+         "s" /* `text` */
+         "s" /* `info` */
+         ":search",
+@@ -2819,6 +2821,7 @@ static PyObject *BPy_BoolProperty(PyObject *self, PyObject *args, PyObject *kw)
+       NULL,
+   };
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "O&" /* `attr` */
+       "|$" /* Optional, keyword only arguments. */
+       "s"  /* `name` */
+@@ -2976,6 +2979,7 @@ static PyObject *BPy_BoolVectorProperty(PyObject *self, PyObject *args, PyObject
+       NULL,
+   };
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "O&" /* `attr` */
+       "|$" /* Optional, keyword only arguments. */
+       "s"  /* `name` */
+@@ -3166,6 +3170,7 @@ static PyObject *BPy_IntProperty(PyObject *self, PyObject *args, PyObject *kw)
+       NULL,
+   };
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "O&" /* `attr` */
+       "|$" /* Optional, keyword only arguments. */
+       "s"  /* `name` */
+@@ -3335,6 +3340,7 @@ static PyObject *BPy_IntVectorProperty(PyObject *self, PyObject *args, PyObject
+       "get",      "set",     NULL,
+   };
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "O&" /* `attr` */
+       "|$" /* Optional, keyword only arguments. */
+       "s"  /* `name` */
+@@ -3533,6 +3539,7 @@ static PyObject *BPy_FloatProperty(PyObject *self, PyObject *args, PyObject *kw)
+       "update",   "get",  "set",         NULL,
+   };
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "O&" /* `attr` */
+       "|$" /* Optional, keyword only arguments. */
+       "s"  /* `name` */
+@@ -3717,6 +3724,7 @@ static PyObject *BPy_FloatVectorProperty(PyObject *self, PyObject *args, PyObjec
+       NULL,
+   };
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "O&" /* `attr` */
+       "|$" /* Optional, keyword only arguments. */
+       "s"  /* `name` */
+@@ -3928,6 +3936,7 @@ static PyObject *BPy_StringProperty(PyObject *self, PyObject *args, PyObject *kw
+       NULL,
+   };
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "O&" /* `attr` */
+       "|$" /* Optional, keyword only arguments. */
+       "s"  /* `name` */
+@@ -4132,6 +4141,7 @@ static PyObject *BPy_EnumProperty(PyObject *self, PyObject *args, PyObject *kw)
+       NULL,
+   };
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "O&" /* `attr` */
+       "O"  /* `items` */
+       "|$" /* Optional, keyword only arguments. */
+@@ -4360,6 +4370,7 @@ PyObject *BPy_PointerProperty(PyObject *self, PyObject *args, PyObject *kw)
+       NULL,
+   };
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "O&" /* `attr` */
+       "O"  /* `type` */
+       "|$" /* Optional, keyword only arguments. */
+@@ -4503,6 +4514,7 @@ PyObject *BPy_CollectionProperty(PyObject *self, PyObject *args, PyObject *kw)
+       NULL,
+   };
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "O&" /* `attr` */
+       "O"  /* `type` */
+       "|$" /* Optional, keyword only arguments. */
+@@ -4621,6 +4633,7 @@ static PyObject *BPy_RemoveProperty(PyObject *self, PyObject *args, PyObject *kw
+       NULL,
+   };
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "s" /* `attr` */
+       ":RemoveProperty",
+       _keywords,
+diff --git a/source/blender/python/intern/bpy_rna.c b/source/blender/python/intern/bpy_rna.c
+index 8b25197..bcb53fb 100644
+--- a/source/blender/python/intern/bpy_rna.c
++++ b/source/blender/python/intern/bpy_rna.c
+@@ -64,6 +64,7 @@
+ #include "../generic/idprop_py_ui_api.h"
+ #include "../generic/py_capi_rna.h"
+ #include "../generic/py_capi_utils.h"
++#include "../generic/python_compat.h"
+ #include "../generic/python_utildefines.h"
+ 
+ #define USE_PEDANTIC_WRITE
+@@ -3622,6 +3623,7 @@ static PyObject *pyrna_struct_is_property_set(BPy_StructRNA *self, PyObject *arg
+ 
+   static const char *_keywords[] = {"", "ghost", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "s"  /* `name` (positional). */
+       "|$" /* Optional keyword only arguments. */
+       "O&" /* `ghost` */
+@@ -4007,7 +4009,7 @@ static PyObject *pyrna_struct_type_recast(BPy_StructRNA *self)
+ static PyObject *pyrna_struct_bl_rna_find_subclass_recursive(PyObject *cls, const char *id)
+ {
+   PyObject *ret_test = NULL;
+-  PyObject *subclasses = ((PyTypeObject *)cls)->tp_subclasses;
++  PyObject *subclasses = (PyObject *)((PyTypeObject *)cls)->tp_subclasses;
+   if (subclasses) {
+     /* Unfortunately we can't use the dict key because Python class names
+      * don't match the bl_idname used internally. */
+diff --git a/source/blender/python/intern/bpy_rna_context.c b/source/blender/python/intern/bpy_rna_context.c
+index b3a60e1..34de286 100644
+--- a/source/blender/python/intern/bpy_rna_context.c
++++ b/source/blender/python/intern/bpy_rna_context.c
+@@ -18,6 +18,8 @@
+ 
+ #include "bpy_rna_context.h"
+ 
++#include "../generic/python_compat.h"
++
+ #include "RNA_access.h"
+ #include "RNA_prototypes.h"
+ 
+@@ -239,6 +241,7 @@ static PyObject *bpy_context_temp_override(PyObject *self, PyObject *args, PyObj
+ 
+   static const char *const _keywords[] = {"window", "area", "region", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "|$" /* Optional, keyword only arguments. */
+       "O&" /* `window` */
+       "O&" /* `area` */
+diff --git a/source/blender/python/intern/bpy_rna_data.c b/source/blender/python/intern/bpy_rna_data.c
+index 2dc0b8d..4d47008 100644
+--- a/source/blender/python/intern/bpy_rna_data.c
++++ b/source/blender/python/intern/bpy_rna_data.c
+@@ -14,6 +14,8 @@
+ #include <Python.h>
+ #include <stddef.h>
+ 
++#include "../generic/python_compat.h"
++
+ #include "BLI_string.h"
+ #include "BLI_utildefines.h"
+ 
+@@ -130,6 +132,7 @@ static PyObject *bpy_rna_data_temp_data(PyObject *UNUSED(self), PyObject *args,
+   const char *filepath = NULL;
+   static const char *_keywords[] = {"filepath", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "|$" /* Optional keyword only arguments. */
+       "z"  /* `filepath` */
+       ":temp_data",
+diff --git a/source/blender/python/intern/bpy_rna_gizmo.c b/source/blender/python/intern/bpy_rna_gizmo.c
+index 8ba8b4d..06b4029 100644
+--- a/source/blender/python/intern/bpy_rna_gizmo.c
++++ b/source/blender/python/intern/bpy_rna_gizmo.c
+@@ -21,6 +21,7 @@
+ #include "bpy_rna_gizmo.h"
+ 
+ #include "../generic/py_capi_utils.h"
++#include "../generic/python_compat.h"
+ #include "../generic/python_utildefines.h"
+ 
+ #include "RNA_access.h"
+@@ -340,6 +341,7 @@ static PyObject *bpy_gizmo_target_set_handler(PyObject *UNUSED(self), PyObject *
+    * (see: rna_wm_gizmo_api.c). conventions should match. */
+   static const char *const _keywords[] = {"self", "target", "get", "set", "range", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "O&" /* `self` */
+       "O&" /* `target` */
+       "|$" /* Optional keyword only arguments. */
+@@ -438,6 +440,7 @@ static PyObject *bpy_gizmo_target_get_value(PyObject *UNUSED(self), PyObject *ar
+ 
+   static const char *const _keywords[] = {"self", "target", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "O&" /* `self` */
+       "O&" /* `target` */
+       ":target_get_value",
+@@ -503,6 +506,7 @@ static PyObject *bpy_gizmo_target_set_value(PyObject *UNUSED(self), PyObject *ar
+ 
+   static const char *const _keywords[] = {"self", "target", "value", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "O&" /* `self` */
+       "O&" /* `target` */
+       "O"  /* `value` */
+@@ -581,6 +585,7 @@ static PyObject *bpy_gizmo_target_get_range(PyObject *UNUSED(self), PyObject *ar
+ 
+   static const char *const _keywords[] = {"self", "target", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "O&" /* `self` */
+       "O&" /* `target` */
+       ":target_get_range",
+diff --git a/source/blender/python/intern/bpy_rna_id_collection.c b/source/blender/python/intern/bpy_rna_id_collection.c
+index 1b18877..dd46d31 100644
+--- a/source/blender/python/intern/bpy_rna_id_collection.c
++++ b/source/blender/python/intern/bpy_rna_id_collection.c
+@@ -33,6 +33,7 @@
+ 
+ #include "../generic/py_capi_rna.h"
+ #include "../generic/py_capi_utils.h"
++#include "../generic/python_compat.h"
+ #include "../generic/python_utildefines.h"
+ 
+ #include "RNA_access.h"
+@@ -159,6 +160,7 @@ static PyObject *bpy_user_map(PyObject *UNUSED(self), PyObject *args, PyObject *
+ 
+   static const char *_keywords[] = {"subset", "key_types", "value_types", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "|$" /* Optional keyword only arguments. */
+       "O"  /* `subset` */
+       "O!" /* `key_types` */
+@@ -302,6 +304,7 @@ static PyObject *bpy_batch_remove(PyObject *UNUSED(self), PyObject *args, PyObje
+ 
+   static const char *_keywords[] = {"ids", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "O" /* `ids` */
+       ":batch_remove",
+       _keywords,
+@@ -380,6 +383,7 @@ static PyObject *bpy_orphans_purge(PyObject *UNUSED(self), PyObject *args, PyObj
+ 
+   static const char *_keywords[] = {"do_local_ids", "do_linked_ids", "do_recursive", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "|"  /* Optional arguments. */
+       "O&" /* `do_local_ids` */
+       "O&" /* `do_linked_ids` */
+diff --git a/source/blender/python/intern/bpy_rna_text.c b/source/blender/python/intern/bpy_rna_text.c
+index 8f10496..c3ff76e 100644
+--- a/source/blender/python/intern/bpy_rna_text.c
++++ b/source/blender/python/intern/bpy_rna_text.c
+@@ -18,6 +18,8 @@
+ 
+ #include "BKE_text.h"
+ 
++#include "../generic/python_compat.h"
++
+ #include "bpy_capi_utils.h"
+ #include "bpy_rna.h"
+ #include "bpy_rna_text.h"
+@@ -64,6 +66,7 @@ static PyObject *bpy_rna_region_as_string(PyObject *self, PyObject *args, PyObje
+ 
+   static const char *_keywords[] = {"range", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "|$"         /* Optional keyword only arguments. */
+       "((ii)(ii))" /* `range` */
+       ":region_as_string",
+@@ -122,6 +125,7 @@ static PyObject *bpy_rna_region_from_string(PyObject *self, PyObject *args, PyOb
+ 
+   static const char *_keywords[] = {"", "range", NULL};
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "s#"         /* `buf` (positional). */
+       "|$"         /* Optional keyword only arguments. */
+       "((ii)(ii))" /* `range` */
+diff --git a/source/blender/python/intern/bpy_utils_units.c b/source/blender/python/intern/bpy_utils_units.c
+index c50872e..6504811 100644
+--- a/source/blender/python/intern/bpy_utils_units.c
++++ b/source/blender/python/intern/bpy_utils_units.c
+@@ -19,6 +19,7 @@
+ #include "bpy_utils_units.h"
+ 
+ #include "../generic/py_capi_utils.h"
++#include "../generic/python_compat.h"
+ 
+ #include "BKE_unit.h"
+ 
+@@ -176,6 +177,7 @@ static PyObject *bpyunits_to_value(PyObject *UNUSED(self), PyObject *args, PyObj
+       NULL,
+   };
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "s"  /* `unit_system` */
+       "s"  /* `unit_category` */
+       "s#" /* `str_input` */
+@@ -263,6 +265,7 @@ static PyObject *bpyunits_to_string(PyObject *UNUSED(self), PyObject *args, PyOb
+       NULL,
+   };
+   static _PyArg_Parser _parser = {
++      PY_ARG_PARSER_HEAD_COMPAT()
+       "s"  /* `unit_system` */
+       "s"  /* `unit_category` */
+       "d"  /* `value` */
