@@ -7,7 +7,7 @@ TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://github.com/scikit-image/scikit-image/archive/refs/tags/v$TERMUX_PKG_VERSION.tar.gz
 TERMUX_PKG_SHA256=a2cf85577f8a9105ac46130277ad27e1627bfa3effecff7c1ef3ea851e5671ba
 TERMUX_PKG_AUTO_UPDATE=true
-TERMUX_PKG_DEPENDS="libc++, python, python-pip, python-numpy, python-pillow, python-pywavelets, python-scipy"
+TERMUX_PKG_DEPENDS="libandroid-complex-math, libc++, python, python-pip, python-numpy, python-pillow, python-pywavelets, python-scipy"
 TERMUX_PKG_PYTHON_COMMON_DEPS="wheel, 'Cython>=3.0.4', meson-python, build"
 _NUMPY_VERSION=$(. $TERMUX_SCRIPTDIR/packages/python-numpy/build.sh; echo $TERMUX_PKG_VERSION)
 TERMUX_PKG_PYTHON_BUILD_DEPS="pythran, 'numpy==$_NUMPY_VERSION'"
@@ -28,6 +28,9 @@ termux_step_pre_configure() {
 	# FIXME: NDK r27b cannot compile pythran due to https://github.com/llvm/llvm-project/issues/76358
 	_setup_toolchain_ndk_gcc_11
 
+	# ERROR: ./lib/python3.12/site-packages/skimage/measure/_marching_cubes_lewiner_cy.cpython-312.so contains undefined symbols:
+	#   139: 0000000000000000     0 NOTYPE  GLOBAL DEFAULT  UND cpow
+	LDFLAGS+=" -landroid-complex-math"
 	LDFLAGS+=" -Wl,--no-as-needed -lpython${TERMUX_PYTHON_VERSION}"
 
 	# FIXME: Don't know why NDK's libc++ should link against clang's libunwind,
