@@ -164,7 +164,7 @@ _setup_standalone_toolchain_current_ndk_newer_gcc() {
 	# XXX: Install some build dependencies
 	# XXX: So should TUR use a custom builder image?
 	env -i PATH="$PATH" sudo apt update
-	env -i PATH="$PATH" sudo apt install -y libgmp-dev libmpfr-dev libmpc-dev zlib1g-dev libisl-dev libtinfo5 libncurses5
+	env -i PATH="$PATH" sudo apt install -y libgmp-dev libmpfr-dev libmpc-dev zlib1g-dev libisl-dev
 
 	local GCC_VERSION="$1"
 	local GCC_TOOLCHAIN_REVISION="$2"
