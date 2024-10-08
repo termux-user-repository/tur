@@ -49,7 +49,6 @@ lib/python${_MAJOR_VERSION}/test
 lib/python${_MAJOR_VERSION}/*/test
 lib/python${_MAJOR_VERSION}/*/tests
 lib/python${_MAJOR_VERSION}/site-packages/*/
-lib/libpython3.so
 "
 
 termux_step_pre_configure() {
@@ -74,6 +73,11 @@ termux_step_pre_configure() {
 	fi
 
 	export LIBCRYPT_LIBS="-lcrypt"
+}
+
+termux_step_post_make_install() {
+	ln -sfr $TERMUX_PREFIX/bin/python$_MAJOR_VERSION $TERMUX_PREFIX/bin/python
+	ln -sfr $TERMUX_PREFIX/bin/python$_MAJOR_VERSION $TERMUX_PREFIX/bin/python3
 }
 
 termux_step_post_massage() {
