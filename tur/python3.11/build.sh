@@ -10,7 +10,6 @@ TERMUX_PKG_SHA256=07a4356e912900e61a15cb0949a06c4a05012e213ecd6b4e84d0f67aabbee3
 TERMUX_PKG_AUTO_UPDATE=false
 TERMUX_PKG_DEPENDS="gdbm, libandroid-posix-semaphore, libandroid-support, libbz2, libcrypt, libexpat, libffi, liblzma, libsqlite, ncurses, ncurses-ui-libs, openssl, readline, zlib"
 TERMUX_PKG_BUILD_DEPENDS="tk"
-TERMUX_PKG_RECOMMENDS="python3.11-ensurepip-wheels"
 TERMUX_PKG_SUGGESTS="python3.11-tkinter"
 TERMUX_PKG_MAKE_INSTALL_TARGET=altinstall
 
