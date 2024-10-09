@@ -12,9 +12,10 @@ TERMUX_PKG_DEPENDS="gdbm, libandroid-posix-semaphore, libandroid-support, libbz2
 TERMUX_PKG_BUILD_DEPENDS="tk"
 TERMUX_PKG_SUGGESTS="python3.11-tkinter"
 TERMUX_PKG_MAKE_INSTALL_TARGET=altinstall
+TERMUX_PKG_HOSTBUILD=true
 
 # https://github.com/termux/termux-packages/issues/15908
-TERMUX_PKG_MAKE_PROCESSES=1
+TERMUX_PKG_MAKE_PROCESSES=16
 
 _MAJOR_VERSION="${TERMUX_PKG_VERSION%.*}"
 
@@ -50,7 +51,25 @@ lib/python${_MAJOR_VERSION}/*/tests
 lib/python${_MAJOR_VERSION}/site-packages/*/
 "
 
+TERMUX_PKG_EXTRA_HOSTBUILD_CONFIGURE_ARGS="
+--prefix=$TERMUX_PREFIX/opt/python$_MAJOR_VERSION/cross
+"
+
+TERMUX_PKG_UNDEF_SYMBOLS_FILES="
+./opt/python$_MAJOR_VERSION/cross/lib/python$_MAJOR_VERSION/lib-dynload/*.so
+"
+
+termux_step_host_build() {
+	$TERMUX_PKG_SRCDIR/configure $TERMUX_PKG_EXTRA_HOSTBUILD_CONFIGURE_ARGS
+	make -j $TERMUX_PKG_MAKE_PROCESSES
+	make altinstall
+}
+
 termux_step_pre_configure() {
+	# Remove this marker all the time.
+	rm -rf $TERMUX_HOSTBUILD_MARKER
+
+	export PATH="$TERMUX_PREFIX/opt/python$_MAJOR_VERSION/cross/bin:$PATH"
 	# -O3 gains some additional performance on at least aarch64.
 	CFLAGS="${CFLAGS/-Oz/-O3}"
 
@@ -91,18 +110,34 @@ termux_step_post_massage() {
 termux_step_create_debscripts() {
 	# Post-installation script for setting up pip.
 	cat <<- POSTINST_EOF > ./postinst
-	#!$TERMUX_PREFIX/bin/bash
+	#!$TERMUX_PREFIX/bin/sh
 
 	echo "Setting up pip..."
 
+	cd ${TERMUX_PREFIX}/tmp
 	${TERMUX_PREFIX}/bin/python${_MAJOR_VERSION} -m ensurepip --altinstall --upgrade
 
 	exit 0
 	POSTINST_EOF
 
-	chmod 0755 postinst
+	# Pre-rm script to cleanup runtime-generated files.
+	cat <<- PRERM_EOF > ./prerm
+	#!$TERMUX_PREFIX/bin/sh
 
-	if [ "$TERMUX_PACKAGE_FORMAT" = "pacman" ]; then
-		echo "post_install" > postupg
+	if [ "$TERMUX_PACKAGE_FORMAT" != "pacman" ] && [ "\$1" != "remove" ]; then
+	    exit 0
 	fi
+
+	echo "Uninstalling python modules..."
+	cd ${TERMUX_PREFIX}/tmp
+	pip${_MAJOR_VERSION} freeze 2>/dev/null | xargs pip${_MAJOR_VERSION} uninstall -y >/dev/null 2>/dev/null
+	rm -f $TERMUX_PREFIX/bin/pip${_MAJOR_VERSION} $TERMUX_PREFIX/bin/easy_install-${_MAJOR_VERSION}
+
+	echo "Deleting remaining files from site-packages..."
+	rm -Rf $TERMUX_PREFIX/lib/python${_MAJOR_VERSION}/site-packages/*
+
+	exit 0
+	PRERM_EOF
+
+	chmod 0755 postinst prerm
 }
