@@ -1,0 +1,13 @@
+https://github.com/termux/termux-packages/issues/15908
+
+--- a/setup.py
++++ b/setup.py
+@@ -288,8 +288,6 @@
+         self.failed = []
+         self.failed_on_import = []
+         self.missing = []
+-        if '-j' in os.environ.get('MAKEFLAGS', ''):
+-            self.parallel = True
+ 
+     def add(self, ext):
+         self.extensions.append(ext)
