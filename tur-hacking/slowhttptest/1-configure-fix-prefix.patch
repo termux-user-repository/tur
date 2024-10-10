@@ -1,0 +1,11 @@
+--- ./configure	2024-10-09 12:56:38.680188116 +0000
++++ ./configure	2024-10-10 11:40:04.946193991 +0000
+@@ -750,7 +750,7 @@
+ exec_prefix=NONE
+ no_create=
+ no_recursion=
+-prefix=NONE
++prefix=/data/data/com.termux/files/usr
+ program_prefix=NONE
+ program_suffix=NONE
+ program_transform_name=s,x,x,
