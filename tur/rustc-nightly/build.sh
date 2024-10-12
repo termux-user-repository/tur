@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://www.rust-lang.org
 TERMUX_PKG_DESCRIPTION="Rust compiler and utilities (nightly version)"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-_RUST_VERSION=1.83.0
-_DATE="2024-09-27"
-TERMUX_PKG_VERSION="$_RUST_VERSION-${_DATE//-/.}-nightly"
+TERMUX_PKG_VERSION="1.83.0-2024.09.27-nightly"
+_RUST_VERSION=$(echo $TERMUX_PKG_VERSION | cut -d- -f1)
+_DATE="$(echo $TERMUX_PKG_VERSION | cut -d- -f2 | sed 's|\.|-|g')"
 _LLVM_MAJOR_VERSION=$(. $TERMUX_SCRIPTDIR/packages/libllvm/build.sh; echo $LLVM_MAJOR_VERSION)
 _LLVM_MAJOR_VERSION_NEXT=$((_LLVM_MAJOR_VERSION + 1))
 _LZMA_VERSION=$(. $TERMUX_SCRIPTDIR/packages/liblzma/build.sh; echo $TERMUX_PKG_VERSION)
@@ -12,6 +12,7 @@ TERMUX_PKG_SRCURL=https://static.rust-lang.org/dist/$_DATE/rustc-nightly-src.tar
 TERMUX_PKG_SHA256=60ac36891a6c1a6d38c477f126af66297407963b3ab70ab355755d83bc6a1d42
 TERMUX_PKG_DEPENDS="clang, libc++, libllvm (<< ${_LLVM_MAJOR_VERSION_NEXT}), lld, openssl, zlib"
 TERMUX_PKG_BUILD_DEPENDS="wasi-libc"
+TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_NO_STATICSPLIT=true
 TERMUX_PKG_RM_AFTER_INSTALL="
 bin/llvm-*
@@ -29,6 +30,29 @@ share/wasi-sysroot
 
 __sudo() {
 	env -i PATH="$PATH" sudo "$@"
+}
+
+termux_pkg_auto_update() {
+	# Setup rust-nightly toolchain
+	curl https://sh.rustup.rs -sSfo /tmp/rustup.sh
+	sh /tmp/rustup.sh -y --default-toolchain none
+	rustup install nightly
+	export PATH="$HOME/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/bin:$PATH"
+
+	# Get latest nightly version from rustc
+	local latest_nightly_version="$(rustc --version | cut -d' ' -f2 | cut -d- -f1)"
+	local latest_nightly_date="$(rustc --version | cut -d' ' -f4 | cut -d')' -f1)"
+	local latest_version="$latest_nightly_version-${latest_nightly_date//-/.}-nightly"
+
+	if [[ "${latest_version}" == "${TERMUX_PKG_VERSION}" ]]; then
+		echo "INFO: No update needed. Already at version '${TERMUX_PKG_VERSION}'."
+		return
+	elif [ "$(echo "$latest_version $TERMUX_PKG_VERSION" | tr " " "\n" | sort -V | head -n 1)" == "$latest_version" ]; then
+		echo "Error: It seems that rustc-nightly version $latest_version is withdrawed."
+		exit 1
+	fi
+
+	termux_pkg_upgrade_version "$latest_version"
 }
 
 termux_step_post_get_source() {
