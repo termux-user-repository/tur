@@ -2,14 +2,14 @@ TERMUX_PKG_HOMEPAGE=https://www.rust-lang.org
 TERMUX_PKG_DESCRIPTION="Rust compiler and utilities (nightly version)"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="1.83.0-2024.09.27-nightly"
+TERMUX_PKG_VERSION="1.83.0-2024.10.11-nightly"
 _RUST_VERSION=$(echo $TERMUX_PKG_VERSION | cut -d- -f1)
 _DATE="$(echo $TERMUX_PKG_VERSION | cut -d- -f2 | sed 's|\.|-|g')"
 _LLVM_MAJOR_VERSION=$(. $TERMUX_SCRIPTDIR/packages/libllvm/build.sh; echo $LLVM_MAJOR_VERSION)
 _LLVM_MAJOR_VERSION_NEXT=$((_LLVM_MAJOR_VERSION + 1))
 _LZMA_VERSION=$(. $TERMUX_SCRIPTDIR/packages/liblzma/build.sh; echo $TERMUX_PKG_VERSION)
 TERMUX_PKG_SRCURL=https://static.rust-lang.org/dist/$_DATE/rustc-nightly-src.tar.xz
-TERMUX_PKG_SHA256=60ac36891a6c1a6d38c477f126af66297407963b3ab70ab355755d83bc6a1d42
+TERMUX_PKG_SHA256=fed4dc7ba06fba75da91663e28920f7a09d8274a744d7e9aea7af99b734661d7
 TERMUX_PKG_DEPENDS="clang, libc++, libllvm (<< ${_LLVM_MAJOR_VERSION_NEXT}), lld, openssl, zlib"
 TERMUX_PKG_BUILD_DEPENDS="wasi-libc"
 TERMUX_PKG_AUTO_UPDATE=true
@@ -120,9 +120,10 @@ termux_step_configure() {
 	__sudo apt update
 	__sudo apt install -y llvm-18-dev llvm-18-tools
 
+	# Use beta toolchain to build nightly toolchain
 	if [[ "${TERMUX_ON_DEVICE_BUILD}" == "false" ]]; then
-		rustup install nightly
-		export PATH="${HOME}/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/bin:${PATH}"
+		rustup install beta
+		export PATH="${HOME}/.rustup/toolchains/beta-x86_64-unknown-linux-gnu/bin:${PATH}"
 	fi
 	local RUSTC=$(command -v rustc)
 	local CARGO=$(command -v cargo)
@@ -157,7 +158,8 @@ termux_step_configure() {
 	export RUST_LIBDIR=$TERMUX_PKG_BUILDDIR/_lib
 	# Add rpath
 	export RUSTFLAGS="-C link-arg=-Wl,-rpath=$RUST_NIGHTLY_PREFIX/lib $RUSTFLAGS"
-	export CARGO_TARGET_${env_host}_RUSTFLAGS="-C link-arg=-Wl,-rpath=$RUST_NIGHTLY_PREFIX/lib -L${RUST_LIBDIR}"
+	export RUSTFLAGS="-C link-arg=-Wl,-rpath=\$ORIGIN/../lib $RUSTFLAGS"
+	export CARGO_TARGET_${env_host}_RUSTFLAGS="-C link-arg=-Wl,-rpath=\$ORIGIN/../lib -C link-arg=-Wl,-rpath=$RUST_NIGHTLY_PREFIX/lib -L${RUST_LIBDIR}"
 
 	# x86_64: __lttf2
 	case "${TERMUX_ARCH}" in
