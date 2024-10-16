@@ -2,14 +2,14 @@ TERMUX_PKG_HOMEPAGE=https://www.rust-lang.org
 TERMUX_PKG_DESCRIPTION="Rust compiler and utilities (nightly version)"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="1.83.0-2024.10.11-nightly"
+TERMUX_PKG_VERSION="1.84.0-2024.10.14-nightly"
 _RUST_VERSION=$(echo $TERMUX_PKG_VERSION | cut -d- -f1)
 _DATE="$(echo $TERMUX_PKG_VERSION | cut -d- -f2 | sed 's|\.|-|g')"
 _LLVM_MAJOR_VERSION=$(. $TERMUX_SCRIPTDIR/packages/libllvm/build.sh; echo $LLVM_MAJOR_VERSION)
 _LLVM_MAJOR_VERSION_NEXT=$((_LLVM_MAJOR_VERSION + 1))
 _LZMA_VERSION=$(. $TERMUX_SCRIPTDIR/packages/liblzma/build.sh; echo $TERMUX_PKG_VERSION)
 TERMUX_PKG_SRCURL=https://static.rust-lang.org/dist/$_DATE/rustc-nightly-src.tar.xz
-TERMUX_PKG_SHA256=fed4dc7ba06fba75da91663e28920f7a09d8274a744d7e9aea7af99b734661d7
+TERMUX_PKG_SHA256=33df2792ddaf672a10bf9e1d7adb22505dcd68e894b49bf084eeb85e90b1a56a
 TERMUX_PKG_DEPENDS="clang, libc++, libllvm (<< ${_LLVM_MAJOR_VERSION_NEXT}), lld, openssl, zlib"
 TERMUX_PKG_BUILD_DEPENDS="wasi-libc"
 TERMUX_PKG_AUTO_UPDATE=true
@@ -120,10 +120,10 @@ termux_step_configure() {
 	__sudo apt update
 	__sudo apt install -y llvm-18-dev llvm-18-tools
 
-	# Use beta toolchain to build nightly toolchain
+	# Use nightly toolchain to build nightly toolchain
 	if [[ "${TERMUX_ON_DEVICE_BUILD}" == "false" ]]; then
-		rustup install beta
-		export PATH="${HOME}/.rustup/toolchains/beta-x86_64-unknown-linux-gnu/bin:${PATH}"
+		rustup install nightly
+		export PATH="${HOME}/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/bin:${PATH}"
 	fi
 	local RUSTC=$(command -v rustc)
 	local CARGO=$(command -v cargo)
