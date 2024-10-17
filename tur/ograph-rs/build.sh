@@ -26,7 +26,7 @@ termux_step_make_install() {
 }
 
 termux_pkg_auto_update() {
-	# Ask Forgejo for version of latest release
+	# Ask Forgejo for latest release
 	local curl_response=$(
 		curl \
 			--silent \
