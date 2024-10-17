@@ -18,6 +18,34 @@ termux_step_make() {
 }
 
 termux_step_make_install() {
+	# Move binary into place
 	install -Dm700 -t $TERMUX_PREFIX/bin target/${CARGO_TARGET_NAME}/release/ograph
+
+	# Move docs into place
 	install -Dm600 -t $TERMUX_PREFIX/share/doc/$TERMUX_PKG_NAME README.*
+}
+
+termux_pkg_auto_update() {
+	# Ask Forgejo for version of latest release
+	local curl_response=$(
+		curl \
+			--silent \
+			"https://git.average.name/api/v1/repos/AverageHelper/ograph-rs/releases/latest" \
+			--write-out '|%{http_code}'
+	) || {
+		local http_code="${curl_response##*|}"
+		if [[ "${http_code}" != "200" ]]; then
+			echo "Error: failed to get latest ograph-rs release from ${TERMUX_PKG_HOMEPAGE}"
+			exit 1
+		fi
+	}
+
+	# Get version string in the following format: "v0.3.2"
+	local remote_tag_name=$(echo $curl_response | cut -d"|" -f1 | jq .tag_name)
+
+	# Strip the quotes and leading 'v'
+	local latest_version=${remote_tag_name:2:-1}
+
+	# Run upgrade if not latest
+	termux_pkg_upgrade_version "${latest_version}"
 }
