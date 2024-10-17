@@ -1,6 +1,6 @@
 TERMUX_PKG_HOMEPAGE="https://git.average.name/AverageHelper/ograph-rs"
 TERMUX_PKG_DESCRIPTION="A simple command-line utility to extract and print OpenGraph metadata from a given URL."
-TERMUX_PKG_LICENSE="GPL-3.0-or-later"
+TERMUX_PKG_LICENSE="GPL-3.0"
 TERMUX_PKG_MAINTAINER="@AverageHelper"
 TERMUX_PKG_VERSION="0.3.0"
 TERMUX_PKG_SRCURL="https://git.average.name/AverageHelper/ograph-rs/archive/v${TERMUX_PKG_VERSION}.tar.gz"
