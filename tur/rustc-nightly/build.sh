@@ -52,7 +52,9 @@ termux_pkg_auto_update() {
 		exit 1
 	fi
 
-	termux_pkg_upgrade_version "$latest_version"
+	# termux_pkg_upgrade_version "$latest_version"
+ 	echo "INFO: latest_version: $latest_version"
+ 	exit 1
 }
 
 termux_step_post_get_source() {
