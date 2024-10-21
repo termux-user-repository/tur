@@ -4,6 +4,6 @@ packages/sundials
 packages/arpack-ng
 packages/qrupdate-ng
 packages/octave
+packages/virglrenderer-android
 x11-packages/octave-x
-x11-packages/virglrenderer-android
 x11-packages/wine-stable
