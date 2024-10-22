@@ -5,6 +5,7 @@ TERMUX_PKG_MAINTAINER="@termux-user-repository"
 _PKG_VER="2.4b1"
 _DEBIAN_REVISION="31"
 TERMUX_PKG_VERSION="$_PKG_VER+debian-$_DEBIAN_REVISION"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=(https://monkey.org/~dugsong/dsniff/beta/dsniff-$_PKG_VER.tar.gz)
 TERMUX_PKG_SRCURL+=(https://ftp.debian.org/debian/pool/main/d/dsniff/dsniff_$TERMUX_PKG_VERSION.debian.tar.xz)
 TERMUX_PKG_SHA256=(a9803a7a02ddfe5fb9704ce86f0ffc48453c321e88db85810db411ba0841152a)
