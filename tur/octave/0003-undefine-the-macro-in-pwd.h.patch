@@ -1,6 +1,23 @@
---- a/liboctave/system/oct-password.cc
-+++ b/liboctave/system/oct-password.cc
-@@ -31,6 +31,15 @@
+--- a/liboctave/wrappers/pwd-wrappers.h
++++ b/liboctave/wrappers/pwd-wrappers.h
+@@ -43,7 +43,14 @@
+   char *pw_passwd;
+   uid_t pw_uid;
+   gid_t pw_gid;
++#if defined(__ANDROID__) && !defined(__LP64__)
++#if !defined(pw_gecos)
++/* Note: On LP32, we define pw_gecos to pw_passwd since they're both NULL. */
++# define pw_gecos pw_passwd
++#endif
++#else
+   char *pw_gecos;
++#endif
+   char *pw_dir;
+   char *pw_shell;
+ };
+--- a/liboctave/wrappers/pwd-wrappers.c
++++ b/liboctave/wrappers/pwd-wrappers.c
+@@ -32,6 +32,15 @@
  
  #if defined (HAVE_PWD_H)
  #  include <pwd.h>
@@ -15,4 +32,4 @@
 +#  endif
  #endif
  
- #include "lo-error.h"
+ #include "pwd-wrappers.h"
