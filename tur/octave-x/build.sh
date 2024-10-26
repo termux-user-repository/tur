@@ -2,23 +2,17 @@ TERMUX_PKG_HOMEPAGE=https://octave.org
 TERMUX_PKG_DESCRIPTION="GNU Octave is a high-level language, primarily intended for numerical computations. (with X11 support)"
 TERMUX_PKG_LICENSE="GPL-3.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION=1:8.4.0
-TERMUX_PKG_REVISION=5
+TERMUX_PKG_VERSION=1:9.2.0
 TERMUX_PKG_SRCURL=https://ftpmirror.gnu.org/octave/octave-${TERMUX_PKG_VERSION#*:}.tar.xz
-TERMUX_PKG_SHA256=6f9ad73a3ee4291b6341d6c0f5e5c85d6e0310376e4991b959a6d340b3ffa8a8
-TERMUX_PKG_DEPENDS="arpack-ng, bzip2, fftw, fltk, fontconfig, freetype, glpk, glu, graphicsmagick, libcurl, libhdf5, libiconv, libopenblas, libsndfile, opengl, openssl, pcre2, portaudio, qhull, qrupdate-ng, rapidjson, readline, suitesparse, sundials, zlib"
-TERMUX_PKG_BUILD_DEPENDS="gnuplot, less"
-
-# Qt-GUI cannot be enabled, because `qcollectiongenerator` and
-# `qhelpgenerator` is not exist at host.
-#TERMUX_PKG_DEPENDS="zlib, bzip2, openssl, libiconv, pcre, readline, libcurl, libhdf5, qhull, rapidjson, fftw, glpk, libopenblas, arpack-ng, qrupdate-ng, suitesparse, sundials, fontconfig, freetype, graphicsmagick, libsndfile, portaudio, fltk, mesa, glu, qt5-qtbase, qt5-qttools, qscintilla""
-#TERMUX_PKG_BUILD_DEPENDS="gnuplot, less, qt5-qtbase-cross-tools, qt5-qttools-cross-tools"
-
+TERMUX_PKG_SHA256=21417afb579105b035cac0bea09201522e384893ae90a781b8727efa32765807
+TERMUX_PKG_DEPENDS="arpack-ng, bzip2, fftw, fltk, fontconfig, freetype, glpk, glu, graphicsmagick, libcurl, libhdf5, libiconv, libopenblas, libsndfile, opengl, openssl, pcre2, portaudio, qhull, qrupdate-ng, qt6-qtbase, qt6-qttools, qt6-qt5compat, rapidjson, readline, suitesparse, sundials, zlib"
+TERMUX_PKG_BUILD_DEPENDS="gnuplot, less, qt6-qtbase-cross-tools, qt6-qttools-cross-tools"
 TERMUX_PKG_RECOMMENDS="gnuplot, less"
 TERMUX_PKG_CONFLICTS="octave"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 --with-x
+--with-qt=6
 --enable-link-all-dependencies
 --disable-openmp
 --with-blas=openblas
@@ -78,7 +72,5 @@ termux_step_pre_configure() {
 	done
 	export PATH="$TERMUX_PKG_TMPDIR/_fake_bin:$PATH"
 
-	## This is to allow the build script find the `moc` on cross-build host
-	# for Qt-GUI
-	#export PATH+=":${TERMUX_PREFIX}/opt/qt/cross/bin"
+	export PATH="$TERMUX_PREFIX/opt/qt6/cross/bin:$PATH"
 }
