@@ -4,6 +4,7 @@ TERMUX_PKG_LICENSE="LGPL-2.1"
 TERMUX_PKG_LICENSE_FILE="LICENSE, LICENSE.OLD, COPYING.LIB"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION=9.20
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://github.com/AndreRH/wine/archive/refs/tags/hangover-$TERMUX_PKG_VERSION.tar.gz
 TERMUX_PKG_SHA256=7007a864f927bb8c789e04c8b0c3cb24ab1ae3928eaca26c1325391243570dcd
 TERMUX_PKG_DEPENDS="fontconfig, freetype, krb5, libandroid-spawn, libc++, libgmp, libgnutls, libxcb, libxcomposite, libxcursor, libxfixes, libxrender, mesa, opengl, pulseaudio, sdl2, vulkan-loader, xorg-xrandr"
@@ -41,7 +42,7 @@ exec_prefix=$TERMUX_PREFIX
 --without-gstreamer
 --without-inotify
 --with-krb5
---with-mingw
+--with-mingw=clang
 --without-netapi
 --without-opencl
 --with-opengl
@@ -68,16 +69,18 @@ exec_prefix=$TERMUX_PREFIX
 --without-xshape
 --without-xshm
 --without-xxf86vm
---enable-archs=i386,arm,aarch64
+--enable-archs=i386,aarch64,arm64ec
 "
+# TODO: `--enable-archs=arm` doesn't build with option `--with-mingw=clang`, but
+# TODO: `arm64ec` doesn't build with option `--with-mingw` (arm64ec-w64-mingw32-clang)
 
 _setup_llvm_mingw_toolchain() {
 	# LLVM-mingw's version number must not be the same as the NDK's.
-	local _llvm_mingw_version=18
-	local _version="20240417"
-	local _url="https://github.com/mstorsjo/llvm-mingw/releases/download/$_version/llvm-mingw-$_version-ucrt-ubuntu-20.04-x86_64.tar.xz"
+	local _llvm_mingw_version=19
+	local _version="20240929"
+	local _url="https://github.com/bylaws/llvm-mingw/releases/download/$_version/llvm-mingw-$_version-ucrt-ubuntu-20.04-x86_64.tar.xz"
 	local _path="$TERMUX_PKG_CACHEDIR/$(basename $_url)"
-	local _sha256sum=d28ce4168c83093adf854485446011a0327bad9fe418014de81beba233ce76f1
+	local _sha256sum=ce75ad076c87663fd4a77513e947252d97ce799a11926c1f3ac7afed1d6ab85c
 	termux_download $_url $_path $_sha256sum
 	local _extract_path="$TERMUX_PKG_CACHEDIR/llvm-mingw-toolchain-$_llvm_mingw_version"
 	if [ ! -d "$_extract_path" ]; then
@@ -85,7 +88,7 @@ _setup_llvm_mingw_toolchain() {
 		tar -C "$_extract_path"-tmp --strip-component=1 -xf "$_path"
 		mv "$_extract_path"-tmp "$_extract_path"
 	fi
-	export PATH="$PATH:$_extract_path/bin"
+	export PATH="$_extract_path/bin:$PATH"
 }
 
 termux_step_host_build() {
