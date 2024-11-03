@@ -17,6 +17,12 @@ TUR also hosts a PyPI index and contains some prebuilt Python packages.
 python -m pip install some_packages --extra-index-url https://termux-user-repository.github.io/pypi/
 ```
 
+You can add this index to your pip config for convenience by adding the following lines to your pip config (`~/.config/pip/pip.conf`):
+```
+[install]
+extra-index-url = https://termux-user-repository.github.io/pypi/
+```
+
 ## Request
 *Request to all TUR users.*
 
