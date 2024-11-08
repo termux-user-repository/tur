@@ -1,0 +1,11 @@
+--- a/scripts/updates/utils/termux_pkg_upgrade_version.sh
++++ b/scripts/updates/utils/termux_pkg_upgrade_version.sh
+@@ -96,7 +96,7 @@
+ 		fi
+ 	done
+ 
+-	local big_package=false
++	local big_package=true
+ 	while IFS= read -r p; do
+ 		if [[ "${p}" == "${TERMUX_PKG_NAME}" ]]; then
+ 			big_package=true
