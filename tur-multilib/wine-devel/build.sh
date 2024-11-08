@@ -3,11 +3,10 @@ TERMUX_PKG_DESCRIPTION="A compatibility layer for running Windows programs"
 TERMUX_PKG_LICENSE="LGPL-2.1"
 TERMUX_PKG_LICENSE_FILE="LICENSE, LICENSE.OLD, COPYING.LIB"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION=9.7
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_VERSION=9.20
 _VERSION_FOLDER="$(test "${TERMUX_PKG_VERSION:2:1}" = 0 && echo ${TERMUX_PKG_VERSION:0:3} || echo ${TERMUX_PKG_VERSION:0:2}x)"
 TERMUX_PKG_SRCURL=https://dl.winehq.org/wine/source/${_VERSION_FOLDER}/wine-$TERMUX_PKG_VERSION.tar.xz
-TERMUX_PKG_SHA256=d9f3c333656e88bd4cef5331f34b1c8b69c964a52759eef745d8ddae51a15353
+TERMUX_PKG_SHA256=95f2b45b1458125be7d9fccc94ca5f8cce0a5e4ae11d0d193cfb7dddb35e7a86
 TERMUX_PKG_DEPENDS="fontconfig, freetype, krb5, libandroid-spawn, libc++, libgmp, libgnutls, libxcb, libxcomposite, libxcursor, libxfixes, libxrender, mesa, opengl, pulseaudio, sdl2, vulkan-loader, xorg-xrandr"
 TERMUX_PKG_ANTI_BUILD_DEPENDS="vulkan-loader"
 TERMUX_PKG_BUILD_DEPENDS="libandroid-spawn-static, vulkan-loader-generic"
@@ -87,11 +86,11 @@ fi
 
 _setup_llvm_mingw_toolchain() {
 	# LLVM-mingw's version number must not be the same as the NDK's.
-	local _llvm_mingw_version=18
-	local _version="20240417"
+	local _llvm_mingw_version=16
+	local _version="20230614"
 	local _url="https://github.com/mstorsjo/llvm-mingw/releases/download/$_version/llvm-mingw-$_version-ucrt-ubuntu-20.04-x86_64.tar.xz"
 	local _path="$TERMUX_PKG_CACHEDIR/$(basename $_url)"
-	local _sha256sum=d28ce4168c83093adf854485446011a0327bad9fe418014de81beba233ce76f1
+	local _sha256sum=9ae925f9b205a92318010a396170e69f74be179ff549200e8122d3845ca243b8
 	termux_download $_url $_path $_sha256sum
 	local _extract_path="$TERMUX_PKG_CACHEDIR/llvm-mingw-toolchain-$_llvm_mingw_version"
 	if [ ! -d "$_extract_path" ]; then
@@ -128,6 +127,17 @@ termux_step_pre_configure() {
 	LDFLAGS="${LDFLAGS/-Wl,-z,relro,-z,now/}"
 
 	LDFLAGS+=" -landroid-spawn"
+
+	if [ "$TERMUX_ARCH" = "x86_64" ]; then
+		mkdir -p "$TERMUX_PKG_TMPDIR/bin"
+		cat <<- EOF > "$TERMUX_PKG_TMPDIR/bin/x86_64-linux-android-clang"
+			#!/bin/bash
+			set -- "\${@/-mabi=ms/}"
+			exec $TERMUX_STANDALONE_TOOLCHAIN/bin/x86_64-linux-android-clang "\$@"
+		EOF
+		chmod +x "$TERMUX_PKG_TMPDIR/bin/x86_64-linux-android-clang"
+		export PATH="$TERMUX_PKG_TMPDIR/bin:$PATH"
+	fi
 }
 
 termux_step_make() {
