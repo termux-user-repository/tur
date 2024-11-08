@@ -1,0 +1,14 @@
+Luanti seems to not have previously been exposed to cross-compiling executables
+for platforms other than SurfaceFlinger. This prevents the error
+"CMake Error: failed to create symbolic link '/minetest': Permission denied"
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -569,7 +569,7 @@ endif()
+ 
+ # When cross-compiling assume the user doesn't want to run the executable anyway,
+ # otherwise place it in <source dir>/bin/ since Luanti can only run from there.
+-if(NOT CMAKE_CROSSCOMPILING)
++if(NOT THIS_IS_FOR_SURFACEFLINGER_IN_OWOKITTYS_OPINION)
+ 	set(EXECUTABLE_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/bin")
+ endif()
+ 
