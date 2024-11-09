@@ -1,18 +1,18 @@
---- a/ffplayout-api/build.rs
-+++ b/ffplayout-api/build.rs
+--- a/engine/build.rs
++++ b/engine/build.rs
 @@ -1,13 +1,8 @@
 -use static_files::NpmBuild;
 +use static_files::resource_dir;
  
  fn main() -> std::io::Result<()> {
      if !cfg!(debug_assertions) && cfg!(feature = "embed_frontend") {
--        NpmBuild::new("../ffplayout-frontend")
+-        NpmBuild::new("../frontend")
 -            .install()?
 -            .run("generate")?
--            .target("../ffplayout-frontend/.output/public")
+-            .target("../frontend/.output/public")
 -            .change_detection()
 -            .to_resource_dir()
-+        resource_dir("../ffplayout-frontend/.output/public")
++        resource_dir("../frontend/.output/public")
              .build()
      } else {
          Ok(())
