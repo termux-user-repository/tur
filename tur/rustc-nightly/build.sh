@@ -46,15 +46,15 @@ termux_pkg_auto_update() {
 
 	if [[ "${latest_version}" == "${TERMUX_PKG_VERSION}" ]]; then
 		echo "INFO: No update needed. Already at version '${TERMUX_PKG_VERSION}'."
-  		rm -rf ~/.cargo ~/.rustup
+		rm -rf ~/.cargo ~/.rustup
 		return
 	elif [ "$(echo "$latest_version $TERMUX_PKG_VERSION" | tr " " "\n" | sort -V | head -n 1)" == "$latest_version" ]; then
 		echo "Error: It seems that rustc-nightly version $latest_version is withdrawed."
-  		rm -rf ~/.cargo ~/.rustup
+		rm -rf ~/.cargo ~/.rustup
 		exit 1
 	fi
- 
-  	rm -rf ~/.cargo ~/.rustup
+
+	rm -rf ~/.cargo ~/.rustup
 	termux_pkg_upgrade_version "$latest_version"
 }
 
