@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="Dataframes powered by a multithreaded, vectorized query 
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="1.13.0"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://github.com/pola-rs/polars/releases/download/py-$TERMUX_PKG_VERSION/polars-$TERMUX_PKG_VERSION.tar.gz
 TERMUX_PKG_SHA256=8d05370f9463710c7f5e3857c1ace2e9b538ead799424f22f388137f6b01440f
 TERMUX_PKG_AUTO_UPDATE=true
