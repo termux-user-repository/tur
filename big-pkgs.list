@@ -1,0 +1,6 @@
+chromium
+code-server
+code-oss
+electron-headers-.*
+rustc-nightly
+python-polars
