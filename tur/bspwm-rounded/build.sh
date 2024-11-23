@@ -7,7 +7,13 @@ TERMUX_PKG_REVISION=6
 TERMUX_PKG_SRCURL="https://github.com/phuhl/bspwm-rounded/archive/refs/tags/$TERMUX_PKG_VERSION.zip"
 TERMUX_PKG_SHA256="1f2d04fa13d6bf3d19290303030ad07d4ae4bb6c7c96101120d79842e3bdca7a"
 TERMUX_PKG_AUTO_UPDATE=true
-TERMUX_PKG_UPDATE_TAG_TYPE="newset-tag"
+
+if [[ ${TERMUX_PKG_UPDATE_TAG_PICK} == "latest-release-tag" ]]; then
+  TERMUX_PKG_UPDATE_TAG_TYPE="latest-release-tag"
+else
+  TERMUX_PKG_UPDATE_TAG_TYPE="newest-tag"
+fi
+
 TERMUX_PKG_DEPENDS="git, git-lfs, libxcb, patch, patchelf, python, python-ensurepip-wheels, python-pip, rust, rustc-dev, rustc-src, sxhkd, xcb-util, xcb-util-cursor, xcb-util-image, xcb-util-keysyms, xcb-util-renderutil, xcb-util-wm"
 TERMUX_PKG_SUGGESTS="chromium, kitty, picom"
 TERMUX_PKG_BUILD_DEPENDS="build-essential"
@@ -15,7 +21,7 @@ TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_EXTRA_MAKE_ARGS="prefix=/data/data/com.termux/files/usr"
 
 termux_step_pre_configure() {
-   TERMUX_LOCAL_DIR="${PREFIX}/opt/termux-local"
+   local TERMUX_LOCAL_DIR="${PREFIX}/opt/termux-local"
 
    mkdir --parent --verbose --mode=755 ${TERMUX_LOCAL_DIR}
    ln -sf ${TERMUX_LOCAL_DIR} ${PREFIX}/local
@@ -25,7 +31,7 @@ termux_step_pre_configure() {
    echo -e "PATH+=':/data/data/com.termux/files/usr/local/bin'" > ${PREFIX}/etc/profile.d/local-path.sh
 
    sed -i -E '1 i\#!/data/data/com.termux/files/usr/bin/bash\' ${PREFIX}/etc/profile.d/local-path.sh
-   chmod 755 ${PREFIX}/etc/profile.d/local-path.sh
+   chmod --verbose 755 ${PREFIX}/etc/profile.d/local-path.sh
    ${PREFIX}/etc/profile.d/local-path.sh
 }
 
@@ -46,8 +52,8 @@ termux_step_post_make_install() {
 }
 
 termux_step_post_massage() {
-   BSPWM_CONFIG_DIR="${HOME}/.config/bspwm"
-   SXHKD_CONFIG_DIR="${HOME}/.config/sxhkd"
+   local BSPWM_CONFIG_DIR="${HOME}/.config/bspwm"
+   local SXHKD_CONFIG_DIR="${HOME}/.config/sxhkd"
 
    mkdir --parent --verbose --mode=755 ${BSPWM_CONFIG_DIR}
    mkdir --parent --verbose --mode=755 ${SXHKD_CONFIG_DIR}
