@@ -1,6 +1,9 @@
 TERMUX_PKG_HOMEPAGE=https://www.nongnu.org/clanbomber
 TERMUX_PKG_DESCRIPTION="The goal of ClanBomber is to blow away your opponents using bombs, but avoid being blown up yourself."
-TERMUX_PKG_LICENSE="GPL-3.0"
+TERMUX_PKG_LICENSE="custom"
+TERMUX_PKG_LICENSE_FILE="\
+COPYING
+LICENSE.DEJAVU"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION=2.3
 TERMUX_PKG_SRCURL=https://github.com/viti95/ClanBomber2/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz
