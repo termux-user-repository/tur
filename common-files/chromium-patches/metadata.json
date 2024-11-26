@@ -307,6 +307,9 @@
   "chromium-no-glibc-version/5563.patch": {
     "start": 5563
   },
+  "chromium-no-landlock/6478.patch": {
+    "start": 6478
+  },
   "chromium-no-priority-inheritance-locks/4389.patch": {
     "start": 4389,
     "end": 4960
@@ -667,6 +670,10 @@
     "start": 9999999,
     "comment": "Disable since 115.0.5790.98-1"
   },
+  "script-add-ld-preload/6478.patch": {
+    "start": 6478,
+    "comment": "Enable since Ubuntu 24.04"
+  },
   "simple_url_pattern_matcher-no-constexpr-string/6312.patch" : {
     "start": 6312
   },
@@ -808,6 +815,9 @@
   },
   "x11-fix-dynamic-loaded-libraries/6261.patch": {
     "start": 6261
+  },
+  "y-cxx11-narrowing/6478.patch": {
+    "start": 6099
   },
   "y-exclusive_sync_wait_info-constructor/6099.patch": {
     "start": 6099
