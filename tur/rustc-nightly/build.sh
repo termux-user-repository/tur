@@ -2,14 +2,14 @@ TERMUX_PKG_HOMEPAGE=https://www.rust-lang.org
 TERMUX_PKG_DESCRIPTION="Rust compiler and utilities (nightly version)"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="1.84.0-2024.10.16-nightly"
+TERMUX_PKG_VERSION="1.85.0-2024.11.25-nightly"
 _RUST_VERSION=$(echo $TERMUX_PKG_VERSION | cut -d- -f1)
 _DATE="$(echo $TERMUX_PKG_VERSION | cut -d- -f2 | sed 's|\.|-|g')"
 _LLVM_MAJOR_VERSION=$(. $TERMUX_SCRIPTDIR/packages/libllvm/build.sh; echo $LLVM_MAJOR_VERSION)
 _LLVM_MAJOR_VERSION_NEXT=$((_LLVM_MAJOR_VERSION + 1))
 _LZMA_VERSION=$(. $TERMUX_SCRIPTDIR/packages/liblzma/build.sh; echo $TERMUX_PKG_VERSION)
 TERMUX_PKG_SRCURL=https://static.rust-lang.org/dist/$_DATE/rustc-nightly-src.tar.xz
-TERMUX_PKG_SHA256=6bfddf15640d040ced97d696b619f34ae74d352b82e7a414719df5f87d14e428
+TERMUX_PKG_SHA256=08cb6f3d140521fefe9ff8ab0a636273babc04ca64cbcad2cdb3538388c3b8dc
 TERMUX_PKG_DEPENDS="clang, libc++, libllvm (<< ${_LLVM_MAJOR_VERSION_NEXT}), lld, openssl, zlib"
 TERMUX_PKG_BUILD_DEPENDS="wasi-libc"
 TERMUX_PKG_AUTO_UPDATE=true
@@ -63,6 +63,10 @@ termux_step_post_get_source() {
 	if [ "$_rust_version" != "$_RUST_VERSION" ]; then
 		termux_error_exit "Version mismatch: Expected $_RUST_VERSION, got $_rust_version."
 	fi
+
+	# Bypass the config.guess replace to make rust happy
+	find ./vendor/ -name config.sub -exec chmod u+w '{}' \; -exec mv '{}' '{}.bp' \;
+	find ./vendor/ -name config.guess -exec chmod u+w '{}' \; -exec mv '{}' '{}.bp' \;
 }
 
 termux_step_pre_configure() {
@@ -122,6 +126,10 @@ termux_step_configure() {
 		echo "$_line" | __sudo tee -a "$_file"
 	__sudo apt update
 	__sudo apt install -y llvm-18-dev llvm-18-tools
+
+	# Bypass the config.guess replace to make rust happy
+	find "$TERMUX_PKG_SRCDIR"/vendor/ -name config.sub.bp -exec bash -c 'mv "$0" "${0%.*}"' {} \;
+	find "$TERMUX_PKG_SRCDIR"/vendor/ -name config.guess.bp -exec bash -c 'mv "$0" "${0%.*}"' {} \;
 
 	# Use nightly toolchain to build nightly toolchain
 	if [[ "${TERMUX_ON_DEVICE_BUILD}" == "false" ]]; then
@@ -217,7 +225,6 @@ termux_step_make_install() {
 	# error: could not document `std`
 	"${TERMUX_PKG_SRCDIR}/x.py" install -j ${TERMUX_PKG_MAKE_PROCESSES} --target wasm32-unknown-unknown --stage 1 std
 	[[ ! -e "${TERMUX_PREFIX}/share/wasi-sysroot" ]] && termux_error_exit "wasi-sysroot not found"
-	"${TERMUX_PKG_SRCDIR}/x.py" install -j ${TERMUX_PKG_MAKE_PROCESSES} --target wasm32-wasi --stage 1 std
 	"${TERMUX_PKG_SRCDIR}/x.py" install -j ${TERMUX_PKG_MAKE_PROCESSES} --target wasm32-wasip1 --stage 1 std
 	"${TERMUX_PKG_SRCDIR}/x.py" install -j ${TERMUX_PKG_MAKE_PROCESSES} --target wasm32-wasip2 --stage 1 std
 
