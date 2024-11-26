@@ -7,8 +7,6 @@ for SurfaceFlinger display server and replace it with everything that I know
 is for the X11 display server, while keeping everything else the same.
 
 
-diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 282fea4df..cc75e2286 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -89,13 +89,6 @@ set(ENABLE_UPDATE_CHECKER (NOT ${DEVELOPMENT_BUILD}) CACHE BOOL
@@ -25,8 +23,6 @@ index 282fea4df..cc75e2286 100644
  if(TRUE)
  	message(STATUS "Using imported IrrlichtMt at subdirectory 'irr'")
  	if(BUILD_CLIENT)
-diff --git a/irr/src/CIrrDeviceSDL.cpp b/irr/src/CIrrDeviceSDL.cpp
-index 60cf54d04..c4f47ac3c 100644
 --- a/irr/src/CIrrDeviceSDL.cpp
 +++ b/irr/src/CIrrDeviceSDL.cpp
 @@ -305,7 +305,7 @@ CIrrDeviceSDL::CIrrDeviceSDL(const SIrrlichtCreationParameters &param) :
@@ -47,8 +43,6 @@ index 60cf54d04..c4f47ac3c 100644
  			// Android likes to send the right mouse button as the back button.
  			// According to some web searches I did, this is probably
  			// vendor/device-specific.
-diff --git a/irr/src/CIrrDeviceSDL.h b/irr/src/CIrrDeviceSDL.h
-index b52422423..cecc56923 100644
 --- a/irr/src/CIrrDeviceSDL.h
 +++ b/irr/src/CIrrDeviceSDL.h
 @@ -161,7 +161,7 @@ class CIrrDeviceSDL : public CIrrDeviceStub
@@ -60,8 +54,6 @@ index b52422423..cecc56923 100644
  			// On Android, this somehow results in a camera jump when enabling
  			// relative mouse mode and it isn't supported anyway.
  			SDL_WarpMouseInWindow(Device->Window,
-diff --git a/irr/src/CMakeLists.txt b/irr/src/CMakeLists.txt
-index 41d6645e9..53fd8c67d 100644
 --- a/irr/src/CMakeLists.txt
 +++ b/irr/src/CMakeLists.txt
 @@ -61,11 +61,6 @@ if(WIN32)
@@ -114,8 +106,6 @@ index 41d6645e9..53fd8c67d 100644
 -if(APPLE OR ANDROID OR EMSCRIPTEN)
 -	target_compile_definitions(IrrlichtMt PUBLIC IRR_MOBILE_PATHS)
 -endif()
-diff --git a/lib/catch2/catch_amalgamated.hpp b/lib/catch2/catch_amalgamated.hpp
-index 6cc67e76f..4105fba9a 100644
 --- a/lib/catch2/catch_amalgamated.hpp
 +++ b/lib/catch2/catch_amalgamated.hpp
 @@ -9046,7 +9046,7 @@ namespace Catch {
@@ -127,8 +117,6 @@ index 6cc67e76f..4105fba9a 100644
  #    define CATCH_INTERNAL_CONFIG_ANDROID_LOGWRITE
  #endif
  
-diff --git a/lib/lua/src/llex.c b/lib/lua/src/llex.c
-index 5affe7c16..e5285f88f 100644
 --- a/lib/lua/src/llex.c
 +++ b/lib/lua/src/llex.c
 @@ -178,11 +178,11 @@ static void buffreplace (LexState *ls, char from, char to) {
@@ -145,8 +133,6 @@ index 5affe7c16..e5285f88f 100644
    ls->decpoint = (cv ? cv->decimal_point[0] : '.');
  #else
    ls->decpoint = '.';
-diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
-index 2275a2075..f654bb80c 100644
 --- a/src/CMakeLists.txt
 +++ b/src/CMakeLists.txt
 @@ -329,9 +329,6 @@ else()
@@ -207,8 +193,6 @@ index 2275a2075..f654bb80c 100644
  	# Android does this manually in app/build.gradle -> prepareAssets
  	# for now!
  elseif (USE_GETTEXT)
-diff --git a/src/client/game.cpp b/src/client/game.cpp
-index 27b58334f..629c1c7f7 100644
 --- a/src/client/game.cpp
 +++ b/src/client/game.cpp
 @@ -151,7 +151,7 @@ struct LocalFormspecHandler : public TextDest
@@ -289,8 +273,6 @@ index 27b58334f..629c1c7f7 100644
  #if USE_SOUND
  	if (g_settings->getBool("enable_sound")) {
  		os << "button_exit[4," << (ypos++) << ";3,0.5;btn_sound;"
-diff --git a/src/client/hud.cpp b/src/client/hud.cpp
-index 2da9efa5e..b6db1be99 100644
 --- a/src/client/hud.cpp
 +++ b/src/client/hud.cpp
 @@ -393,7 +393,7 @@ void Hud::drawLuaElements(const v3s16 &camera_offset)
@@ -302,8 +284,6 @@ index 2da9efa5e..b6db1be99 100644
  				// The text size on Android is not proportional with the actual scaling
  				// FIXME: why do we have such a weird unportable hack??
  				if (font_size > 3 && e->offset.X < -20)
-diff --git a/src/client/renderingengine.cpp b/src/client/renderingengine.cpp
-index 4e45bd4cd..c0ae0649e 100644
 --- a/src/client/renderingengine.cpp
 +++ b/src/client/renderingengine.cpp
 @@ -163,7 +163,7 @@ RenderingEngine::RenderingEngine(MyEventReceiver *receiver)
@@ -342,28 +322,8 @@ index 4e45bd4cd..c0ae0649e 100644
  }
  
  void RenderingEngine::autosaveScreensizeAndCo(
-diff --git a/src/defaultsettings.cpp b/src/defaultsettings.cpp
-index 7758c96bf..6a14d0a8e 100644
 --- a/src/defaultsettings.cpp
 +++ b/src/defaultsettings.cpp
-@@ -14,7 +14,7 @@
- 
- 
- /*
-- * inspired by https://github.com/systemd/systemd/blob/7aed43437175623e0f3ae8b071bbc500c13ce893/src/hostname/hostnamed.c#L406
-+ * inspired by https://github.com/systemd/systemd/blob/7aed4343`7175623e0f3ae8b071bbc500c13ce893/src/hostname/hostnamed.c#L406
-  * this could be done in future with D-Bus using query:
-  * busctl get-property org.freedesktop.hostname1 /org/freedesktop/hostname1 org.freedesktop.hostname1 Chassis
-  */
-@@ -83,7 +83,7 @@ void set_default_settings()
- 	// Client
- 	settings->setDefault("address", "");
- 	settings->setDefault("enable_sound", "true");
--#if defined(__unix__) && !defined(__APPLE__) && !defined (__ANDROID__)
-+#if defined(__unix__) && !defined(__APPLE__) && !defined (THIS_IS_FOR_SURFACEFLINGER_IN_OWOKITTYS_OPINION)
- 	// On Linux+X11 (not Linux+Wayland or Linux+XWayland), I've encountered a bug
- 	// where fake mouse events were generated from touch events if in relative
- 	// mouse mode, resulting in the touchscreen controls being instantly disabled
 @@ -401,7 +401,7 @@ void set_default_settings()
  	settings->setDefault("contentdb_enable_updates_indicator", "true");
  	settings->setDefault("contentdb_max_concurrent_downloads", "3");
@@ -393,8 +353,6 @@ index 7758c96bf..6a14d0a8e 100644
  
  	// Apply settings according to screen size
  	float x_inches = (float) porting::getDisplaySize().X /
-diff --git a/src/filesys.cpp b/src/filesys.cpp
-index 8881eb2ca..9d4f94bf3 100644
 --- a/src/filesys.cpp
 +++ b/src/filesys.cpp
 @@ -436,7 +436,7 @@ std::string TempPath()
@@ -406,8 +364,6 @@ index 8881eb2ca..9d4f94bf3 100644
  	return porting::path_cache;
  #else
  	return DIR_DELIM "tmp";
-diff --git a/src/gui/guiEngine.cpp b/src/gui/guiEngine.cpp
-index 912bdbc75..fbb90980b 100644
 --- a/src/gui/guiEngine.cpp
 +++ b/src/gui/guiEngine.cpp
 @@ -375,7 +375,7 @@ void GUIEngine::run()
@@ -419,8 +375,6 @@ index 912bdbc75..fbb90980b 100644
  		m_menu->getAndroidUIInput();
  #endif
  	}
-diff --git a/src/gui/guiFormSpecMenu.cpp b/src/gui/guiFormSpecMenu.cpp
-index ed1c3009d..785102145 100644
 --- a/src/gui/guiFormSpecMenu.cpp
 +++ b/src/gui/guiFormSpecMenu.cpp
 @@ -3326,7 +3326,7 @@ void GUIFormSpecMenu::legacySortElements(std::list<IGUIElement *>::iterator from
@@ -432,8 +386,6 @@ index ed1c3009d..785102145 100644
  void GUIFormSpecMenu::getAndroidUIInput()
  {
  	porting::AndroidDialogState dialogState = getAndroidUIInputState();
-diff --git a/src/gui/guiFormSpecMenu.h b/src/gui/guiFormSpecMenu.h
-index 5c3fcd80d..3f6ffcffc 100644
 --- a/src/gui/guiFormSpecMenu.h
 +++ b/src/gui/guiFormSpecMenu.h
 @@ -277,7 +277,7 @@ class GUIFormSpecMenu : public GUIModalMenu
@@ -445,8 +397,6 @@ index 5c3fcd80d..3f6ffcffc 100644
  	void getAndroidUIInput();
  #endif
  
-diff --git a/src/gui/guiOpenURL.cpp b/src/gui/guiOpenURL.cpp
-index 7ce79b0e5..01a2a1f12 100644
 --- a/src/gui/guiOpenURL.cpp
 +++ b/src/gui/guiOpenURL.cpp
 @@ -153,7 +153,7 @@ void GUIOpenURLMenu::drawMenu()
@@ -458,8 +408,6 @@ index 7ce79b0e5..01a2a1f12 100644
  	getAndroidUIInput();
  #endif
  }
-diff --git a/src/gui/guiPasswordChange.cpp b/src/gui/guiPasswordChange.cpp
-index a9b73dfe8..6e2cf13ca 100644
 --- a/src/gui/guiPasswordChange.cpp
 +++ b/src/gui/guiPasswordChange.cpp
 @@ -154,7 +154,7 @@ void GUIPasswordChange::drawMenu()
@@ -480,8 +428,6 @@ index a9b73dfe8..6e2cf13ca 100644
  void GUIPasswordChange::getAndroidUIInput()
  {
  	porting::AndroidDialogState dialogState = getAndroidUIInputState();
-diff --git a/src/gui/guiPasswordChange.h b/src/gui/guiPasswordChange.h
-index 8dc670cc2..ef65205e2 100644
 --- a/src/gui/guiPasswordChange.h
 +++ b/src/gui/guiPasswordChange.h
 @@ -44,7 +44,7 @@ class GUIPasswordChange : public GUIModalMenu
@@ -493,8 +439,6 @@ index 8dc670cc2..ef65205e2 100644
  	void getAndroidUIInput();
  #endif
  
-diff --git a/src/gui/modalMenu.cpp b/src/gui/modalMenu.cpp
-index 0a130e905..b25707ef5 100644
 --- a/src/gui/modalMenu.cpp
 +++ b/src/gui/modalMenu.cpp
 @@ -38,7 +38,7 @@ GUIModalMenu::GUIModalMenu(gui::IGUIEnvironment* env, gui::IGUIElement* parent,
@@ -524,8 +468,6 @@ index 0a130e905..b25707ef5 100644
  porting::AndroidDialogState GUIModalMenu::getAndroidUIInputState()
  {
  	// No dialog is shown
-diff --git a/src/gui/modalMenu.h b/src/gui/modalMenu.h
-index 62cbcfc1d..d91457b5e 100644
 --- a/src/gui/modalMenu.h
 +++ b/src/gui/modalMenu.h
 @@ -7,7 +7,7 @@
@@ -555,8 +497,6 @@ index 62cbcfc1d..d91457b5e 100644
  	std::string m_jni_field_name;
  #endif
  
-diff --git a/src/log.cpp b/src/log.cpp
-index 144504660..85ac29604 100644
 --- a/src/log.cpp
 +++ b/src/log.cpp
 @@ -14,7 +14,7 @@
@@ -586,8 +526,6 @@ index 144504660..85ac29604 100644
  
  constexpr static unsigned int g_level_to_android[] = {
  	ANDROID_LOG_INFO,     // LL_NONE
-diff --git a/src/log_internal.h b/src/log_internal.h
-index 512a57949..7fd79d88e 100644
 --- a/src/log_internal.h
 +++ b/src/log_internal.h
 @@ -186,14 +186,14 @@ class CaptureLogOutput : public ILogOutput {
@@ -607,8 +545,6 @@ index 512a57949..7fd79d88e 100644
  extern AndroidLogOutput stdout_output;
  extern AndroidLogOutput stderr_output;
  #else
-diff --git a/src/main.cpp b/src/main.cpp
-index 6d30b2f07..ddbd631d3 100644
 --- a/src/main.cpp
 +++ b/src/main.cpp
 @@ -543,7 +543,7 @@ static bool create_userdata_path()
@@ -629,8 +565,6 @@ index 6d30b2f07..ddbd631d3 100644
  	return false;
  #else
  #ifdef _WIN32
-diff --git a/src/porting.cpp b/src/porting.cpp
-index f0e2bee0b..6576fefbf 100644
 --- a/src/porting.cpp
 +++ b/src/porting.cpp
 @@ -25,7 +25,7 @@
@@ -705,8 +639,6 @@ index f0e2bee0b..6576fefbf 100644
  	openURIAndroid(uri.c_str());
  	return true;
  #elif defined(__APPLE__)
-diff --git a/src/porting.h b/src/porting.h
-index edbc236a8..430e9050f 100644
 --- a/src/porting.h
 +++ b/src/porting.h
 @@ -326,6 +326,6 @@ bool open_directory(const std::string &path);
@@ -717,8 +649,6 @@ index edbc236a8..430e9050f 100644
 +#ifdef THIS_IS_FOR_SURFACEFLINGER_IN_OWOKITTYS_OPINION
  #include "porting_android.h"
  #endif
-diff --git a/src/porting_android.cpp b/src/porting_android.cpp
-index 620d9d224..1269f7046 100644
 --- a/src/porting_android.cpp
 +++ b/src/porting_android.cpp
 @@ -2,7 +2,7 @@
@@ -730,8 +660,6 @@ index 620d9d224..1269f7046 100644
  #error This file may only be compiled for android!
  #endif
  
-diff --git a/src/porting_android.h b/src/porting_android.h
-index 86601f450..0565c741c 100644
 --- a/src/porting_android.h
 +++ b/src/porting_android.h
 @@ -4,7 +4,7 @@
@@ -743,8 +671,6 @@ index 86601f450..0565c741c 100644
  #error This header has to be included on Android port only!
  #endif
  
-diff --git a/src/script/lua_api/l_mainmenu.cpp b/src/script/lua_api/l_mainmenu.cpp
-index 69f63d964..bdfe5b5b9 100644
 --- a/src/script/lua_api/l_mainmenu.cpp
 +++ b/src/script/lua_api/l_mainmenu.cpp
 @@ -1076,7 +1076,7 @@ int ModApiMainMenu::l_open_dir(lua_State *L)
@@ -756,8 +682,6 @@ index 69f63d964..bdfe5b5b9 100644
  	std::string path = luaL_checkstring(L, 1);
  	porting::shareFileAndroid(path);
  	lua_pushboolean(L, true);
-diff --git a/src/server.cpp b/src/server.cpp
-index c9d96fa34..30803e818 100644
 --- a/src/server.cpp
 +++ b/src/server.cpp
 @@ -3101,7 +3101,7 @@ std::wstring Server::handleChat(const std::string &name,
