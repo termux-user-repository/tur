@@ -2,14 +2,14 @@ TERMUX_PKG_HOMEPAGE=https://www.rust-lang.org
 TERMUX_PKG_DESCRIPTION="Rust compiler and utilities (nightly version)"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="1.85.0-2024.11.25-nightly"
+TERMUX_PKG_VERSION="1.85.0-2024.11.26-nightly"
 _RUST_VERSION=$(echo $TERMUX_PKG_VERSION | cut -d- -f1)
 _DATE="$(echo $TERMUX_PKG_VERSION | cut -d- -f2 | sed 's|\.|-|g')"
 _LLVM_MAJOR_VERSION=$(. $TERMUX_SCRIPTDIR/packages/libllvm/build.sh; echo $LLVM_MAJOR_VERSION)
 _LLVM_MAJOR_VERSION_NEXT=$((_LLVM_MAJOR_VERSION + 1))
 _LZMA_VERSION=$(. $TERMUX_SCRIPTDIR/packages/liblzma/build.sh; echo $TERMUX_PKG_VERSION)
 TERMUX_PKG_SRCURL=https://static.rust-lang.org/dist/$_DATE/rustc-nightly-src.tar.xz
-TERMUX_PKG_SHA256=08cb6f3d140521fefe9ff8ab0a636273babc04ca64cbcad2cdb3538388c3b8dc
+TERMUX_PKG_SHA256=6afe4e14de8a0f73e5106c5e2b62797402019146855f72ea22c9e5dea3f7090f
 TERMUX_PKG_DEPENDS="clang, libc++, libllvm (<< ${_LLVM_MAJOR_VERSION_NEXT}), lld, openssl, zlib"
 TERMUX_PKG_BUILD_DEPENDS="wasi-libc"
 TERMUX_PKG_AUTO_UPDATE=true
@@ -55,11 +55,11 @@ termux_pkg_auto_update() {
 	fi
 
 	rm -rf ~/.cargo ~/.rustup
-  	wget "https://static.rust-lang.org/dist/$latest_nightly_date/rustc-nightly-src.tar.xz" -O /tmp/rustc-nightly-src.tar.xz
-    	local _sha256_checksum="$(sha256sum /tmp/rustc-nightly-src.tar.xz | cut -d' ' -f1)"
+	wget "https://static.rust-lang.org/dist/$latest_nightly_date/rustc-nightly-src.tar.xz" -O /tmp/rustc-nightly-src.tar.xz
+	local _sha256_checksum="$(sha256sum /tmp/rustc-nightly-src.tar.xz | cut -d' ' -f1)"
 	echo "Error: Update it manually. Version $latest_version, checksum $_sha256_checksum"
- 	rm -f /tmp/rustc-nightly-src.tar.xz
- 	exit 1
+	rm -f /tmp/rustc-nightly-src.tar.xz
+	exit 1
 	# termux_pkg_upgrade_version "$latest_version"
 }
 
