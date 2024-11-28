@@ -50,10 +50,14 @@ termux_step_make_install() {
 	build-python -m maturin build --release --skip-auditwheel --target $CARGO_BUILD_TARGET -Z build-std
 
 	local _pyver="${TERMUX_PYTHON_VERSION/./}"
-	# Fix wheel name for arm
+	# Fix wheel name, although it it built with tag `cp39-abi3`, but it is linked against `python3.x.so`
+	# so it will not work on other pythons.
 	if [ "$TERMUX_ARCH" = "arm" ]; then
-		mv ./target/wheels/tokenizers-$TERMUX_PKG_VERSION-cp$_pyver-cp$_pyver-linux_armv7l.whl \
+		mv ./target/wheels/tokenizers-$TERMUX_PKG_VERSION-cp39-abi3-linux_armv7l.whl \
 			./target/wheels/tokenizers-$TERMUX_PKG_VERSION-py$_pyver-none-any.whl
+	else
+		mv ./target/wheels/tokenizers-$TERMUX_PKG_VERSION-cp39-abi3-linux_$TERMUX_ARCH.whl \
+			./target/wheels/tokenizers-$TERMUX_PKG_VERSION-cp$_pyver-cp$_pyver-linux_$TERMUX_ARCH.whl
 	fi
 
 	pip install --no-deps ./target/wheels/*.whl --prefix $TERMUX_PREFIX
