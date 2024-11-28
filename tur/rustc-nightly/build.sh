@@ -55,11 +55,11 @@ termux_pkg_auto_update() {
 	fi
 
 	rm -rf ~/.cargo ~/.rustup
-  	wget "https://static.rust-lang.org/dist/$latest_nightly_date/rustc-nightly-src.tar.xz" -O /tmp/rustc-nightly-src.tar.xz
-    	local _sha256_checksum="$(sha256sum /tmp/rustc-nightly-src.tar.xz | cut -d' ' -f1)"
+	wget "https://static.rust-lang.org/dist/$latest_nightly_date/rustc-nightly-src.tar.xz" -O /tmp/rustc-nightly-src.tar.xz
+	local _sha256_checksum="$(sha256sum /tmp/rustc-nightly-src.tar.xz | cut -d' ' -f1)"
 	echo "Error: Update it manually. Version $latest_version, checksum $_sha256_checksum"
- 	rm -f /tmp/rustc-nightly-src.tar.xz
- 	exit 1
+	rm -f /tmp/rustc-nightly-src.tar.xz
+	exit 1
 	# termux_pkg_upgrade_version "$latest_version"
 }
 
