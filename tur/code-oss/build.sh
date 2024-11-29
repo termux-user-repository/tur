@@ -2,7 +2,7 @@ TERMUX_PKG_HOMEPAGE=https://github.com/microsoft/vscode
 TERMUX_PKG_DESCRIPTION="Visual Studio Code"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="1.90.0"
+TERMUX_PKG_VERSION="1.90.1"
 TERMUX_PKG_SRCURL=git+https://github.com/microsoft/vscode
 TERMUX_PKG_GIT_BRANCH="$TERMUX_PKG_VERSION"
 TERMUX_PKG_DEPENDS="electron-deps, libx11, libxkbfile, libsecret, ripgrep"
@@ -69,6 +69,7 @@ termux_step_host_build() {
 		mv -f $TERMUX_PREFIX/bin $TERMUX_PREFIX/bin.bp
 	fi
 	_setup_nodejs_20
+	export DISABLE_V8_COMPILE_CACHE=1
 	npm install yarn node-gyp
 	export PATH="$TERMUX_PKG_HOSTBUILD_DIR/node_modules/.bin:$PATH"
 	if [ -e "$TERMUX_PREFIX/bin.bp" ]; then
@@ -111,6 +112,7 @@ termux_step_make() {
 
 	export CXX="$CXX -v -L$TERMUX_PREFIX/lib"
 
+	export DISABLE_V8_COMPILE_CACHE=1
 	yarn
 	yarn run gulp vscode-linux-$CODE_ARCH-min
 
