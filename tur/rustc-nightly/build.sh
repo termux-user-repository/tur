@@ -124,14 +124,6 @@ termux_step_pre_configure() {
 }
 
 termux_step_configure() {
-	# Install llvm-18
-	local _line="deb [arch=amd64] http://apt.llvm.org/noble/ llvm-toolchain-noble-18 main"
-	local _file="/etc/apt/sources.list.d/apt-llvm-org.list"
-	__sudo grep -qF -- "$_line" "$_file" || \
-		echo "$_line" | __sudo tee -a "$_file"
-	__sudo apt update
-	__sudo apt install -y llvm-18-dev llvm-18-tools
-
 	# Bypass the config.guess replace to make rust happy
 	find "$TERMUX_PKG_SRCDIR"/vendor/ -name config.sub.bp -exec bash -c 'mv "$0" "${0%.*}"' {} \;
 	find "$TERMUX_PKG_SRCDIR"/vendor/ -name config.guess.bp -exec bash -c 'mv "$0" "${0%.*}"' {} \;
