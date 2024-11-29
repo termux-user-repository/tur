@@ -2,14 +2,14 @@ TERMUX_PKG_HOMEPAGE=https://www.rust-lang.org
 TERMUX_PKG_DESCRIPTION="Rust compiler and utilities (nightly version)"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="1.85.0-2024.11.27-nightly"
+TERMUX_PKG_VERSION="1.85.0-2024.11.28-nightly"
 _RUST_VERSION=$(echo $TERMUX_PKG_VERSION | cut -d- -f1)
 _DATE="$(echo $TERMUX_PKG_VERSION | cut -d- -f2 | sed 's|\.|-|g')"
 _LLVM_MAJOR_VERSION=$(. $TERMUX_SCRIPTDIR/packages/libllvm/build.sh; echo $LLVM_MAJOR_VERSION)
 _LLVM_MAJOR_VERSION_NEXT=$((_LLVM_MAJOR_VERSION + 1))
 _LZMA_VERSION=$(. $TERMUX_SCRIPTDIR/packages/liblzma/build.sh; echo $TERMUX_PKG_VERSION)
 TERMUX_PKG_SRCURL=https://static.rust-lang.org/dist/$_DATE/rustc-nightly-src.tar.xz
-TERMUX_PKG_SHA256=87ebc395c33b4491e3a0f779e4d35c6370660dc1f19daa51c0b94411b8e27477
+TERMUX_PKG_SHA256=77f403c766056f28487b989101166d1e6a9df0f2863e0bf084fa4352504ceaf5
 TERMUX_PKG_DEPENDS="clang, libc++, libllvm (<< ${_LLVM_MAJOR_VERSION_NEXT}), lld, openssl, zlib"
 TERMUX_PKG_BUILD_DEPENDS="wasi-libc"
 TERMUX_PKG_AUTO_UPDATE=true
@@ -124,14 +124,6 @@ termux_step_pre_configure() {
 }
 
 termux_step_configure() {
-	# Install llvm-18
-	local _line="deb [arch=amd64] http://apt.llvm.org/noble/ llvm-toolchain-noble-18 main"
-	local _file="/etc/apt/sources.list.d/apt-llvm-org.list"
-	__sudo grep -qF -- "$_line" "$_file" || \
-		echo "$_line" | __sudo tee -a "$_file"
-	__sudo apt update
-	__sudo apt install -y llvm-18-dev llvm-18-tools
-
 	# Bypass the config.guess replace to make rust happy
 	find "$TERMUX_PKG_SRCDIR"/vendor/ -name config.sub.bp -exec bash -c 'mv "$0" "${0%.*}"' {} \;
 	find "$TERMUX_PKG_SRCDIR"/vendor/ -name config.guess.bp -exec bash -c 'mv "$0" "${0%.*}"' {} \;
