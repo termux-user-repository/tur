@@ -129,7 +129,19 @@ termux_step_make_install() {
 	local _electron_verion="$(jq -r '.devDependencies.electron' $TERMUX_PKG_SRCDIR/package.json)"
 	local _electron_archive_url=https://github.com/termux-user-repository/electron-tur-builder/releases/download/v$_electron_verion/electron-v$_electron_verion-linux-$ELECTRON_ARCH.zip
 	local _electron_archive_path="$TERMUX_PKG_CACHEDIR/$(basename $_electron_archive_url)"
-	termux_download $_electron_archive_url $_electron_archive_path SKIP_CHECKSUM
+	local __sha256sums="
+b636cc1a55156cea78c9de73836dd3846e111ad7a44b65ecd328430be97037f2 electron-v29.4.0-linux-arm64.zip
+647eb734926cf3769b1287ac8d3348932b0de579085ff8bd9f213b522ffd869a electron-v29.4.0-linux-armv7l.zip
+a419039cd691dc5724f5f28b171be1ab08afcc255f0b9664217564621864f6e3 electron-v29.4.0-linux-x64.zip
+	"
+	local __checksum
+	local __file
+	while read -r __checksum __file; do
+		if [ "$__checksum" == "" ]; then continue; fi
+		if [ "$__file" != "electron-v$_electron_verion-linux-$ELECTRON_ARCH.zip" ]; then continue; fi
+		break
+	done <<< "$__sha256sums"
+	termux_download $_electron_archive_url $_electron_archive_path $__checksum
 
 	# Unzip the pre-built electron
 	unzip $_electron_archive_path -d $TERMUX_PREFIX/lib/code-oss
