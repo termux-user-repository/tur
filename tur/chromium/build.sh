@@ -52,9 +52,9 @@ termux_step_make_install() {
 
 	# Download the pre-built chromium compiled for Termux
 	local _chromium_version="$TERMUX_PKG_VERSION"
-	local _chromium_archive_url=https://github.com/termux-user-repository/chromium-builder/releases/download/$_chromium_version/chromium-v$_chromium_version-linux-$TERMUX_ARCH.zip
+	local _chromium_archive_url=https://github.com/termux-user-repository/chromium-builder/releases/download/$_chromium_version/$__file
 	local _chromium_archive_path="$TERMUX_PKG_CACHEDIR/$(basename $_chromium_archive_url)"
-	termux_download $_chromium_archive_url $_chromium_archive_path SKIP_CHECKSUM
+	termux_download $_chromium_archive_url $_chromium_archive_path $__checksum
 
 	# Unzip the pre-built chromium
 	unzip $_chromium_archive_path -d $TERMUX_PREFIX/lib/$TERMUX_PKG_NAME
