@@ -17,7 +17,7 @@ index 5afa7f0..dde3090 100644
  			}
  		}
 +	],
-+ "quality": "stable",
++	"quality": "stable",
 +	"extensionsGallery": {
 +		"serviceUrl": "https://open-vsx.org/vscode/gallery",
 +		"itemUrl": "https://open-vsx.org/vscode/item"
