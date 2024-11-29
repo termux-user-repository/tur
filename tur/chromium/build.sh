@@ -2,16 +2,16 @@ TERMUX_PKG_HOMEPAGE=https://www.chromium.org/Home
 TERMUX_PKG_DESCRIPTION="Chromium web browser"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="Chongyun Lee <uchkks@protonmail.com>"
-TERMUX_PKG_VERSION=125.0.6422.141
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_VERSION=126.0.6478.182
 TERMUX_PKG_SRCURL=https://commondatastorage.googleapis.com/chromium-browser-official/chromium-$TERMUX_PKG_VERSION.tar.xz
-TERMUX_PKG_SHA256=9966b50279d0cfaaf4b58570387f0d526388f8d5f6dd990e3f083a55d8d8e603
-TERMUX_PKG_DEPENDS="atk, cups, dbus, gtk3, krb5, libc++, libevdev, libxkbcommon, libminizip, libnss, libwayland, libx11, mesa, openssl, pango, pulseaudio, libdrm, libjpeg-turbo, libpng, libwebp, libflac, fontconfig, freetype, zlib, libxml2, libxslt, libopus, libsnappy"
+TERMUX_PKG_SHA256=3939f5b3116ebd3cb15ff8c7059888f6b00f4cfa8a77bde983ee4ce5d0eea427
+TERMUX_PKG_DEPENDS="atk, cups, dbus, fontconfig, gtk3, krb5, libc++, libdrm, libevdev, libxkbcommon, libminizip, libnss, libwayland, libx11, mesa, openssl, pango, pulseaudio, zlib"
 # TODO: Split chromium-common and chromium-headless
 # TERMUX_PKG_DEPENDS+=", chromium-common"
 # TERMUX_PKG_SUGGESTS="chromium-headless, chromium-driver"
 TERMUX_PKG_SUGGESTS="qt5-qtbase"
 TERMUX_PKG_BUILD_DEPENDS="qt5-qtbase, qt5-qtbase-cross-tools"
+TERMUX_PKG_ANTI_BUILD_DEPENDS="atk, cups, dbus, fontconfig, gtk3, krb5, libc++, libdrm, libevdev, libxkbcommon, libminizip, libnss, libwayland, libx11, mesa, openssl, pango, pulseaudio, zlib, qt5-qtbase, qt5-qtbase-cross-tools"
 TERMUX_PKG_AUTO_UPDATE=true
 # Chromium doesn't support i686 on Linux.
 TERMUX_PKG_BLACKLISTED_ARCHES="i686"
@@ -36,6 +36,19 @@ termux_step_make() {
 
 termux_step_make_install() {
 	mkdir -p $TERMUX_PREFIX/lib/$TERMUX_PKG_NAME
+
+	local __sha256sums="
+0a0c6466cc0ec6010d902bb8a9b77fca10706092ec7de9b8fe385515d80e1a75 chromium-v126.0.6478.182-linux-aarch64.zip
+851b62cdcc70e485dfa8542e690b2cf9887df7739d9e6c87d11b8abff87e4ae9 chromium-v126.0.6478.182-linux-arm.zip
+75e552f069436465230eba5426622f1bf866d834ffcd6b518d187b2ab038b551 chromium-v126.0.6478.182-linux-x86_64.zip
+	"
+	local __checksum
+	local __file
+	while read -r __checksum __file; do
+		if [ "$__checksum" == "" ]; then continue; fi
+		if [ "$__file" != "chromium-v$TERMUX_PKG_VERSION-linux-$TERMUX_ARCH.zip" ]; then continue; fi
+		break
+	done <<< "$__sha256sums"
 
 	# Download the pre-built chromium compiled for Termux
 	local _chromium_version="$TERMUX_PKG_VERSION"
