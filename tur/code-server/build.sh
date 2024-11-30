@@ -52,6 +52,7 @@ termux_step_host_build() {
 	env -i PATH="$PATH" sudo apt install -yq libxkbfile-dev libsecret-1-dev libkrb5-dev
 	_setup_nodejs_20
 	cd $TERMUX_PKG_SRCDIR
+	npm ci
 	npm install ternary-stream
 	npm run build
 	npm run build:vscode
