@@ -51,20 +51,16 @@ termux_step_host_build() {
 	env -i PATH="$PATH" sudo apt update
 	env -i PATH="$PATH" sudo apt install -yq libxkbfile-dev libsecret-1-dev libkrb5-dev
 	_setup_nodejs_20
-	npm install yarn
-	export PATH="$TERMUX_PKG_HOSTBUILD_DIR/node_modules/.bin:$PATH"
 	cd $TERMUX_PKG_SRCDIR
-	yarn --frozen-lockfile
-	yarn add ternary-stream
-	yarn build
-	yarn build:vscode
-	yarn release
+	npm install ternary-stream
+	npm run build
+	npm run build:vscode
+	npm run release
 	mv $TERMUX_PREFIX/bin.bp $TERMUX_PREFIX/bin
 }
 
 termux_step_configure() {
 	_setup_nodejs_20
-	export PATH="$TERMUX_PKG_HOSTBUILD_DIR/node_modules/.bin:$PATH"
 }
 
 termux_step_make() {
@@ -89,7 +85,7 @@ termux_step_make() {
 	rm -f $TERMUX_PREFIX/lib/librt.{so,a}
 	echo "INPUT(-landroid-spawn)" >> $TERMUX_PREFIX/lib/librt.so
 
-	yarn release:standalone
+	npm run release:standalone
 	mv $TERMUX_PREFIX/bin.bp $TERMUX_PREFIX/bin
 }
 
