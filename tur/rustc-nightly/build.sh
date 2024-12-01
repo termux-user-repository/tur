@@ -130,8 +130,8 @@ termux_step_configure() {
 
 	# Use nightly toolchain to build nightly toolchain
 	if [[ "${TERMUX_ON_DEVICE_BUILD}" == "false" ]]; then
-		rustup install nightly
-		export PATH="${HOME}/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/bin:${PATH}"
+		rustup install beta
+		export PATH="${HOME}/.rustup/toolchains/beta-x86_64-unknown-linux-gnu/bin:${PATH}"
 	fi
 	local RUSTC=$(command -v rustc)
 	local CARGO=$(command -v cargo)
