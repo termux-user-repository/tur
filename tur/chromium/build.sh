@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://www.chromium.org/Home
 TERMUX_PKG_DESCRIPTION="Chromium web browser"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="Chongyun Lee <uchkks@protonmail.com>"
-TERMUX_PKG_VERSION=126.0.6478.182
+TERMUX_PKG_VERSION=127.0.6533.119
 TERMUX_PKG_SRCURL=https://commondatastorage.googleapis.com/chromium-browser-official/chromium-$TERMUX_PKG_VERSION.tar.xz
-TERMUX_PKG_SHA256=3939f5b3116ebd3cb15ff8c7059888f6b00f4cfa8a77bde983ee4ce5d0eea427
+TERMUX_PKG_SHA256=acc9e3f9fd2d180b8831865a1ac4f5cdd9ffe6211f47f467296d9ee1be2a577e
 TERMUX_PKG_DEPENDS="atk, cups, dbus, fontconfig, gtk3, krb5, libc++, libdrm, libevdev, libxkbcommon, libminizip, libnss, libwayland, libx11, mesa, openssl, pango, pulseaudio, zlib"
 # TODO: Split chromium-common and chromium-headless
 # TERMUX_PKG_DEPENDS+=", chromium-common"
@@ -38,9 +38,9 @@ termux_step_make_install() {
 	mkdir -p $TERMUX_PREFIX/lib/$TERMUX_PKG_NAME
 
 	local __sha256sums="
-0a0c6466cc0ec6010d902bb8a9b77fca10706092ec7de9b8fe385515d80e1a75 chromium-v126.0.6478.182-linux-aarch64.zip
-851b62cdcc70e485dfa8542e690b2cf9887df7739d9e6c87d11b8abff87e4ae9 chromium-v126.0.6478.182-linux-arm.zip
-75e552f069436465230eba5426622f1bf866d834ffcd6b518d187b2ab038b551 chromium-v126.0.6478.182-linux-x86_64.zip
+b4c2f6f38c348bfa3fdfa5eb156bbc2533614cca2069f366405060fa44da1151 chromium-v127.0.6533.119-linux-aarch64.zip
+5dd613e4f687c8573f647b36013dd00950b422ba6d4e9f667e535e21650c445a chromium-v127.0.6533.119-linux-arm.zip
+cd6e9e6e9036e3a18d7fa427fea92c4fb3cd4e1a08d1f3ecf1f54b4188789e46 chromium-v127.0.6533.119-linux-x86_64.zip
 	"
 	local __checksum
 	local __file
