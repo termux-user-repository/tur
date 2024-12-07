@@ -2,14 +2,14 @@ TERMUX_PKG_HOMEPAGE=https://www.rust-lang.org
 TERMUX_PKG_DESCRIPTION="Rust compiler and utilities (nightly version)"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="1.85.0-2024.12.05-nightly"
+TERMUX_PKG_VERSION="1.85.0-2024.12.06-nightly"
 _RUST_VERSION=$(echo $TERMUX_PKG_VERSION | cut -d- -f1)
 _DATE="$(echo $TERMUX_PKG_VERSION | cut -d- -f2 | sed 's|\.|-|g')"
 _LLVM_MAJOR_VERSION=$(. $TERMUX_SCRIPTDIR/packages/libllvm/build.sh; echo $LLVM_MAJOR_VERSION)
 _LLVM_MAJOR_VERSION_NEXT=$((_LLVM_MAJOR_VERSION + 1))
 _LZMA_VERSION=$(. $TERMUX_SCRIPTDIR/packages/liblzma/build.sh; echo $TERMUX_PKG_VERSION)
 TERMUX_PKG_SRCURL=https://static.rust-lang.org/dist/$_DATE/rustc-nightly-src.tar.xz
-TERMUX_PKG_SHA256=b8e92aa61cb4487dc570be293dfe3df86132a482464f91917c59d7dfee0b9ab2
+TERMUX_PKG_SHA256=450e5137940ab96cbaf3dc3157d194182b2c934247841b1c6147e746b4a581e6
 TERMUX_PKG_DEPENDS="clang, libc++, libllvm (<< ${_LLVM_MAJOR_VERSION_NEXT}), lld, openssl, zlib"
 TERMUX_PKG_BUILD_DEPENDS="wasi-libc"
 TERMUX_PKG_AUTO_UPDATE=true
@@ -164,10 +164,7 @@ termux_step_configure() {
 	local env_host=$(printf $CARGO_TARGET_NAME | tr a-z A-Z | sed s/-/_/g)
 	export ${env_host}_OPENSSL_DIR=$TERMUX_PREFIX
 	export RUST_LIBDIR=$TERMUX_PKG_BUILDDIR/_lib
-	# Add rpath
-	export RUSTFLAGS="-C link-arg=-Wl,-rpath=$RUST_NIGHTLY_PREFIX/lib $RUSTFLAGS"
-	export RUSTFLAGS="-C link-arg=-Wl,-rpath=\$ORIGIN/../lib $RUSTFLAGS"
-	export CARGO_TARGET_${env_host}_RUSTFLAGS="-C link-arg=-Wl,-rpath=\$ORIGIN/../lib -C link-arg=-Wl,-rpath=$RUST_NIGHTLY_PREFIX/lib -L${RUST_LIBDIR}"
+	export CARGO_TARGET_${env_host}_RUSTFLAGS="-L${RUST_LIBDIR}"
 
 	# x86_64: __lttf2
 	case "${TERMUX_ARCH}" in
@@ -184,6 +181,11 @@ termux_step_configure() {
 	"${AR}" rcu "${RUST_LIBDIR}/libsyncfs.a" syncfs.o
 	export CARGO_TARGET_${env_host}_RUSTFLAGS+=" -C link-arg=-l:libsyncfs.a"
 
+	# Add rpath
+	export CARGO_TARGET_${env_host}_RUSTFLAGS+=" -C link-arg=-Wl,-rpath=\$ORIGIN/../lib"
+	export CARGO_TARGET_${env_host}_RUSTFLAGS+=" -C link-arg=-Wl,-rpath=$RUST_NIGHTLY_PREFIX/lib"
+	export CARGO_TARGET_${env_host}_RUSTFLAGS+=" -C link-arg=-Wl,-rpath=${TERMUX_PREFIX}/lib -C link-arg=-Wl,--enable-new-dtags"
+
 	export X86_64_UNKNOWN_LINUX_GNU_OPENSSL_LIB_DIR=/usr/lib/x86_64-linux-gnu
 	export X86_64_UNKNOWN_LINUX_GNU_OPENSSL_INCLUDE_DIR=/usr/include
 	export PKG_CONFIG_ALLOW_CROSS=1
@@ -192,6 +194,8 @@ termux_step_configure() {
 	export CC_x86_64_unknown_linux_gnu=gcc
 	export CFLAGS_x86_64_unknown_linux_gnu="-O2"
 	export RUST_BACKTRACE=full
+
+	unset CC CFLAGS CFLAGS_${env_host} CPP CPPFLAGS CXX CXXFLAGS LD LDFLAGS PKG_CONFIG RANLIB
 }
 
 termux_step_make() {
@@ -199,17 +203,6 @@ termux_step_make() {
 }
 
 termux_step_make_install() {
-	unset CC CFLAGS CPP CPPFLAGS CXX CXXFLAGS LD LDFLAGS PKG_CONFIG RANLIB
-
-	# needed to workaround build issue that only happens on x86_64
-	# /home/runner/.termux-build/rust/build/build/bootstrap/debug/bootstrap: error while loading shared libraries: /lib/x86_64-linux-gnu/libc.so: invalid ELF header
-	if [[ "${TERMUX_ON_DEVICE_BUILD}" == "false" ]] && [[ "${TERMUX_ARCH}" == "x86_64" ]]; then
-		mv -v ${TERMUX_PREFIX}{,.tmp}
-		${TERMUX_PKG_SRCDIR}/x.py build -j ${TERMUX_PKG_MAKE_PROCESSES} --host x86_64-unknown-linux-gnu --stage 1 cargo
-		[[ -d "${TERMUX_PREFIX}" ]] && termux_error_exit "Contaminated PREFIX found:\n$(find ${TERMUX_PREFIX} | sort)"
-		mv -v ${TERMUX_PREFIX}{.tmp,}
-	fi
-
 	# install causes on device build fail to continue
 	# dist uses a lot of spaces on CI
 	local job="install"
