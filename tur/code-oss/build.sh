@@ -2,7 +2,7 @@ TERMUX_PKG_HOMEPAGE=https://github.com/microsoft/vscode
 TERMUX_PKG_DESCRIPTION="Visual Studio Code"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="1.90.1"
+TERMUX_PKG_VERSION="1.95.3"
 TERMUX_PKG_SRCURL=git+https://github.com/microsoft/vscode
 TERMUX_PKG_GIT_BRANCH="$TERMUX_PKG_VERSION"
 TERMUX_PKG_DEPENDS="electron-deps, libx11, libxkbfile, libsecret, ripgrep"
@@ -16,7 +16,7 @@ TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_UPDATE_TAG_TYPE="latest-release-tag"
 
 _setup_nodejs_20() {
-	local NODEJS_VERSION=20.12.1
+	local NODEJS_VERSION=20.18.0
 	local NODEJS_FOLDER=${TERMUX_PKG_CACHEDIR}/build-tools/nodejs-${NODEJS_VERSION}
 
 	if [ ! -x "$NODEJS_FOLDER/bin/node" ]; then
@@ -24,7 +24,7 @@ _setup_nodejs_20() {
 		local NODEJS_TAR_FILE=$TERMUX_PKG_TMPDIR/nodejs-$NODEJS_VERSION.tar.xz
 		termux_download https://nodejs.org/dist/v${NODEJS_VERSION}/node-v${NODEJS_VERSION}-linux-x64.tar.xz \
 			"$NODEJS_TAR_FILE" \
-			042844eeea4e19fa46687cc028dd5e323602d81784a9da8386c24463e3984e11
+			4543670b589593f8fa5f106111fd5139081da42bb165a9239f05195e405f240a
 		tar -xf "$NODEJS_TAR_FILE" -C "$NODEJS_FOLDER" --strip-components=1
 	fi
 	export PATH="$NODEJS_FOLDER/bin:$PATH"
@@ -44,15 +44,9 @@ termux_step_post_get_source() {
 		termux_error_exit "Version mismatch: electron version $_electron_verion, header version $_header_version."
 	fi
 
-	# Parse yarn.lock and get native-keymap verion
-	python3 -m venv $TERMUX_PKG_CACHEDIR/venv-dir
-	(. $TERMUX_PKG_CACHEDIR/venv-dir/bin/activate
-	python3 -m pip install pyarn
-	python3 $TERMUX_PKG_BUILDER_DIR/get-version-from-yarn-v1-lockfile.py native-keymap $TERMUX_PKG_SRCDIR/yarn.lock > $TERMUX_PKG_TMPDIR/_native_keymap_verion_info.json)
-
 	# Use custom node-native-keymap
-	local _native_keymap_verion="$(jq -r '.version' $TERMUX_PKG_TMPDIR/_native_keymap_verion_info.json)"
-	local _native_keymap_src_url="$(jq -r '.url' $TERMUX_PKG_TMPDIR/_native_keymap_verion_info.json)"
+	local _native_keymap_verion="$(jq -r ".dependencies.\"native-keymap\"" package.json | cut -d'^' -f2)"
+	local _native_keymap_src_url="https://registry.npmjs.org/native-keymap/-/native-keymap-$_native_keymap_verion.tgz"
 	local _native_keymap_sha256sum="SKIP_CHECKSUM"
 	local _native_keymap_path="$TERMUX_PKG_CACHEDIR/$(basename $_native_keymap_src_url)"
 	termux_download $_native_keymap_src_url $_native_keymap_path $_native_keymap_sha256sum
@@ -70,7 +64,7 @@ termux_step_host_build() {
 	fi
 	_setup_nodejs_20
 	export DISABLE_V8_COMPILE_CACHE=1
-	npm install yarn node-gyp
+	npm install node-gyp
 	export PATH="$TERMUX_PKG_HOSTBUILD_DIR/node_modules/.bin:$PATH"
 	if [ -e "$TERMUX_PREFIX/bin.bp" ]; then
 		rm -rf $TERMUX_PREFIX/bin
@@ -113,8 +107,8 @@ termux_step_make() {
 	export CXX="$CXX -v -L$TERMUX_PREFIX/lib"
 
 	export DISABLE_V8_COMPILE_CACHE=1
-	yarn
-	yarn run gulp vscode-linux-$CODE_ARCH-min
+	npm install
+	npm run gulp vscode-linux-$CODE_ARCH-min
 
 	if [ -e "$TERMUX_PREFIX/bin.bp" ]; then
 		rm -rf $TERMUX_PREFIX/bin
@@ -130,9 +124,9 @@ termux_step_make_install() {
 	local _electron_archive_url=https://github.com/termux-user-repository/electron-tur-builder/releases/download/v$_electron_verion/electron-v$_electron_verion-linux-$ELECTRON_ARCH.zip
 	local _electron_archive_path="$TERMUX_PKG_CACHEDIR/$(basename $_electron_archive_url)"
 	local __sha256sums="
-b636cc1a55156cea78c9de73836dd3846e111ad7a44b65ecd328430be97037f2 electron-v29.4.0-linux-arm64.zip
-647eb734926cf3769b1287ac8d3348932b0de579085ff8bd9f213b522ffd869a electron-v29.4.0-linux-armv7l.zip
-a419039cd691dc5724f5f28b171be1ab08afcc255f0b9664217564621864f6e3 electron-v29.4.0-linux-x64.zip
+5405cd610fd32bf752b77ec839ea5be030d67de5b28cb0c7186fd79abea84226 electron-v32.2.1-linux-arm64.zip
+d3af90f0f7ff7e22718bbcfb62a0a80d6498e065bf31abe000a3998141bbbfb9 electron-v32.2.1-linux-armv7l.zip
+cb538c885fc55663038f77638bda670c92802f7c7c0b9adf74963c0c3f9e9077 electron-v32.2.1-linux-x64.zip
 	"
 	local __checksum
 	local __file
@@ -164,7 +158,7 @@ a419039cd691dc5724f5f28b171be1ab08afcc255f0b9664217564621864f6e3 electron-v29.4.
 	chmod +x $TERMUX_PREFIX/lib/code-oss/bin/code-oss
 
 	# Replace ripgrep
-	ln -sfr $TERMUX_PREFIX/bin/rg $TERMUX_PREFIX/lib/code-oss/resources/app/node_modules.asar.unpacked/@vscode/ripgrep/bin/rg
+	ln -sfr $TERMUX_PREFIX/bin/rg $TERMUX_PREFIX/lib/code-oss/resources/app/node_modules/@vscode/ripgrep/bin/rg
 
 	# Install appdata and desktop file
 	sed -i "s|@@NAME_SHORT@@|Code|g
