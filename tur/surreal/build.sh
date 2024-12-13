@@ -4,9 +4,9 @@ TERMUX_PKG_DESCRIPTION="A scalable, distributed, collaborative, document-graph d
 TERMUX_PKG_LICENSE="non-free"
 TERMUX_PKG_LICENSE_FILE="LICENSE"
 TERMUX_PKG_MAINTAINER="@SunPodder"
-TERMUX_PKG_VERSION="2.1.2"
+TERMUX_PKG_VERSION="2.1.3"
 TERMUX_PKG_SRCURL="https://github.com/surrealdb/surrealdb/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz"
-TERMUX_PKG_SHA256=e096b18639923cb2714816f34c755e2d4a544c1197ea387b94025fb2940d8f44
+TERMUX_PKG_SHA256=7046f8c46b500988d729fff212d0e009244675fd6e766096cf311382489ac42b
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_BUILD_DEPENDS="openssl, zlib"
@@ -36,7 +36,7 @@ termux_step_configure() {
 
 termux_step_make() {
 	export CXXFLAGS+=" -lz"
-	RUSTFLAGS="--cfg surrealdb_unstable $RUSTFLAGS"
+	export RUSTFLAGS="--cfg surrealdb_unstable"
 	cargo build --jobs $TERMUX_PKG_MAKE_PROCESSES --target $CARGO_TARGET_NAME --release
 }
 
