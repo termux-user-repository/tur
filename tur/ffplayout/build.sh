@@ -29,13 +29,11 @@ termux_step_host_build() {
 termux_step_make() {
 	termux_setup_rust
 
+	unset CFLAGS
+
 	if [ "$TERMUX_ARCH" == "x86_64" ]; then
-		local libdir=target/x86_64-linux-android/release/deps
-		mkdir -p $libdir
-		pushd $libdir
-		RUSTFLAGS+=" -C link-arg=$($CC -print-libgcc-file-name)"
-		echo "INPUT(-l:libunwind.a)" > libgcc.so
-		popd
+		local env_host=$(printf $CARGO_TARGET_NAME | tr a-z A-Z | sed s/-/_/g)
+		export CARGO_TARGET_${env_host}_RUSTFLAGS+=" -C link-arg=$($CC -print-libgcc-file-name)"
 	fi
 
 	cargo build --jobs $TERMUX_PKG_MAKE_PROCESSES --release --target $CARGO_TARGET_NAME
