@@ -2,7 +2,7 @@ TERMUX_PKG_HOMEPAGE=https://ollama.com/
 TERMUX_PKG_DESCRIPTION="Get up and running with large language models"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="0.5.1"
+TERMUX_PKG_VERSION="0.5.2"
 TERMUX_PKG_SRCURL=git+https://github.com/ollama/ollama
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_AUTO_UPDATE=true
@@ -14,7 +14,7 @@ termux_step_make() {
 
 	export ARCH="$GOARCH"
 	export VERSION="$TERMUX_PKG_VERSION"
-	go generate './...'
+
 	go build -trimpath -ldflags="-w -s -X=github.com/ollama/ollama/version.Version=$TERMUX_PKG_VERSION -X=github.com/ollama/ollama/server.mode=release"
 }
 
