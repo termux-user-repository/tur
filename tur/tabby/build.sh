@@ -23,7 +23,8 @@ termux_step_pre_configure() {
 	touch "${TERMUX_PKG_BUILDDIR}/android.toolchain.cmake"
 
 	if [ "$TERMUX_ARCH" = "x86_64" ]; then
-		RUSTFLAGS+=" -C link-arg=$($CC -print-libgcc-file-name)"
+		local env_host=$(printf $CARGO_TARGET_NAME | tr a-z A-Z | sed s/-/_/g)
+		export CARGO_TARGET_${env_host}_RUSTFLAGS+=" -C link-arg=$($CC -print-libgcc-file-name)"
 	fi
 
 	LDFLAGS+=" -fopenmp -static-openmp"
