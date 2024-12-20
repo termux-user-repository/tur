@@ -3,11 +3,15 @@ TERMUX_PKG_DESCRIPTION="thunk generator for C and assembler"
 TERMUX_PKG_LICENSE="GPL-3.0"
 TERMUX_PKG_MAINTAINER="@stsp"
 TERMUX_PKG_VERSION=1.3
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://github.com/stsp/thunk_gen/archive/refs/tags/${TERMUX_PKG_VERSION}.tar.gz
 TERMUX_PKG_SHA256=248795fbbf2988aabdf6fb83a53b6b83d42fd8346de5b88507ef673bc84ba830
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_BUILD_DEPENDS="flex, bison"
 TERMUX_PKG_HOSTBUILD=true
+TERMUX_PKG_NO_SHEBANG_FIX_FILES="
+opt/${TERMUX_PKG_NAME}/cross/libexec/thunk_gen/*
+"
 
 termux_step_host_build() {
 	export PATH="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH"
