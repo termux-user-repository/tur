@@ -3,15 +3,15 @@ TERMUX_PKG_DESCRIPTION="A compatibility layer for running Windows programs (Hang
 TERMUX_PKG_LICENSE="LGPL-2.1"
 TERMUX_PKG_LICENSE_FILE="LICENSE, LICENSE.OLD, COPYING.LIB"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION=9.20
-TERMUX_PKG_REVISION=2
+TERMUX_PKG_VERSION=10.0~rc2
+_REAL_VERSION="${TERMUX_PKG_VERSION/\~/-}"
 TERMUX_PKG_SRCURL=(
-	https://github.com/AndreRH/wine/archive/refs/tags/hangover-$TERMUX_PKG_VERSION.tar.gz
-	https://github.com/AndreRH/hangover/releases/download/hangover-$TERMUX_PKG_VERSION/hangover_${TERMUX_PKG_VERSION}_ubuntu2004_focal_arm64.tar
+	https://github.com/AndreRH/wine/archive/refs/tags/hangover-$_REAL_VERSION.tar.gz
+	https://github.com/AndreRH/hangover/releases/download/hangover-$_REAL_VERSION/hangover_${_REAL_VERSION}_ubuntu2004_focal_arm64.tar
 )
 TERMUX_PKG_SHA256=(
-	7007a864f927bb8c789e04c8b0c3cb24ab1ae3928eaca26c1325391243570dcd
-	3c6c7605bd892d47f226295f46aa4e01a805a98e03593a8e93c349463eee0b4a
+	79adb826f3fe21ea834d32e1b70bd02d7eddd1f2ffe84b6ee47e700ee3c3f09f
+	59312dddb98ef7803160630bbdef3869f6440fe3d48a8a5c6935c07244db2d09
 )
 TERMUX_PKG_DEPENDS="fontconfig, freetype, krb5, libandroid-spawn, libc++, libgmp, libgnutls, libxcb, libxcomposite, libxcursor, libxfixes, libxrender, mesa, opengl, pulseaudio, sdl2, vulkan-loader, xorg-xrandr"
 TERMUX_PKG_ANTI_BUILD_DEPENDS="vulkan-loader"
@@ -139,8 +139,8 @@ termux_step_post_make_install() {
 	for _type in wow64fex arm64ecfex; do
 		mkdir -p $_type
 		cd $_type
-		ar -x "$TERMUX_PKG_SRCDIR"/hangover-lib${_type}_${TERMUX_PKG_VERSION}_arm64.deb
-		tar xf data.tar.zst
+		ar -x "$TERMUX_PKG_SRCDIR"/hangover-lib${_type}_${_REAL_VERSION}_arm64.deb
+		tar xf data.tar.xz
 		install -Dm644 usr/lib/wine/aarch64-windows/lib$_type.dll \
 			"$TERMUX_PREFIX"/lib/wine/aarch64-windows/lib$_type.dll
 		install -Dm644 usr/share/doc/hangover-lib$_type/copyright \
@@ -151,6 +151,6 @@ termux_step_post_make_install() {
 	# Install LICENSE file for hangover
 	mkdir -p "$TERMUX_PREFIX"/share/doc/hangover
 	rm -f "$TERMUX_PREFIX"/share/doc/hangover/copyright
-	curl -L https://raw.githubusercontent.com/AndreRH/hangover/refs/tags/hangover-${TERMUX_PKG_VERSION}/LICENSE \
+	curl -L https://raw.githubusercontent.com/AndreRH/hangover/refs/tags/hangover-${_REAL_VERSION}/LICENSE \
 		-o "$TERMUX_PREFIX"/share/doc/hangover/copyright
 }
