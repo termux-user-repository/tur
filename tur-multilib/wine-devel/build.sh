@@ -3,14 +3,17 @@ TERMUX_PKG_DESCRIPTION="A compatibility layer for running Windows programs"
 TERMUX_PKG_LICENSE="LGPL-2.1"
 TERMUX_PKG_LICENSE_FILE="LICENSE, LICENSE.OLD, COPYING.LIB"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION=9.21
-_VERSION_FOLDER="$(test "${TERMUX_PKG_VERSION:2:1}" = 0 && echo ${TERMUX_PKG_VERSION:0:3} || echo ${TERMUX_PKG_VERSION:0:2}x)"
-TERMUX_PKG_SRCURL=https://dl.winehq.org/wine/source/${_VERSION_FOLDER}/wine-$TERMUX_PKG_VERSION.tar.xz
-TERMUX_PKG_SHA256=4442b47ffd9b2ea457100e36ed5fd4e6f4d829d9db79a25e605175a988ca2fff
+TERMUX_PKG_VERSION=10.0~rc2
+_REAL_VERSION="${TERMUX_PKG_VERSION/\~/-}"
+_VERSION_FOLDER="$(test "${_REAL_VERSION:3:1}" = 0 && echo ${_REAL_VERSION:0:4} || echo ${_REAL_VERSION:0:3}x)"
+TERMUX_PKG_SRCURL=https://dl.winehq.org/wine/source/${_VERSION_FOLDER}/wine-$_REAL_VERSION.tar.xz
+TERMUX_PKG_SHA256=ccad4ff0cc9f691b4ef18be0e1e9989183a4784422993785764af78d89ad5ab7
 TERMUX_PKG_DEPENDS="fontconfig, freetype, krb5, libandroid-spawn, libc++, libgmp, libgnutls, libxcb, libxcomposite, libxcursor, libxfixes, libxrender, mesa, opengl, pulseaudio, sdl2, vulkan-loader, xorg-xrandr"
 TERMUX_PKG_ANTI_BUILD_DEPENDS="vulkan-loader"
 TERMUX_PKG_BUILD_DEPENDS="libandroid-spawn-static, vulkan-loader-generic"
 TERMUX_PKG_NO_STATICSPLIT=true
+TERMUX_PKG_AUTO_UPDATE=true
+TERMUX_PKG_UPDATE_TAG_TYPE="newest-tag"
 TERMUX_PKG_HOSTBUILD=true
 TERMUX_PKG_EXTRA_HOSTBUILD_CONFIGURE_ARGS="
 --without-x
@@ -95,9 +98,13 @@ termux_pkg_auto_update() {
 	return
 	} >&2
 
-	if [[ "${latest_tag}" == "${TERMUX_PKG_VERSION}" ]]; then
-		echo "INFO: No update needed. Already at version '${TERMUX_PKG_VERSION}'."
+	if [[ "${latest_tag}" == "${_REAL_VERSION}" ]]; then
+		echo "INFO: No update needed. Already at version '${_REAL_VERSION}'."
 		return
+	fi
+
+	if [ "${latest_tag/-/\~}" != "${latest_tag}" ]; then
+		latest_tag="${latest_tag/-/\~}"
 	fi
 
 	termux_pkg_upgrade_version "${latest_tag}"
