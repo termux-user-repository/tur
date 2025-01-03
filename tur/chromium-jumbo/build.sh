@@ -118,7 +118,7 @@ termux_step_configure() {
 	popd
 
 	# Construct args
-	local _clang_base_path="/usr/lib/llvm-17"
+	local _clang_base_path="/usr/lib/llvm-18"
 	local _host_cc="$_clang_base_path/bin/clang"
 	local _host_cxx="$_clang_base_path/bin/clang++"
 	local _host_toolchain="$TERMUX_PKG_CACHEDIR/custom-toolchain:host"
