@@ -11,7 +11,7 @@ TERMUX_PKG_DEPENDS="atk, cups, dbus, fontconfig, gtk3, krb5, libc++, libdrm, lib
 # TERMUX_PKG_DEPENDS+=", chromium-common"
 # TERMUX_PKG_SUGGESTS="chromium-headless, chromium-driver"
 # Chromium doesn't support i686 on Linux.
-TERMUX_PKG_BLACKLISTED_ARCHES="i686"
+TERMUX_PKG_BLACKLISTED_ARCHES="x86_64, i686, arm"
 
 SYSTEM_LIBRARIES="    libdrm  fontconfig"
 # TERMUX_PKG_DEPENDS="libdrm, fontconfig"
@@ -19,6 +19,10 @@ SYSTEM_LIBRARIES="    libdrm  fontconfig"
 termux_step_post_get_source() {
 	python3 build/linux/unbundle/replace_gn_files.py --system-libraries \
 		$SYSTEM_LIBRARIES
+
+	# Copy things from chromium-snapshot for testing
+	mkdir -p $TERMUX_PREFIX/opt/chromium-snapshot-cross
+	cp -Rf $TERMUX_PKG_BUILDER_DIR/chromium-snapshot-cross/* $TERMUX_PREFIX/opt/chromium-snapshot-cross/
 }
 
 termux_step_pre_configure() {
@@ -32,7 +36,6 @@ termux_step_pre_configure() {
 termux_step_configure() {
 	cd $TERMUX_PKG_SRCDIR
 	termux_setup_ninja
-	termux_setup_nodejs
 
 	# Fetch depot_tools
 	export DEPOT_TOOLS_UPDATE=0
@@ -73,9 +76,12 @@ termux_step_configure() {
 	build/linux/sysroot_scripts/install-sysroot.py --arch=amd64
 
 	# Link to system tools required by the build
-	mkdir -p third_party/node/linux/node-linux-x64/bin
-	ln -sf $(command -v node) third_party/node/linux/node-linux-x64/bin/
 	ln -sf $(command -v java) third_party/jdk/current/bin/
+
+	# Install nodejs
+	if [ ! -f "third_party/node/linux/node-linux-x64/bin/node" ]; then
+		./third_party/node/update_node_binaries
+	fi
 
 	# Dummy librt.so
 	# Why not dummy a librt.a? Some of the binaries reference symbols only exists in Android
@@ -263,6 +269,8 @@ use_jumbo_build = true
 
 termux_step_make() {
 	cd $TERMUX_PKG_BUILDDIR
+	# Build v8 snapshot in another action
+	# ninja -C out/Release v8_context_snapshot run_mksnapshot_default generate_bytecode_builtins_list run_torque
 	ninja -C out/Release chromedriver chrome chrome_crashpad_handler headless_shell -k 0
 }
 

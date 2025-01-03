@@ -1,0 +1,158 @@
+--- a/tools/v8_context_snapshot/BUILD.gn
++++ b/tools/v8_context_snapshot/BUILD.gn
+@@ -35,7 +35,7 @@
+   ]
+ }
+ 
+-if (use_v8_context_snapshot) {
++if (use_v8_context_snapshot && false) {
+   if (v8_snapshot_toolchain == current_toolchain) {
+     action("generate_v8_context_snapshot") {
+       script = "//build/gn_run_binary.py"
+@@ -113,3 +113,20 @@
+     }
+   }
+ }
++
++if (use_v8_context_snapshot) {
++  if (v8_snapshot_toolchain == current_toolchain) {
++    action("generate_v8_context_snapshot") {
++      script = "//v8/tools/run.py"
++      output_file = "$root_build_dir/$v8_context_snapshot_filename"
++      output_path = rebase_path(output_file, root_build_dir)
++      args = [
++        "bash", "-c", 
++        "cp -f" + " " +
++        "@TERMUX_PREFIX@/opt/chromium-snapshot-cross/$output_path" + " " +
++        "$output_path",
++      ]
++      outputs = [ output_file ]
++    }
++  }
++}
+--- a/v8/BUILD.gn
++++ b/v8/BUILD.gn
+@@ -2117,7 +2117,12 @@
+     suffix = "_$target_name"
+   }
+ 
++if (false) {
+   toolchain = invoker.toolchain
++} else {
++  if (invoker.toolchain != "") {
++  }
++}
+ 
+   action("run_torque" + suffix) {
+     visibility = [
+@@ -2127,7 +2132,9 @@
+       "tools/gcmole/:*",
+     ]
+ 
++if (false) {
+     deps = [ ":torque($toolchain)" ]
++}
+ 
+     script = "tools/run.py"
+ 
+@@ -2169,15 +2176,25 @@
+       ]
+     }
+ 
++if (false) {
+     args = [
+       "./" + rebase_path(
+               get_label_info(":torque($toolchain)", "root_out_dir") + "/torque",
+               root_build_dir),
++    ]
++} else {
++    args = [
++      "@TERMUX_PREFIX@/opt/chromium-snapshot-cross/host/torque",
++    ]
++}
++  
++    args += [
+       "-o",
+       rebase_path("$destination_folder", root_build_dir),
+       "-v8-root",
+       rebase_path(".", root_build_dir),
+     ]
++
+     if (v8_annotate_torque_ir) {
+       args += [ "-annotate-ir" ]
+     }
+@@ -2325,6 +2342,7 @@
+ action("generate_bytecode_builtins_list") {
+   script = "tools/run.py"
+   outputs = [ "$target_gen_dir/builtins-generated/bytecodes-builtins-list.h" ]
++if (false) {
+   deps = [ ":bytecode_builtins_list_generator($v8_generator_toolchain)" ]
+   args = [
+     "./" + rebase_path(
+@@ -2335,6 +2353,16 @@
+     rebase_path("$target_gen_dir/builtins-generated/bytecodes-builtins-list.h",
+                 root_build_dir),
+   ]
++} else {
++  output_file_path = rebase_path("$target_gen_dir/builtins-generated/bytecodes-builtins-list.h",
++                root_build_dir)
++  args = [
++    "bash", "-c", 
++    "cp -f" + " " +
++    "@TERMUX_PREFIX@/opt/chromium-snapshot-cross/$output_file_path" + " " +
++    "$target_gen_dir/builtins-generated/bytecodes-builtins-list.h",
++  ]
++}
+ }
+ 
+ # Template to generate different V8 snapshots based on different runtime flags.
+@@ -2355,7 +2383,9 @@
+     suffix = "_$name"
+   }
+   action("run_mksnapshot_" + name) {
++if (false) {
+     deps = [ ":mksnapshot($v8_snapshot_toolchain)" ]
++}
+ 
+     script = "tools/run.py"
+ 
+@@ -2365,6 +2395,7 @@
+ 
+     data = []
+ 
++if (false) {
+     args = [
+       "./" + rebase_path(get_label_info(":mksnapshot($v8_snapshot_toolchain)",
+                                         "root_out_dir") + "/mksnapshot",
+@@ -2382,6 +2413,9 @@
+       "--embedded_src",
+       rebase_path("$target_gen_dir/embedded${suffix}.S", root_build_dir),
+     ]
++} else {
++    args = []
++}
+ 
+     if (v8_log_builtins_block_count_input != "") {
+       args += [
+@@ -2493,6 +2527,21 @@
+     if (v8_enable_verify_heap) {
+       args += [ "--verify-heap" ]
+     }
++
++    if (true) {
++      gen_dir = rebase_path("$target_gen_dir", root_build_dir)
++      args = []
++      args += [
++        "bash", "-c", 
++        "cp -f" + " " +
++        "@TERMUX_PREFIX@/opt/chromium-snapshot-cross/snapshot_blob${suffix}.bin" + " " +
++        "$root_out_dir/snapshot_blob${suffix}.bin" + " " +
++        "&&" + " " +
++        "cp -f" + " " +
++        "@TERMUX_PREFIX@/opt/chromium-snapshot-cross/$gen_dir/embedded${suffix}.S" + " " +
++        "$gen_dir/embedded${suffix}.S",
++      ]
++    }
+   }
+ }
+ 
