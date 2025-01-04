@@ -19,3 +19,5 @@
 *.png       binary
 *.tar       binary
 *.tar.*     binary
+*.bin       binary
+torque      binary
