@@ -215,6 +215,8 @@ enable_rust = false
 llvm_android_mainline = true
 # Enable jumbo build (unified build)
 use_jumbo_build = true
+# Compile pdfium as a static library
+pdf_is_complete_lib = true
 " > $_common_args_file
 
 	if [ "$TERMUX_ARCH" = "arm" ]; then
@@ -292,16 +294,10 @@ termux_step_make() {
 						third_party/swiftshader/src/Vulkan:icd_file \
 						third_party/swiftshader/src/Vulkan:swiftshader_libvulkan
 
-	# (Maybe future?) Build ANGLE
-	# time ninja -C out/Release \
-	# 					third_party/angle:libEGL \
-	# 					third_party/angle:libGLESv2 \
-	# 					third_party/angle:angle_version_info \
-	# 					third_party/angle:angle_gpu_info_util \
-	# 					third_party/angle:translator \
-	# 					third_party/angle:translator_gl_d3d_only \
-	# 					third_party/angle:angle_image_util \
-	# 					third_party/angle:includes
+	# Build pdfium
+	time ninja -C out/Release \
+						third_party/pdfium \
+						third_party/pdfium:pdfium_public_headers
 }
 
 termux_step_make_install() {
@@ -314,7 +310,8 @@ termux_step_make_install() {
 		bytecode_builtins_list_generator # generate_bytecode_builtins_list
 		gen-regexp-special-case          # v8:run_gen-regexp-special-case
 	)
-	cp "${v8_tools[@]/#/out/Release/$cr_v8_toolchain/}" "$TERMUX_PREFIX/opt/$TERMUX_PKG_NAME/"
+	mkdir -p "$TERMUX_PREFIX/opt/$TERMUX_PKG_NAME/$cr_v8_toolchain/"
+	cp "${v8_tools[@]/#/out/Release/$cr_v8_toolchain/}" "$TERMUX_PREFIX/opt/$TERMUX_PKG_NAME/$cr_v8_toolchain/"
 
 	local host_tools=(
 		make_top_domain_list_variables     # generate_top_domain_list_variables_file
@@ -325,7 +322,8 @@ termux_step_make_install() {
 		top_domain_generator               # generate_top_domains_trie
 		icudtl.dat                         # icu data
 	)
-	cp "${host_tools[@]/#/out/Release/host/}" "$TERMUX_PREFIX/opt/$TERMUX_PKG_NAME/"
+	mkdir -p "$TERMUX_PREFIX/opt/$TERMUX_PKG_NAME/host/"
+	cp "${host_tools[@]/#/out/Release/host/}" "$TERMUX_PREFIX/opt/$TERMUX_PKG_NAME/host/"
 
 	local normal_files=(
 		# v8 snapshot data
@@ -337,6 +335,9 @@ termux_step_make_install() {
 		vk_swiftshader_icd.json
 	)
 	cp "${normal_files[@]/#/out/Release/}" "$TERMUX_PREFIX/opt/$TERMUX_PKG_NAME/"
+
+	mkdir -p "$TERMUX_PREFIX/opt/$TERMUX_PKG_NAME/obj/third_party/pdfium/"
+	cp "out/Release/obj/third_party/pdfium/libpdfium.a" "$TERMUX_PREFIX/opt/$TERMUX_PKG_NAME/obj/third_party/pdfium/"
 }
 
 termux_step_post_make_install() {
