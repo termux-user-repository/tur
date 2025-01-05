@@ -313,7 +313,6 @@ termux_step_make_install() {
 		torque                           # torque
 		bytecode_builtins_list_generator # generate_bytecode_builtins_list
 		gen-regexp-special-case          # v8:run_gen-regexp-special-case
-		icudtl.dat                       # icu data
 	)
 	cp "${v8_tools[@]/#/out/Release/$cr_v8_toolchain/}" "$TERMUX_PREFIX/opt/$TERMUX_PKG_NAME/"
 
