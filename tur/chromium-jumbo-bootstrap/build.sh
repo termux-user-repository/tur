@@ -313,6 +313,7 @@ termux_step_make_install() {
 		torque                           # torque
 		bytecode_builtins_list_generator # generate_bytecode_builtins_list
 		gen-regexp-special-case          # v8:run_gen-regexp-special-case
+		icudtl.dat                       # icu data
 	)
 	cp "${v8_tools[@]/#/out/Release/$cr_v8_toolchain/}" "$TERMUX_PREFIX/opt/$TERMUX_PKG_NAME/"
 
@@ -323,6 +324,7 @@ termux_step_make_install() {
 		root_store_tool                    # gen_root_store_inc
 		transport_security_state_generator # generate_transport_security_state
 		top_domain_generator               # generate_top_domains_trie
+		icudtl.dat                         # icu data
 	)
 	cp "${host_tools[@]/#/out/Release/host/}" "$TERMUX_PREFIX/opt/$TERMUX_PKG_NAME/"
 
@@ -334,9 +336,6 @@ termux_step_make_install() {
 		# swiftshader
 		libvk_swiftshader.so
 		vk_swiftshader_icd.json
-
-		# ICU data
-		icudtl.dat
 	)
 	cp "${normal_files[@]/#/out/Release/}" "$TERMUX_PREFIX/opt/$TERMUX_PKG_NAME/"
 }
