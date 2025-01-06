@@ -3,11 +3,12 @@ TERMUX_PKG_DESCRIPTION="64-bit DOS core"
 TERMUX_PKG_LICENSE="GPL-3.0"
 TERMUX_PKG_MAINTAINER="@stsp"
 TERMUX_PKG_VERSION=1.9
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_REVISION=2
 TERMUX_PKG_SRCURL=https://github.com/dosemu2/fdpp/archive/refs/tags/${TERMUX_PKG_VERSION}.tar.gz
 TERMUX_PKG_SHA256=65fdf0819d490c8ba32fc706309f483f0c6547ff65c860efbb4323e4138896ed
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_BUILD_DEPENDS="nasm-segelf-cross, libelf, thunk-gen-cross"
+TERMUX_PKG_DEPENDS="libelf"
 
 termux_step_configure() {
 	local _PREFIX_FOR_SEGELF=${TERMUX_PREFIX}/opt/nasm-segelf/cross
