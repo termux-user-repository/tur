@@ -7,7 +7,7 @@ TERMUX_PKG_SRCURL=https://github.com/bettercap/bettercap/archive/refs/tags/v${TE
 TERMUX_PKG_SHA256=33fb079d148bdbf640a6a634873dec7799430b0e949ba45007976e50c1323000
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_AUTO_UPDATE=false
-TERMUX_PKG_BUILD_DEPENDS="git, libusb, libpcap, root-repo, libnetfilter-queue"
+TERMUX_PKG_BUILD_DEPENDS="libusb, libpcap, root-repo, libnetfilter-queue"
 TERMUX_PKG_DEPENDS="libusb, libpcap, root-repo, libnetfilter-queue"
 
 termux_step_make() {
