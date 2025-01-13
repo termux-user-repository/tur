@@ -31,7 +31,7 @@ termux_step_make_install() {
 	local install_prefix="$TERMUX_PREFIX/opt/$TERMUX_PKG_NAME"
 	rm -rf "$install_prefix"
 	mkdir -p "$install_prefix"
-	
+
 	# Install binary
 	install -Dm700 rife-ncnn-vulkan "$install_prefix"
 	ln -sfr $install_prefix/rife-ncnn-vulkan $TERMUX_PREFIX/bin/
