@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="Visual Studio Code"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="1.95.3"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=git+https://github.com/microsoft/vscode
 TERMUX_PKG_GIT_BRANCH="$TERMUX_PKG_VERSION"
 TERMUX_PKG_DEPENDS="electron-deps, libx11, libxkbfile, libsecret, ripgrep"
@@ -124,9 +125,9 @@ termux_step_make_install() {
 	local _electron_archive_url=https://github.com/termux-user-repository/electron-tur-builder/releases/download/v$_electron_verion/electron-v$_electron_verion-linux-$ELECTRON_ARCH.zip
 	local _electron_archive_path="$TERMUX_PKG_CACHEDIR/$(basename $_electron_archive_url)"
 	local __sha256sums="
-5405cd610fd32bf752b77ec839ea5be030d67de5b28cb0c7186fd79abea84226 electron-v32.2.1-linux-arm64.zip
-d3af90f0f7ff7e22718bbcfb62a0a80d6498e065bf31abe000a3998141bbbfb9 electron-v32.2.1-linux-armv7l.zip
-cb538c885fc55663038f77638bda670c92802f7c7c0b9adf74963c0c3f9e9077 electron-v32.2.1-linux-x64.zip
+d2afb892c729f37f7e79f329d6aa633b352df95f10304d599044c44bc8010791 electron-v32.2.1-linux-arm64.zip
+65c5c47cb38a34e1e490fd77d17be11f9776a100f8e9f395b97ce28a4d5f3f21 electron-v32.2.1-linux-armv7l.zip
+32976c3084a9ba263ca2b07a764d57d22e349a688f877aabc987600374c886e4 electron-v32.2.1-linux-x64.zip
 	"
 	local __checksum
 	local __file
