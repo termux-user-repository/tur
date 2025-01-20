@@ -1,24 +1,15 @@
 --- a/ddclient.in
 +++ b/ddclient.in
-@@ -50,7 +50,7 @@
- 
- my $etc = subst_var('@sysconfdir@', '/etc/ddclient');
- my $cachedir = subst_var('@localstatedir@', '/var') . '/cache/ddclient';
--my $savedir = '/tmp';
-+my $savedir = '@TERMUX_PREFIX@/tmp';
- if ($program =~ /test/i) {
-     $etc = '.';
-     $cachedir = '.';
-@@ -802,7 +802,7 @@
+@@ -1195,7 +1195,7 @@
          'examples'   => \&nic_nsupdate_examples,
-         'variables' => {
-             %{$variables{'service-common-defaults'}},
--            'login' => setv(T_LOGIN,  1, 0, '/usr/bin/nsupdate', undef),
-+            'login' => setv(T_LOGIN,  1, 0, '@TERMUX_PREFIX@/bin/nsupdate', undef),
-             'tcp'   => setv(T_BOOL,   0, 1, 0,                   undef),
-             'ttl'   => setv(T_NUMBER, 0, 1, 600,                 undef),
-             'zone'  => setv(T_STRING, 1, 1, '',                  undef),
-@@ -2611,7 +2611,7 @@
+         'cfgvars' => {
+             %{$cfgvars{'protocol-common-defaults'}},
+-            'login' => setv(T_LOGIN,  0, '/usr/bin/nsupdate', undef),
++            'login' => setv(T_LOGIN,  0, '@TERMUX_PREFIX@/bin/nsupdate', undef),
+             'tcp'   => setv(T_BOOL,   0, 0,                   undef),
+             'ttl'   => setv(T_NUMBER, 0, 600,                 undef),
+             'zone'  => setv(T_STRING, 1, undef,               undef),
+@@ -2777,7 +2777,7 @@
  
      # Hard code to /tmp rather than use system TMPDIR to protect from malicious
      # shell instructions in TMPDIR environment variable.  All systems should have /tmp.
