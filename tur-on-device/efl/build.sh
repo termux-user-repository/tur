@@ -21,12 +21,12 @@ termux_step_pre_configure() {
 }
 
 termux_step_configure() {
-    termux_setup_meson
-    $TERMUX_MESON build --prefix $TERMUX_PREFIX $TERMUX_PKG_EXTRA_CONFIGURE_ARGS
+	termux_setup_meson
+	$TERMUX_MESON build --prefix $TERMUX_PREFIX $TERMUX_PKG_EXTRA_CONFIGURE_ARGS
 }
 
 termux_step_make() {
-    termux_setup_ninja
+	termux_setup_ninja
 	cd build
 	ninja \
 	-j ${TERMUX_PKG_MAKE_PROCESSES} \
