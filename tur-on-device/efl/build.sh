@@ -27,10 +27,8 @@ termux_step_configure() {
 
 termux_step_make() {
     termux_setup_ninja
-
 	cd build
 	ninja \
 	-j ${TERMUX_PKG_MAKE_PROCESSES} \
 	install
-
 }
