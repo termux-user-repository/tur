@@ -46,7 +46,7 @@ jobs:
       fail-fast: false
     steps:
     - name: Clone repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 1000
         submodules: true
@@ -198,15 +198,21 @@ jobs:
       run: |
         tar cf build-status/${{ matrix.target_arch }}-${{ github.sha }}.tar ./*.txt ./debs ./artifacts ./output
     - name: Upload build deps
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: build-deps-${{ matrix.target_arch }}-${{ github.sha }}
         path: ./build-deps
+        include-hidden-files: true
+        overwrite: true
+        compression-level: 0
     - name: Upload build status
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: build-status-${{ matrix.target_arch }}-${{ github.sha }}
         path: ./build-status
+        include-hidden-files: true
+        overwrite: true
+        compression-level: 0
 
   build-1:
     runs-on: ubuntu-24.04
@@ -222,7 +228,7 @@ jobs:
       fail-fast: false
     steps:
     - name: Clone repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 1000
         submodules: true
@@ -235,12 +241,12 @@ jobs:
         sudo apt autoremove -yq
         sudo rm -rf /opt/hostedtoolcache /usr/local /usr/share/dotnet /usr/share/swift
     - name: Download build deps
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: build-deps-${{ matrix.target_arch }}-${{ github.sha }}
         path: ./build-deps
     - name: Download build status
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: build-status-${{ matrix.target_arch }}-${{ github.sha }}
         path: ./build-status
@@ -267,10 +273,13 @@ jobs:
       run: |
         tar cf build-status/${{ matrix.target_arch }}-${{ github.sha }}.tar ./*.txt ./debs ./artifacts ./output
     - name: Upload build status
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: build-status-${{ matrix.target_arch }}-${{ github.sha }}
         path: ./build-status
+        include-hidden-files: true
+        overwrite: true
+        compression-level: 0
 
   build-2:
     runs-on: ubuntu-24.04
@@ -286,7 +295,7 @@ jobs:
       fail-fast: false
     steps:
     - name: Clone repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 1000
         submodules: true
@@ -299,12 +308,12 @@ jobs:
         sudo apt autoremove -yq
         sudo rm -rf /opt/hostedtoolcache /usr/local /usr/share/dotnet /usr/share/swift
     - name: Download build deps
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: build-deps-${{ matrix.target_arch }}-${{ github.sha }}
         path: ./build-deps
     - name: Download build status
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: build-status-${{ matrix.target_arch }}-${{ github.sha }}
         path: ./build-status
@@ -331,10 +340,13 @@ jobs:
       run: |
         tar cf build-status/${{ matrix.target_arch }}-${{ github.sha }}.tar ./*.txt ./debs ./artifacts ./output
     - name: Upload build status
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: build-status-${{ matrix.target_arch }}-${{ github.sha }}
         path: ./build-status
+        include-hidden-files: true
+        overwrite: true
+        compression-level: 0
 
   build-3:
     runs-on: ubuntu-24.04
@@ -350,7 +362,7 @@ jobs:
       fail-fast: false
     steps:
     - name: Clone repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 1000
         submodules: true
@@ -363,12 +375,12 @@ jobs:
         sudo apt autoremove -yq
         sudo rm -rf /opt/hostedtoolcache /usr/local /usr/share/dotnet /usr/share/swift
     - name: Download build deps
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: build-deps-${{ matrix.target_arch }}-${{ github.sha }}
         path: ./build-deps
     - name: Download build status
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: build-status-${{ matrix.target_arch }}-${{ github.sha }}
         path: ./build-status
@@ -395,10 +407,13 @@ jobs:
       run: |
         tar cf build-status/${{ matrix.target_arch }}-${{ github.sha }}.tar ./*.txt ./debs ./artifacts ./output
     - name: Upload build status
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: build-status-${{ matrix.target_arch }}-${{ github.sha }}
         path: ./build-status
+        include-hidden-files: true
+        overwrite: true
+        compression-level: 0
 
   build-4:
     runs-on: ubuntu-24.04
@@ -414,7 +429,7 @@ jobs:
       fail-fast: false
     steps:
     - name: Clone repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 1000
         submodules: true
@@ -427,12 +442,12 @@ jobs:
         sudo apt autoremove -yq
         sudo rm -rf /opt/hostedtoolcache /usr/local /usr/share/dotnet /usr/share/swift
     - name: Download build deps
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: build-deps-${{ matrix.target_arch }}-${{ github.sha }}
         path: ./build-deps
     - name: Download build status
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: build-status-${{ matrix.target_arch }}-${{ github.sha }}
         path: ./build-status
@@ -459,10 +474,13 @@ jobs:
       run: |
         tar cf build-status/${{ matrix.target_arch }}-${{ github.sha }}.tar ./*.txt ./debs ./artifacts ./output
     - name: Upload build status
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: build-status-${{ matrix.target_arch }}-${{ github.sha }}
         path: ./build-status
+        include-hidden-files: true
+        overwrite: true
+        compression-level: 0
 
   build-5:
     runs-on: ubuntu-24.04
@@ -478,7 +496,7 @@ jobs:
       fail-fast: false
     steps:
     - name: Clone repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 1000
         submodules: true
@@ -491,12 +509,12 @@ jobs:
         sudo apt autoremove -yq
         sudo rm -rf /opt/hostedtoolcache /usr/local /usr/share/dotnet /usr/share/swift
     - name: Download build deps
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: build-deps-${{ matrix.target_arch }}-${{ github.sha }}
         path: ./build-deps
     - name: Download build status
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: build-status-${{ matrix.target_arch }}-${{ github.sha }}
         path: ./build-status
@@ -523,10 +541,13 @@ jobs:
       run: |
         tar cf build-status/${{ matrix.target_arch }}-${{ github.sha }}.tar ./*.txt ./debs ./artifacts ./output
     - name: Upload build status
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: build-status-${{ matrix.target_arch }}-${{ github.sha }}
         path: ./build-status
+        include-hidden-files: true
+        overwrite: true
+        compression-level: 0
 
   build-6:
     runs-on: ubuntu-24.04
@@ -542,7 +563,7 @@ jobs:
       fail-fast: false
     steps:
     - name: Clone repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 1000
         submodules: true
@@ -555,12 +576,12 @@ jobs:
         sudo apt autoremove -yq
         sudo rm -rf /opt/hostedtoolcache /usr/local /usr/share/dotnet /usr/share/swift
     - name: Download build deps
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: build-deps-${{ matrix.target_arch }}-${{ github.sha }}
         path: ./build-deps
     - name: Download build status
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: build-status-${{ matrix.target_arch }}-${{ github.sha }}
         path: ./build-status
@@ -587,10 +608,13 @@ jobs:
       run: |
         tar cf build-status/${{ matrix.target_arch }}-${{ github.sha }}.tar ./*.txt ./debs ./artifacts ./output
     - name: Upload build status
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: build-status-${{ matrix.target_arch }}-${{ github.sha }}
         path: ./build-status
+        include-hidden-files: true
+        overwrite: true
+        compression-level: 0
 
   build-7:
     runs-on: ubuntu-24.04
@@ -606,7 +630,7 @@ jobs:
       fail-fast: false
     steps:
     - name: Clone repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 1000
         submodules: true
@@ -619,12 +643,12 @@ jobs:
         sudo apt autoremove -yq
         sudo rm -rf /opt/hostedtoolcache /usr/local /usr/share/dotnet /usr/share/swift
     - name: Download build deps
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: build-deps-${{ matrix.target_arch }}-${{ github.sha }}
         path: ./build-deps
     - name: Download build status
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: build-status-${{ matrix.target_arch }}-${{ github.sha }}
         path: ./build-status
@@ -651,10 +675,13 @@ jobs:
       run: |
         tar cf build-status/${{ matrix.target_arch }}-${{ github.sha }}.tar ./*.txt ./debs ./artifacts ./output
     - name: Upload build status
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: build-status-${{ matrix.target_arch }}-${{ github.sha }}
         path: ./build-status
+        include-hidden-files: true
+        overwrite: true
+        compression-level: 0
 
   build-8:
     runs-on: ubuntu-24.04
@@ -670,7 +697,7 @@ jobs:
       fail-fast: false
     steps:
     - name: Clone repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 1000
         submodules: true
@@ -683,12 +710,12 @@ jobs:
         sudo apt autoremove -yq
         sudo rm -rf /opt/hostedtoolcache /usr/local /usr/share/dotnet /usr/share/swift
     - name: Download build deps
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: build-deps-${{ matrix.target_arch }}-${{ github.sha }}
         path: ./build-deps
     - name: Download build status
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: build-status-${{ matrix.target_arch }}-${{ github.sha }}
         path: ./build-status
@@ -715,10 +742,13 @@ jobs:
       run: |
         tar cf build-status/${{ matrix.target_arch }}-${{ github.sha }}.tar ./*.txt ./debs ./artifacts ./output
     - name: Upload build status
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: build-status-${{ matrix.target_arch }}-${{ github.sha }}
         path: ./build-status
+        include-hidden-files: true
+        overwrite: true
+        compression-level: 0
 
   build-9:
     runs-on: ubuntu-24.04
@@ -734,7 +764,7 @@ jobs:
       fail-fast: false
     steps:
     - name: Clone repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 1000
         submodules: true
@@ -747,12 +777,12 @@ jobs:
         sudo apt autoremove -yq
         sudo rm -rf /opt/hostedtoolcache /usr/local /usr/share/dotnet /usr/share/swift
     - name: Download build deps
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: build-deps-${{ matrix.target_arch }}-${{ github.sha }}
         path: ./build-deps
     - name: Download build status
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: build-status-${{ matrix.target_arch }}-${{ github.sha }}
         path: ./build-status
@@ -779,10 +809,13 @@ jobs:
       run: |
         tar cf build-status/${{ matrix.target_arch }}-${{ github.sha }}.tar ./*.txt ./debs ./artifacts ./output
     - name: Upload build status
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: build-status-${{ matrix.target_arch }}-${{ github.sha }}
         path: ./build-status
+        include-hidden-files: true
+        overwrite: true
+        compression-level: 0
 
   finished-build:
     runs-on: ubuntu-24.04
@@ -797,7 +830,7 @@ jobs:
       fail-fast: false
     steps:
     - name: Clone repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 1000
         submodules: true
@@ -810,7 +843,7 @@ jobs:
         sudo apt autoremove -yq
         sudo rm -rf /opt/hostedtoolcache /usr/local /usr/share/dotnet /usr/share/swift
     - name: Download build status
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: build-status-${{ matrix.target_arch }}-${{ github.sha }}
         path: ./build-status
@@ -851,10 +884,13 @@ jobs:
         find debs -type f -name "*.deb" -exec sha256sum "{}" \; | sort -k2
     - name: Store *.deb files
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: debs-${{ matrix.target_arch }}-${{ github.sha }}
         path: ./artifacts
+        include-hidden-files: true
+        overwrite: true
+        compression-level: 0
     - name: Upload to temporary release.
       if: github.event_name != 'pull_request'
       run: | 
