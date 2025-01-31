@@ -50,7 +50,7 @@ jobs:
       fail-fast: false
     steps:
     - name: Clone repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 1000
         submodules: true
@@ -227,10 +227,13 @@ jobs:
         find debs -type f -name "*.deb" -exec sha256sum "{}" \; | sort -k2
     - name: Store *.deb files
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: debs-${{ matrix.target_arch }}-${{ github.sha }}
         path: ./artifacts
+        include-hidden-files: true
+        overwrite: true
+        compression-level: 0
 
   upload:
     if: github.event_name != 'pull_request' && github.ref != 'refs/heads/dev' && !startsWith(github.ref, 'refs/heads/dev/')
@@ -238,9 +241,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Clone repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
     - name: Get *.deb files
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         path: ./
     - name: Upload to a temporary release
