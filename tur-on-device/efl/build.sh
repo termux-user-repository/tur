@@ -19,7 +19,7 @@ termux_step_pre_configure() {
 	if [[ "$TERMUX_ARCH" = arm ]] ; then
 		TERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -Dnative-arch-optimization=false"
 	fi
- 
+
 	if [ "${TERMUX_ON_DEVICE_BUILD}" = false ]; then
 		termux_error_exit "This package doesn't support cross-compiling."
 	fi
