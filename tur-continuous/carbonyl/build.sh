@@ -2,18 +2,23 @@ TERMUX_PKG_HOMEPAGE=https://github.com/fathyb/carbonyl
 TERMUX_PKG_DESCRIPTION="Chromium based browser built to run in a terminal"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_LICENSE_FILE="license.md"
-TERMUX_PKG_MAINTAINER="Chongyun Lee <uchkks@protonmail.com>"
-_CHROMIUM_VERSION=110.0.5481.177
+TERMUX_PKG_MAINTAINER="@licy183"
+_CHROMIUM_VERSION=111.0.5563.146
 TERMUX_PKG_VERSION=0.0.3
-TERMUX_PKG_SRCURL=(https://github.com/fathyb/carbonyl/archive/refs/tags/v$TERMUX_PKG_VERSION.tar.gz)
-TERMUX_PKG_SRCURL+=(https://commondatastorage.googleapis.com/chromium-browser-official/chromium-$_CHROMIUM_VERSION.tar.xz)
-TERMUX_PKG_SHA256=(bf421b9498a084a7cf2238a574d37d31b498d3e271fdb3dcf466e7ed6c80013d)
-TERMUX_PKG_SHA256+=(7b2f454d1195270a39f94a9ff6d8d68126be315e0da4e31c20f4ba9183a1c9b7)
-TERMUX_PKG_DEPENDS="electron-deps"
+TERMUX_PKG_REVISION=1
+TERMUX_PKG_SRCURL=(https://github.com/fathyb/carbonyl/archive/refs/tags/v$TERMUX_PKG_VERSION.tar.gz
+					https://commondatastorage.googleapis.com/chromium-browser-official/chromium-$_CHROMIUM_VERSION.tar.xz)
+TERMUX_PKG_SHA256=(bf421b9498a084a7cf2238a574d37d31b498d3e271fdb3dcf466e7ed6c80013d
+					1e701fa31b55fa0633c307af8537b4dbf67e02d8cad1080c57d845ed8c48b5fe)
+TERMUX_PKG_DEPENDS="atk, cups, dbus, fontconfig, gtk3, krb5, libc++, libdrm, libevdev, libxkbcommon, libminizip, libnss, libwayland, libx11, mesa, openssl, pango, pulseaudio, zlib"
 TERMUX_PKG_BUILD_DEPENDS="libnotify, libffi-static"
+TERMUX_PKG_ON_DEVICE_BUILD_NOT_SUPPORTED=true
 # Chromium doesn't support i686 on Linux.
 # Carbonyl donesn't support arm.
 TERMUX_PKG_BLACKLISTED_ARCHES="arm, i686"
+
+SYSTEM_LIBRARIES="    libdrm  fontconfig"
+# TERMUX_PKG_DEPENDS="libdrm, fontconfig"
 
 termux_step_post_get_source() {
 	# Move chromium source
@@ -27,7 +32,10 @@ termux_step_post_get_source() {
 
 	# Apply patches related to chromium
 	pushd chromium/src
-	python $TERMUX_SCRIPTDIR/common-files/apply-chromium-patches.py -v $_CHROMIUM_VERSION
+		for f in $(find "$TERMUX_PKG_BUILDER_DIR/patches" -maxdepth 1 -type f -name *.patch | sort); do
+			echo "Applying patch: $(basename $f)"
+			patch -p1 < "$f"
+		done
 	popd
 
 	# Apply patches related to carbonyl
@@ -67,17 +75,9 @@ termux_step_configure() {
 	ln -s $_host_pkg_config $TERMUX_PKG_TMPDIR/host-pkg-config-bin/pkg-config
 	export PATH="$TERMUX_PKG_TMPDIR/host-pkg-config-bin:$PATH"
 
-	env -i PATH="$PATH" sudo apt update
-	env -i PATH="$PATH" sudo apt install libdrm-dev libjpeg-turbo8-dev libpng-dev fontconfig libfontconfig-dev libfontconfig1-dev libfreetype6-dev zlib1g-dev libcups2-dev libxkbcommon-dev libglib2.0-dev -yq
-	env -i PATH="$PATH" sudo apt install libdrm-dev:i386 libjpeg-turbo8-dev:i386 libpng-dev:i386 libfontconfig-dev:i386 libfontconfig1-dev:i386 libfreetype6-dev:i386 zlib1g-dev:i386 libcups2-dev:i386 libglib2.0-dev:i386 libxkbcommon-dev:i386 -yq
-
-	# Install amd64 rootfs if necessary, it should have been installed by source hooks.
+	# Install amd64 rootfs if necessary
 	build/linux/sysroot_scripts/install-sysroot.py --arch=amd64
 	local _amd64_sysroot_path="$(pwd)/build/linux/$(ls build/linux | grep 'amd64-sysroot')"
-
-	# Install i386 rootfs if necessary, it should have been installed by source hooks.
-	build/linux/sysroot_scripts/install-sysroot.py --arch=i386
-	local _i386_sysroot_path="$(pwd)/build/linux/$(ls build/linux | grep 'i386-sysroot')"
 
 	# Link to system tools required by the build
 	mkdir -p third_party/node/linux/node-linux-x64/bin
@@ -86,7 +86,7 @@ termux_step_configure() {
 
 	# Dummy librt.so
 	# Why not dummy a librt.a? Some of the binaries reference symbols only exists in Android
-	# for some reason, such as the `chrome_crashpad_handler`, which needs to link with 
+	# for some reason, such as the `chrome_crashpad_handler`, which needs to link with
 	# libprotobuf_lite.a, but it is hard to remove the usage of `android/log.h` in protobuf.
 	echo "INPUT(-llog -liconv -landroid-shmem)" > "$TERMUX_PREFIX/lib/librt.so"
 
@@ -117,14 +117,20 @@ termux_step_configure() {
 	popd
 
 	# Construct args
-	local _target_cpu _v8_current_cpu _v8_sysroot_path
-	local _v8_toolchain_name _target_sysroot="$TERMUX_PKG_TMPDIR/sysroot"
+	local _clang_base_path="/usr/lib/llvm-18"
+	local _host_cc="$_clang_base_path/bin/clang"
+	local _host_cxx="$_clang_base_path/bin/clang++"
+	local _host_toolchain="$TERMUX_PKG_CACHEDIR/custom-toolchain:host"
+	local _target_cpu _target_sysroot="$TERMUX_PKG_TMPDIR/sysroot"
+	local _v8_toolchain_name _v8_current_cpu _v8_sysroot_path
 	if [ "$TERMUX_ARCH" = "aarch64" ]; then
 		_target_cpu="arm64"
-		_v8_current_cpu="x64"
+		_v8_current_cpu="arm64"
 		_v8_sysroot_path="$_amd64_sysroot_path"
-		_v8_toolchain_name="clang_x64_v8_arm64"
+		_v8_toolchain_name="host"
 	elif [ "$TERMUX_ARCH" = "arm" ]; then
+		# Install i386 rootfs if necessary
+		build/linux/sysroot_scripts/install-sysroot.py --arch=i386
 		_target_cpu="arm"
 		_v8_current_cpu="x86"
 		_v8_sysroot_path="$_i386_sysroot_path"
@@ -133,7 +139,7 @@ termux_step_configure() {
 		_target_cpu="x64"
 		_v8_current_cpu="x64"
 		_v8_sysroot_path="$_amd64_sysroot_path"
-		_v8_toolchain_name="clang_x64"
+		_v8_toolchain_name="host"
 	fi
 
 	local _common_args_file=$TERMUX_PKG_TMPDIR/common-args-file
@@ -151,7 +157,7 @@ use_sysroot = false
 target_cpu = \"$_target_cpu\"
 target_rpath = \"$TERMUX_PREFIX/lib\"
 target_sysroot = \"$_target_sysroot\"
-clang_base_path = \"$TERMUX_STANDALONE_TOOLCHAIN\"
+clang_base_path = \"$_clang_base_path\"
 custom_toolchain = \"//build/toolchain/linux/unbundle:default\"
 host_toolchain = \"$TERMUX_PKG_CACHEDIR/custom-toolchain:host\"
 v8_snapshot_toolchain = \"$TERMUX_PKG_CACHEDIR/custom-toolchain:$_v8_toolchain_name\"
@@ -173,13 +179,13 @@ use_udev = false
 use_gnome_keyring = false
 use_alsa = false
 use_libpci = false
-use_pulseaudio = true
+use_pulseaudio = false
 use_ozone = true
 use_qt = false
 ozone_auto_platforms = false
-ozone_platform = \"x11\"
-ozone_platform_x11 = true
-ozone_platform_wayland = true
+ozone_platform = \"headless\"
+ozone_platform_x11 = false
+ozone_platform_wayland = false
 ozone_platform_headless = true
 angle_enable_vulkan = true
 angle_enable_swiftshader = true
@@ -188,6 +194,8 @@ use_vaapi_x11 = false
 # See comments on Chromium package
 enable_nacl = false
 use_thin_lto=false
+# Enable jumbo build (unified build)
+# use_jumbo_build = true
 " >> $_common_args_file
 
 	if [ "$TERMUX_ARCH" = "arm" ]; then
@@ -196,29 +204,34 @@ use_thin_lto=false
 	fi
 
 	# Use custom toolchain
+	rm -rf $TERMUX_PKG_CACHEDIR/custom-toolchain
 	mkdir -p $TERMUX_PKG_CACHEDIR/custom-toolchain
-	cp -f $TERMUX_PKG_BUILDER_DIR/toolchain.gn.in $TERMUX_PKG_CACHEDIR/custom-toolchain/BUILD.gn
-	sed -i "s|@HOST_CC@|/usr/bin/clang-14|g
-			s|@HOST_CXX@|/usr/bin/clang++-14|g
-			s|@HOST_LD@|/usr/bin/clang++-14|g
+	cp -f $TERMUX_PKG_BUILDER_DIR/toolchain-template/host-toolchain.gn.in $TERMUX_PKG_CACHEDIR/custom-toolchain/BUILD.gn
+	sed -i "s|@HOST_CC@|$_host_cc|g
+			s|@HOST_CXX@|$_host_cxx|g
+			s|@HOST_LD@|$_host_cxx|g
 			s|@HOST_AR@|$(command -v llvm-ar)|g
 			s|@HOST_NM@|$(command -v llvm-nm)|g
 			s|@HOST_IS_CLANG@|true|g
 			s|@HOST_USE_GOLD@|false|g
 			s|@HOST_SYSROOT@|$_amd64_sysroot_path|g
+			s|@V8_CURRENT_CPU@|$_target_cpu|g
 			" $TERMUX_PKG_CACHEDIR/custom-toolchain/BUILD.gn
-	sed -i "s|@V8_CC@|/usr/bin/clang-14|g
-			s|@V8_CXX@|/usr/bin/clang++-14|g
-			s|@V8_LD@|/usr/bin/clang++-14|g
-			s|@V8_AR@|$(command -v llvm-ar)|g
-			s|@V8_NM@|$(command -v llvm-nm)|g
-			s|@V8_TOOLCHAIN_NAME@|$_v8_toolchain_name|g
-			s|@V8_CURRENT_CPU@|$_v8_current_cpu|g
-			s|@V8_V8_CURRENT_CPU@|$_target_cpu|g
-			s|@V8_IS_CLANG@|true|g
-			s|@V8_USE_GOLD@|false|g
-			s|@V8_SYSROOT@|$_v8_sysroot_path|g
-			" $TERMUX_PKG_CACHEDIR/custom-toolchain/BUILD.gn
+	if [ "$_v8_toolchain_name" != "host" ]; then
+		cat $TERMUX_PKG_BUILDER_DIR/toolchain-template/v8-toolchain.gn.in >> $TERMUX_PKG_CACHEDIR/custom-toolchain/BUILD.gn
+		sed -i "s|@V8_CC@|$_host_cc|g
+				s|@V8_CXX@|$_host_cxx|g
+				s|@V8_LD@|$_host_cxx|g
+				s|@V8_AR@|$(command -v llvm-ar)|g
+				s|@V8_NM@|$(command -v llvm-nm)|g
+				s|@V8_TOOLCHAIN_NAME@|$_v8_toolchain_name|g
+				s|@V8_CURRENT_CPU@|$_v8_current_cpu|g
+				s|@V8_V8_CURRENT_CPU@|$_target_cpu|g
+				s|@V8_IS_CLANG@|true|g
+				s|@V8_USE_GOLD@|false|g
+				s|@V8_SYSROOT@|$_v8_sysroot_path|g
+				" $TERMUX_PKG_CACHEDIR/custom-toolchain/BUILD.gn
+	fi
 
 	cd $TERMUX_PKG_SRCDIR/chromium/src
 	mkdir -p $TERMUX_PKG_BUILDDIR/out/Release
@@ -232,6 +245,28 @@ termux_step_make() {
 	cargo build --jobs $TERMUX_PKG_MAKE_PROCESSES --target $CARGO_TARGET_NAME --release)
 
 	cd $TERMUX_PKG_BUILDDIR
+	# Build v8 snapshot and tools
+	time ninja -C out/Release \
+					v8_context_snapshot \
+					run_torque \
+					generate_bytecode_builtins_list \
+					v8:run_gen-regexp-special-case
+
+	# Build host tools
+	time ninja -C out/Release \
+					generate_top_domain_list_variables_file \
+					generate_chrome_colors_info \
+					character_data \
+					gen_root_store_inc \
+					generate_transport_security_state \
+					generate_top_domains_trie
+
+	# Build swiftshader
+	time ninja -C out/Release \
+						third_party/swiftshader/src/Vulkan:icd_file \
+						third_party/swiftshader/src/Vulkan:swiftshader_libvulkan
+
+	# Build Headless Shell
 	ninja -C $TERMUX_PKG_BUILDDIR/out/Release headless:headless_shell
 }
 
