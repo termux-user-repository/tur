@@ -225,7 +225,7 @@ jobs:
         compression-level: 0
 
   build-arm:
-    runs-on: self-hosted
+    runs-on: ubuntu-24.04-arm
     strategy:
       matrix:
         target_arch: [arm, aarch64]
