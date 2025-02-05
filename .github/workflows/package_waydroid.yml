@@ -15,17 +15,19 @@
 ##  limitations under the License.
 ##
 
-name: Packages-TUR-AVD
+name: Packages-TUR-Waydroid
 
 on:
   push:
     branches:
-    - tur-avd
+    - master
+    - dev
+    - 'dev/**'
     paths:
-    - 'tur-avd/**'
+    - 'tur-waydroid/**'
   pull_request:
     paths:
-    - 'tur-avd/**'
+    - 'tur-waydroid/**'
   workflow_dispatch:
     inputs:
       packages:
@@ -34,26 +36,50 @@ on:
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: ubuntu-24.04
+    env:
+      ANDROID_HOME: "/opt/termux/android-sdk"
+      NDK: "/opt/termux/android-ndk"
+      GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
     strategy:
       matrix:
-        target_arch:
-          # Disabled for aarch64 due to arm64-v8a emulator cannot start.
-          # - {"TERMUX_ARCH": "aarch64", "EMU_ARCH": "arm64-v8a"}
-          - {"TERMUX_ARCH": "arm",     "EMU_ARCH": "armeabi-v7a"}
-          - {"TERMUX_ARCH": "i686",    "EMU_ARCH": "x86"}
-          - {"TERMUX_ARCH": "x86_64",  "EMU_ARCH": "x86_64"}
+        target_arch: [i686, x86_64]
+        # target_arch: [aarch64, arm, i686, x86_64]
       fail-fast: false
     steps:
+    - name: Install DKMS and missing modules
+      run: |
+        sudo apt update
+        sudo apt install dkms -y
+        git clone https://github.com/licy183/anbox-modules -b 6.8.x-ubuntu2404
+        cd anbox-modules && ./INSTALL.sh
+    - name: Install wayland
+      run: |
+        sudo apt update
+        sudo apt install xwayland mutter pulseaudio -y
+    - name: Install waydroid
+      run: |
+        sudo apt update
+        sudo apt install curl ca-certificates -y
+        curl https://repo.waydro.id | sudo bash
+        sudo apt update
+        sudo apt install waydroid -y
+        sudo waydroid init
+    - name: Solve network issues for waydroid
+      run: |
+        # https://unix.stackexchange.com/a/743946
+        sudo sed -i~ -E 's/=.\$\(command -v (nft|ip6?tables-legacy).*/=/g' \
+          /usr/lib/waydroid/data/scripts/waydroid-net.sh
+
     - name: Clone repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 1000
-        path: ${{ github.workspace }}
-    - name: Install basic tools
-      run: brew install coreutils
+        submodules: true
+
     - name: Merge repos
       run: ./setup-environment.sh
+
     - name: Gather build summary
       run: |
         if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
@@ -79,16 +105,29 @@ jobs:
         fi
         mkdir -p ./artifacts ./debs
         touch ./debs/.placeholder
-        echo "File changed: ${CHANGED_FILES}"
         if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+          # Process tag '%ci:no-build' that may be added as line to commit message.
+          # Forces CI to cancel current build with status 'passed'
+          if grep -qiP '^\s*%ci:no-build\s*$' <(git log --format="%B" -n 1 "HEAD"); then
+            tar cf artifacts/debs-${{ matrix.target_arch }}.tar debs
+            echo "[!] Force exiting as tag '%ci:no-build' was applied to HEAD commit message."
+            exit 0
+          fi
+          # XXX: TUR uses the termux-builder directly and may add custom builder image later.
+          # Build local Docker image if setup scripts were changed.
+          # Useful for pull requests submitting changes for both build environment and packages.
+          # if grep -qP '^scripts/(Dockerfile|setup-android-sdk\.sh|setup-ubuntu\.sh)$' <<< "$CHANGED_FILES"; then
+          #   echo "Detected changes for environment setup scripts. Building custom Docker image now."
+          #   cd ./scripts
+          #   docker build -t termux/package-builder:latest .
+          #   cd ..
+          # fi
           for repo_path in $(jq --raw-output 'keys | .[]' repo.json); do
             repo=$(jq --raw-output '.["'${repo_path}'"].name' repo.json)
-            echo "Processing on repo: ${repo}"
             # Parse changed files and identify new packages and deleted packages.
             # Create lists of those packages that will be passed to upload job for
             # further processing.
-            for file in $(echo "${CHANGED_FILES}"); do
-              echo "File path: ${file}"
+            while read -r file; do
               if ! [[ $file == ${repo_path}/* ]]; then
                 # This file does not belong to a package, so ignore it
                 continue
@@ -114,7 +153,7 @@ jobs:
                   echo "$pkg" >> ./deleted_${repo}_packages
                 fi
               fi
-            done
+            done<<<${CHANGED_FILES}
           done
         else
           for pkg in ${{ github.event.inputs.packages }}; do
@@ -141,20 +180,24 @@ jobs:
           if [ -f ./built_${repo}_packages.txt ]; then
             uniq ./built_${repo}_packages.txt > ./built_${repo}_packages.txt.tmp
             mv ./built_${repo}_packages.txt.tmp ./built_${repo}_packages.txt
-            echo "./built_${repo}_packages.txt: "
-            cat ./built_${repo}_packages.txt
           fi
           if [ -f ./built_${repo}_subpackages.txt ]; then
             uniq ./built_${repo}_subpackages.txt > ./built_${repo}_subpackages.txt.tmp
             mv ./built_${repo}_subpackages.txt.tmp ./built_${repo}_subpackages.txt
-            echo "./built_${repo}_subpackages.txt: "
-            cat ./built_${repo}_subpackages.txt
           fi
           if [ -f ./deleted_${repo}_packages.txt ]; then
             uniq ./deleted_${repo}_packages.txt > ./deleted_${repo}_packages.txt.tmp
             mv ./deleted_${repo}_packages.txt.tmp ./deleted_${repo}_packages.txt
           fi
         done
+    - name: Free additional disk space (if necessary)
+      run: |
+        if grep -q '^code-server$\|^demo-package2$\$' ./built_tur_packages.txt; then
+          sudo apt purge -yq $(dpkg -l | grep '^ii' | awk '{ print $2 }' | grep -P '(cabal-|dotnet-|ghc-|libmono|php|aspnetcore)') \
+            mono-runtime-common monodoc-manual ruby
+          sudo apt autoremove -yq
+          sudo rm -rf /opt/hostedtoolcache /usr/local /usr/share/dotnet /usr/share/swift
+        fi
     - name: Lint packages
       run: |
         declare -a package_recipes
@@ -167,39 +210,22 @@ jobs:
         if [ ! -z "$package_recipes" ]; then
           ./scripts/lint-packages.sh $package_recipes
         fi
-
-    # TODO: Generate AVD Snapshot for caching
-    # - name: Check AVD Cache
-    #   uses: actions/cache@v3
-    #   id: avd-cache
-    #   with:
-    #     path: |
-    #       ~/.android/avd/*
-    #       ~/.android/adb*
-    #     key: avd-24-${{ matrix.build_env.MAJOR_VERSION }}
-
-    # - name: Create AVD and Generate Snapshot for Caching
-    #   if: steps.avd-cache.outputs.cache-hit != 'true'
-    #   uses: reactivecircus/android-emulator-runner@v2
-    #   with:
-    #     api-level: 24
-    #     force-avd-creation: false
-    #     emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-    #     disable-animations: false
-    #     script: echo "Generated AVD snapshot for caching."
-
     - name: Build packages
-      uses: licy183/android-emulator-runner@v2.27.0.1
-      with:
-        arch: ${{ matrix.target_arch.EMU_ARCH }}
-        api-level: 24
-        force-avd-creation: false
-        emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-        disable-animations: true
-        script: env TERMUX_ARCH=${{ matrix.target_arch.TERMUX_ARCH }} ./common-files/action-avd-step-build-packages.sh
+      run: |
+        declare -a packages
+        for repo_path in $(jq --raw-output 'keys | .[]' repo.json); do
+          repo=$(jq --raw-output '.["'${repo_path}'"].name' repo.json)
+          if [ -f ./built_${repo}_packages.txt ]; then
+            packages="$packages $(cat ./built_${repo}_packages.txt)"
+          fi
+        done
+        if [ ! -z "$packages" ]; then
+          PACKAGE_TO_BUILD="$packages" bash -x ./waydroid-build-wrapper.sh
+        fi
     - name: Generate build artifacts
       if: always()
       run: |
+        test -d tur/output && mv tur/output/* ./output/
         for repo in $(jq --raw-output '.[].name' repo.json); do
           # Put package lists into directory with *.deb files so they will be transferred to
           # upload job.
@@ -216,18 +242,20 @@ jobs:
         done
         # Files containing certain symbols (e.g. ":") will cause failure in actions/upload-artifact.
         # Archiving *.deb files in a tarball to avoid issues with uploading.
-        tar cf artifacts/debs-${{ matrix.target_arch.TERMUX_ARCH }}-${{ github.sha }}.tar debs
-        rm -rf output
+        tar cf artifacts/debs-${{ matrix.target_arch }}-${{ github.sha }}.tar debs
     - name: Checksums for built *.deb files
       if: always()
       run: |
         find debs -type f -name "*.deb" -exec sha256sum "{}" \; | sort -k2
     - name: Store *.deb files
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
-        name: debs-${{ matrix.target_arch.TERMUX_ARCH }}-${{ github.sha }}
+        name: debs-${{ matrix.target_arch }}-${{ github.sha }}
         path: ./artifacts
+        include-hidden-files: true
+        overwrite: true
+        compression-level: 0
 
   upload:
     if: github.event_name != 'pull_request'
@@ -235,9 +263,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Clone repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
     - name: Get *.deb files
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         path: ./
     - name: Upload to a temporary release
