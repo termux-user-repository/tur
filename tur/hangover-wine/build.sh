@@ -4,6 +4,7 @@ TERMUX_PKG_LICENSE="LGPL-2.1"
 TERMUX_PKG_LICENSE_FILE="LICENSE, LICENSE.OLD, COPYING.LIB"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION=10.0
+TERMUX_PKG_REVISION=1
 _REAL_VERSION="${TERMUX_PKG_VERSION/\~/-}"
 TERMUX_PKG_SRCURL=(
 	https://github.com/AndreRH/wine/archive/refs/tags/hangover-$_REAL_VERSION.tar.gz
@@ -23,14 +24,13 @@ TERMUX_PKG_EXTRA_HOSTBUILD_CONFIGURE_ARGS="
 --disable-tests
 "
 
-TERMUX_PKG_BREAKS="wine-devel, wine-stable, wine-staging"
-TERMUX_PKG_CONFLICTS="wine-devel, wine-stable, wine-staging"
-
 TERMUX_PKG_BLACKLISTED_ARCHES="arm, i686, x86_64"
 
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 enable_wineandroid_drv=no
-exec_prefix=$TERMUX_PREFIX
+--prefix=$TERMUX_PREFIX/opt/hangover-wine
+--exec-prefix=$TERMUX_PREFIX/opt/hangover-wine
+--libdir=$TERMUX_PREFIX/opt/hangover-wine/lib
 --with-wine-tools=$TERMUX_PKG_HOSTBUILD_DIR
 --enable-nls
 --disable-tests
@@ -102,7 +102,6 @@ termux_step_host_build() {
 	_setup_llvm_mingw_toolchain
 
 	# Make host wine-tools
-	(unset sudo; sudo apt update; sudo apt install libfreetype-dev:i386 -yqq)
 	"$TERMUX_PKG_SRCDIR/configure" ${TERMUX_PKG_EXTRA_HOSTBUILD_CONFIGURE_ARGS}
 	make -j "$TERMUX_PKG_MAKE_PROCESSES" __tooldeps__ nls/all
 }
@@ -131,6 +130,14 @@ termux_step_make() {
 
 termux_step_make_install() {
 	make -j $TERMUX_PKG_MAKE_PROCESSES install
+
+	# Create hangover-wine script
+	mkdir -p $TERMUX_PREFIX/bin
+	cat << EOF > $TERMUX_PREFIX/bin/hangover-wine
+#!$TERMUX_PREFIX/bin/env sh
+exec $TERMUX_PREFIX/opt/hangover-wine/bin/wine "\$@"
+EOF
+	chmod +x $TERMUX_PREFIX/bin/hangover-wine
 }
 
 termux_step_post_make_install() {
@@ -142,7 +149,7 @@ termux_step_post_make_install() {
 		ar -x "$TERMUX_PKG_SRCDIR"/hangover-lib${_type}_${_REAL_VERSION}_arm64.deb
 		tar xf data.tar.xz
 		install -Dm644 usr/lib/wine/aarch64-windows/lib$_type.dll \
-			"$TERMUX_PREFIX"/lib/wine/aarch64-windows/lib$_type.dll
+			"$TERMUX_PREFIX"/opt/hangover-wine/lib/wine/aarch64-windows/lib$_type.dll
 		install -Dm644 usr/share/doc/hangover-lib$_type/copyright \
 			"$TERMUX_PREFIX"/share/doc/hangover-lib$_type/copyright
 		cd -
