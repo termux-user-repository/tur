@@ -4,6 +4,7 @@ TERMUX_PKG_LICENSE="LGPL-2.1"
 TERMUX_PKG_LICENSE_FILE="LICENSE, LICENSE.OLD, COPYING.LIB"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="10.0"
+TERMUX_PKG_REVISION=1
 _REAL_VERSION="${TERMUX_PKG_VERSION/\~/-}"
 _VERSION_FOLDER="$(test "${_REAL_VERSION:3:1}" = 0 && echo ${_REAL_VERSION:0:4} || echo ${_REAL_VERSION:0:3}x)"
 TERMUX_PKG_SRCURL=https://dl.winehq.org/wine/source/${_VERSION_FOLDER}/wine-$_REAL_VERSION.tar.xz
@@ -20,12 +21,11 @@ TERMUX_PKG_EXTRA_HOSTBUILD_CONFIGURE_ARGS="
 --disable-tests
 "
 
-TERMUX_PKG_BREAKS="hangover-wine, wine-stable, wine-staging"
-TERMUX_PKG_CONFLICTS="hangover-wine, wine-stable, wine-staging"
-
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 enable_wineandroid_drv=no
-exec_prefix=$TERMUX_PREFIX
+--prefix=$TERMUX_PREFIX/opt/wine-devel
+--exec-prefix=$TERMUX_PREFIX/opt/wine-devel
+--libdir=$TERMUX_PREFIX/opt/wine-devel/lib
 --with-wine-tools=$TERMUX_PKG_HOSTBUILD_DIR
 --enable-nls
 --disable-tests
@@ -172,4 +172,12 @@ termux_step_make() {
 
 termux_step_make_install() {
 	make -j $TERMUX_PKG_MAKE_PROCESSES install
+
+	# Create wine-devel script
+	mkdir -p $TERMUX_PREFIX/bin
+	cat << EOF > $TERMUX_PREFIX/bin/wine-devel
+#!$TERMUX_PREFIX/bin/env sh
+exec $TERMUX_PREFIX/opt/wine-devel/bin/wine "\$@"
+EOF
+	chmod +x $TERMUX_PREFIX/bin/wine-devel
 }
