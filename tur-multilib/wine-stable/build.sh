@@ -1,16 +1,14 @@
 TERMUX_PKG_HOMEPAGE=https://www.winehq.org/
 TERMUX_PKG_DESCRIPTION="A compatibility layer for running Windows programs"
 TERMUX_PKG_LICENSE="LGPL-2.1"
-TERMUX_PKG_LICENSE_FILE="\
-LICENSE
-LICENSE.OLD
-COPYING.LIB"
-TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION=9.0
-TERMUX_PKG_SRCURL=https://dl.winehq.org/wine/source/${TERMUX_PKG_VERSION:0:3}/wine-$TERMUX_PKG_VERSION.tar.xz
-TERMUX_PKG_SHA256=7cfd090a5395f5b76d95bb5defac8a312c8de4c070c1163b8b58da38330ca6ee
-TERMUX_PKG_DEPENDS="fontconfig, freetype, krb5, libandroid-spawn, libc++, libgmp, libgnutls, libxcb, libxcomposite, libxcursor, libxfixes, libxrender, mesa, opengl, pulseaudio, sdl2, vulkan-loader, xorg-xrandr"
-TERMUX_PKG_ANTI_BUILD_DEPENDS="vulkan-loader"
+TERMUX_PKG_LICENSE_FILE="LICENSE, LICENSE.OLD, COPYING.LIB"
+TERMUX_PKG_MAINTAINER="@termux"
+TERMUX_PKG_VERSION="10.0"
+TERMUX_PKG_REVISION=1
+TERMUX_PKG_SRCURL=https://dl.winehq.org/wine/source/${TERMUX_PKG_VERSION%%.*}.0/wine-$TERMUX_PKG_VERSION.tar.xz
+TERMUX_PKG_SHA256=c5e0b3f5f7efafb30e9cd4d9c624b85c583171d33549d933cd3402f341ac3601
+TERMUX_PKG_DEPENDS="fontconfig, freetype, krb5, libandroid-spawn, libc++, libgmp, libgnutls, libxcb, libxcomposite, libxcursor, libxfixes, libxrender, mesa, opengl, pulseaudio, sdl2 | sdl2-compat, vulkan-loader, xorg-xrandr"
+TERMUX_PKG_ANTI_BUILD_DEPENDS="sdl2-compat, vulkan-loader"
 TERMUX_PKG_BUILD_DEPENDS="libandroid-spawn-static, vulkan-loader-generic"
 TERMUX_PKG_NO_STATICSPLIT=true
 TERMUX_PKG_HOSTBUILD=true
@@ -21,7 +19,9 @@ TERMUX_PKG_EXTRA_HOSTBUILD_CONFIGURE_ARGS="
 
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 enable_wineandroid_drv=no
-exec_prefix=$TERMUX_PREFIX
+--prefix=$TERMUX_PREFIX/opt/wine-stable
+--exec-prefix=$TERMUX_PREFIX/opt/wine-stable
+--libdir=$TERMUX_PREFIX/opt/wine-stable/lib
 --with-wine-tools=$TERMUX_PKG_HOSTBUILD_DIR
 --enable-nls
 --disable-tests
@@ -73,7 +73,6 @@ exec_prefix=$TERMUX_PREFIX
 # TERMUX_PKG_BLACKLISTED_ARCHES="arm"
 
 # Enable win64 on 64-bit arches.
-# TODO: Enable win32 after TUR has full support for mutilib 
 if [ "$TERMUX_ARCH_BITS" = 64 ]; then
 	TERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" --enable-win64"
 fi
@@ -105,7 +104,6 @@ termux_step_host_build() {
 	_setup_llvm_mingw_toolchain
 
 	# Make host wine-tools
-	(unset sudo; sudo apt update; sudo apt install libfreetype-dev:i386 -yqq)
 	"$TERMUX_PKG_SRCDIR/configure" ${TERMUX_PKG_EXTRA_HOSTBUILD_CONFIGURE_ARGS}
 	make -j "$TERMUX_PKG_MAKE_PROCESSES" __tooldeps__ nls/all
 }
@@ -126,12 +124,27 @@ termux_step_pre_configure() {
 	LDFLAGS="${LDFLAGS/-Wl,-z,relro,-z,now/}"
 
 	LDFLAGS+=" -landroid-spawn"
-}
 
-termux_step_make() {
-	make -j $TERMUX_PKG_MAKE_PROCESSES -k
+	if [ "$TERMUX_ARCH" = "x86_64" ]; then
+		mkdir -p "$TERMUX_PKG_TMPDIR/bin"
+		cat <<- EOF > "$TERMUX_PKG_TMPDIR/bin/x86_64-linux-android-clang"
+			#!/bin/bash
+			set -- "\${@/-mabi=ms/}"
+			exec $TERMUX_STANDALONE_TOOLCHAIN/bin/x86_64-linux-android-clang "\$@"
+		EOF
+		chmod +x "$TERMUX_PKG_TMPDIR/bin/x86_64-linux-android-clang"
+		export PATH="$TERMUX_PKG_TMPDIR/bin:$PATH"
+	fi
 }
 
 termux_step_make_install() {
 	make -j $TERMUX_PKG_MAKE_PROCESSES install
+
+	# Create wine-stable script
+	mkdir -p $TERMUX_PREFIX/bin
+	cat << EOF > $TERMUX_PREFIX/bin/wine-stable
+#!$TERMUX_PREFIX/bin/env sh
+exec $TERMUX_PREFIX/opt/wine-stable/bin/wine "\$@"
+EOF
+	chmod +x $TERMUX_PREFIX/bin/wine-stable
 }
