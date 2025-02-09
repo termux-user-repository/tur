@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://github.com/pola-rs/polars
 TERMUX_PKG_DESCRIPTION="Dataframes powered by a multithreaded, vectorized query engine, written in Rust"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="1.18.0"
+TERMUX_PKG_VERSION="1.19.0"
 TERMUX_PKG_SRCURL=https://github.com/pola-rs/polars/releases/download/py-$TERMUX_PKG_VERSION/polars-$TERMUX_PKG_VERSION.tar.gz
-TERMUX_PKG_SHA256=5c2f119555ae8d822a5322509c6abd91601a8931115d2e4c3fff13fadf39e877
+TERMUX_PKG_SHA256=b52ada5c43fcdadf64f282522198c5549ee4e46ea57d236a4d7e572643070d9d
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_DEPENDS="libc++, python"
 TERMUX_PKG_PYTHON_COMMON_DEPS="wheel"
@@ -42,75 +42,48 @@ termux_step_pre_configure() {
 	: "${CARGO_HOME:=$HOME/.cargo}"
 	export CARGO_HOME
 
-	rm -rf $CARGO_HOME/registry/src/*/cmake-*
-	rm -rf $CARGO_HOME/registry/src/*/jemalloc-sys-*
-	rm -rf $CARGO_HOME/registry/src/*/arboard-*
 	cargo fetch --target "${CARGO_TARGET_NAME}"
 
-	local p="cmake-0.1.50-src-lib.rs.diff"
-	local d
-	for d in $CARGO_HOME/registry/src/*/cmake-*; do
-		patch --silent -p1 -d ${d} \
-			< "$TERMUX_PKG_BUILDER_DIR/${p}"
-	done
+	# Dummy CMake toolchain file to workaround build error:
+	# CMake Error at /home/builder/.termux-build/_cache/cmake-3.30.3/share/cmake-3.30/Modules/Platform/Android-Determine.cmake:218 (message):
+	# Android: Neither the NDK or a standalone toolchain was found.
+	export TARGET_CMAKE_TOOLCHAIN_FILE="${TERMUX_PKG_BUILDDIR}/android.toolchain.cmake"
+	touch "${TERMUX_PKG_BUILDDIR}/android.toolchain.cmake"
 
-	p="jemalloc-sys-0.5.4+5.3.0-patched-src-lib.rs.diff"
-	for d in $CARGO_HOME/registry/src/*/jemalloc-sys-*; do
-		patch --silent -p1 -d ${d} < "$TERMUX_PKG_BUILDER_DIR/${p}"
-	done
+	cargo vendor
+	patch --silent -p1 \
+		-d ./vendor/arboard/ \
+		< "$TERMUX_PKG_BUILDER_DIR"/arboard-dummy-platform.diff
+	patch --silent -p1 \
+		-d ./vendor/jemalloc-sys/ \
+		< "$TERMUX_PKG_BUILDER_DIR"/jemalloc-sys-0.5.4+5.3.0-patched-src-lib.rs.diff
 
-	p="arboard-dummy-platform.diff"
-	for d in $CARGO_HOME/registry/src/*/arboard-*; do
-		patch --silent -p1 -d ${d} < "$TERMUX_PKG_BUILDER_DIR/${p}"
-	done
+	patch --silent -p1 \
+		-d "$TERMUX_PKG_SRCDIR" \
+		< "$TERMUX_PKG_BUILDER_DIR"/patch-root-Cargo.diff
 
-	local _CARGO_TARGET_LIBDIR="target/${CARGO_TARGET_NAME}/release/deps"
-	mkdir -p $_CARGO_TARGET_LIBDIR
-
-	mv $TERMUX_PREFIX/lib/libz.so.1{,.tmp}
-	mv $TERMUX_PREFIX/lib/libz.so{,.tmp}
-
-	ln -sfT $(readlink -f $TERMUX_PREFIX/lib/libz.so.1.tmp) \
-		$_CARGO_TARGET_LIBDIR/libz.so.1
-	ln -sfT $(readlink -f $TERMUX_PREFIX/lib/libz.so.tmp) \
-		$_CARGO_TARGET_LIBDIR/libz.so
-
-	LDFLAGS+=" -Wl,--no-as-needed -lpython${TERMUX_PYTHON_VERSION}"
-
-	# XXX: Don't know why, this is needed for `cmake` in rust to work properly
-	local _rtarget _renv
-	for _rtarget in {aarch64,i686,x86_64}-linux-android armv7-linux-androideabi; do
-		_renv="CFLAGS_${_rtarget//-/_}"
-		export $_renv+=" --target=${CCTERMUX_HOST_PLATFORM}"
-	done
+	LDFLAGS+=" -Wl,--no-as-needed,-lpython${TERMUX_PYTHON_VERSION},--as-needed"
 }
 
 termux_step_make() {
-	:
-}
-
-termux_step_make_install() {
 	export CARGO_BUILD_TARGET=${CARGO_TARGET_NAME}
 	export PYO3_CROSS_LIB_DIR=$TERMUX_PREFIX/lib
 	export PYTHONPATH=$TERMUX_PREFIX/lib/python${TERMUX_PYTHON_VERSION}/site-packages
 
-	build-python -m maturin build --release --skip-auditwheel --target $CARGO_BUILD_TARGET
+	build-python -m maturin build \
+				--target $CARGO_BUILD_TARGET \
+				--release --skip-auditwheel \
+				--interpreter python${TERMUX_PYTHON_VERSION}
+}
 
+termux_step_make_install() {
 	pip install --no-deps ./target/wheels/*.whl --prefix $TERMUX_PREFIX
 }
 
 termux_step_post_make_install() {
-	mv $TERMUX_PREFIX/lib/libz.so.1{.tmp,}
-	mv $TERMUX_PREFIX/lib/libz.so{.tmp,}
-
+	# This is not necessary, and may cause file conflict
 	rm -f $PYTHONPATH/rust-toolchain.toml
-}
 
-termux_step_post_massage() {
-	rm -f lib/libz.so.1
-	rm -f lib/libz.so
-
-	rm -rf $CARGO_HOME/registry/src/*/cmake-*
-	rm -rf $CARGO_HOME/registry/src/*/jemalloc-sys-*
-	rm -rf $CARGO_HOME/registry/src/*/arboard-*
+	# Remove the vendor sources to save space
+	rm -rf "$TERMUX_PKG_SRCDIR"/vendor
 }
