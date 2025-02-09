@@ -1,0 +1,11 @@
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -134,6 +134,8 @@
+ # simd-json = { git = "https://github.com/ritchie46/simd-json", branch = "alignment" }
+ pyo3 = { git = "https://github.com/bschoenmaeckers/pyo3.git", branch = "release-0.23" }
+ pyo3-ffi = { git = "https://github.com/bschoenmaeckers/pyo3.git", branch = "release-0.23" }
++arboard = { path = "./vendor/arboard" }
++jemalloc-sys = { path = "./vendor/jemalloc-sys" }
+ 
+ [profile.mindebug-dev]
+ inherits = "dev"
