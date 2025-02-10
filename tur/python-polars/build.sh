@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://github.com/pola-rs/polars
 TERMUX_PKG_DESCRIPTION="Dataframes powered by a multithreaded, vectorized query engine, written in Rust"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="1.19.0"
+TERMUX_PKG_VERSION="1.22.0"
 TERMUX_PKG_SRCURL=https://github.com/pola-rs/polars/releases/download/py-$TERMUX_PKG_VERSION/polars-$TERMUX_PKG_VERSION.tar.gz
-TERMUX_PKG_SHA256=b52ada5c43fcdadf64f282522198c5549ee4e46ea57d236a4d7e572643070d9d
+TERMUX_PKG_SHA256=8d94ae25085d92de10d93ab6a06c94f8c911bd5d9c1ff17cd1073a9dca766029
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_DEPENDS="libc++, python"
 TERMUX_PKG_PYTHON_COMMON_DEPS="wheel"
@@ -58,9 +58,10 @@ termux_step_pre_configure() {
 		-d ./vendor/jemalloc-sys/ \
 		< "$TERMUX_PKG_BUILDER_DIR"/jemalloc-sys-0.5.4+5.3.0-patched-src-lib.rs.diff
 
-	patch --silent -p1 \
-		-d "$TERMUX_PKG_SRCDIR" \
-		< "$TERMUX_PKG_BUILDER_DIR"/patch-root-Cargo.diff
+	sed -i 's|^\(\[patch\.crates-io\]\)$|\1\narboard = { path = "\./vendor/arboard" }|g' \
+		Cargo.toml
+	sed -i 's|^\(\[patch\.crates-io\]\)$|\1\njemalloc-sys = { path = "\./vendor/jemalloc-sys" }|g' \
+		Cargo.toml
 
 	LDFLAGS+=" -Wl,--no-as-needed,-lpython${TERMUX_PYTHON_VERSION},--as-needed"
 }
