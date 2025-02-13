@@ -20,6 +20,7 @@ termux_step_pre_configure() {
 
 termux_step_make() {
 	./cc.sh
+	dotnet build-server shutdown
 }
 
 termux_step_make_install() {
