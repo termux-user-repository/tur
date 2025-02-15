@@ -1,0 +1,446 @@
+diff --git a/Cargo.toml b/Cargo.toml
+index 0f45e40..0d9ff0b 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -106,7 +106,7 @@ winres = "0.1"
+ [target.'cfg(target_os = "macos")'.dependencies]
+ objc = "0.2"
+ 
+-[target.'cfg(target_os = "android")'.dependencies]
++[target.'cfg(target_os = "dummy")'.dependencies]
+ ndk = "0.7"
+ ndk-glue = "0.7"
+ ndk-sys = "0.4"
+diff --git a/build.rs b/build.rs
+index df14ab8..cd3d37c 100644
+--- a/build.rs
++++ b/build.rs
+@@ -30,7 +30,7 @@ fn main() {
+         println!("cargo:rustc-link-arg=CoreHaptics");
+     }
+ 
+-    if target.contains("android") {
++    if target.contains("dummy") {
+         println!("cargo:rustc-link-lib=dylib=GLESv2");
+         println!("cargo:rustc-link-lib=dylib=EGL");
+     }
+diff --git a/drsandroid/src/lib.rs b/drsandroid/src/lib.rs
+index a12cbd0..85720c3 100644
+--- a/drsandroid/src/lib.rs
++++ b/drsandroid/src/lib.rs
+@@ -1,5 +1,5 @@
+-#[cfg(target_os = "android")]
+-#[cfg_attr(target_os = "android", ndk_glue::main())]
++#[cfg(target_os = "dummy")]
++#[cfg_attr(target_os = "dummy", ndk_glue::main())]
+ pub fn android_main() {
+     let resource_dir = std::path::PathBuf::from(ndk_glue::native_activity().internal_data_path().to_string_lossy().to_string());
+ 
+diff --git a/src/data/vanilla.rs b/src/data/vanilla.rs
+index 853738b..c2365e6 100644
+--- a/src/data/vanilla.rs
++++ b/src/data/vanilla.rs
+@@ -36,10 +36,10 @@ impl RangeExt for Range<u32> {
+ 
+ impl VanillaExtractor {
+     pub fn from(ctx: &mut Context, exe_name: String, data_base_dir: String) -> Option<Self> {
+-        #[cfg(not(any(target_os = "android", target_os = "horizon")))]
++        #[cfg(not(any(target_os = "dummy", target_os = "horizon")))]
+         let mut vanilla_exe_path = env::current_dir().unwrap();
+ 
+-        #[cfg(target_os = "android")]
++        #[cfg(target_os = "dummy")]
+         let mut vanilla_exe_path = PathBuf::from(ndk_glue::native_activity().internal_data_path().to_string_lossy().to_string());
+ 
+         #[cfg(target_os = "horizon")]
+@@ -49,7 +49,7 @@ impl VanillaExtractor {
+ 
+         log::info!("Looking for vanilla game executable at {:?}", vanilla_exe_path);
+ 
+-        #[cfg(not(any(target_os = "android", target_os = "horizon")))]
++        #[cfg(not(any(target_os = "dummy", target_os = "horizon")))]
+         if !vanilla_exe_path.is_file() {
+             vanilla_exe_path = env::current_exe().unwrap();
+             vanilla_exe_path.pop();
+diff --git a/src/engine_constants/mod.rs b/src/engine_constants/mod.rs
+index 2298bd6..72545cf 100644
+--- a/src/engine_constants/mod.rs
++++ b/src/engine_constants/mod.rs
+@@ -289,7 +289,7 @@ impl EngineConstants {
+             is_demo: false,
+             supports_og_textures: false,
+             has_difficulty_menu: true,
+-            supports_two_player: cfg!(not(target_os = "android")),
++            supports_two_player: cfg!(not(target_os = "dummy")),
+             game: GameConsts {
+                 intro_stage: 72,
+                 intro_event: 100,
+diff --git a/src/framework/backend_glutin.rs b/src/framework/backend_glutin.rs
+index 49564db..b1f9453 100644
+--- a/src/framework/backend_glutin.rs
++++ b/src/framework/backend_glutin.rs
+@@ -36,7 +36,7 @@ impl GlutinBackend {
+ 
+ impl Backend for GlutinBackend {
+     fn create_event_loop(&self, _ctx: &Context) -> GameResult<Box<dyn BackendEventLoop>> {
+-        #[cfg(target_os = "android")]
++        #[cfg(target_os = "dummy")]
+         loop {
+             match ndk_glue::native_window().as_ref() {
+                 Some(_) => {
+@@ -68,7 +68,7 @@ impl GlutinEventLoop {
+             
+             let windowed_context = ContextBuilder::new();
+             let windowed_context = windowed_context.with_gl(GlRequest::Specific(Api::OpenGl, (3, 0)));
+-            #[cfg(target_os = "android")]
++            #[cfg(target_os = "dummy")]
+             let windowed_context = windowed_context.with_gl(GlRequest::Specific(Api::OpenGlEs, (2, 0)));
+ 
+             let windowed_context = windowed_context
+@@ -85,7 +85,7 @@ impl GlutinEventLoop {
+ 
+             window = window.with_title("doukutsu-rs");
+             
+-            #[cfg(not(any(target_os = "windows", target_os = "android", target_os = "horizon")))]
++            #[cfg(not(any(target_os = "windows", target_os = "dummy", target_os = "horizon")))]
+             {
+                 let mut file = filesystem::open(&ctx, "/builtin/icon.bmp").unwrap();
+                 let mut buf: Vec<u8> = Vec::new();
+@@ -106,7 +106,7 @@ impl GlutinEventLoop {
+ 
+             let windowed_context = unsafe { windowed_context.make_current().unwrap() };
+ 
+-            #[cfg(target_os = "android")]
++            #[cfg(target_os = "dummy")]
+             if let Some(nwin) = ndk_glue::native_window().as_ref() {
+                 unsafe {
+                     windowed_context.surface_created(nwin.ptr().as_ptr() as *mut std::ffi::c_void);
+@@ -120,7 +120,7 @@ impl GlutinEventLoop {
+     }
+ }
+ 
+-#[cfg(target_os = "android")]
++#[cfg(target_os = "dummy")]
+ fn request_android_redraw() {
+     match ndk_glue::native_window().as_ref() {
+         Some(native_window) => {
+@@ -137,7 +137,7 @@ fn request_android_redraw() {
+     }
+ }
+ 
+-#[cfg(target_os = "android")]
++#[cfg(target_os = "dummy")]
+ fn get_insets() -> GameResult<(f32, f32, f32, f32)> {
+     unsafe {
+         use jni::objects::JObject;
+@@ -202,7 +202,7 @@ impl BackendEventLoop for GlutinEventLoop {
+                         *mutex = false;
+                     }
+ 
+-                    #[cfg(target_os = "android")]
++                    #[cfg(target_os = "dummy")]
+                     if let Some(nwin) = ndk_glue::native_window().as_ref() {
+                         state_ref.graphics_reset();
+                         unsafe {
+@@ -219,7 +219,7 @@ impl BackendEventLoop for GlutinEventLoop {
+                         *mutex = true;
+                     }
+ 
+-                    #[cfg(target_os = "android")]
++                    #[cfg(target_os = "dummy")]
+                     unsafe {
+                         window.surface_destroyed();
+                     }
+@@ -296,7 +296,7 @@ impl BackendEventLoop for GlutinEventLoop {
+                         }
+                     }
+ 
+-                    #[cfg(not(target_os = "android"))]
++                    #[cfg(not(target_os = "dummy"))]
+                     {
+                         if let Err(err) = game.draw(ctx) {
+                             log::error!("Failed to draw frame: {}", err);
+@@ -305,7 +305,7 @@ impl BackendEventLoop for GlutinEventLoop {
+                         window.window().request_redraw();
+                     }
+ 
+-                    #[cfg(target_os = "android")]
++                    #[cfg(target_os = "dummy")]
+                     request_android_redraw();
+                 }
+                 Event::MainEventsCleared => {
+@@ -322,7 +322,7 @@ impl BackendEventLoop for GlutinEventLoop {
+                         }
+                     }
+ 
+-                    #[cfg(not(any(target_os = "android", target_os = "horizon")))]
++                    #[cfg(not(any(target_os = "dummy", target_os = "horizon")))]
+                     {
+                         if state_ref.settings.window_mode.get_glutin_fullscreen_type() != window.window().fullscreen() {
+                             let fullscreen_type = state_ref.settings.window_mode.get_glutin_fullscreen_type();
+@@ -335,7 +335,7 @@ impl BackendEventLoop for GlutinEventLoop {
+ 
+                     game.update(ctx).unwrap();
+ 
+-                    #[cfg(target_os = "android")]
++                    #[cfg(target_os = "dummy")]
+                     {
+                         match get_insets() {
+                             Ok(insets) => {
+diff --git a/src/framework/backend_sdl2.rs b/src/framework/backend_sdl2.rs
+index fd91da3..969dea5 100644
+--- a/src/framework/backend_sdl2.rs
++++ b/src/framework/backend_sdl2.rs
+@@ -180,7 +180,7 @@ impl SDL2EventLoop {
+         win_builder.opengl();
+ 
+         let mut window = win_builder.build().map_err(|e| GameError::WindowError(e.to_string()))?;
+-        #[cfg(not(any(target_os = "windows", target_os = "android", target_os = "horizon")))]
++        #[cfg(not(any(target_os = "windows", target_os = "dummy", target_os = "horizon")))]
+         {
+             let mut file = filesystem::open(&ctx, "/builtin/icon.bmp").unwrap();
+             let mut buf: Vec<u8> = Vec::new();
+diff --git a/src/framework/error.rs b/src/framework/error.rs
+index 1a41e89..5ca737f 100644
+--- a/src/framework/error.rs
++++ b/src/framework/error.rs
+@@ -101,7 +101,7 @@ impl From<serde_json::Error> for GameError {
+     }
+ }
+ 
+-#[cfg(target_os = "android")]
++#[cfg(target_os = "dummy")]
+ impl From<jni::errors::Error> for GameError {
+     fn from(e: jni::errors::Error) -> GameError {
+         GameError::WindowError(e.to_string())
+diff --git a/src/game/filesystem_container.rs b/src/game/filesystem_container.rs
+index e788ecf..fd2673d 100644
+--- a/src/game/filesystem_container.rs
++++ b/src/game/filesystem_container.rs
+@@ -23,7 +23,7 @@ impl FilesystemContainer {
+     }
+ 
+     pub fn mount_fs(&mut self, context: &mut Context) -> GameResult {
+-        #[cfg(not(any(target_os = "android", target_os = "horizon")))]
++        #[cfg(not(any(target_os = "dummy", target_os = "horizon")))]
+         let resource_dir = if let Ok(data_dir) = std::env::var("CAVESTORY_DATA_DIR") {
+             PathBuf::from(data_dir)
+         } else {
+@@ -63,18 +63,18 @@ impl FilesystemContainer {
+             resource_dir
+         };
+ 
+-        #[cfg(not(any(target_os = "android", target_os = "horizon")))]
++        #[cfg(not(any(target_os = "dummy", target_os = "horizon")))]
+         log::info!("Resource directory: {:?}", resource_dir);
+ 
+         log::info!("Initializing engine...");
+ 
+-        #[cfg(not(any(target_os = "android", target_os = "horizon")))]
++        #[cfg(not(any(target_os = "dummy", target_os = "horizon")))]
+         {
+             mount_vfs(context, Box::new(PhysicalFS::new(&resource_dir, true)));
+             self.game_path = resource_dir.clone();
+         }
+ 
+-        #[cfg(not(any(target_os = "android", target_os = "horizon")))]
++        #[cfg(not(any(target_os = "dummy", target_os = "horizon")))]
+         let project_dirs = match directories::ProjectDirs::from("", "", "doukutsu-rs") {
+             Some(dirs) => dirs,
+             None => {
+@@ -84,7 +84,7 @@ impl FilesystemContainer {
+                 )));
+             }
+         };
+-        #[cfg(target_os = "android")]
++        #[cfg(target_os = "dummy")]
+         {
+             let mut data_path =
+                 PathBuf::from(ndk_glue::native_activity().internal_data_path().to_string_lossy().to_string());
+@@ -125,7 +125,7 @@ impl FilesystemContainer {
+             self.game_path = data_path.clone();
+         }
+ 
+-        #[cfg(not(any(target_os = "android", target_os = "horizon")))]
++        #[cfg(not(any(target_os = "dummy", target_os = "horizon")))]
+         {
+             let mut user_dir = resource_dir.clone();
+             user_dir.pop();
+@@ -195,7 +195,7 @@ impl FilesystemContainer {
+         #[cfg(target_os = "horizon")]
+         return Ok(()); // can't open directories on switch
+ 
+-        #[cfg(target_os = "android")]
++        #[cfg(target_os = "dummy")]
+         unsafe {
+             use jni::objects::{JObject, JValue};
+             use jni::JavaVM;
+@@ -212,7 +212,7 @@ impl FilesystemContainer {
+             return Ok(());
+         }
+ 
+-        #[cfg(not(any(target_os = "android", target_os = "horizon")))]
++        #[cfg(not(any(target_os = "dummy", target_os = "horizon")))]
+         open::that(path).map_err(|e| {
+             use crate::framework::error::GameError;
+             GameError::FilesystemError(format!("Failed to open directory: {}", e))
+diff --git a/src/game/mod.rs b/src/game/mod.rs
+index 9f158db..7b95318 100644
+--- a/src/game/mod.rs
++++ b/src/game/mod.rs
+@@ -223,7 +223,7 @@ fn get_logs_dir() -> GameResult<PathBuf> {
+     let mut logs_dir: PathBuf;
+ 
+ 
+-    #[cfg(target_os = "android")]
++    #[cfg(target_os = "dummy")]
+     {
+         logs_dir = PathBuf::from(ndk_glue::native_activity().internal_data_path().to_string_lossy().to_string());
+     }
+@@ -233,7 +233,7 @@ fn get_logs_dir() -> GameResult<PathBuf> {
+         logs_dir = PathBuf::from("sdmc:/switch/doukutsu-rs");
+     }
+ 
+-    #[cfg(not(any(target_os = "android", target_os = "horizon")))]
++    #[cfg(not(any(target_os = "dummy", target_os = "horizon")))]
+     {
+         let project_dirs = match directories::ProjectDirs::from("", "", "doukutsu-rs") {
+             Some(dirs) => dirs,
+diff --git a/src/game/settings.rs b/src/game/settings.rs
+index e598415..180017e 100644
+--- a/src/game/settings.rs
++++ b/src/game/settings.rs
+@@ -434,7 +434,7 @@ impl Default for Settings {
+             light_cone: true,
+             subpixel_coords: true,
+             motion_interpolation: true,
+-            touch_controls: cfg!(target_os = "android"),
++            touch_controls: cfg!(target_os = "dummy"),
+             display_touch_controls: true,
+             soundtrack: "Organya".to_string(),
+             bgm_volume: 1.0,
+diff --git a/src/menu/controls_menu.rs b/src/menu/controls_menu.rs
+index 592240f..418b0b5 100644
+--- a/src/menu/controls_menu.rs
++++ b/src/menu/controls_menu.rs
+@@ -48,10 +48,10 @@ enum MainMenuEntry {
+ 
+ impl Default for MainMenuEntry {
+     fn default() -> Self {
+-        #[cfg(target_os = "android")]
++        #[cfg(target_os = "dummy")]
+         return MainMenuEntry::DisplayTouchControls;
+ 
+-        #[cfg(not(target_os = "android"))]
++        #[cfg(not(target_os = "dummy"))]
+         return MainMenuEntry::SelectedPlayer;
+     }
+ }
+@@ -200,7 +200,7 @@ impl ControlsMenu {
+     }
+ 
+     pub fn init(&mut self, state: &mut SharedGameState, ctx: &mut Context) -> GameResult {
+-        #[cfg(not(target_os = "android"))]
++        #[cfg(not(target_os = "dummy"))]
+         {
+             self.main.push_entry(
+                 MainMenuEntry::SelectedPlayer,
+diff --git a/src/menu/mod.rs b/src/menu/mod.rs
+index b3ef1e0..3a4cde5 100644
+--- a/src/menu/mod.rs
++++ b/src/menu/mod.rs
+@@ -595,7 +595,7 @@ impl<T: std::cmp::PartialEq + std::default::Default + Clone> Menu<T> {
+                         graphics::draw_rect(ctx, bar_rect, Color::new(1.0, 1.0, 1.0, 1.0))?;
+                     }
+ 
+-                    #[cfg(target_os = "android")]
++                    #[cfg(target_os = "dummy")]
+                     {
+                         state.font.builder().x(self.x as f32 - 25.0).y(y).shadow(true).draw(
+                             "<",
+diff --git a/src/menu/settings_menu.rs b/src/menu/settings_menu.rs
+index ad4fbaf..b252c44 100644
+--- a/src/menu/settings_menu.rs
++++ b/src/menu/settings_menu.rs
+@@ -145,7 +145,7 @@ enum AdvancedMenuEntry {
+     Title,
+     OpenUserData,
+     OpenGameData,
+-    #[cfg(not(any(target_os = "android", target_os = "horizon")))]
++    #[cfg(not(any(target_os = "dummy", target_os = "horizon")))]
+     MakePortable,
+     Back,
+ }
+@@ -247,7 +247,7 @@ impl SettingsMenu {
+                 ],
+             ),
+         );
+-        #[cfg(not(any(target_os = "android", target_os = "horizon")))]
++        #[cfg(not(any(target_os = "dummy", target_os = "horizon")))]
+         self.graphics.push_entry(
+             GraphicsMenuEntry::WindowMode,
+             MenuEntry::Options(
+@@ -411,7 +411,7 @@ impl SettingsMenu {
+             MenuEntry::Active(state.loc.t("menus.options_menu.advanced_menu.open_game_data").to_owned()),
+         );
+ 
+-        #[cfg(not(any(target_os = "android", target_os = "horizon")))]
++        #[cfg(not(any(target_os = "dummy", target_os = "horizon")))]
+         if let Some(fs_container) = &state.fs_container {
+             if !fs_container.is_portable && self.on_title {
+                 self.advanced.push_entry(
+@@ -1081,7 +1081,7 @@ impl SettingsMenu {
+                     }
+                 }
+ 
+-                #[cfg(not(any(target_os = "android", target_os = "horizon")))]
++                #[cfg(not(any(target_os = "dummy", target_os = "horizon")))]
+                 MenuSelectionResult::Selected(AdvancedMenuEntry::MakePortable, _) => {
+                     self.current = CurrentMenu::PortableMenu;
+                 }
+diff --git a/src/scene/no_data_scene.rs b/src/scene/no_data_scene.rs
+index 15b3da0..8a47b9a 100644
+--- a/src/scene/no_data_scene.rs
++++ b/src/scene/no_data_scene.rs
+@@ -7,7 +7,7 @@ use crate::graphics::font::Font;
+ use crate::scene::Scene;
+ 
+ pub struct NoDataScene {
+-    #[cfg(target_os = "android")]
++    #[cfg(target_os = "dummy")]
+     flag: bool,
+     err: String,
+ }
+@@ -15,20 +15,20 @@ pub struct NoDataScene {
+ impl NoDataScene {
+     pub fn new(err: GameError) -> Self {
+         Self {
+-            #[cfg(target_os = "android")]
++            #[cfg(target_os = "dummy")]
+             flag: false,
+             err: err.to_string(),
+         }
+     }
+ }
+ 
+-#[cfg(target_os = "android")]
++#[cfg(target_os = "dummy")]
+ static REL_URL: &str = "https://github.com/doukutsu-rs/doukutsu-rs#data-files";
+ 
+ impl Scene for NoDataScene {
+     #[allow(unused)]
+     fn tick(&mut self, state: &mut SharedGameState, ctx: &mut Context) -> GameResult {
+-        #[cfg(target_os = "android")]
++        #[cfg(target_os = "dummy")]
+         {
+             use crate::common::Rect;
+             use crate::util::browser;
+@@ -68,7 +68,7 @@ impl Scene for NoDataScene {
+         )?;
+ 
+         let mut y = 60.0;
+-        #[cfg(target_os = "android")]
++        #[cfg(target_os = "dummy")]
+         {
+             let yellow = (255, 255, 0, 255);
+             state.font.builder().center(state.canvas_size.0).y(y).color(yellow).draw(
