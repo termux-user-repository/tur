@@ -4,34 +4,34 @@ TERMUX_PKG_DESCRIPTION="A scalable, distributed, collaborative, document-graph d
 TERMUX_PKG_LICENSE="non-free"
 TERMUX_PKG_LICENSE_FILE="LICENSE"
 TERMUX_PKG_MAINTAINER="@SunPodder"
-TERMUX_PKG_VERSION="2.1.4"
+TERMUX_PKG_VERSION="2.2.0"
 TERMUX_PKG_SRCURL="https://github.com/surrealdb/surrealdb/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz"
-TERMUX_PKG_SHA256=9b46926766d40d174c011665847e966afd91e4f2e77af60538c5fa5f380964be
+TERMUX_PKG_SHA256=ec4b624b4261c477a92a4d19711bb3e21dae99e521872e1a7ad7f64d19369fa3
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_BUILD_IN_SRC=true
-TERMUX_PKG_BUILD_DEPENDS="openssl, zlib"
+TERMUX_PKG_DEPENDS="openssl, zlib"
 TERMUX_PKG_BLACKLISTED_ARCHES="arm, i686"
 
 termux_step_configure() {
-	env -i PATH="$PATH" sudo apt update
-	env -i PATH="$PATH" sudo apt install protobuf-compiler -y
-
+	termux_setup_protobuf
 	termux_setup_rust
-	export CARGO_HOME="${HOME}/.cargo"
-	cargo fetch --target $CARGO_TARGET_NAME
 
-	rm -rf $CARGO_HOME/registry/src/index.crates.io-*/librocksdb-sys-*/
-	rm -rf $CARGO_HOME/registry/src/index.crates.io-*/jemalloc-sys-*/
-	cargo fetch --target $CARGO_TARGET_NAME
+	: "${CARGO_HOME:=$HOME/.cargo}"
+	export CARGO_HOME
+
+	cargo vendor
+	find ./vendor \
+		-mindepth 1 -maxdepth 1 -type d \
+		! -wholename ./vendor/librocksdb-sys \
+		-exec rm -rf '{}' \;
 
 	sed -e "s|@TERMUX_PREFIX@|$TERMUX_PREFIX|" \
 		$TERMUX_PKG_BUILDER_DIR/librocksdb-sys.diff \
-		| patch --silent -p1 \
-			-d $CARGO_HOME/registry/src/index.crates.io-*/librocksdb-sys-*/
+		| patch --silent -p1 -d ./vendor/librocksdb-sys/
 
-	cat $TERMUX_PKG_BUILDER_DIR/jemalloc-sys.diff \
-		| patch --silent -p1 \
-			-d $CARGO_HOME/registry/src/index.crates.io-*/jemalloc-sys-*/
+	echo "" >> Cargo.toml
+	echo "[patch.crates-io]" >> Cargo.toml
+	echo "librocksdb-sys = { path = \"./vendor/librocksdb-sys\" }" >> Cargo.toml
 }
 
 termux_step_make() {
@@ -42,9 +42,4 @@ termux_step_make() {
 
 termux_step_make_install() {
 	install -Dm755 -t $TERMUX_PREFIX/bin target/${CARGO_TARGET_NAME}/release/surreal
-}
-
-termux_step_post_make_install() {
-	rm -rf $CARGO_HOME/registry/src/index.crates.io-*/librocksdb-sys-*/
-	rm -rf $CARGO_HOME/registry/src/index.crates.io-*/jemalloc-sys*/
 }
