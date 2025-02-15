@@ -1,0 +1,72 @@
+diff --git a/Cargo.toml b/Cargo.toml
+index db7965e..39a50e3 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -115,16 +115,16 @@ core-foundation-sys = "0.8.2"
+ mach = "0.3"
+ parking_lot = "0.12"
+ 
+-[target.'cfg(target_os = "android")'.dependencies]
++[target.'cfg(target_os = "dummy")'.dependencies]
+ jni = "0.19"
+ ndk = "0.7"
+ ndk-context = "0.1"
+ 
+-[target.'cfg(target_os = "android")'.dependencies.oboe]
++[target.'cfg(target_os = "dummy")'.dependencies.oboe]
+ version = "0.5"
+ features = ["java-interface"]
+ 
+-[target.'cfg(target_os = "android")'.dev-dependencies]
++[target.'cfg(target_os = "dummy")'.dev-dependencies]
+ ndk-glue = "0.7"
+ 
+ [target.'cfg(target_os = "emscripten")'.dependencies]
+diff --git a/examples/android.rs b/examples/android.rs
+index b58731d..c8c5553 100644
+--- a/examples/android.rs
++++ b/examples/android.rs
+@@ -9,7 +9,7 @@ use cpal::{
+ };
+ use cpal::{FromSample, Sample};
+ 
+-#[cfg_attr(target_os = "android", ndk_glue::main(backtrace = "full"))]
++#[cfg_attr(target_os = "dummy", ndk_glue::main(backtrace = "full"))]
+ fn main() {
+     let host = cpal::default_host();
+ 
+diff --git a/src/host/mod.rs b/src/host/mod.rs
+index a00d968..00b25c9 100644
+--- a/src/host/mod.rs
++++ b/src/host/mod.rs
+@@ -22,7 +22,7 @@ pub(crate) mod emscripten;
+ ))]
+ pub(crate) mod jack;
+ pub(crate) mod null;
+-#[cfg(target_os = "android")]
++#[cfg(target_os = "dummy")]
+ pub(crate) mod oboe;
+ #[cfg(windows)]
+ pub(crate) mod wasapi;
+diff --git a/src/platform/mod.rs b/src/platform/mod.rs
+index f1c9a31..35b3e07 100644
+--- a/src/platform/mod.rs
++++ b/src/platform/mod.rs
+@@ -675,7 +675,7 @@ mod platform_impl {
+     }
+ }
+ 
+-#[cfg(target_os = "android")]
++#[cfg(target_os = "dummy")]
+ mod platform_impl {
+     pub use crate::host::oboe::{
+         Device as OboeDevice, Devices as OboeDevices, Host as OboeHost, Stream as OboeStream,
+@@ -720,7 +720,7 @@ mod platform_impl {
+     target_os = "macos",
+     target_os = "ios",
+     target_os = "emscripten",
+-    target_os = "android",
++    target_os = "dummy",
+     target_os = "horizon",
+     all(target_arch = "wasm32", feature = "wasm-bindgen"),
+ )))]

@@ -1,0 +1,72 @@
+diff --git a/Cargo.toml b/Cargo.toml
+index 2227083..368d05b 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -62,20 +62,20 @@ version = "0.5"
+ hardened = []
+ wasm-console = ["web-sys/console"]
+ 
+-[target."cfg(any(target_os = \"aix\", target_os = \"linux\", target_os = \"freebsd\", target_os = \"netbsd\", target_os = \"openbsd\", target_os = \"haiku\", target_os = \"illumos\"))".dependencies.home]
++[target."cfg(any(target_os = \"aix\", target_os = \"android\", target_os = \"linux\", target_os = \"freebsd\", target_os = \"netbsd\", target_os = \"openbsd\", target_os = \"haiku\", target_os = \"illumos\"))".dependencies.home]
+ version = "0.5"
+ 
+ [target."cfg(target_arch = \"wasm32\")".dependencies.web-sys]
+ version = "0.3"
+ features = ["Window"]
+ 
+-[target."cfg(target_os = \"android\")".dependencies.jni]
++[target."cfg(target_os = \"dummy\")".dependencies.jni]
+ version = "0.21"
+ 
+-[target."cfg(target_os = \"android\")".dependencies.ndk-context]
++[target."cfg(target_os = \"dummy\")".dependencies.ndk-context]
+ version = "0.1"
+ 
+-[target."cfg(target_os = \"android\")".dev-dependencies.ndk-glue]
++[target."cfg(target_os = \"dummy\")".dev-dependencies.ndk-glue]
+ version = ">= 0.3, <= 0.7"
+ 
+ [target."cfg(target_os = \"ios\")".dependencies.objc]
+diff --git a/src/lib.rs b/src/lib.rs
+index 24ee96e..94006db 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -43,12 +43,12 @@
+ 
+ #[cfg_attr(target_os = "ios", path = "ios.rs")]
+ #[cfg_attr(target_os = "macos", path = "macos.rs")]
+-#[cfg_attr(target_os = "android", path = "android.rs")]
+ #[cfg_attr(target_arch = "wasm32", path = "wasm.rs")]
+ #[cfg_attr(windows, path = "windows.rs")]
+ #[cfg_attr(
+     any(
+         target_os = "aix",
++        target_os = "android",
+         target_os = "linux",
+         target_os = "freebsd",
+         target_os = "netbsd",
+@@ -80,6 +80,7 @@
+ 
+ #[cfg(any(
+     target_os = "aix",
++    target_os = "android",
+     target_os = "linux",
+     target_os = "freebsd",
+     target_os = "netbsd",
+@@ -339,7 +339,6 @@ impl TargetType {
+     /// Returns true if this target represents an HTTP url, false otherwise
+     #[cfg(any(
+         feature = "hardened",
+-        target_os = "android",
+         target_os = "ios",
+         target_family = "wasm"
+     ))]
+@@ -349,7 +348,7 @@ impl TargetType {
+ 
+     /// If `target` represents a valid http/https url, return the str corresponding to it
+     /// else return `std::io::Error` of kind `std::io::ErrorKind::InvalidInput`
+-    #[cfg(any(target_os = "android", target_os = "ios", target_family = "wasm"))]
++    #[cfg(any(target_os = "ios", target_family = "wasm"))]
+     fn get_http_url(&self) -> Result<&str> {
+         if self.is_http() {
+             Ok(self.0.as_str())
