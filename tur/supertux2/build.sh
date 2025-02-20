@@ -16,10 +16,10 @@ TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 "
 
 termux_step_pre_configure() {
-    termux_setup_cmake
+	termux_setup_cmake
 }
 
 termux_step_configure() {
-    export CMAKE_PREFIX_PATH=/data/data/com.termux/files/usr
-    cmake . $TERMUX_PKG_EXTRA_CONFIGURE_ARGS
+	export CMAKE_PREFIX_PATH=/data/data/com.termux/files/usr
+	cmake . $TERMUX_PKG_EXTRA_CONFIGURE_ARGS
 }
