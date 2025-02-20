@@ -1,0 +1,72 @@
+From 8f05899b0b9ee8817ceec610589341a8b9cb3a4d Mon Sep 17 00:00:00 2001
+From: Ronald Y <knyipab@gmail.com>
+Date: Sun, 22 Sep 2024 09:21:18 +0800
+Subject: [PATCH 1/8] configure-error-and-disable-isystem
+
+Change-Id: I70125356c9306f442fd5c2ec8343b55019cd118b
+---
+ configure.ac | 27 ++++-----------------------
+ 1 file changed, 4 insertions(+), 23 deletions(-)
+
+diff --git a/configure.ac b/configure.ac
+index d31963fce..5bda2889d 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -4058,26 +4058,7 @@ AC_SUBST(ENABLE_WASM_STRIP)
+ AC_SUBST(ENABLE_WASM_STRIP_WRITER)
+ AC_SUBST(ENABLE_WASM_STRIP_CALC)
+ 
+-# Use -isystem (gcc) if possible, to avoid warnings in 3rd party headers.
+-# NOTE: must _not_ be used for bundled external libraries!
+-ISYSTEM=
+-if test "$GCC" = "yes"; then
+-    AC_MSG_CHECKING( for -isystem )
+-    save_CFLAGS=$CFLAGS
+-    CFLAGS="$CFLAGS -isystem /usr/include -Werror"
+-    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]], [[ return 0; ]])],[ ISYSTEM="-isystem " ],[])
+-    CFLAGS=$save_CFLAGS
+-    if test -n "$ISYSTEM"; then
+-        AC_MSG_RESULT(yes)
+-    else
+-        AC_MSG_RESULT(no)
+-    fi
+-fi
+-if test -z "$ISYSTEM"; then
+-    # fall back to using -I
+-    ISYSTEM=-I
+-fi
+-AC_SUBST(ISYSTEM)
++ISYSTEM=-I
+ 
+ dnl ===================================================================
+ dnl  Check which Visual Studio compiler is used
+@@ -11304,7 +11285,7 @@ else
+         save_CXXFLAGS=$CXXFLAGS
+         save_IFS=$IFS
+         IFS=$P_SEP
+-        for i in $CPLUS_INCLUDE_PATH /usr/include; do
++        for i in $CPLUS_INCLUDE_PATH /data/data/com.termux/files/usr/include; do
+             dnl Reset IFS as soon as possible, to avoid unexpected side effects (and the
+             dnl "/usr/include" fallback makes sure we get here at least once; resetting rather than
+             dnl unsetting follows the advice at <https://git.savannah.gnu.org/gitweb/?p=autoconf.git;
+@@ -12735,7 +12716,7 @@ elif test \( \( "$_os" = "Linux" -o "$_os" = "Darwin" \) -a "$ENABLE_NSS" = TRUE
+         SYSTEM_GPGMEPP=TRUE
+ 
+         # C++ library doesn't come with fancy gpgmepp-config, check for headers the old-fashioned way
+-        AC_CHECK_HEADER(gpgme++/gpgmepp_version.h, [ GPGMEPP_CFLAGS=-I/usr/include/gpgme++ ],
++        AC_CHECK_HEADER(gpgme++/gpgmepp_version.h, [ GPGMEPP_CFLAGS=-I/data/data/com.termux/files/usr/include/gpgme++ ],
+             [AC_MSG_ERROR([gpgmepp headers not found, install gpgmepp >= 1.14 development package])], [])
+         AC_CHECK_HEADER(gpgme.h, [],
+             [AC_MSG_ERROR([gpgme headers not found, install gpgme development package])], [])
+@@ -15065,7 +15046,7 @@ AC_SUBST(PERL)
+ if test -n "$TMPDIR"; then
+     TEMP_DIRECTORY="$TMPDIR"
+ else
+-    TEMP_DIRECTORY="/tmp"
++    TEMP_DIRECTORY="/data/data/com.termux/files/usr/tmp"
+ fi
+ CYGWIN_BASH="C:/cygwin64/bin/bash.exe"
+ if test "$build_os" = "cygwin"; then
+-- 
+2.46.1
+
