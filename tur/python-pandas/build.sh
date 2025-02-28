@@ -7,7 +7,7 @@ TERMUX_PKG_VERSION="2.2.3"
 TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=git+https://github.com/pandas-dev/pandas
 TERMUX_PKG_AUTO_UPDATE=true
-TERMUX_PKG_DEPENDS="libc++, python, python-numpy, python-pip"
+TERMUX_PKG_DEPENDS="libc++, python, python-numpy, python-ensurepip"
 _NUMPY_VERSION=$(. $TERMUX_SCRIPTDIR/packages/python-numpy/build.sh; echo $TERMUX_PKG_VERSION)
 TERMUX_PKG_PYTHON_COMMON_DEPS="'Cython==3.0.5', 'numpy==$_NUMPY_VERSION', wheel, versioneer"
 TERMUX_PKG_BUILD_IN_SRC=true

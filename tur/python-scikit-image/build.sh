@@ -6,7 +6,7 @@ TERMUX_PKG_VERSION="0.25.2"
 TERMUX_PKG_SRCURL=https://github.com/scikit-image/scikit-image/archive/refs/tags/v$TERMUX_PKG_VERSION.tar.gz
 TERMUX_PKG_SHA256=ca7cf6861179dc60f56fdd4e7f1df88ce44984472529f66d3ff472b7e75e67a1
 TERMUX_PKG_AUTO_UPDATE=true
-TERMUX_PKG_DEPENDS="libandroid-complex-math, libc++, python, python-pip, python-numpy, python-pillow, python-pywavelets, python-scipy"
+TERMUX_PKG_DEPENDS="libandroid-complex-math, libc++, python, python-ensurepip, python-numpy, python-pillow, python-pywavelets, python-scipy"
 TERMUX_PKG_ANTI_BUILD_DEPENDS="python-pillow, python-pywavelets, python-scipy"
 TERMUX_PKG_PYTHON_COMMON_DEPS="wheel, 'Cython>=3.0.4', meson-python, build"
 _NUMPY_VERSION=$(. $TERMUX_SCRIPTDIR/packages/python-numpy/build.sh; echo $TERMUX_PKG_VERSION)
