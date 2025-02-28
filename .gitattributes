@@ -1,6 +1,5 @@
 # Default.
 *           text eol=lf
-
 # Treat patch files as binaries but let diff'ing them
 # as normal text.
 *.diff      binary diff
@@ -8,10 +7,8 @@
 *.patch32   binary diff
 *.patch64   binary diff
 *.patch.*   binary diff
-
 # Powershell scripts.
 *.ps1       text eol=crlf
-
 # Binaries.
 *.gpg       binary
 *.gz        binary
@@ -19,3 +16,18 @@
 *.png       binary
 *.tar       binary
 *.tar.*     binary
+*.bin       binary
+bytecode_builtins_list_generator    binary
+character_data_generator            binary
+gen-regexp-special-case             binary
+generate_colors_info                binary
+make_top_domain_list_variables      binary
+mksnapshot                          binary
+root_store_tool                     binary
+top_domain_generator                binary
+torque                              binary
+transport_security_state_generator  binary
+icudtl.dat                          binary
+libvk_swiftshader.so                binary
+libpdfium.a                         binary
+*.a filter=lfs diff=lfs merge=lfs -text
