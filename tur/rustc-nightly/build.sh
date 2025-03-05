@@ -1,22 +1,24 @@
-TERMUX_PKG_HOMEPAGE=https://www.rust-lang.org
+TERMUX_PKG_HOMEPAGE=https://www.rust-lang.org/
 TERMUX_PKG_DESCRIPTION="Rust compiler and utilities (nightly version)"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="1.85.0-2024.12.15-nightly"
+TERMUX_PKG_VERSION="1.87.0-2025.03.05-nightly"
 _RUST_VERSION=$(echo $TERMUX_PKG_VERSION | cut -d- -f1)
 _DATE="$(echo $TERMUX_PKG_VERSION | cut -d- -f2 | sed 's|\.|-|g')"
 _LLVM_MAJOR_VERSION=$(. $TERMUX_SCRIPTDIR/packages/libllvm/build.sh; echo $LLVM_MAJOR_VERSION)
 _LLVM_MAJOR_VERSION_NEXT=$((_LLVM_MAJOR_VERSION + 1))
 _LZMA_VERSION=$(. $TERMUX_SCRIPTDIR/packages/liblzma/build.sh; echo $TERMUX_PKG_VERSION)
 TERMUX_PKG_SRCURL=https://static.rust-lang.org/dist/$_DATE/rustc-nightly-src.tar.xz
-TERMUX_PKG_SHA256=a49331088f0829f53fab8ef03edd99a2c56cea4239cd607e42c3d341162713d3
-TERMUX_PKG_DEPENDS="clang, libc++, libllvm (<< ${_LLVM_MAJOR_VERSION_NEXT}), lld, openssl, zlib"
+TERMUX_PKG_SHA256=91724890f2affa47b7e8e9891c8808764beff007bdb47054aedb0d2ad2c6c8c5
+TERMUX_PKG_DEPENDS="clang, libandroid-execinfo, libc++, libllvm (<< ${_LLVM_MAJOR_VERSION_NEXT}), lld, openssl, zlib"
 TERMUX_PKG_BUILD_DEPENDS="wasi-libc"
-TERMUX_PKG_AUTO_UPDATE=true
+TERMUX_PKG_NO_REPLACE_GUESS_SCRIPTS=true
 TERMUX_PKG_NO_STATICSPLIT=true
+TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_RM_AFTER_INSTALL="
-bin/llvm-*
 bin/llc
+bin/lld
+bin/llvm-*
 bin/opt
 bin/sh
 lib/liblzma.a
@@ -68,10 +70,6 @@ termux_step_post_get_source() {
 	if [ "$_rust_version" != "$_RUST_VERSION" ]; then
 		termux_error_exit "Version mismatch: Expected $_RUST_VERSION, got $_rust_version."
 	fi
-
-	# Bypass the config.guess replace to make rust happy
-	find ./vendor/ -name config.sub -exec chmod u+w '{}' \; -exec mv '{}' '{}.bp' \;
-	find ./vendor/ -name config.guess -exec chmod u+w '{}' \; -exec mv '{}' '{}.bp' \;
 }
 
 termux_step_pre_configure() {
@@ -93,10 +91,6 @@ termux_step_pre_configure() {
 	ln -vfst "${RUST_LIBDIR}" \
 		${TERMUX_PREFIX}/lib/libLLVM-${_LLVM_MAJOR_VERSION}.so
 
-	# rust tries to find static library 'c++_shared'
-	ln -vfs $TERMUX_STANDALONE_TOOLCHAIN/sysroot/usr/lib/$TERMUX_HOST_PLATFORM/libc++_static.a \
-		$RUST_LIBDIR/libc++_shared.a
-
 	# https://github.com/termux/termux-packages/issues/18379
 	# NDK r26 multiple ld.lld: error: undefined symbol: __cxa_*
 	ln -vfst "${RUST_LIBDIR}" "${TERMUX_PREFIX}"/lib/libc++_shared.so
@@ -111,16 +105,7 @@ termux_step_pre_configure() {
 	# but written in a future-proof manner.
 	ln -vfst $RUST_LIBDIR $(echo | $CC -x c - -Wl,-t -shared | grep '\.so$')
 
-	# rust checks libs in PREFIX/lib. It then can't find libc.so and libdl.so because rust program doesn't
-	# know where those are. Putting them temporarly in $PREFIX/lib prevents that failure
-	# https://github.com/termux/termux-packages/issues/11427
-	[[ "${TERMUX_ON_DEVICE_BUILD}" == "true" ]] && return
-	mv $TERMUX_PREFIX/lib/liblzma.a{,.tmp} || :
-	mv $TERMUX_PREFIX/lib/liblzma.so{,.tmp} || :
-	mv $TERMUX_PREFIX/lib/liblzma.so.${_LZMA_VERSION}{,.tmp} || :
-	mv $TERMUX_PREFIX/lib/libtinfo.so.6{,.tmp} || :
-	mv $TERMUX_PREFIX/lib/libz.so.1{,.tmp} || :
-	mv $TERMUX_PREFIX/lib/libz.so{,.tmp} || :
+	ln -vfst "${RUST_LIBDIR}" "${TERMUX_PREFIX}"/lib/libandroid-execinfo.so
 }
 
 termux_step_configure() {
@@ -146,8 +131,6 @@ termux_step_configure() {
 			done
 		done
 	fi
-
-	export RUST_BACKTRACE=1
 
 	RUST_NIGHTLY_PREFIX="$TERMUX_PREFIX"/opt/rust-nightly
 	mkdir -p "$RUST_NIGHTLY_PREFIX"
@@ -181,19 +164,14 @@ termux_step_configure() {
 	"${AR}" rcu "${RUST_LIBDIR}/libsyncfs.a" syncfs.o
 	export CARGO_TARGET_${env_host}_RUSTFLAGS+=" -C link-arg=-l:libsyncfs.a"
 
+	# rust 1.87.0
+	# note: ld.lld: error: undefined reference due to --no-allow-shlib-undefined: backtrace
+	export CARGO_TARGET_${env_host}_RUSTFLAGS+=" -C link-arg=-landroid-execinfo"
+
 	# Add rpath
 	export CARGO_TARGET_${env_host}_RUSTFLAGS+=" -C link-arg=-Wl,-rpath=\$ORIGIN/../lib"
 	export CARGO_TARGET_${env_host}_RUSTFLAGS+=" -C link-arg=-Wl,-rpath=$RUST_NIGHTLY_PREFIX/lib"
 	export CARGO_TARGET_${env_host}_RUSTFLAGS+=" -C link-arg=-Wl,-rpath=${TERMUX_PREFIX}/lib -C link-arg=-Wl,--enable-new-dtags"
-
-	export X86_64_UNKNOWN_LINUX_GNU_OPENSSL_LIB_DIR=/usr/lib/x86_64-linux-gnu
-	export X86_64_UNKNOWN_LINUX_GNU_OPENSSL_INCLUDE_DIR=/usr/include
-	export PKG_CONFIG_ALLOW_CROSS=1
-
-	# for backtrace-sys
-	export CC_x86_64_unknown_linux_gnu=gcc
-	export CFLAGS_x86_64_unknown_linux_gnu="-O2"
-	export RUST_BACKTRACE=full
 
 	unset CC CFLAGS CFLAGS_${env_host} CPP CPPFLAGS CXX CXXFLAGS LD LDFLAGS PKG_CONFIG RANLIB
 }
@@ -236,13 +214,7 @@ termux_step_make_install() {
 	done
 
 	cd "$TERMUX_PREFIX/lib"
-	rm -f libc.so libdl.so
-	mv liblzma.a{.tmp,} || :
-	mv liblzma.so{.tmp,} || :
-	mv liblzma.so.${_LZMA_VERSION}{.tmp,} || :
-	mv libtinfo.so.6{.tmp,} || :
-	mv libz.so.1{.tmp,} || :
-	mv libz.so{.tmp,} || :
+	rm -fv libc.so libdl.so
 
 	cd "$RUST_NIGHTLY_PREFIX/lib"
 	ln -vfs rustlib/${CARGO_TARGET_NAME}/lib/*.so .
