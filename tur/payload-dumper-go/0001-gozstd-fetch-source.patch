@@ -1,0 +1,18 @@
+--- a/vendor/github.com/valyala/gozstd/Makefile
++++ b/vendor/github.com/valyala/gozstd/Makefile
+@@ -70,12 +70,14 @@
+ 	rm -f $(LIBZSTD_NAME)
+ 	cd zstd && $(MAKE) clean
+ 
+-update-zstd:
++update-zstd-source:
+ 	rm -rf zstd-tmp
+ 	git clone --branch $(ZSTD_VERSION) --depth 1 https://github.com/Facebook/zstd zstd-tmp
+ 	rm -rf zstd-tmp/.git
+ 	rm -rf zstd
+ 	mv zstd-tmp zstd
++
++update-zstd: update-zstd-source
+ 	$(MAKE) clean libzstd.a
+ 	cp zstd/lib/zstd.h .
+ 	cp zstd/lib/zdict.h .
