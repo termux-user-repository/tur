@@ -3,12 +3,11 @@ TERMUX_PKG_DESCRIPTION="A compatibility layer for running Windows programs"
 TERMUX_PKG_LICENSE="LGPL-2.1"
 TERMUX_PKG_LICENSE_FILE="LICENSE, LICENSE.OLD, COPYING.LIB"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="10.2"
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_VERSION="10.3"
 _REAL_VERSION="${TERMUX_PKG_VERSION/\~/-}"
 _VERSION_FOLDER="$(test "${_REAL_VERSION:3:1}" = 0 && echo ${_REAL_VERSION:0:4} || echo ${_REAL_VERSION:0:3}x)"
 TERMUX_PKG_SRCURL=https://dl.winehq.org/wine/source/${_VERSION_FOLDER}/wine-$_REAL_VERSION.tar.xz
-TERMUX_PKG_SHA256=9d90dfb6cf10b810a7b4789f0067712b4730d3ea2a88b91f1be273b2ad04243f
+TERMUX_PKG_SHA256=de3d88ff0056b82ffdfca842f1119592e4914f48c4ea023768e0419c36467c3e
 TERMUX_PKG_DEPENDS="fontconfig, freetype, krb5, libandroid-spawn, libc++, libgmp, libgnutls, libxcb, libxcomposite, libxcursor, libxfixes, libxrender, mesa, opengl, pulseaudio, sdl2, vulkan-loader, xorg-xrandr"
 TERMUX_PKG_ANTI_BUILD_DEPENDS="vulkan-loader"
 TERMUX_PKG_BUILD_DEPENDS="libandroid-spawn-static, vulkan-loader-generic"
