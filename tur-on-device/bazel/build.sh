@@ -2,12 +2,12 @@ TERMUX_PKG_HOMEPAGE=https://bazel.build/
 TERMUX_PKG_DESCRIPTION="Correct, reproducible, and fast builds for everyone"
 TERMUX_PKG_LICENSE="Apache-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="7.1.2"
+TERMUX_PKG_VERSION="7.5.0"
 TERMUX_PKG_SRCURL=https://github.com/bazelbuild/bazel/releases/download/$TERMUX_PKG_VERSION/bazel-$TERMUX_PKG_VERSION-dist.zip
-TERMUX_PKG_SHA256=9cf6ed2319c816919d97015eef6d0c5942cd1aed48e03c73ba0815d953ed61ab
-TERMUX_PKG_DEPENDS="libarchive, openjdk-17, patch, unzip, zip"
+TERMUX_PKG_SHA256=9d3d9b74cf3cbba0401874c3a1f70efc6531878d34146b22d4fd209276efafdd
+TERMUX_PKG_DEPENDS="libarchive, openjdk-21, patch, unzip, zip"
 TERMUX_PKG_BUILD_DEPENDS="libandroid-spawn-static, which"
-TERMUX_PKG_BREAKS="openjdk-11"
+TERMUX_PKG_BREAKS="openjdk-11, openjdk-17"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_BLACKLISTED_ARCHES="arm, i686"
 TERMUX_PKG_NO_STRIP=true
@@ -97,11 +97,11 @@ termux_step_post_get_source() {
 termux_step_pre_configure() {
 	__ensure_is_on_device_compile
 
-	# Ensure openjdk-17 is installed
+	# Ensure openjdk-21 is installed
 	apt autoremove --purge openjdk* -y
-	apt install --reinstall openjdk-17 -y
+	apt install --reinstall openjdk-21 -y
 
-	export JAVA_HOME="$TERMUX_PREFIX/lib/jvm/java-17-openjdk"
+	export JAVA_HOME="$TERMUX_PREFIX/lib/jvm/java-21-openjdk"
 }
 
 termux_step_make() {
@@ -123,5 +123,5 @@ termux_step_make_install() {
 }
 
 termux_step_post_massage() {
-	rm -rf lib var share/doc/openjdk-17
+	rm -rf lib var share/doc/openjdk-21
 }
