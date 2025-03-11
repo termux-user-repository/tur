@@ -141,7 +141,7 @@ jobs:
       issues: write
       contents: write
     if: github.event_name != 'pull_request' && github.repository == 'termux-user-repository/tur'
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Clone repository
         uses: actions/checkout@v4
@@ -155,10 +155,12 @@ jobs:
       - name: Free additional disk space
         run: |
           sudo apt purge -yq $(dpkg -l | grep '^ii' | awk '{ print $2 }' | grep -P '(aspnetcore|cabal-|dotnet-|ghc-|libmono|mongodb-|mysql-|php)') \
-            firefox google-chrome-stable google-cloud-cli microsoft-edge-stable mono-devel mono-runtime-common monodoc-manual powershell ruby
+            firefox google-chrome-stable microsoft-edge-stable mono-devel mono-runtime-common monodoc-manual ruby
           sudo apt autoremove -yq
           sudo apt clean
           sudo rm -fr /opt/ghc /opt/hostedtoolcache /usr/lib/node_modules /usr/local/share/boost /usr/share/dotnet /usr/share/swift
+          sudo rm -rf /usr/local/lib/android /usr/local/.ghcup
+          sudo docker image prune --all --force
       - name: Process package updates
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
