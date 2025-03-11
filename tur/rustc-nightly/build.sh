@@ -2,14 +2,14 @@ TERMUX_PKG_HOMEPAGE=https://www.rust-lang.org/
 TERMUX_PKG_DESCRIPTION="Rust compiler and utilities (nightly version)"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="1.87.0-2025.03.09-nightly"
+TERMUX_PKG_VERSION="1.87.0-2025.03.10-nightly"
 _RUST_VERSION=$(echo $TERMUX_PKG_VERSION | cut -d- -f1)
 _DATE="$(echo $TERMUX_PKG_VERSION | cut -d- -f2 | sed 's|\.|-|g')"
 _LLVM_MAJOR_VERSION=$(. $TERMUX_SCRIPTDIR/packages/libllvm/build.sh; echo $LLVM_MAJOR_VERSION)
 _LLVM_MAJOR_VERSION_NEXT=$((_LLVM_MAJOR_VERSION + 1))
 _LZMA_VERSION=$(. $TERMUX_SCRIPTDIR/packages/liblzma/build.sh; echo $TERMUX_PKG_VERSION)
 TERMUX_PKG_SRCURL=https://static.rust-lang.org/dist/$_DATE/rustc-nightly-src.tar.xz
-TERMUX_PKG_SHA256=f6dff06b4ad49dedc131d7196d2397e04ae66633566c12dae44b0b2f4b4e0a3e
+TERMUX_PKG_SHA256=7856618b4efba83c8c4584dce6877fe020f782ddcd1c9792069d5d4226e9d97b
 TERMUX_PKG_DEPENDS="clang, libandroid-execinfo, libc++, libllvm (<< ${_LLVM_MAJOR_VERSION_NEXT}), lld, openssl, zlib"
 TERMUX_PKG_BUILD_DEPENDS="wasi-libc"
 TERMUX_PKG_NO_REPLACE_GUESS_SCRIPTS=true
@@ -59,10 +59,8 @@ termux_pkg_auto_update() {
 	rm -rf ~/.cargo ~/.rustup
 	wget "https://static.rust-lang.org/dist/$latest_nightly_date/rustc-nightly-src.tar.xz" -O /tmp/rustc-nightly-src.tar.xz
 	local _sha256_checksum="$(sha256sum /tmp/rustc-nightly-src.tar.xz | cut -d' ' -f1)"
-	echo "Error: Update it manually. Version $latest_version, checksum $_sha256_checksum"
 	rm -f /tmp/rustc-nightly-src.tar.xz
-	exit 1
-	# termux_pkg_upgrade_version "$latest_version"
+	termux_pkg_upgrade_version "$latest_version"
 }
 
 termux_step_post_get_source() {
