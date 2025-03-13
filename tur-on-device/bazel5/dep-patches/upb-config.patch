@@ -1,6 +1,8 @@
+diff --git a/bazel/build_defs.bzl b/bazel/build_defs.bzl
+index acd474d3..cd0b6a9a 100644
 --- a/bazel/build_defs.bzl
 +++ b/bazel/build_defs.bzl
-@@ -35,6 +35,8 @@
+@@ -35,6 +35,8 @@ UPB_DEFAULT_CPPOPTS = select({
          # "-Wshorten-64-to-32",  # not in GCC (and my Kokoro images doesn't have Clang)
          "-Werror",
          "-Wno-long-long",
@@ -9,12 +11,13 @@
          # copybara:strip_end
      ],
  })
-@@ -49,6 +51,8 @@
+@@ -49,6 +51,9 @@ UPB_DEFAULT_COPTS = select({
          "-Werror=pedantic",
          "-Wall",
          "-Wstrict-prototypes",
 +        "-Wno-deprecated-builtins",
 +        "-Wno-gnu-offsetof-extensions",
++        "-Wno-c11-extensions",
          # GCC (at least) emits spurious warnings for this that cannot be fixed
          # without introducing redundant initialization (with runtime cost):
          #   https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80635

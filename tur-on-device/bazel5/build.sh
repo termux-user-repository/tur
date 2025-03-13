@@ -3,11 +3,12 @@ TERMUX_PKG_DESCRIPTION="Correct, reproducible, and fast builds for everyone"
 TERMUX_PKG_LICENSE="Apache-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="5.4.1"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://github.com/bazelbuild/bazel/releases/download/$TERMUX_PKG_VERSION/bazel-$TERMUX_PKG_VERSION-dist.zip
 TERMUX_PKG_SHA256=dcff6935756aa7aca4fc569bb2bd26e1537f0b1f6d1bda5f2b200fa835cc507f
 TERMUX_PKG_DEPENDS="libarchive, openjdk-17, patch, unzip, zip"
 TERMUX_PKG_BUILD_DEPENDS="libandroid-spawn-static, which"
-TERMUX_PKG_BREAKS="openjdk-11"
+TERMUX_PKG_BREAKS="openjdk-11, openjdk-21"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_BLACKLISTED_ARCHES="arm, i686"
 TERMUX_PKG_NO_STRIP=true
@@ -97,8 +98,8 @@ termux_step_pre_configure() {
 	__ensure_is_on_device_compile
 
 	# Ensure openjdk-17 is installed
-	# apt autoremove --purge openjdk* -y
-	# apt install --reinstall openjdk-17 -y
+	apt autoremove --purge openjdk* -y
+	apt install --reinstall openjdk-17 -y
 
 	export JAVA_HOME="$TERMUX_PREFIX/lib/jvm/java-17-openjdk"
 }

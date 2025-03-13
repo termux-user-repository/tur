@@ -22,13 +22,14 @@
          "used_in": [
              "additional_distfiles",
              "test_WORKSPACE_files",
-@@ -114,6 +117,10 @@
+@@ -114,6 +117,11 @@
              "https://mirror.bazel.build/github.com/protocolbuffers/upb/archive/2de300726a1ba2de9a468468dc5ff9ed17a3215f.tar.gz",
              "https://github.com/protocolbuffers/upb/archive/2de300726a1ba2de9a468468dc5ff9ed17a3215f.tar.gz",
          ],
 +        "patch_args": ["-p1"],
 +        "patches": [
 +            "//third_party/termux-patches:upb-config.patch",
++            "//third-party/termux-patches:upb-clang-19.patch",
 +        ],
          "used_in": [
              "additional_distfiles",

@@ -1,0 +1,17 @@
+cherry-pick of https://github.com/protocolbuffers/protobuf/commit/21af7830ad5ff34798d7c5c8c70c30b450f6634e
+
+--- a/upb/port_def.inc
++++ b/upb/port_def.inc
+@@ -91,7 +91,11 @@
+ #define UPB_ALIGN_UP(size, align) (((size) + (align) - 1) / (align) * (align))
+ #define UPB_ALIGN_DOWN(size, align) ((size) / (align) * (align))
+ #define UPB_ALIGN_MALLOC(size) UPB_ALIGN_UP(size, 16)
++#ifdef __clang__
++#define UPB_ALIGN_OF(type) _Alignof(type)
++#else
+ #define UPB_ALIGN_OF(type) offsetof (struct { char c; type member; }, member)
++#endif
+ 
+ /* Hints to the compiler about likely/unlikely branches. */
+ #if defined (__GNUC__) || defined(__clang__)
+
