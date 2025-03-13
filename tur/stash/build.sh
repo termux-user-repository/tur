@@ -31,7 +31,7 @@ termux_step_pre_configure() {
 
 termux_step_make() {
 	export CGO_ENABLED=1
-	go build -o stash -v -tags "sqlite_omit_load_extension osusergo netgo" -trimpath -ldflags="s -w -extldflags=-static \
+	go build -o stash -v -tags "sqlite_omit_load_extension osusergo netgo" -trimpath -ldflags="-s -w -extldflags=-static \
 	-X 'github.com/stashapp/stash/internal/build.buildstamp=$(date +%Y-%m-%d)' \
 	-X 'github.com/stashapp/stash/internal/build.githash=$(git rev-parse --short HEAD 2>/dev/null || echo unknown)' \
 	-X 'github.com/stashapp/stash/internal/build.version=${TERMUX_PKG_VERSION}' \
