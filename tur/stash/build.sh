@@ -11,30 +11,27 @@ TERMUX_PKG_HOSTBUILD=true
 
 termux_step_host_build() {
 	termux_setup_nodejs
-	termux_setup_golang
 
-	cp -r $TERMUX_PKG_SRCDIR/ui/v2.5 ./ui
-	mkdir -p ui/build
+	cp -r $TERMUX_PKG_SRCDIR ./stash
+	mkdir -p stash/ui/v2.5/build
+	cd stash/ui/v2.5
 	yarnpkg install --frozen-lockfile
-	touch ui/build/index.html
-	cp -r $TERMUX_PKG_SRCDIR ./web
-	cd web
-	GOOS=android GOARCH=arm64 go generate ./cmd/stash
-	cd ../ui
+	touch build/index.html
+	cd ../..
+	go generate ./cmd/stash
+	cd ui/v2.5
 	yarnpkg run gqlgen
+	yarnpkg build
 }
 
 termux_step_pre_configure() {
-	cp -r $TERMUX_PKG_HOSTBUILD_DIR/ui/build $TERMUX_PKG_SRCDIR/ui/v2.5
+	cp -r $TERMUX_PKG_HOSTBUILD_DIR/stash/ui/v2.5/build $TERMUX_PKG_SRCDIR/ui/v2.5
 	termux_setup_golang
 }
 
 termux_step_make() {
 	export CGO_ENABLED=1
-	cd $TERMUX_PKG_SRCDIR/ui/v2.5
-	yarnpkg build
-	cd $TERMUX_PKG_SRCDIR
-	go build -o stash -trimpath -ldflags="-s -w -extldflags=-static-pie \
+	go build -o stash -v -tags "sqlite_omit_load_extension osusergo netgo" -trimpath -ldflags="s -w -extldflags=-static \
 	-X 'github.com/stashapp/stash/internal/build.buildstamp=$(date +%Y-%m-%d)' \
 	-X 'github.com/stashapp/stash/internal/build.githash=$(git rev-parse --short HEAD 2>/dev/null || echo unknown)' \
 	-X 'github.com/stashapp/stash/internal/build.version=${TERMUX_PKG_VERSION}' \
