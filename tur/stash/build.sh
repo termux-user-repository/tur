@@ -11,19 +11,22 @@ TERMUX_PKG_HOSTBUILD=true
 
 termux_step_host_build() {
 	termux_setup_nodejs
+	termux_setup_golang
 
 	cp -r $TERMUX_PKG_SRCDIR/ui/v2.5 ./ui
-	cd ui
 	mkdir -p build
 	yarnpkg install --frozen-lockfile
+	touch ui/v2.5/build/index.html
+	cp -r $TERMUX_PKG_SRCDIR ./web
+	cd web
+	GOOS=android GOARCH=arm64 go generate ./cmd/stash
+	cd ../ui
 	yarnpkg run gqlgen
 }
 
 termux_step_pre_configure() {
 	cp -r $TERMUX_PKG_HOSTBUILD_DIR/ui/build $TERMUX_PKG_SRCDIR/ui/v2.5
 	termux_setup_golang
-	touch ui/v2.5/build/index.html
-	go generate ./cmd/stash
 }
 
 termux_step_make() {
