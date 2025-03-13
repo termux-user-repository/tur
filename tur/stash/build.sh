@@ -12,20 +12,25 @@ TERMUX_PKG_HOSTBUILD=true
 termux_step_host_build() {
 	termux_setup_nodejs
 
-	apt-get install -yq node-yarnpkg
-	cp -r $TERMUX_PKG_SRCDIR/ui/v2.5 ./ui-v2.5
-	cd ui-v2.5
-	yarn install --frozen-lockfile
-	yarn build
+	cp -r $TERMUX_PKG_SRCDIR/ui/v2.5 ./ui
+	cd ui
+	mkdir -p build
+	yarnpkg install --frozen-lockfile
+	yarnpkg run gqlgen
 }
 
 termux_step_pre_configure() {
-	cp -r $TERMUX_PKG_HOSTBUILD_DIR/ui-v2.5/build $TERMUX_PKG_SRCDIR/web/
+	cp -r $TERMUX_PKG_HOSTBUILD_DIR/ui/build $TERMUX_PKG_SRCDIR/ui/v2.5
 	termux_setup_golang
+	touch ui/v2.5/build/index.html
+	go generate ./cmd/stash
 }
 
 termux_step_make() {
 	export CGO_ENABLED=1
+	cd $TERMUX_PKG_SRCDIR/ui/v2.5
+	yarnpkg build
+	cd $TERMUX_PKG_SRCDIR
 	go build -o stash -trimpath -ldflags="-s -w -extldflags=-static-pie \
 	-X 'github.com/stashapp/stash/internal/build.buildstamp=$(date +%Y-%m-%d)' \
 	-X 'github.com/stashapp/stash/internal/build.githash=$(git rev-parse --short HEAD 2>/dev/null || echo unknown)' \
