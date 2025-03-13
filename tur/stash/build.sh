@@ -14,9 +14,9 @@ termux_step_host_build() {
 	termux_setup_golang
 
 	cp -r $TERMUX_PKG_SRCDIR/ui/v2.5 ./ui
-	mkdir -p build
+	mkdir -p ui/build
 	yarnpkg install --frozen-lockfile
-	touch ui/v2.5/build/index.html
+	touch ui/build/index.html
 	cp -r $TERMUX_PKG_SRCDIR ./web
 	cd web
 	GOOS=android GOARCH=arm64 go generate ./cmd/stash
