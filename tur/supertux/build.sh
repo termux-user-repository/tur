@@ -19,6 +19,6 @@ TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 "
 
 termux_step_pre_configure() {
-    export LDFLAGS+=" -Wl,--no-as-needed,-lOpenSLES,--as-needed"
-    export CMAKE_PREFIX_PATH=$TERMUX_PREFIX
+	export LDFLAGS+=" -Wl,--no-as-needed,-lOpenSLES,--as-needed"
+	export CMAKE_PREFIX_PATH=$TERMUX_PREFIX
 }
