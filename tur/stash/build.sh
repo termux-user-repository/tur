@@ -36,7 +36,11 @@ termux_step_make() {
     -tags "sqlite_stat4 sqlite_math_functions" \
     -buildmode=pie \
     -trimpath \
-    -ldflags="-s -w -linkmode=external" \
+    -ldflags="-s -w -linkmode=external \
+	-X 'github.com/stashapp/stash/internal/build.buildstamp=$(date +%Y-%m-%d)' \
+	-X 'github.com/stashapp/stash/internal/build.githash=$(git rev-parse --short HEAD 2>/dev/null || echo unknown)' \
+	-X 'github.com/stashapp/stash/internal/build.version=${TERMUX_PKG_VERSION}' \
+	-X 'github.com/stashapp/stash/internal/build.officialBuild=false'" \
     -mod=readonly \
     -modcacherw \
     ./cmd/stash
