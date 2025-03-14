@@ -15,6 +15,9 @@ termux_step_host_build() {
 	cp -r $TERMUX_PKG_SRCDIR ./stash
 	mkdir -p stash/ui/v2.5/build
 	cd stash/ui/v2.5
+	export VITE_APP_DATE=$(date +%Y-%m-%d)
+	export VITE_APP_GITHASH=$(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
+	export VITE_APP_STASH_VERSION=v${TERMUX_PKG_VERSION}
 	yarnpkg install --frozen-lockfile
 	touch build/index.html
 	cd ../..
@@ -38,8 +41,8 @@ termux_step_make() {
     -trimpath \
     -ldflags="-s -w -linkmode=external \
 	-X 'github.com/stashapp/stash/internal/build.buildstamp=$(date +%Y-%m-%d)' \
-	-X 'github.com/stashapp/stash/internal/build.githash=$(git rev-parse --short HEAD 2>/dev/null || echo unknown)' \
-	-X 'github.com/stashapp/stash/internal/build.version=${TERMUX_PKG_VERSION}' \
+	-X 'github.com/stashapp/stash/internal/build.githash=$(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)' \
+	-X 'github.com/stashapp/stash/internal/build.version=v${TERMUX_PKG_VERSION}' \
 	-X 'github.com/stashapp/stash/internal/build.officialBuild=false'" \
     -mod=readonly \
     -modcacherw \
