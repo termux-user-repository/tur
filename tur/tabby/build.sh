@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="Self-hosted AI coding assistant"
 TERMUX_PKG_LICENSE="Apache-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="0.25.1"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=git+https://github.com/TabbyML/tabby
 TERMUX_PKG_DEPENDS="graphviz, libopenblas, libsqlite"
 TERMUX_PKG_BUILD_IN_SRC=true
@@ -26,8 +27,6 @@ termux_step_pre_configure() {
 		local env_host=$(printf $CARGO_TARGET_NAME | tr a-z A-Z | sed s/-/_/g)
 		export CARGO_TARGET_${env_host}_RUSTFLAGS+=" -C link-arg=$($CC -print-libgcc-file-name)"
 	fi
-
-	LDFLAGS+=" -fopenmp -static-openmp"
 }
 
 termux_step_make() {
@@ -35,6 +34,16 @@ termux_step_make() {
 }
 
 termux_step_make_install() {
-	install -Dm700 target/${CARGO_TARGET_NAME}/release/tabby $TERMUX_PREFIX/bin/
-	install -Dm700 target/${CARGO_TARGET_NAME}/release/llama-server $TERMUX_PREFIX/bin/
+	mkdir -p $TERMUX_PREFIX/opt/tabby/bin/
+	install -Dm700 target/${CARGO_TARGET_NAME}/release/tabby $TERMUX_PREFIX/opt/tabby/bin/
+	install -Dm700 target/${CARGO_TARGET_NAME}/release/llama-server $TERMUX_PREFIX/opt/tabby/bin/
+
+	# Create start script
+	cat << EOF > $TERMUX_PREFIX/bin/tabby
+#!$TERMUX_PREFIX/bin/env sh
+
+exec $TERMUX_PREFIX/opt/tabby/bin/tabby "\$@"
+
+EOF
+	chmod +x $TERMUX_PREFIX/bin/tabby
 }
