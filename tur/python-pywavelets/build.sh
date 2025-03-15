@@ -6,7 +6,7 @@ TERMUX_PKG_VERSION="1.8.0"
 TERMUX_PKG_SRCURL=https://github.com/PyWavelets/pywt/archive/refs/tags/v$TERMUX_PKG_VERSION.tar.gz
 TERMUX_PKG_SHA256=4e7e6fcf65bcf58e9e7ec7b278b8921f34fd7b1884ab9c7b32a91beec29412fc
 TERMUX_PKG_AUTO_UPDATE=true
-TERMUX_PKG_DEPENDS="libc++, python, python-pip, python-numpy"
+TERMUX_PKG_DEPENDS="libc++, python, python-ensurepip, python-numpy"
 TERMUX_PKG_BUILD_DEPENDS="python-numpy-static"
 TERMUX_PKG_PYTHON_COMMON_DEPS="wheel, 'Cython>=3.0.4', meson-python, build"
 
