@@ -1,0 +1,19 @@
+diff --git a/afio.h b/afio.h
+index f46a292..c345296 100644
+--- a/afio.h
++++ b/afio.h
+@@ -239,10 +239,10 @@ unsigned long long PSt_size;
+  * V7 and BSD UNIX use old-fashioned names for a couple of
+  * string functions.
+  */
+-#ifdef	INDEX
+-#define	strchr	index		/* Forward character search */
+-#define	strrchr	rindex		/* Reverse character search */
+-#endif /* INDEX */
++/* #ifdef	INDEX */
++#define	index	strchr		/* Forward character search */
++#define	rindex	strrchr		/* Reverse character search */
++/* #endif */ /* INDEX */
+ 
+ /*
+  * Some compilers can't handle void casts.

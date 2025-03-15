@@ -1,0 +1,179 @@
+$NetBSD: patch-ac,v 1.4 2020/11/25 14:59:24 ryoon Exp $
+
+- Use standard headers.
+- Use strerror, not sys_errlist and sys_nerr.
+- Use POSIX utime() interface, not half-baked version.
+- Use W* macros from sys/wait.h instead of hard-coding the historic
+  bit patterns.
+- Build fix for makedev() on Solaris and Interix.
+- Fix bad calls to execlp() that break on 64-bit platforms.
+
+--- a/afio.c	2018-11-30 14:25:04.000000000 +0000
++++ b/afio.c
+@@ -163,7 +163,7 @@
+ #include <stdio.h>
+ #include <errno.h>
+ 
+-#ifdef sun
++#ifdef __sun
+ #include <sys/types.h>
+ #include <utime.h>
+ #include <signal.h>
+@@ -199,30 +199,29 @@ extern char *sys_errlist[];
+ #include <sys/types.h>
+ #include <sys/ioctl.h>
+ #include <sys/stat.h>
++#include <sys/wait.h>
+ #include <pwd.h>
+ #include <grp.h>
++#include <utime.h>
+ #include "patchlevel.h"
+ 
+ #ifdef linux
+ 
+-#define linux_tstamp 1
+-
+-#include <utime.h>
+-#include <sys/wait.h>
+-
+ /* for flushing floppy cache */
+ #include <linux/fd.h>
+ #endif
+ 
+ /* compatibility fixes for IRIX native c compiler. */
+ #ifdef irix_cc_compatibility
+-#define linux_tstamp 1
+ #include <strings.h>
+ #endif
+ 
+ #ifndef	major
+-#ifdef sun
++#if defined(sun) || defined(__INTERIX)
+ #include <sys/mkdev.h>
++# if !defined(makedev) && defined(mkdev)
++#  define makedev(a,b) mkdev((a),(b))
++# endif
+ #else
+ #include <sys/sysmacros.h>
+ #endif
+@@ -1187,7 +1186,7 @@ savedirstamp (char *name, time_t mtime)
+ STATIC void
+ restoredirstamps (void)
+ {
+-#ifdef linux_tstamp
++#ifndef broken_utime
+   auto struct utimbuf tstamp;
+ #else
+   auto time_t tstamp[2];
+@@ -1196,7 +1195,7 @@ restoredirstamps (void)
+   Dir *DirP_forw;
+   while(DirP_curr!=NULL)
+   {
+-#ifdef linux_tstamp
++#ifndef broken_utime
+     tstamp.actime = DirP_curr->d_mtime;
+     tstamp.modtime = DirP_curr->d_mtime;
+     /* no error code checking on purpose */
+@@ -1287,7 +1286,7 @@ readcheck (av)
+   auto char name[PATHSIZE];
+   auto char local[PATHSIZE];
+   int sel, res;
+-#ifdef linux_tstamp
++#ifndef broken_utime
+   auto struct utimbuf tstamp;
+ #else
+   auto time_t tstamp[2];
+@@ -1315,7 +1314,7 @@ readcheck (av)
+       if(aflag && atime_sb_valid && ((sb.sb_mode & S_IFMT)==S_IFREG))
+       {
+ 	  /* reset access time, this distroys the ctime btw. */
+-#ifdef linux_tstamp
++#ifndef broken_utime
+ 	  tstamp.actime = atime_sb.sb_atime;
+ 	  tstamp.modtime = atime_sb.sb_mtime;
+ 	  VOID utime (name, &tstamp);
+@@ -1807,7 +1806,7 @@ inentry (name, asb)
+   reg Link *linkp;
+   reg int ifd;
+   reg int ofd;
+-#ifdef linux_tstamp
++#ifndef broken_utime
+   auto struct utimbuf tstamp;
+ #else
+   auto time_t tstamp[2];
+@@ -1843,7 +1842,7 @@ inentry (name, asb)
+   /* Cannot set utime on symlink (at least not under Linux) */
+   if((asb->sb_mode & S_IFMT) != S_IFLNK)
+   {
+-#ifdef linux_tstamp
++#ifndef broken_utime
+       tstamp.actime = tstamp.modtime = mflag ? timenow : asb->sb_mtime;
+       VOID utime (name, &tstamp);
+ #else
+@@ -3727,7 +3726,7 @@ out (av)
+     auto char name[PATHSIZE];
+     auto char fsname[PATHSIZE];
+     auto int compression;
+-#ifdef linux_tstamp
++#ifndef broken_utime
+     auto struct utimbuf tstamp;
+ #else
+     auto time_t tstamp[2];
+@@ -3905,7 +3904,7 @@ out (av)
+ 	if(aflag && *fsname && ((sb.sb_mode & S_IFMT)==S_IFREG))
+ 	{
+ 	    /* reset access time, this distroys the ctime btw. */
+-#ifdef linux_tstamp
++#ifndef broken_utime
+ 	    tstamp.actime = sb.sb_atime;
+ 	    tstamp.modtime = sb.sb_mtime;
+ 	    VOID utime (fsname, &tstamp);
+@@ -4405,7 +4404,7 @@ passitem (from, asb, ifd, dir)
+ {
+   reg int ofd;
+ 
+-#ifdef linux_tstamp
++#ifndef broken_utime
+   auto struct utimbuf tstamp;
+ #else
+   auto time_t tstamp[2];
+@@ -4421,7 +4420,7 @@ passitem (from, asb, ifd, dir)
+ 	continue;
+       if (ofd > 0)
+ 	passdata (from, ifd, to, ofd);
+-#ifdef linux_tstamp
++#ifndef broken_utime
+       tstamp.actime = tstamp.modtime = mflag ? timenow : asb->sb_mtime;
+       VOID utime (to, &tstamp);
+ #else
+@@ -5103,7 +5102,7 @@ xwait (pid, what, compstat2)
+      char *what;
+      int compstat2;
+ {
+-  reg int status;
++  int status;
+   reg Child *cp;
+   reg Child **acp;
+   auto char why[100];
+@@ -5120,16 +5119,16 @@ xwait (pid, what, compstat2)
+   free ((char *) cp);
+   if (status == 0)
+     return (0);
+-  if (status & 0377)
++  if (WIFSIGNALED(status))
+     VOID sprintf (why, "Killed by signal %d%s",
+-		  status & 0177, status & 0200 ? " -- core dumped" : "");
++		  WTERMSIG(status), WCOREDUMP(status) ? " -- core dumped" : "");
+   else
+-    VOID sprintf (why, "Exit %d", (status >> 8) & 0377);
++    VOID sprintf (why, "Exit %d", WEXITSTATUS(status));
+ 
+-  if ((!compstat2 && (((status >> 8) & 0377) != 2)) || compstat2)
++  if ((!compstat2 && (WEXITSTATUS(status) != 2)) || compstat2)
+     return (warn (what, why));
+   else
+-    return ((status >> 8) & 0377);
++    return WEXITSTATUS(status);
+ }
+ 
+ 
