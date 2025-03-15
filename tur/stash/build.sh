@@ -11,6 +11,13 @@ TERMUX_PKG_HOSTBUILD=true
 
 termux_step_host_build() {
 	termux_setup_nodejs
+	termux_setup_golang
+
+	mkdir -p _yarn_bin/
+	cd _yarn_bin
+	npm install yarn
+	export PATH="$TERMUX_PKG_HOSTBUILD_DIR/_yarn_bin/node_modules/.bin:$PATH"
+	cd -
 
 	cp -r $TERMUX_PKG_SRCDIR ./stash
 	mkdir -p stash/ui/v2.5/build
@@ -18,13 +25,13 @@ termux_step_host_build() {
 	export VITE_APP_DATE=$(date +%Y-%m-%d)
 	export VITE_APP_GITHASH=$(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 	export VITE_APP_STASH_VERSION=v${TERMUX_PKG_VERSION}
-	yarnpkg install --frozen-lockfile
+	yarn install --frozen-lockfile
 	touch build/index.html
 	cd ../..
 	go generate ./cmd/stash
 	cd ui/v2.5
-	yarnpkg run gqlgen
-	yarnpkg build
+	yarn run gqlgen
+	yarn build
 }
 
 termux_step_pre_configure() {
@@ -36,17 +43,17 @@ termux_step_make() {
 	cd stash
 	export CGO_ENABLED=1
 	go build -o stash -v \
-	-tags "sqlite_stat4 sqlite_math_functions" \
-	-buildmode=pie \
-	-trimpath \
-	-ldflags="-s -w -linkmode=external \
+    -tags "sqlite_stat4 sqlite_math_functions" \
+    -buildmode=pie \
+    -trimpath \
+    -ldflags="-s -w -linkmode=external \
 	-X 'github.com/stashapp/stash/internal/build.buildstamp=$(date +%Y-%m-%d)' \
 	-X 'github.com/stashapp/stash/internal/build.githash=$(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)' \
 	-X 'github.com/stashapp/stash/internal/build.version=v${TERMUX_PKG_VERSION}' \
 	-X 'github.com/stashapp/stash/internal/build.officialBuild=false'" \
-	-mod=readonly \
-	-modcacherw \
-	./cmd/stash
+    -mod=readonly \
+    -modcacherw \
+    ./cmd/stash
 }
 
 termux_step_make_install() {
