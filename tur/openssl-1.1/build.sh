@@ -7,6 +7,7 @@ _VERSION=1.1.1w
 TERMUX_PKG_VERSION=1:${_VERSION}
 TERMUX_PKG_SRCURL=https://www.openssl.org/source/openssl-${_VERSION/\~/-}.tar.gz
 TERMUX_PKG_SHA256=cf3098950cb4d853ad95c0841f1f9c6d3dc102dccfcacd521d93925208b76ac8
+TERMUX_PKG_ON_DEVICE_BUILD_NOT_SUPPORTED=true
 TERMUX_PKG_AUTO_UPDATE=false
 TERMUX_PKG_DEPENDS="ca-certificates, zlib"
 TERMUX_PKG_CONFFILES="etc/tls/openssl.cnf"
@@ -22,12 +23,6 @@ termux_step_pre_configure() {
 }
 
 termux_step_configure() {
-	# Certain packages are not safe to build on device because their
-	# build.sh script deletes specific files in $TERMUX_PREFIX.
-	if $TERMUX_ON_DEVICE_BUILD; then
-		termux_error_exit "Package '$TERMUX_PKG_NAME' is not safe for on-device builds."
-	fi
-
 	CFLAGS+=" -DNO_SYSLOG"
 
 	perl -p -i -e "s@TERMUX_CFLAGS@$CFLAGS@g" Configure
