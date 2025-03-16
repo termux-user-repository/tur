@@ -11,3 +11,11 @@ termux_step_pre_configure(){
     cp -r $TERMUX_PKG_SRCDIR/its $TERMUX_PKG_BUILDDIR/its
     autoreconf -vfi
 }
+
+termux_step_make(){
+    return
+}
+
+termux_step_make_install(){
+    return
+}
