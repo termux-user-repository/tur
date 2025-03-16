@@ -9,13 +9,13 @@ TERMUX_PKG_DEPENDS="libxml2-python"
 
 termux_step_pre_configure(){
 	cp -r $TERMUX_PKG_SRCDIR/its $TERMUX_PKG_BUILDDIR/its
-	autoreconf -vfi
+	autoreconf -vf
 }
 
 termux_step_make(){
-	return
+	make -j $TERMUX_PKG_MAKE_PROCESSES
 }
 
 termux_step_make_install(){
-	return
+	make install
 }
