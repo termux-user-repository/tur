@@ -8,11 +8,12 @@
  ])
  _DEFAULT_COPTS.extend([
      "-std=c99",
-@@ -43,6 +44,7 @@
+@@ -43,6 +44,8 @@
      "-Werror=pedantic",
      "-Wall",
      "-Wstrict-prototypes",
 +    "-Wno-gnu-offsetof-extensions",
++    "-Wno-c11-extensions",
      # GCC (at least) emits spurious warnings for this that cannot be fixed
      # without introducing redundant initialization (with runtime cost):
      #   https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80635
