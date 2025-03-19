@@ -11,7 +11,7 @@ TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_AUTO_UPDATE=true
 
 termux_step_pre_configure(){
-	cpan -fi XML::Parser
+	cpan -f -i XML::Parser
 	autoreconf -vf
 }
 
