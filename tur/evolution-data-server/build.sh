@@ -16,7 +16,7 @@ TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 -DENABLE_UOA=OFF
 "
 termux_step_pre_configure(){
-	sed -i 's/libsecret-1/libsecret/g' CMakeLists.txt
+	sed 's/libsecret-1/libsecret/g' CMakeLists.txt
 	sed -i 's/libical-glib/libical/g' CMakeLists.txt
 }
 
