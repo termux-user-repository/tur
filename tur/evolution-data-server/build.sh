@@ -15,6 +15,9 @@ TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 -DENABLE_GOA=OFF
 -DENABLE_UOA=OFF
 "
+termux_step_pre_configure(){
+	sed 's/libsecret-1/libsecret/g' CMakeLists.txt
+}
 
 termux_step_make(){
 	make -j $TERMUX_PKG_MAKE_PROCESSES
