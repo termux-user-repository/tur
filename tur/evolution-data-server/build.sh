@@ -9,11 +9,11 @@ TERMUX_PKG_DEPENDS="libcairo, glib, gtk4, krb5, libical, libsoup3, libuuid, libx
 TERMUX_PKG_BUILD_DEPENDS="intltool, python"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_AUTO_UPDATE=true
-TERMUX_PKG_EXTRA_CONFIGURE_ARGS={
+TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 --disable-tests
 --disable-uoa
 --disable-goa
-}
+"
 
 termux_step_make(){
 	make -j $TERMUX_PKG_MAKE_PROCESSES
