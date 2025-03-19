@@ -9,7 +9,6 @@ TERMUX_PKG_DEPENDS="libcairo, glib, gtk4, krb5, libical, libsoup3, libuuid, libx
 TERMUX_PKG_BUILD_DEPENDS="intltool, python, valac"
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
--G 'Unix Makefiles'
 -DCMAKE_INSTALL_PREFIX=$TERMUX_PREFIX
 -DENABLE_GTK_DOC=OFF
 -DENABLE_WEATHER=OFF
