@@ -8,6 +8,7 @@ TERMUX_PKG_SHA256=7ae5482aa4ee2894467716c5be982500e1d511dddf4ab29b68fdb107d7f8a8
 TERMUX_PKG_DEPENDS="cairo, glib, gtk4, krb5, libical, libsoup3, libuuid, libxml2, libnspr, libnss, openldap, libsqlite, webkit2gtk4.1, webkitgtk6.0"
 TERMUX_PKG_BUILD_DEPENDS="perl, intltool, python"
 TERMUX_PKG_BUILD_IN_SRC=true
+TERMUX_PKG_AUTO_UPDATE=true
 
 termux_step_pre_configure(){
 	cpan -fi XML::Parser
