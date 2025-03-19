@@ -8,6 +8,7 @@ TERMUX_PKG_SHA256=7ae5482aa4ee2894467716c5be982500e1d511dddf4ab29b68fdb107d7f8a8
 TERMUX_PKG_DEPENDS="libcairo, glib, gtk4, json-glib, krb5, libcanberra, libdb, libical, libsoup3, libuuid, libxml2, libnspr, libnss, openldap, libsecret, libsqlite, pango, webkit2gtk-4.1, webkitgtk-6.0"
 TERMUX_PKG_BUILD_DEPENDS="intltool, python, valac"
 TERMUX_PKG_AUTO_UPDATE=true
+TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 -DCMAKE_INSTALL_PREFIX=$TERMUX_PREFIX
 -DENABLE_GTK_DOC=OFF
