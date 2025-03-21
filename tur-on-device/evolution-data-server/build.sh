@@ -15,19 +15,11 @@ TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 -DENABLE_GOA=OFF
 -DENABLE_UOA=OFF
 "
-termux_step_get_source(){
-	# Force to install XML-Parser
+termux_step_create_debscripts(){
+	echo "Forcing to install XML::Parser"
 	cpan -f -i XML::Parser
 }
 termux_step_pre_configure(){
 	pip install setuptools
 	sed -i 's/libical-glib/libical/g' CMakeLists.txt
-}
-
-termux_step_make(){
-	make -j $TERMUX_PKG_MAKE_PROCESSES
-}
-
-termux_step_make_install(){
-	make install
 }
