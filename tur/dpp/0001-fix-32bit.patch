@@ -1,0 +1,12 @@
+--- a/src/dpp/socket.cpp
++++ b/src/dpp/socket.cpp
+@@ -74,7 +74,9 @@
+ 
+ template bool raii_socket::set_option<int>(int, int, int);
+ template bool raii_socket::set_option<bool>(int, int, bool);
++#if !defined(__ANDROID__) || defined(__LP64__)
+ template bool raii_socket::set_option<socklen_t>(int, int, socklen_t);
++#endif
+ 
+ bool raii_socket::listen() {
+ 	return ::listen(fd, SOMAXCONN) >= 0;
