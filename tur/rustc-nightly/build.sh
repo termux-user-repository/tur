@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="Rust compiler and utilities (nightly version)"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="1.87.0-2025.03.21-nightly"
+TERMUX_PKG_REVISION=1
 _RUST_VERSION=$(echo $TERMUX_PKG_VERSION | cut -d- -f1)
 _DATE="$(echo $TERMUX_PKG_VERSION | cut -d- -f2 | sed 's|\.|-|g')"
 _LLVM_MAJOR_VERSION=$(. $TERMUX_SCRIPTDIR/packages/libllvm/build.sh; echo $LLVM_MAJOR_VERSION)
@@ -259,6 +260,12 @@ termux_step_make_install() {
 }
 
 termux_step_post_make_install() {
+	if [ "$TERMUX_ARCH_BITS" = "64" ]; then
+		mkdir -p $TERMUX_PREFIX/opt/rust-nightly/lib/rustlib/$CARGO_TARGET_NAME/codegen-backends/
+		cp build/$CARGO_TARGET_NAME/stage1/lib/rustlib/$CARGO_TARGET_NAME/codegen-backends/librustc_codegen_cranelift-$_RUST_VERSION-nightly.so \
+			$TERMUX_PREFIX/opt/rust-nightly/lib/rustlib/$CARGO_TARGET_NAME/codegen-backends/librustc_codegen_cranelift-$_RUST_VERSION-nightly.so
+	fi
+
 	mkdir -p $TERMUX_PREFIX/etc/profile.d
 	echo "#!$TERMUX_PREFIX/bin/sh" > $TERMUX_PREFIX/etc/profile.d/rust-nightly.sh
 	echo "export PATH=$RUST_NIGHTLY_PREFIX/bin:\$PATH" >> $TERMUX_PREFIX/etc/profile.d/rust-nightly.sh
