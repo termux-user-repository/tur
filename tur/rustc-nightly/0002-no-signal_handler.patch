@@ -1,9 +1,9 @@
 --- a/compiler/rustc_driver_impl/src/lib.rs
 +++ b/compiler/rustc_driver_impl/src/lib.rs
-@@ -89,10 +89,10 @@
- #[macro_use]
- mod print;
- mod session_diagnostics;
+@@ -97,10 +97,10 @@
+ // Keep the OS parts of this `cfg` in sync with the `cfg` on the `libc`
+ // dependency in `compiler/rustc_driver/Cargo.toml`, to keep
+ // `-Wunused-crated-dependencies` satisfied.
 -#[cfg(all(not(miri), unix, any(target_env = "gnu", target_os = "macos")))]
 +#[cfg(all(not(miri), unix, any(target_env = "gnu", target_os = "macos", target_os = "android")))]
  mod signal_handler;
