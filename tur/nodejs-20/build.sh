@@ -3,13 +3,14 @@ TERMUX_PKG_DESCRIPTION="Open Source, cross-platform JavaScript runtime environme
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION=20.18.1
+TERMUX_PKG_REVISION=2
 TERMUX_PKG_SRCURL=https://nodejs.org/dist/v${TERMUX_PKG_VERSION}/node-v${TERMUX_PKG_VERSION}.tar.xz
 TERMUX_PKG_SHA256=91df43f8ab6c3f7be81522d73313dbdd5634bbca228ef0e6d9369fe0ab8cccd0
 # Note that we do not use a shared libuv to avoid an issue with the Android
 # linker, which does not use symbols of linked shared libraries when resolving
 # symbols on dlopen(). See https://github.com/termux/termux-packages/issues/462.
 TERMUX_PKG_DEPENDS="libc++, openssl, c-ares, zlib"
-TERMUX_PKG_CONFLICTS="nodejs, nodejs-current"
+TERMUX_PKG_SUGGESTS="clang, make, pkg-config, python"
 _INSTALL_PREFIX=opt/nodejs-20
 TERMUX_PKG_RM_AFTER_INSTALL="
 $_INSTALL_PREFIX/lib/node_modules/npm/html
