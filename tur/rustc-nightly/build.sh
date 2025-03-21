@@ -2,15 +2,14 @@ TERMUX_PKG_HOMEPAGE=https://www.rust-lang.org/
 TERMUX_PKG_DESCRIPTION="Rust compiler and utilities (nightly version)"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="1.87.0-2025.03.19-nightly"
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_VERSION="1.87.0-2025.03.20-nightly"
 _RUST_VERSION=$(echo $TERMUX_PKG_VERSION | cut -d- -f1)
 _DATE="$(echo $TERMUX_PKG_VERSION | cut -d- -f2 | sed 's|\.|-|g')"
 _LLVM_MAJOR_VERSION=$(. $TERMUX_SCRIPTDIR/packages/libllvm/build.sh; echo $LLVM_MAJOR_VERSION)
 _LLVM_MAJOR_VERSION_NEXT=$((_LLVM_MAJOR_VERSION + 1))
 _LZMA_VERSION=$(. $TERMUX_SCRIPTDIR/packages/liblzma/build.sh; echo $TERMUX_PKG_VERSION)
 TERMUX_PKG_SRCURL=https://static.rust-lang.org/dist/$_DATE/rustc-nightly-src.tar.xz
-TERMUX_PKG_SHA256=df8820aa5a7375a44b9b1b2102623cd0455a48af47c65a1aca32a65033d58d27
+TERMUX_PKG_SHA256=79e28d862863440ad50e463ea5c8c9f34eabff3d06f97418399cf96cf863e990
 TERMUX_PKG_DEPENDS="clang, libandroid-execinfo, libc++, libllvm (<< ${_LLVM_MAJOR_VERSION_NEXT}), lld, openssl, zlib"
 TERMUX_PKG_BUILD_DEPENDS="wasi-libc"
 TERMUX_PKG_NO_REPLACE_GUESS_SCRIPTS=true
@@ -197,8 +196,7 @@ termux_step_make_install() {
 
 	"${TERMUX_PKG_SRCDIR}/x.py" dist -j ${TERMUX_PKG_MAKE_PROCESSES} rustc-dev
 
-	# remove version suffix: beta, nightly
-	local VERSION=${TERMUX_PKG_VERSION//-*}
+	local VERSION=nightly
 
 	if [[ "${TERMUX_ON_DEVICE_BUILD}" == "true" ]]; then
 		echo "WARN: Replacing on device rust! Caveat emptor!"
