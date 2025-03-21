@@ -44,6 +44,7 @@ termux_pkg_auto_update() {
 	# Get latest nightly version from rustc
 	local latest_nightly_version="$(rustc --version | cut -d' ' -f2 | cut -d- -f1)"
 	local latest_nightly_date="$(rustc --version | cut -d' ' -f4 | cut -d')' -f1)"
+	latest_nightly_date="$(date +%Y-%m-%d -d "$latest_nightly_date 1 day")"
 	local latest_version="$latest_nightly_version-${latest_nightly_date//-/.}-nightly"
 
 	if [[ "${latest_version}" == "${TERMUX_PKG_VERSION}" ]]; then
@@ -57,9 +58,11 @@ termux_pkg_auto_update() {
 	fi
 
 	rm -rf ~/.cargo ~/.rustup
-	wget "https://static.rust-lang.org/dist/$latest_nightly_date/rustc-nightly-src.tar.xz" -O /tmp/rustc-nightly-src.tar.xz
+	wget -q "https://static.rust-lang.org/dist/$latest_nightly_date/rustc-nightly-src.tar.xz" -O /tmp/rustc-nightly-src.tar.xz
 	local _sha256_checksum="$(sha256sum /tmp/rustc-nightly-src.tar.xz | cut -d' ' -f1)"
 	rm -f /tmp/rustc-nightly-src.tar.xz
+	echo "Version : $latest_version"
+	echo "Checksum: $_sha256_checksum"
 	termux_pkg_upgrade_version "$latest_version"
 }
 
@@ -107,10 +110,6 @@ termux_step_pre_configure() {
 }
 
 termux_step_configure() {
-	# Bypass the config.guess replace to make rust happy
-	find "$TERMUX_PKG_SRCDIR"/vendor/ -name config.sub.bp -exec bash -c 'mv "$0" "${0%.*}"' {} \;
-	find "$TERMUX_PKG_SRCDIR"/vendor/ -name config.guess.bp -exec bash -c 'mv "$0" "${0%.*}"' {} \;
-
 	# Use nightly toolchain to build nightly toolchain
 	if [[ "${TERMUX_ON_DEVICE_BUILD}" == "false" ]]; then
 		rustup install beta
