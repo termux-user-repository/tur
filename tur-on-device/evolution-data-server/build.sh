@@ -16,9 +16,8 @@ TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 -DENABLE_UOA=OFF
 "
 termux_step_get_source(){
-	echo "Forcing to install XML::Parser before install intltool"
-	cpan -f -i XML::Parser
-	pkg i intltool
+	# Force to install XML:Parser if intltool fail to install
+	pkg i intltool || cpan -f -i XML::Parser
 }
 termux_step_pre_configure(){
 	pip install setuptools
