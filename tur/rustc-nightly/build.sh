@@ -2,14 +2,15 @@ TERMUX_PKG_HOMEPAGE=https://www.rust-lang.org/
 TERMUX_PKG_DESCRIPTION="Rust compiler and utilities (nightly version)"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="1.87.0-2025.03.20-nightly"
+TERMUX_PKG_VERSION="1.87.0-2025.03.21-nightly"
+TERMUX_PKG_REVISION=1
 _RUST_VERSION=$(echo $TERMUX_PKG_VERSION | cut -d- -f1)
 _DATE="$(echo $TERMUX_PKG_VERSION | cut -d- -f2 | sed 's|\.|-|g')"
 _LLVM_MAJOR_VERSION=$(. $TERMUX_SCRIPTDIR/packages/libllvm/build.sh; echo $LLVM_MAJOR_VERSION)
 _LLVM_MAJOR_VERSION_NEXT=$((_LLVM_MAJOR_VERSION + 1))
 _LZMA_VERSION=$(. $TERMUX_SCRIPTDIR/packages/liblzma/build.sh; echo $TERMUX_PKG_VERSION)
 TERMUX_PKG_SRCURL=https://static.rust-lang.org/dist/$_DATE/rustc-nightly-src.tar.xz
-TERMUX_PKG_SHA256=79e28d862863440ad50e463ea5c8c9f34eabff3d06f97418399cf96cf863e990
+TERMUX_PKG_SHA256=8c394d3b7c13ef768deff45a979741f9eda1979c46bb8789660dba891939bab7
 TERMUX_PKG_DEPENDS="clang, libandroid-execinfo, libc++, libllvm (<< ${_LLVM_MAJOR_VERSION_NEXT}), lld, openssl, zlib"
 TERMUX_PKG_BUILD_DEPENDS="wasi-libc"
 TERMUX_PKG_NO_REPLACE_GUESS_SCRIPTS=true
@@ -259,6 +260,12 @@ termux_step_make_install() {
 }
 
 termux_step_post_make_install() {
+	if [ "$TERMUX_ARCH_BITS" = "64" ]; then
+		mkdir -p $TERMUX_PREFIX/opt/rust-nightly/lib/rustlib/$CARGO_TARGET_NAME/codegen-backends/
+		cp build/$CARGO_TARGET_NAME/stage1/lib/rustlib/$CARGO_TARGET_NAME/codegen-backends/librustc_codegen_cranelift-$_RUST_VERSION-nightly.so \
+			$TERMUX_PREFIX/opt/rust-nightly/lib/rustlib/$CARGO_TARGET_NAME/codegen-backends/librustc_codegen_cranelift-$_RUST_VERSION-nightly.so
+	fi
+
 	mkdir -p $TERMUX_PREFIX/etc/profile.d
 	echo "#!$TERMUX_PREFIX/bin/sh" > $TERMUX_PREFIX/etc/profile.d/rust-nightly.sh
 	echo "export PATH=$RUST_NIGHTLY_PREFIX/bin:\$PATH" >> $TERMUX_PREFIX/etc/profile.d/rust-nightly.sh
