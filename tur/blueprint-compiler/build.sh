@@ -5,10 +5,4 @@ TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION=0.16.0
 TERMUX_PKG_SRCURL=https://gitlab.gnome.org/jwestman/blueprint-compiler/-/archive/v${TERMUX_PKG_VERSION}/blueprint-compiler-v${TERMUX_PKG_VERSION}.tar.gz
 TERMUX_PKG_SHA256=01feb8263fe7a450b0a9fed0fd54cf88947aaf00f86cc7da345f8b39a0e7bd30
-TERMUX_PKG_DEPENDS="python, glib"
-TERMUX_PKG_BUILD_DEPENDS="g-ir-scanner, glib-cross"
-
-termux_step_pre_configure() {
-	termux_setup_gir
-	termux_setup_glib_cross_pkg_config_wrapper
-}
+TERMUX_PKG_DEPENDS="python"
