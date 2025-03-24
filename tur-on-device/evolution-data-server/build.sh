@@ -20,6 +20,7 @@ termux_step_get_source(){
 	pkg i intltool || cpan -f -i XML::Parser
 	pip install setuptools
 }
-termux_step_pre_configure(){
+termux_step_configure(){
 	sed -i 's/libical-glib/libical/g' CMakeLists.txt
+	termux_setup_cmake
 }
