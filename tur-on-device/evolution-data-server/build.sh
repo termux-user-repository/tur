@@ -20,7 +20,7 @@ termux_step_get_source(){
 	pkg i intltool || cpan -f -i XML::Parser
 	pip install setuptools
 	termux_download_src_archive
-	termux_unpack_src_archive
+	termux_extract_src_archive
 }
 
 termux_step_pre_configure(){
