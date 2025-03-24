@@ -18,8 +18,8 @@ TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 termux_step_get_source(){
 	# Force to install XML:Parser if intltool fail to install
 	pkg i intltool || cpan -f -i XML::Parser
+	pip install setuptools
 }
 termux_step_pre_configure(){
-	pip install setuptools
 	sed -i 's/libical-glib/libical/g' CMakeLists.txt
 }
