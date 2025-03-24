@@ -19,8 +19,10 @@ termux_step_get_source(){
 	# Force to install XML:Parser if intltool fail to install
 	pkg i intltool || cpan -f -i XML::Parser
 	pip install setuptools
+	termux_download_src_archive
+	termux_unpack_src_archive
 }
-termux_step_configure(){
+
+termux_step_pre_configure(){
 	sed -i 's/libical-glib/libical/g' CMakeLists.txt
-	termux_setup_cmake
 }
