@@ -11,3 +11,11 @@ TERMUX_PKG_PLATFORM_INDEPENDENT=true
 termux_step_pre_configure(){
 	autoreconf -vf
 }
+
+termux_step_make(){
+	make -j $TERMUX_PKG_MAKE_PROCESSES
+}
+
+termux_step_make_install(){
+	make install
+}
