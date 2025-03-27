@@ -1,6 +1,6 @@
 TERMUX_PKG_HOMEPAGE=https://libical.github.io/libical/libical-glib/
 TERMUX_PKG_DESCRIPTION="GObject wrapper for libical library"
-TERMUX_PKG_LICENSE="LGPL-2.1-only OR MPL-2.0"
+TERMUX_PKG_LICENSE="LGPL-2.1-only"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="3.0.20"
 TERMUX_PKG_SRCURL=https://github.com/libical/libical/releases/download/v$TERMUX_PKG_VERSION/libical-$TERMUX_PKG_VERSION.tar.gz
