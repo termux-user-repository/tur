@@ -1,0 +1,28 @@
+--- a/scripts/build/termux_step_create_debian_package.sh
++++ b/scripts/build/termux_step_create_debian_package.sh
+@@ -3,6 +3,11 @@
+ 		# Metapackage doesn't have data inside.
+ 		rm -rf data
+ 	fi
++	local xz_opt=""
++	if [ "$TERMUX_DEBUG_BUILD" = "true" ]; then
++		xz_opt="-0"
++	fi
++	XZ_OPT=$xz_opt \
+ 	tar --sort=name \
+ 		--mtime="@${SOURCE_DATE_EPOCH}" \
+ 		--owner=0 --group=0 --numeric-owner \
+--- a/scripts/build/termux_create_debian_subpackages.sh
++++ b/scripts/build/termux_create_debian_subpackages.sh
+@@ -84,6 +84,11 @@
+ 		fi
+ 		local SUB_PKG_INSTALLSIZE
+ 		SUB_PKG_INSTALLSIZE=$(du -sk . | cut -f 1)
++		local xz_opt=""
++		if [ "$TERMUX_DEBUG_BUILD" = "true" ]; then
++			xz_opt="-0"
++		fi
++		XZ_OPT=$xz_opt \
+ 		tar --sort=name \
+ 			--mtime="@${SOURCE_DATE_EPOCH}" \
+ 			--owner=0 --group=0 --numeric-owner \
