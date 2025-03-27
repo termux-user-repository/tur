@@ -11,7 +11,7 @@
 +                    str = strmake( "%s24", target_name );
 +                }
 +            } else {
-+                str = strmake( "%s", target );
++                str = strmake( "%s", target_name );
 +            }
              strarray_add( &ret, "-target" );
 -            strarray_add( &ret, target_name );
