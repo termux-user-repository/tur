@@ -13,6 +13,5 @@ termux_step_pre_configure() {
 	if [ "${TERMUX_ON_DEVICE_BUILD}" = false ]; then
 		termux_error_exit "This package doesn't support cross-compiling."
 	fi
-  
 	termux_setup_gir
 }
