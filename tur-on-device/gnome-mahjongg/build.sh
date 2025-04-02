@@ -14,6 +14,6 @@ termux_step_pre_configure() {
 		termux_error_exit "This package doesn't support cross-compiling."
 	fi
 
- 	export PYTHONDONTWRITEBYTECODE=1
+	export PYTHONDONTWRITEBYTECODE=1
 	termux_setup_gir
 }
