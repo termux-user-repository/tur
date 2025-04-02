@@ -13,7 +13,7 @@ termux_step_pre_configure() {
 	if [ "${TERMUX_ON_DEVICE_BUILD}" = false ]; then
 		termux_error_exit "This package doesn't support cross-compiling."
 	fi
- 
- 	export PYTHONDONTWRITEBYTECODE=1
+
+	export PYTHONDONTWRITEBYTECODE=1
 	termux_setup_gir
 }
