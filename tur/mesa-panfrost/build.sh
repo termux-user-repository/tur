@@ -16,7 +16,7 @@ TERMUX_PKG_CONFLICTS="libmesa, ndk-sysroot (<= 25b), mesa"
 TERMUX_PKG_REPLACES="libmesa, mesa"
 TERMUX_PKG_PROVIDES="mesa"
 # Not for Intel and AMD
-TERMUX_PKG_BLACKLISTED_ARCHES="x86-64, i686"
+TERMUX_PKG_BLACKLISTED_ARCHES="x86_64, i686"
 
 # FIXME: Set `shared-llvm` to disabled if possible
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
