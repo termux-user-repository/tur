@@ -12,9 +12,9 @@ TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_DEPENDS="libandroid-shmem, libc++, libdrm, libglvnd, libllvm (<< ${_LLVM_MAJOR_VERSION_NEXT}), libwayland, libx11, libxext, libxfixes, libxshmfence, libxxf86vm, ncurses, vulkan-loader, zlib, zstd"
 TERMUX_PKG_SUGGESTS="mesa-dev"
 TERMUX_PKG_BUILD_DEPENDS="libwayland-protocols, libxrandr, llvm, llvm-tools, mlir, xorgproto"
-TERMUX_PKG_CONFLICTS="libmesa, ndk-sysroot (<= 25b), mesa"
-TERMUX_PKG_REPLACES="libmesa, mesa"
-TERMUX_PKG_PROVIDES="mesa"
+TERMUX_PKG_CONFLICTS="libmesa, ndk-sysroot (<= 25b), mesa, mesa-zink"
+TERMUX_PKG_REPLACES="libmesa, mesa, mesa-zink"
+TERMUX_PKG_PROVIDES="mesa, mesa-zink"
 # Not for Intel and AMD
 TERMUX_PKG_BLACKLISTED_ARCHES="x86_64, i686"
 
