@@ -10,7 +10,7 @@ TERMUX_PKG_SRCURL=https://archive.mesa3d.org/mesa-${TERMUX_PKG_VERSION}.tar.xz
 TERMUX_PKG_SHA256=5ff426ed6ce0588fd96d18975bdff451ae2ab2fe98b5d1528842ee71ec66711b
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_DEPENDS="libandroid-shmem, libc++, libdrm, libglvnd, libllvm (<< ${_LLVM_MAJOR_VERSION_NEXT}), libwayland, libx11, libxext, libxfixes, libxshmfence, libxxf86vm, ncurses, spirv-llvm-translator, vulkan-loader, zlib, zstd"
-#TERMUX_PKG_SUGGESTS="mesa-dev"
+TERMUX_PKG_SUGGESTS="mesa-panfrost-dev"
 TERMUX_PKG_BUILD_DEPENDS="libwayland-protocols, libxrandr, llvm, llvm-tools, mlir, xorgproto"
 TERMUX_PKG_CONFLICTS="libmesa, ndk-sysroot (<= 25b), mesa, mesa-zink"
 TERMUX_PKG_REPLACES="libmesa, mesa, mesa-zink"
