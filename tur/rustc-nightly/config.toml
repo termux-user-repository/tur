@@ -28,6 +28,7 @@ tools = [
     "rust-demangler",
 ]
 sanitizers = false
+local-rebuild = true
 android-ndk = "@TERMUX_STANDALONE_TOOLCHAIN@"
 
 [install]
