@@ -22,7 +22,7 @@ TERMUX_PKG_UPDATE_TAG_TYPE="latest-release-tag"
 #   File "/data/data/com.termux/files/usr/lib/python3.10/site-packages/scipy-1.8.0-py3.10-linux-i686.egg/scipy/linalg/_basic.py", line 1227 in lstsq
 #   File "/data/data/com.termux/files/usr/lib/python3.10/site-packages/scipy-1.8.0-py3.10-linux-i686.egg/scipy/linalg/tests/test_basic.py", line 1047 in test_simple_overdet_complex
 # XXX: Although it doesn't seem to work fine, I'd like to enable this package as it happens only on some functions.
-# TERMUX_PKG_BLACKLISTED_ARCHES="arm, i686"
+# TERMUX_PKG_EXCLUDED_ARCHES="arm, i686"
 
 TERMUX_MESON_WHEEL_CROSSFILE="$TERMUX_PKG_TMPDIR/wheel-cross-file.txt"
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="

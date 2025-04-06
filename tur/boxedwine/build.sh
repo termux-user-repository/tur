@@ -12,7 +12,7 @@ TERMUX_PKG_GIT_BRANCH="master"
 TERMUX_PKG_SHA256=007eb8e0db735c64839f90c3020ca117281b1f3e7176e02608e128d8f51f5d49
 TERMUX_PKG_DEPENDS="glu, libc++, libcurl, libminizip, libx11, opengl, openssl, pulseaudio, sdl2, zlib"
 TERMUX_PKG_BUILD_IN_SRC=true
-TERMUX_PKG_BLACKLISTED_ARCHES="i686"
+TERMUX_PKG_EXCLUDED_ARCHES="i686"
 
 termux_step_post_get_source() {
 	git fetch --unshallow

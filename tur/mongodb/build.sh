@@ -13,7 +13,7 @@ TERMUX_PKG_SHA256=f9aa08d43b87694085b06744025702f80acf0efd373b77704a7fd32a7f54ec
 TERMUX_PKG_DEPENDS="libcurl, libstemmer, liblzma, libyaml-cpp, openssl, pcre2, zlib, zstd"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_HOSTBUILD=true
-TERMUX_PKG_BLACKLISTED_ARCHES="arm, i686"
+TERMUX_PKG_EXCLUDED_ARCHES="arm, i686"
 
 termux_step_host_build() {
 	env -i PATH="$PATH" sudo apt update

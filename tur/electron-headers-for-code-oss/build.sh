@@ -8,7 +8,7 @@ TERMUX_PKG_SRCURL=git+https://github.com/electron/electron
 TERMUX_PKG_DEPENDS="electron-deps"
 TERMUX_PKG_BUILD_DEPENDS="libnotify, libffi-static"
 # Chromium doesn't support i686 on Linux.
-TERMUX_PKG_BLACKLISTED_ARCHES="i686"
+TERMUX_PKG_EXCLUDED_ARCHES="i686"
 
 __tur_setup_depot_tools() {
 	export DEPOT_TOOLS_UPDATE=0

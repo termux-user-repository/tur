@@ -75,7 +75,7 @@ enable_tools=yes
 
 # FIXME: This package doesn't work on arm since 8.x, but anyway
 # FIXME: I'd like to compile it.
-# TERMUX_PKG_BLACKLISTED_ARCHES="arm"
+# TERMUX_PKG_EXCLUDED_ARCHES="arm"
 
 # Enable win64 on 64-bit arches.
 # TODO: Enable win32 after TUR has full support for mutilib

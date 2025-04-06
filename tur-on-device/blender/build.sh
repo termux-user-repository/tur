@@ -8,7 +8,7 @@ TERMUX_PKG_SRCURL=git+https://github.com/blender/blender.git
 TERMUX_PKG_GIT_BRANCH="v${TERMUX_PKG_VERSION#*:}"
 
 # Blender does not support 32bit
-TERMUX_PKG_BLACKLISTED_ARCHES="arm, i686"
+TERMUX_PKG_EXCLUDED_ARCHES="arm, i686"
 
 TERMUX_PKG_DEPENDS="libpng, libtiff, python, python-pip, python-numpy, openexr, desktop-file-utils, potrace, shared-mime-info, hicolor-icon-theme, glew, openjpeg, freetype, ffmpeg, fftw, alembic, libsndfile, ptex, sdl2, libspnav, openal-soft, opencolorio, libblosc, sse2neon, libandroid-execinfo, brotli, libepoxy, openimageio, pybind11, openvdb, libraw, libpugixml, shaderc"
 TERMUX_PKG_BUILD_DEPENDS="subversion, git-lfs"

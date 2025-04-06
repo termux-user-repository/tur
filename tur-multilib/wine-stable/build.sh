@@ -70,7 +70,7 @@ enable_wineandroid_drv=no
 
 # FIXME: This package doesn't work on arm since 8.x, but anyway
 # FIXME: I'd like to compile it.
-# TERMUX_PKG_BLACKLISTED_ARCHES="arm"
+# TERMUX_PKG_EXCLUDED_ARCHES="arm"
 
 # Enable win64 on 64-bit arches.
 if [ "$TERMUX_ARCH_BITS" = 64 ]; then

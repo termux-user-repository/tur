@@ -15,7 +15,7 @@ TERMUX_PKG_UPDATE_TAG_TYPE="latest-release-tag"
 
 # Polars doesn't officially support 32-bit Python.
 # See https://github.com/pola-rs/polars/issues/10460
-TERMUX_PKG_BLACKLISTED_ARCHES="arm, i686"
+TERMUX_PKG_EXCLUDED_ARCHES="arm, i686"
 
 termux_pkg_auto_update() {
 	# Get latest release tag:

@@ -9,7 +9,7 @@ TERMUX_PKG_DEPENDS="libarchive, openjdk-21, patch, unzip, zip"
 TERMUX_PKG_BUILD_DEPENDS="libandroid-spawn-static, which"
 TERMUX_PKG_BREAKS="openjdk-11, openjdk-17"
 TERMUX_PKG_BUILD_IN_SRC=true
-TERMUX_PKG_BLACKLISTED_ARCHES="arm, i686"
+TERMUX_PKG_EXCLUDED_ARCHES="arm, i686"
 TERMUX_PKG_NO_STRIP=true
 
 __ensure_is_on_device_compile() {
