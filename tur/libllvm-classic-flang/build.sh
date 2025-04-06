@@ -5,13 +5,14 @@ TERMUX_PKG_LICENSE_FILE="llvm/LICENSE.TXT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 _DATE=2023.04.19
 TERMUX_PKG_VERSION=${_DATE//./}
-TERMUX_PKG_REVISION=3
+TERMUX_PKG_REVISION=4
 _LLVM_COMMIT=cd736e11b188a8f6ff14041abd818ad86f36b9bb
 TERMUX_PKG_SRCURL=https://github.com/flang-compiler/classic-flang-llvm-project/archive/${_LLVM_COMMIT}.zip
 TERMUX_PKG_SHA256=6a5caa2ccfabf9492443c31762900fc7c945201d43b3a705f31d56256091b109
 TERMUX_PKG_HOSTBUILD=true
 TERMUX_PKG_DEPENDS="binutils-is-llvm, libc++, ncurses, ndk-sysroot, libffi, zlib"
 TERMUX_PKG_SUGGESTS="libandroid-complex-math, classic-flang"
+TERMUX_PKG_UNDEF_SYMBOLS_FILES=all
 # XXX: We may add this package later I suppose.
 TERMUX_PKG_PROVIDES="libllvm-15, clang-15, lld-15"
 TERMUX_PKG_REPLACES="libllvm-15, clang-15, lld-15"
@@ -91,6 +92,7 @@ termux_step_pre_configure() {
 	_RPATH_FLAG="-Wl,-rpath=$TERMUX_PREFIX/lib"
 	_RPATH_FLAG_ADD="-Wl,-rpath='\$ORIGIN/../lib' -Wl,-rpath=$TERMUX_PREFIX/lib"
 	LDFLAGS="${LDFLAGS/$_RPATH_FLAG/$_RPATH_FLAG_ADD $_RPATH_FLAG}"
+	LDFLAGS+=" -Wl,--undefined-version"
 	echo $LDFLAGS
 	export TERMUX_SRCDIR_SAVE=$TERMUX_PKG_SRCDIR
 	TERMUX_PKG_SRCDIR=$TERMUX_PKG_SRCDIR/llvm
@@ -101,7 +103,7 @@ termux_step_post_configure() {
 }
 
 termux_step_post_make_install() {
-	ln -sfr $_INSTALL_PREFIX/bin/flang $TERMUX_PREFIX/bin/
+	ln -sfr $_INSTALL_PREFIX/bin/flang $TERMUX_PREFIX/bin/flang-old
 	ln -sfr $_INSTALL_PREFIX/bin/clang-15 $TERMUX_PREFIX/bin/
 	ln -sfr $_INSTALL_PREFIX/bin/lld $_INSTALL_PREFIX/bin/lld-15
 	ln -sfr $_INSTALL_PREFIX/bin/lld $TERMUX_PREFIX/bin/lld-15
