@@ -2,15 +2,14 @@ TERMUX_PKG_HOMEPAGE=https://www.rust-lang.org/
 TERMUX_PKG_DESCRIPTION="Rust compiler and utilities (nightly version)"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="1.88.0-2025.04.06-nightly"
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_VERSION="1.88.0-2025.04.07-nightly"
 _RUST_VERSION=$(echo $TERMUX_PKG_VERSION | cut -d- -f1)
 _DATE="$(echo $TERMUX_PKG_VERSION | cut -d- -f2 | sed 's|\.|-|g')"
 _LLVM_MAJOR_VERSION=$(. $TERMUX_SCRIPTDIR/packages/libllvm/build.sh; echo $LLVM_MAJOR_VERSION)
 _LLVM_MAJOR_VERSION_NEXT=$((_LLVM_MAJOR_VERSION + 1))
 _LZMA_VERSION=$(. $TERMUX_SCRIPTDIR/packages/liblzma/build.sh; echo $TERMUX_PKG_VERSION)
 TERMUX_PKG_SRCURL=https://static.rust-lang.org/dist/$_DATE/rustc-nightly-src.tar.xz
-TERMUX_PKG_SHA256=d7468762b4cbdb3ad3a4275572cafcae27385d5ce4da8b7e78a7d06a3160c072
+TERMUX_PKG_SHA256=65e130b5c2106ea72727d02d0f3873d54aedaedd4a93a746d3cb5c06e024ec21
 TERMUX_PKG_DEPENDS="clang, libandroid-execinfo, libc++, libllvm (<< ${_LLVM_MAJOR_VERSION_NEXT}), lld, openssl, zlib"
 TERMUX_PKG_BUILD_DEPENDS="wasi-libc"
 TERMUX_PKG_NO_REPLACE_GUESS_SCRIPTS=true
@@ -111,6 +110,14 @@ termux_step_pre_configure() {
 }
 
 termux_step_configure() {
+	# Install llvm-19
+	local _line="deb [arch=amd64] http://apt.llvm.org/noble/ llvm-toolchain-noble-19 main"
+	local _file="/etc/apt/sources.list.d/apt-llvm-org.list"
+	__sudo grep -qF -- "$_line" "$_file" || \
+		echo "$_line" | __sudo tee -a "$_file"
+	__sudo apt update
+	__sudo apt install -y llvm-19-dev llvm-19-tools
+
 	# Use nightly toolchain to build nightly toolchain
 	if [[ "${TERMUX_ON_DEVICE_BUILD}" == "false" ]]; then
 		rustup install nightly
