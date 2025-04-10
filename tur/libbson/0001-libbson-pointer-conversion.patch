@@ -1,0 +1,43 @@
+From 39786b65b53464c9ea2b994feb9d7bad334cca6d Mon Sep 17 00:00:00 2001
+From: ii14 <59243201+ii14@users.noreply.github.com>
+Date: Tue, 2 Aug 2022 16:49:15 +0200
+Subject: [PATCH] Fix missing const qualifier in bson_tm::tm_zone (#1077)
+
+Co-authored-by: ii14 <ii14@users.noreply.github.com>
+---
+ src/libbson/src/bson/bson-timegm-private.h | 22 +++++++++++-----------
+ 1 file changed, 11 insertions(+), 11 deletions(-)
+
+diff --git a/src/libbson/src/bson/bson-timegm-private.h b/src/libbson/src/bson/bson-timegm-private.h
+index 13ed15d222..89d57b54da 100644
+--- a/src/libbson/src/bson/bson-timegm-private.h
++++ b/src/libbson/src/bson/bson-timegm-private.h
+@@ -29,17 +29,17 @@ BSON_BEGIN_DECLS
+ 
+ /* avoid system-dependent struct tm definitions */
+ struct bson_tm {
+-   int64_t tm_sec;    /* seconds after the minute [0-60] */
+-   int64_t tm_min;    /* minutes after the hour [0-59] */
+-   int64_t tm_hour;   /* hours since midnight [0-23] */
+-   int64_t tm_mday;   /* day of the month [1-31] */
+-   int64_t tm_mon;    /* months since January [0-11] */
+-   int64_t tm_year;   /* years since 1900 */
+-   int64_t tm_wday;   /* days since Sunday [0-6] */
+-   int64_t tm_yday;   /* days since January 1 [0-365] */
+-   int64_t tm_isdst;  /* Daylight Savings Time flag */
+-   int64_t tm_gmtoff; /* offset from CUT in seconds */
+-   char *tm_zone;     /* timezone abbreviation */
++   int64_t tm_sec;      /* seconds after the minute [0-60] */
++   int64_t tm_min;      /* minutes after the hour [0-59] */
++   int64_t tm_hour;     /* hours since midnight [0-23] */
++   int64_t tm_mday;     /* day of the month [1-31] */
++   int64_t tm_mon;      /* months since January [0-11] */
++   int64_t tm_year;     /* years since 1900 */
++   int64_t tm_wday;     /* days since Sunday [0-6] */
++   int64_t tm_yday;     /* days since January 1 [0-365] */
++   int64_t tm_isdst;    /* Daylight Savings Time flag */
++   int64_t tm_gmtoff;   /* offset from CUT in seconds */
++   const char *tm_zone; /* timezone abbreviation */
+ };
+ 
+ int64_t
