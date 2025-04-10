@@ -8,7 +8,9 @@ TERMUX_PKG_SRCURL=https://dev-www.libreoffice.org/src/libetonyek/libetonyek-${TE
 TERMUX_PKG_SHA256=b430435a6e8487888b761dc848b7981626eb814884963ffe25eb26a139301e9a
 TERMUX_PKG_DEPENDS="libxml2, libwpd, librevenge, liblangtag, zlib"
 TERMUX_PKG_BUILD_DEPENDS="boost, cppunit, glm, mdds"
-TERMUX_PKG_EXTRA_CONFIGURE_ARGS="--with-mdds=2.1"
+TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
+--with-mdds=3.0
+"
 
 termux_step_pre_configure() {
 	local _libgcc_file="$($CC -print-libgcc-file-name)"
