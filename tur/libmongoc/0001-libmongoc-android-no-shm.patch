@@ -1,19 +1,18 @@
 --- a/src/libmongoc/src/mongoc/mongoc-counters.c
 +++ b/src/libmongoc/src/mongoc/mongoc-counters.c
-@@ -23,8 +23,10 @@
+@@ -23,7 +23,9 @@
  
  #ifdef BSON_OS_UNIX
  #include <sys/mman.h>
 +#ifndef __ANDROID__
  #include <sys/shm.h>
- #endif
 +#endif
+ #include <unistd.h>
+ #endif
  
- #ifdef _MSC_VER
- #include <windows.h>
-@@ -33,6 +35,66 @@
- #include "mongoc-counters-private.h"
- #include "mongoc-log.h"
+@@ -35,6 +37,66 @@
+ #include <mongoc/mongoc-log.h>
+ #include <common-atomic-private.h>
  
 +#ifdef __ANDROID__
 +static int shm_unlink(const char *name) {
