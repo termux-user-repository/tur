@@ -1,0 +1,11 @@
+--- a/src/Makefile.am
++++ b/src/Makefile.am
+@@ -3,7 +3,7 @@
+ clanbomber2dir = $(RELATIVE_DATADIR)/$(PACKAGE)
+ relative_localedir = $(RELATIVE_DATADIR)/locale
+ 
+-AM_CXXFLAGS = -std=c++17 -lstdc++fs
++AM_CXXFLAGS = -std=c++17
+ 
+ AM_CPPFLAGS = \
+ 	$(SDL2_CFLAGS) \
