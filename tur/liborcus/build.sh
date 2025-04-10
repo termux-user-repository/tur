@@ -2,10 +2,9 @@ TERMUX_PKG_HOMEPAGE="https://gitlab.com/orcus/orcus/"
 TERMUX_PKG_DESCRIPTION="File import filter library for spreadsheet documents."
 TERMUX_PKG_LICENSE="MPL-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION=0.19.2
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_VERSION=0.20.0
 TERMUX_PKG_SRCURL=https://gitlab.com/orcus/orcus/-/archive/${TERMUX_PKG_VERSION}/orcus-${TERMUX_PKG_VERSION}.tar.gz
-TERMUX_PKG_SHA256=4fb632224aecc29e79c432f862c446b32f97b81d6855fa3773a2f11eda3d1c3b
+TERMUX_PKG_SHA256=fe728a5d54a9f5d75687067029257c7565787295ac1542981e2fa8edfa475ecc
 TERMUX_PKG_DEPENDS="boost, libc++, libixion, zlib"
 TERMUX_PKG_BUILD_DEPENDS="boost-headers, mdds"
 TERMUX_PKG_AUTO_UPDATE=true
@@ -31,9 +30,10 @@ termux_step_post_massage() {
 	# Do not forget to bump revision of reverse dependencies and rebuild them
 	# after SOVERSION is changed.
 	local _SOVERSION_GUARD_FILES="
-lib/liborcus-0.18.so
-lib/liborcus-parser-0.18.so
-lib/liborcus-spreadsheet-model-0.18.so
+lib/liborcus-0.20.so
+lib/liborcus-parser-0.20.so
+lib/liborcus-mso-0.20.so
+lib/liborcus-spreadsheet-model-0.20.so
 "
 	local f
 	for f in ${_SOVERSION_GUARD_FILES}; do
