@@ -64,10 +64,10 @@ termux_step_configure() {
 
 	# Install amd64 rootfs and deps
 	env -i PATH="$PATH" sudo apt update
-	env -i PATH="$PATH" sudo apt install lsb-release -yq
+	# env -i PATH="$PATH" sudo apt install lsb-release -yq
 	# env -i PATH="$PATH" sudo apt install libfontconfig1 libffi7 -yq
 	env -i PATH="$PATH" sudo apt install libfontconfig1 -yq
-	env -i PATH="$PATH" sudo ./build/install-build-deps.sh --no-syms --no-arm --no-chromeos-fonts --no-nacl --no-prompt --unsupported
+	# env -i PATH="$PATH" sudo ./build/install-build-deps.sh --no-syms --no-arm --no-chromeos-fonts --no-nacl --no-prompt --unsupported
 	build/linux/sysroot_scripts/install-sysroot.py --arch=amd64
 	local _amd64_sysroot_path="$(pwd)/build/linux/$(ls build/linux | grep 'amd64-sysroot')"
 	rm -rf "$_amd64_sysroot_path"
@@ -136,7 +136,7 @@ termux_step_configure() {
 		# Install i386 rootfs and deps
 		# env -i PATH="$PATH" sudo apt install libfontconfig1:i386 libffi7:i386 -yq
 		env -i PATH="$PATH" sudo apt install libfontconfig1:i386 -yq
-		env -i PATH="$PATH" sudo ./build/install-build-deps.sh --lib32 --no-syms --no-arm --no-chromeos-fonts --no-nacl --no-prompt --unsupported
+		# env -i PATH="$PATH" sudo ./build/install-build-deps.sh --lib32 --no-syms --no-arm --no-chromeos-fonts --no-nacl --no-prompt --unsupported
 		build/linux/sysroot_scripts/install-sysroot.py --arch=i386
 		local _i386_sysroot_path="$(pwd)/build/linux/$(ls build/linux | grep 'i386-sysroot')"
 		rm -rf "$_i386_sysroot_path"
