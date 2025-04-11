@@ -74,7 +74,7 @@ termux_step_configure() {
 	env -i PATH="$PATH" sudo apt update
 	# env -i PATH="$PATH" sudo apt install lsb-release -yq
 	# env -i PATH="$PATH" sudo apt install libfontconfig1 libffi7 -yq
-	env -i PATH="$PATH" sudo apt install libfontconfig1 -yq
+	env -i PATH="$PATH" sudo apt install libfontconfig1 libcups2-dev -yq
 	# env -i PATH="$PATH" sudo ./build/install-build-deps.sh --no-syms --no-arm --no-chromeos-fonts --no-nacl --no-prompt --unsupported
 	build/linux/sysroot_scripts/install-sysroot.py --arch=amd64
 	local _amd64_sysroot_path="$(pwd)/build/linux/$(ls build/linux | grep 'amd64-sysroot')"
