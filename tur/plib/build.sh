@@ -7,6 +7,9 @@ TERMUX_PKG_SRCURL=http://deb.debian.org/debian/pool/main/p/plib/plib_${TERMUX_PK
 TERMUX_PKG_SHA256=485b22bf6fdc0da067e34ead5e26f002b76326f6371e2ae006415dea6a380a32
 TERMUX_PKG_DEPENDS="mesa"
 TERMUX_PKG_BUILD_IN_SRC=true
+TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
+ac_cv_lib_MesaGL_glNewList=yes
+"
 
 termux_step_pre_configure() {
 	export LDFLAGS+=" -Wl,--no-as-needed,-lOpenSLES,--as-needed"
