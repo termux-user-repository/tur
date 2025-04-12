@@ -139,7 +139,7 @@ termux_step_configure() {
 		_v8_toolchain_name="host"
 	elif [ "$TERMUX_ARCH" = "arm" ]; then
 		# Install i386 rootfs and deps
-		env -i PATH="$PATH" sudo apt install libfontconfig1:i386 -yq
+		env -i PATH="$PATH" sudo apt install libfontconfig1:i386 libexpat1:i386 libglib2.0-dev:i386 -yq
 		build/linux/sysroot_scripts/install-sysroot.py --arch=i386
 		local _i386_sysroot_path="$(pwd)/build/linux/$(ls build/linux | grep 'i386-sysroot')"
 		rm -rf "$_i386_sysroot_path"
