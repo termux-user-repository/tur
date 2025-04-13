@@ -1,4 +1,5 @@
 chromium
+chromium-jumbo-host-tools
 code-server
 code-oss
 electron-headers-.*
