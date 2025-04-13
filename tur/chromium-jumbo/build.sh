@@ -12,7 +12,7 @@ TERMUX_PKG_BUILD_DEPENDS="chromium-jumbo-host-tools"
 # TERMUX_PKG_DEPENDS+=", chromium-common"
 # TERMUX_PKG_SUGGESTS="chromium-headless, chromium-driver"
 # Chromium doesn't support i686 on Linux.
-TERMUX_PKG_EXCLUDED_ARCHES="x86_64, i686, arm"
+TERMUX_PKG_EXCLUDED_ARCHES="i686"
 
 SYSTEM_LIBRARIES="    libdrm  fontconfig"
 # TERMUX_PKG_DEPENDS="libdrm, fontconfig"
