@@ -371,14 +371,6 @@ termux_step_post_make_install() {
 	rm $TERMUX_PREFIX/lib/lib{{pthread,resolv,ffi_pic}.a,rt.so}
 }
 
-termux_step_post_massage() {
-	# Except the deb file, we also create a zip file like chromium release
-	mkdir -p $TERMUX_SCRIPTDIR/output-chromium
-
-	pushd $TERMUX_PKG_MASSAGEDIR/$TERMUX_PREFIX/opt/$TERMUX_PKG_NAME
-	zip -r $TERMUX_SCRIPTDIR/output-chromium/chromium-v$TERMUX_PKG_VERSION-linux-$TERMUX_ARCH.zip ./*
-	popd
-}
 # TODO:
 # (2) Split packages
 
