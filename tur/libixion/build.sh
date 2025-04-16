@@ -2,10 +2,9 @@ TERMUX_PKG_HOMEPAGE="https://gitlab.com/ixion/ixion/blob/master/README.md"
 TERMUX_PKG_DESCRIPTION="A general purpose formula parser & interpreter"
 TERMUX_PKG_LICENSE="MPL-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION=0.19.0
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_VERSION=0.20.0
 TERMUX_PKG_SRCURL="https://gitlab.com/ixion/ixion/-/archive/${TERMUX_PKG_VERSION}/ixion-${TERMUX_PKG_VERSION}.tar.gz"
-TERMUX_PKG_SHA256=b5b67ea7fc631a0fda4fff3123f0cc2e3831849bdd8fbae8443be0766a77f243
+TERMUX_PKG_SHA256=4a6c2c480ad40b706ecf459dfca03f39351e12b48911c7c4803b75c823a1bcb1
 TERMUX_PKG_DEPENDS="boost, libc++"
 TERMUX_PKG_BUILD_DEPENDS="boost-headers, mdds, libspdlog"
 TERMUX_PKG_AUTO_UPDATE=true
@@ -31,7 +30,7 @@ termux_step_post_massage() {
 	# Do not forget to bump revision of reverse dependencies and rebuild them
 	# after SOVERSION is changed.
 	local _SOVERSION_GUARD_FILES="
-lib/libixion-0.18.so
+lib/libixion-0.20.so
 "
 	local f
 	for f in ${_SOVERSION_GUARD_FILES}; do

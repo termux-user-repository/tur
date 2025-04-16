@@ -3,11 +3,11 @@ TERMUX_PKG_DESCRIPTION="A compatibility layer for running Windows programs"
 TERMUX_PKG_LICENSE="LGPL-2.1"
 TERMUX_PKG_LICENSE_FILE="LICENSE, LICENSE.OLD, COPYING.LIB"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="10.3"
+TERMUX_PKG_VERSION="10.5"
 _REAL_VERSION="${TERMUX_PKG_VERSION/\~/-}"
 _VERSION_FOLDER="$(test "${_REAL_VERSION:3:1}" = 0 && echo ${_REAL_VERSION:0:4} || echo ${_REAL_VERSION:0:3}x)"
 TERMUX_PKG_SRCURL=https://dl.winehq.org/wine/source/${_VERSION_FOLDER}/wine-$_REAL_VERSION.tar.xz
-TERMUX_PKG_SHA256=de3d88ff0056b82ffdfca842f1119592e4914f48c4ea023768e0419c36467c3e
+TERMUX_PKG_SHA256=c036ec1ef47674774a5f994583022e9e2eb68fe8fc18b3a8c79e685b3bec89bc
 TERMUX_PKG_DEPENDS="fontconfig, freetype, krb5, libandroid-spawn, libc++, libgmp, libgnutls, libxcb, libxcomposite, libxcursor, libxfixes, libxrender, mesa, opengl, pulseaudio, sdl2, vulkan-loader, xorg-xrandr"
 TERMUX_PKG_ANTI_BUILD_DEPENDS="vulkan-loader"
 TERMUX_PKG_BUILD_DEPENDS="libandroid-spawn-static, vulkan-loader-generic"
@@ -74,7 +74,7 @@ enable_tools=yes
 
 # FIXME: This package doesn't work on arm since 8.x, but anyway
 # FIXME: I'd like to compile it.
-# TERMUX_PKG_BLACKLISTED_ARCHES="arm"
+# TERMUX_PKG_EXCLUDED_ARCHES="arm"
 
 # Enable win64 on 64-bit arches.
 # TODO: Enable win32 after TUR has full support for mutilib

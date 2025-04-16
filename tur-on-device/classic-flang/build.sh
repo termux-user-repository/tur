@@ -9,7 +9,7 @@ _FLANG_COMMIT=5caea370cd46260de6f48fed72b34c79c5702378
 TERMUX_PKG_SRCURL=https://github.com/flang-compiler/flang/archive/${_FLANG_COMMIT}.zip
 TERMUX_PKG_SHA256=635b984acd554674cdbc6395567ff5c71d97710083aa1d9470a057105231387b
 TERMUX_PKG_DEPENDS="libandroid-complex-math, libandroid-execinfo, libllvm-classic-flang"
-TERMUX_PKG_BLACKLISTED_ARCHES="arm, i686"
+TERMUX_PKG_EXCLUDED_ARCHES="arm, i686"
 TERMUX_PKG_NO_STATICSPLIT=true
 
 _INSTALL_PREFIX_R="opt/classic-flang"

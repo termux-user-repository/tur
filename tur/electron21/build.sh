@@ -7,7 +7,7 @@ TERMUX_PKG_SRCURL=git+https://github.com/electron/electron
 TERMUX_PKG_DEPENDS="electron-deps"
 TERMUX_PKG_ANTI_BUILD_DEPENDS="electron-deps"
 # Chromium-based application doesn't support i686 on Linux.
-TERMUX_PKG_BLACKLISTED_ARCHES="i686"
+TERMUX_PKG_EXCLUDED_ARCHES="i686"
 
 termux_step_get_source() {
 	mkdir -p $TERMUX_PKG_SRCDIR

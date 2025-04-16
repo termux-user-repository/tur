@@ -40,7 +40,7 @@ gl_cv_have_weak=no
 "
 
 # FIXME: Diable for arm temporarily
-TERMUX_PKG_BLACKLISTED_ARCHES="arm"
+TERMUX_PKG_EXCLUDED_ARCHES="arm"
 
 source $TERMUX_SCRIPTDIR/common-files/setup_toolchain_gcc.sh
 

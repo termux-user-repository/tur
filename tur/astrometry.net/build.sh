@@ -12,7 +12,7 @@ _NUMPY_VERSION=$(. $TERMUX_SCRIPTDIR/packages/python-numpy/build.sh; echo $TERMU
 TERMUX_PKG_PYTHON_COMMON_DEPS="wheel, setuptools, 'numpy==$_NUMPY_VERSION'"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_AUTO_UPDATE=true
-TERMUX_PKG_BLACKLISTED_ARCHES="arm" # FIXME: arm cross-compile C compiler fails for unknown reason
+TERMUX_PKG_EXCLUDED_ARCHES="arm" # FIXME: arm cross-compile C compiler fails for unknown reason
 
 termux_step_make () {
 	make TERMUX_HOST_PLATFORM="$TERMUX_HOST_PLATFORM"

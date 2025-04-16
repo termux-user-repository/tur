@@ -1,0 +1,20 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -42,7 +42,7 @@
+   ADD_DEP_INCLUDE_DIR("${ROOT_SOURCE_DIR}/dep")
+   ADD_DEP_LIBRARY_DIR("${ROOT_SOURCE_DIR}/dep")
+ endif()
+-if(UNIX OR MINGW)
++if((UNIX AND NOT ANDROID) OR MINGW)
+   if(CYGWIN)
+     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=gnu++11")
+   else()
+@@ -68,7 +68,7 @@
+ if(WIN32)
+   add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+ endif()
+-if(UNIX OR MINGW)
++if((UNIX AND NOT ANDROID) OR MINGW)
+   add_definitions(-D_FILE_OFFSET_BITS=64)
+   if(APPLE)
+     add_definitions(-Wno-shift-overflow)

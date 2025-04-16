@@ -2,14 +2,14 @@ TERMUX_PKG_HOMEPAGE=https://www.rust-lang.org/
 TERMUX_PKG_DESCRIPTION="Rust compiler and utilities (nightly version)"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="1.87.0-2025.03.17-nightly"
+TERMUX_PKG_VERSION="1.88.0-2025.04.16-nightly"
 _RUST_VERSION=$(echo $TERMUX_PKG_VERSION | cut -d- -f1)
 _DATE="$(echo $TERMUX_PKG_VERSION | cut -d- -f2 | sed 's|\.|-|g')"
 _LLVM_MAJOR_VERSION=$(. $TERMUX_SCRIPTDIR/packages/libllvm/build.sh; echo $LLVM_MAJOR_VERSION)
 _LLVM_MAJOR_VERSION_NEXT=$((_LLVM_MAJOR_VERSION + 1))
 _LZMA_VERSION=$(. $TERMUX_SCRIPTDIR/packages/liblzma/build.sh; echo $TERMUX_PKG_VERSION)
 TERMUX_PKG_SRCURL=https://static.rust-lang.org/dist/$_DATE/rustc-nightly-src.tar.xz
-TERMUX_PKG_SHA256=66bc4c0a9e2b7b36026952a79f1b97061048fe981ce16098cd69a310176c51a3
+TERMUX_PKG_SHA256=316454878d27da6ec89517100b2323ec5a92cde522d0602552e9aae30de8219f
 TERMUX_PKG_DEPENDS="clang, libandroid-execinfo, libc++, libllvm (<< ${_LLVM_MAJOR_VERSION_NEXT}), lld, openssl, zlib"
 TERMUX_PKG_BUILD_DEPENDS="wasi-libc"
 TERMUX_PKG_NO_REPLACE_GUESS_SCRIPTS=true
@@ -44,6 +44,7 @@ termux_pkg_auto_update() {
 	# Get latest nightly version from rustc
 	local latest_nightly_version="$(rustc --version | cut -d' ' -f2 | cut -d- -f1)"
 	local latest_nightly_date="$(rustc --version | cut -d' ' -f4 | cut -d')' -f1)"
+	latest_nightly_date="$(date +%Y-%m-%d -d "$latest_nightly_date 1 day")"
 	local latest_version="$latest_nightly_version-${latest_nightly_date//-/.}-nightly"
 
 	if [[ "${latest_version}" == "${TERMUX_PKG_VERSION}" ]]; then
@@ -57,9 +58,11 @@ termux_pkg_auto_update() {
 	fi
 
 	rm -rf ~/.cargo ~/.rustup
-	wget "https://static.rust-lang.org/dist/$latest_nightly_date/rustc-nightly-src.tar.xz" -O /tmp/rustc-nightly-src.tar.xz
+	wget -q "https://static.rust-lang.org/dist/$latest_nightly_date/rustc-nightly-src.tar.xz" -O /tmp/rustc-nightly-src.tar.xz
 	local _sha256_checksum="$(sha256sum /tmp/rustc-nightly-src.tar.xz | cut -d' ' -f1)"
 	rm -f /tmp/rustc-nightly-src.tar.xz
+	echo "Version : $latest_version"
+	echo "Checksum: $_sha256_checksum"
 	termux_pkg_upgrade_version "$latest_version"
 }
 
@@ -107,14 +110,18 @@ termux_step_pre_configure() {
 }
 
 termux_step_configure() {
-	# Bypass the config.guess replace to make rust happy
-	find "$TERMUX_PKG_SRCDIR"/vendor/ -name config.sub.bp -exec bash -c 'mv "$0" "${0%.*}"' {} \;
-	find "$TERMUX_PKG_SRCDIR"/vendor/ -name config.guess.bp -exec bash -c 'mv "$0" "${0%.*}"' {} \;
+	# Install llvm-19
+	local _line="deb [arch=amd64] http://apt.llvm.org/noble/ llvm-toolchain-noble-19 main"
+	local _file="/etc/apt/sources.list.d/apt-llvm-org.list"
+	__sudo grep -qF -- "$_line" "$_file" || \
+		echo "$_line" | __sudo tee -a "$_file"
+	__sudo apt update
+	__sudo apt install -y llvm-19-dev llvm-19-tools
 
 	# Use nightly toolchain to build nightly toolchain
 	if [[ "${TERMUX_ON_DEVICE_BUILD}" == "false" ]]; then
-		rustup install beta
-		export PATH="${HOME}/.rustup/toolchains/beta-x86_64-unknown-linux-gnu/bin:${PATH}"
+		rustup install nightly
+		export PATH="${HOME}/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/bin:${PATH}"
 	fi
 	local RUSTC=$(command -v rustc)
 	local CARGO=$(command -v cargo)
@@ -196,8 +203,7 @@ termux_step_make_install() {
 
 	"${TERMUX_PKG_SRCDIR}/x.py" dist -j ${TERMUX_PKG_MAKE_PROCESSES} rustc-dev
 
-	# remove version suffix: beta, nightly
-	local VERSION=${TERMUX_PKG_VERSION//-*}
+	local VERSION=nightly
 
 	if [[ "${TERMUX_ON_DEVICE_BUILD}" == "true" ]]; then
 		echo "WARN: Replacing on device rust! Caveat emptor!"
@@ -261,6 +267,12 @@ termux_step_make_install() {
 }
 
 termux_step_post_make_install() {
+	if [ "$TERMUX_ARCH_BITS" = "64" ]; then
+		mkdir -p $TERMUX_PREFIX/opt/rust-nightly/lib/rustlib/$CARGO_TARGET_NAME/codegen-backends/
+		cp build/$CARGO_TARGET_NAME/stage1/lib/rustlib/$CARGO_TARGET_NAME/codegen-backends/librustc_codegen_cranelift-$_RUST_VERSION-nightly.so \
+			$TERMUX_PREFIX/opt/rust-nightly/lib/rustlib/$CARGO_TARGET_NAME/codegen-backends/librustc_codegen_cranelift-$_RUST_VERSION-nightly.so
+	fi
+
 	mkdir -p $TERMUX_PREFIX/etc/profile.d
 	echo "#!$TERMUX_PREFIX/bin/sh" > $TERMUX_PREFIX/etc/profile.d/rust-nightly.sh
 	echo "export PATH=$RUST_NIGHTLY_PREFIX/bin:\$PATH" >> $TERMUX_PREFIX/etc/profile.d/rust-nightly.sh

@@ -1,13 +1,18 @@
 TERMUX_PKG_HOMEPAGE=https://github.com/mongodb/mongo-c-driver
 TERMUX_PKG_DESCRIPTION="A high-performance MongoDB driver for C"
-TERMUX_PKG_LICENSE="Apache-2.0"
+TERMUX_PKG_LICENSE="Apache-2.0, custom"
+TERMUX_PKG_LICENSE_FILE="COPYING, THIRD_PARTY_NOTICES, src/libmongoc/THIRD_PARTY_NOTICES"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION=1.22.2
-TERMUX_PKG_REVISION=2
+TERMUX_PKG_VERSION=1.30.3
 TERMUX_PKG_SRCURL=https://github.com/mongodb/mongo-c-driver/releases/download/$TERMUX_PKG_VERSION/mongo-c-driver-$TERMUX_PKG_VERSION.tar.gz
-TERMUX_PKG_SHA256=2e59b9d38d600bd63ccc0b215dd44c6254a66eeb8085a5ac513748cd6220532e
-TERMUX_PKG_DEPENDS="libicu, libsasl, libmongocrypt, openssl, zlib, zstd"
-TERMUX_PKG_EXTRA_CONFIGURE_ARGS="-DENABLE_TESTS=OFF"
+TERMUX_PKG_SHA256=9f42eb507e8c591546dc9c584230a6f71127842cb597cc4ab219d1ebe251e7af
+TERMUX_PKG_DEPENDS="libbson, libicu, libmongocrypt, libsasl, libsnappy, openssl, zlib, zstd"
+TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
+-DCMAKE_INSTALL_PREFIX=$TERMUX_PREFIX
+-DCMAKE_INSTALL_LIBDIR=lib
+-DUSE_SYSTEM_LIBBSON=ON
+-DENABLE_TESTS=OFF
+"
 
 termux_step_pre_configure() {
 	echo "!<arch>" > $TERMUX_PREFIX/lib/libresolv.a

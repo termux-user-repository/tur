@@ -10,7 +10,7 @@ TERMUX_PKG_DEPENDS="gpgme, libcurl, libsqlite, notmuch, openssl, pcre2"
 TERMUX_PKG_ANTI_BUILD_DEPENDS="gpgme, notmuch"
 TERMUX_PKG_UPDATE_TAG_TYPE="newest-tag"
 # `meli` assumes that `(u)size_t` is 64-bit, but it is not true on 32-bit Android.
-TERMUX_PKG_BLACKLISTED_ARCHES="arm, i686"
+TERMUX_PKG_EXCLUDED_ARCHES="arm, i686"
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_UPDATE_TAG_TYPE="latest-release-tag"
 

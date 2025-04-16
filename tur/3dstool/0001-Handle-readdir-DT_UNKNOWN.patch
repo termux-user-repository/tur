@@ -1,0 +1,40 @@
+From c0b19dfebb8f197dda6d5a35265c6e42acd19bab Mon Sep 17 00:00:00 2001
+From: badda71 <webersebastian@yahoo.de>
+Date: Fri, 3 Jan 2020 19:32:03 +0100
+Subject: [PATCH] Handle cases where readdir returns DT_UNKNOWN in romfs.cpp
+
+On some systems, readdir always returns DT_UNKNOWN. This needs to be handled by calling stat() explicitly. See man 3 readdir: "Currently, only some filesystems (among them: Btrfs, ext2, ext3, and ext4) have full support for returning the file type in d_type.  All applications must properly handle a return of DT_UNKNOWN."
+---
+ src/romfs.cpp | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+
+diff --git a/src/romfs.cpp b/src/romfs.cpp
+index 034843d8..cbd48710 100644
+--- a/src/romfs.cpp
++++ b/src/romfs.cpp
+@@ -1,5 +1,6 @@
+ #include "romfs.h"
+ #include "space.h"
++#include <sys/stat.h>
+ #include <openssl/sha.h>
+ 
+ bool RemapIgnoreLevelCompare(const CRomFs::SCommonFileEntry* lhs, const CRomFs::SCommonFileEntry* rhs)
+@@ -441,6 +442,18 @@ bool CRomFs::createEntryList()
+ #endif
+ 				string sNameUpper = sName;
+ 				transform(sNameUpper.begin(), sNameUpper.end(), sNameUpper.begin(), ::toupper);
++				// handle cases where d_type is DT_UNKNOWN
++				if (pDirent->d_type == DT_UNKNOWN)
++				{
++					static struct stat stat_buf;
++					static char fname[PATH_MAX];
++					snprintf(fname, PATH_MAX, "%s/%s", m_vCreateDir[current.EntryOffset].Path.c_str(), pDirent->d_name);
++					if (stat(fname, &stat_buf) == 0)
++					{
++						if (S_ISREG(stat_buf.st_mode)) pDirent->d_type = DT_REG;
++						else if (S_ISDIR(stat_buf.st_mode)) pDirent->d_type = DT_DIR;
++					}
++				}
+ 				if (pDirent->d_type == DT_REG)
+ 				{
+ 					mFile.insert(make_pair(sNameUpper, sName));

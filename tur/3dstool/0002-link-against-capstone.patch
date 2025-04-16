@@ -1,0 +1,11 @@
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -33,7 +33,7 @@
+     target_link_libraries(3dstool curl crypto)
+   endif()
+ else()
+-  target_link_libraries(3dstool curl ssl crypto)
++  target_link_libraries(3dstool curl ssl crypto capstone)
+   if(APPLE OR CYGWIN)
+     target_link_libraries(3dstool iconv)
+   endif()

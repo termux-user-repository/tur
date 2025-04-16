@@ -2,7 +2,7 @@ TERMUX_PKG_HOMEPAGE=https://tabby.tabbyml.com/
 TERMUX_PKG_DESCRIPTION="Self-hosted AI coding assistant"
 TERMUX_PKG_LICENSE="Apache-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="0.26.0"
+TERMUX_PKG_VERSION="0.27.1"
 TERMUX_PKG_SRCURL=git+https://github.com/TabbyML/tabby
 TERMUX_PKG_DEPENDS="graphviz, libopenblas, libsqlite"
 TERMUX_PKG_BUILD_IN_SRC=true
@@ -10,7 +10,7 @@ TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_UPDATE_TAG_TYPE="latest-release-tag"
 # simd-json v0.13.10 fail to compile for i686 with error related to avx2 instructions
 # ARM_NEON is not supported by arm, therefore llama.cpp/ggml uses undeclared identifier 'vld1q_f16'
-TERMUX_PKG_BLACKLISTED_ARCHES="arm, i686"
+TERMUX_PKG_EXCLUDED_ARCHES="arm, i686"
 
 termux_step_pre_configure() {
 	termux_setup_rust

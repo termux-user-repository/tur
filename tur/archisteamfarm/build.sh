@@ -2,14 +2,14 @@ TERMUX_PKG_HOMEPAGE=https://github.com/JustArchiNET/ArchiSteamFarm
 TERMUX_PKG_DESCRIPTION="ArchiSteamFarm"
 TERMUX_PKG_LICENSE="Apache-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="6.1.3.3"
+TERMUX_PKG_VERSION="6.1.4.3"
 TERMUX_PKG_SRCURL=git+https://github.com/JustArchiNET/ArchiSteamFarm
 TERMUX_PKG_GIT_BRANCH="${TERMUX_PKG_VERSION}"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_DEPENDS="aspnetcore-runtime-9.0, dotnet-host, dotnet-runtime-9.0"
 TERMUX_PKG_BUILD_DEPENDS="aspnetcore-targeting-pack-9.0, dotnet-targeting-pack-9.0"
 TERMUX_PKG_AUTO_UPDATE=true
-TERMUX_PKG_BLACKLISTED_ARCHES="arm"
+TERMUX_PKG_EXCLUDED_ARCHES="arm"
 TERMUX_DOTNET_VERSION=9.0
 TERMUX_PKG_UPDATE_TAG_TYPE="latest-release-tag"
 
