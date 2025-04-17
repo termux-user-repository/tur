@@ -5,7 +5,7 @@ TERMUX_PKG_MAINTAINER="@lunsokhasovan, @termux-user-repository"
 TERMUX_PKG_VERSION=48.1
 TERMUX_PKG_SRCURL=https://download.gnome.org/sources/gnome-mines/${TERMUX_PKG_VERSION%.*}/gnome-mines-${TERMUX_PKG_VERSION}.tar.xz
 TERMUX_PKG_SHA256=ef4b2d2dde3bec614157edde4d9189cc6afe692952a2dd55b2870e2e62ed8104
-TERMUX_PKG_DEPENDS="glib, gtk4, libadwaita, librsvg, libgnome-games-support"
+TERMUX_PKG_DEPENDS="glib, gtk4, libadwaita, libcairo, librsvg, libgnome-games-support"
 TERMUX_PKG_BUILD_DEPENDS="g-ir-scanner, gettext, itstool"
 TERMUX_PKG_AUTO_UPDATE=true
 

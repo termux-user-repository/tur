@@ -5,7 +5,7 @@ TERMUX_PKG_MAINTAINER="@lunsokhasovan, @termux-user-repository"
 TERMUX_PKG_VERSION=48.1
 TERMUX_PKG_SRCURL=https://download.gnome.org/sources/lightsoff/${TERMUX_PKG_VERSION%.*}/lightsoff-${TERMUX_PKG_VERSION}.tar.xz
 TERMUX_PKG_SHA256=2ec99501713dbcd13c5a565a2e118cc4cc2b502836b387a7736cfba40a8b3989
-TERMUX_PKG_DEPENDS="glib, gtk4, libadwaita, libcairo, librsvg, libgnome-games-support, pango"
+TERMUX_PKG_DEPENDS="glib, gtk4, libadwaita, libcairo, librsvg"
 TERMUX_PKG_BUILD_DEPENDS="g-ir-scanner, gettext, itstool"
 TERMUX_PKG_AUTO_UPDATE=true
 
