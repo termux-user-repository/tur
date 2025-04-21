@@ -5,7 +5,70 @@ Subject: [PATCH] reland jumbo 7
 
 Enable jumbo build for the following component(s)/source_set(s):
 
-- //components/*
+- //components/affiliations/core/browser:affiliations
+- //components/autofill/content/browser:browser
+- //components/autofill/content/renderer:renderer
+- //components/autofill/core/browser:browser
+- //components/autofill/core/common:common
+- //components/cdm/browser:browser
+- //components/cdm/common:common
+- //components/cdm/renderer:renderer
+- //components/content_settings/core/browser:browser
+- //components/content_settings/core/common:common
+- //components/domain_reliability:domain_reliability
+- //components/download/internal/common:internal
+- //components/download/public/common:public
+- //components/feature_engagement/internal:internal
+- //components/feature_engagement/public:public
+- //components/global_media_controls:global_media_controls
+- //components/guest_view/browser:browser
+- //components/guest_view/renderer:renderer
+- //components/leveldb_proto:leveldb_proto
+- //components/lookalikes/core:core
+- //components/lookalikes/core:safety_tips
+- //components/media_router/common/providers/cast/certificate:certificate_reader
+- //components/media_router/common/providers/cast/certificate:certificate
+- //components/media_router/common/providers/cast/certificate:openscreen_certificate_verifier
+- //components/metrics:metrics
+- //components/omnibox/browser:browser
+- //components/password_manager/content/browser:browser
+- //components/password_manager/core/browser:browser
+- //components/password_manager/core/browser:password_hash_data
+- //components/password_manager/core/browser/leak_detection:leak_detection
+- //components/password_manager/core/common:common
+- //components/payments/content:content
+- //components/payments/content:content_common
+- //components/payments/content:utils
+- //components/payments/core:core
+- //components/payments/core:error_strings
+- //components/payments/core:method_strings
+- //components/performance_manager:performance_manager
+- //components/policy/content:safe_sites_navigation_throttle
+- //components/policy/content:content
+- //components/policy/core/browser:internal
+- //components/policy/core/common:policy_namespace_internal
+- //components/policy/core/common:util
+- //components/prefs:prefs
+- //components/printing/browser:browser
+- //components/safe_browsing/content/browser:browser
+- //components/safe_browsing/content/browser:client_side_detection_images_cache
+- //components/safe_browsing/content/browser:client_side_detection_service
+- //components/safe_browsing/core/browser:browser
+- //components/security_state/content:content
+- //components/security_state/core:core
+- //components/storage_monitor:storage_monitor
+# - //components/sync:?
+- //components/sync/base:base
+- //components/sync/protocol:util
+- //components/sync/service:service
+- //components/sync_device_info:sync_device_info
+- //components/sync_user_events:sync_user_events
+- //components/ui_devtools:ui_devtools
+- //components/url_formatter:skeleton_generator
+- //components/url_formatter:url_formatter
+- //components/variations:variations
+- //components/webauthn/content/browser:browser
+- //components/wifi:wifi
 
 ---
  components/affiliations/core/browser/BUILD.gn      |  3 ++-

@@ -5,8 +5,26 @@ Subject: [PATCH] reland jumbo 6
 
 Enable jumbo build for the following component(s)/source_set(s):
 
-- //mojom/*
-- //third_party/blink/*
+- //mojo/public/cpp/bindings:bindings_base
+- //mojo/public/cpp/bindings:bindings
+- //mojo/public/cpp/system:system
+- //third_party/blink/common:common
+- //third_party/blink/renderer/controller:controller
+- //third_party/blink/renderer/core:prerequisites
+- //third_party/blink/renderer/core:core
+- //third_party/blink/renderer/core/inspector:generated
+- //third_party/blink/renderer/modules:modules
+- //third_party/blink/renderer/platform:platform
+- //third_party/blink/renderer/platform/blob:generator
+- //third_party/blink/renderer/platform/image-decoders:image_decoders
+- //third_party/blink/renderer/platform/media:media
+- //third_party/blink/renderer/platform/wtf:wtf
+
+Enable jumbo build for the following template(s):
+
+- //mojo/public/tools/bindings/mojom.gni -> template("mojom")
+- //third_party/blink/renderer/modules/modules.gni -> template("blink_modules_sources")
+- //third_party/blink/renderer/platform/platform.gni -> template("blink_platform_sources")
 
 ---
  content/common/BUILD.gn                       |  4 +++

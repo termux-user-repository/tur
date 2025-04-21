@@ -5,11 +5,40 @@ Subject: [PATCH] reland jumbo 11
 
 Enable jumbo build for the following component(s)/source_set(s):
 
-- //gpu/*
-- //media/*
-- //ppapi/*
-- //services/*
-- //storage/*
+- //gpu/command_buffer/client:client_sources
+- //gpu/command_buffer/client:gles2_implementation
+- //gpu/command_buffer/client:gles2_implementation_no_check
+- //gpu/command_buffer/client:gles2_c_lib
+- //gpu/command_buffer/common:common_base_sources
+- //gpu/command_buffer/common:common_sources
+- //gpu/command_buffer/service:service_sources
+- //gpu/config:config_sources
+- //gpu/ipc/service:service
+- //media/audio:audio
+- //media/base:base
+- //media/base/ipc:ipc
+- //media/capture:capture_base
+- //media/capture:capture_device_specific
+- //media/capture:capture_lib
+- //media/cast:common
+- //media/cast:encoding
+- //media/cast:sender
+- //media/filters:filters
+- //media/mojo/clients:clients
+- //media/mojo/common:common
+- //media/mojo/services:services
+- //ppapi/cpp:cpp
+- //ppapi/cpp:objects
+- //ppapi/host:host
+- //ppapi/proxy:proxy
+- //ppapi/shared_impl:common
+- //services/cert_verifier/cert_net_url_loader:cert_net_url_loader
+- //services/network:network_service
+- //services/network/public/cpp:crash_keys
+- //services/network/public/cpp:cpp
+- //services/network/public/cpp:first_party_sets_mojom_support
+- //services/network/public/cpp:cpp_base
+- //storage:browser
 
 ---
  gpu/BUILD.gn                                  |  3 ++-

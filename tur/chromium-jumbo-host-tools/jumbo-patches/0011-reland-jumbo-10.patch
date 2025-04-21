@@ -5,8 +5,13 @@ Subject: [PATCH] reland jumbo 10
 
 Enable jumbo build for the following component(s)/source_set(s):
 
-- //device/*
-- //extensions/*
+- //device/bluetooth:deprecated_experimental_mojo
+- //device/bluetooth:bluetooth
+- //device/fido:fido
+- //device/gamepad:gamepad
+- //extensions/browser:browser_sources
+- //extensions/common:common
+- //extensions/renderer:renderer
 
 ---
  device/bluetooth/BUILD.gn                          | 14 ++++++++++++--

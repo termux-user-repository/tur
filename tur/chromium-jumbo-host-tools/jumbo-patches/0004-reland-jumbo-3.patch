@@ -1,16 +1,24 @@
-From 56cb027ce79862439fad0682d4c412104aa5ab18 Mon Sep 17 00:00:00 2001
+From 1b7193abe207808e7c2bff7c47a0ef4c6484a3fd Mon Sep 17 00:00:00 2001
 From: Chongyun Lee <licy183@termux.dev>
-Date: Wed, 16 Apr 2025 14:23:23 +0800
+Date: Sun Apr 20 23:55:52 2025 +0800
 Subject: [PATCH] reland jumbo 3
 
 Enable jumbo build for the following component(s)/source_set(s):
 
 - //net:net
+- //net/dns:dns
 
 ---
  net/BUILD.gn                                     | 10 +++++++++-
  net/base/host_port_pair.cc                       |  4 ++++
  net/base/ip_endpoint.cc                          |  4 ++++
+ net/dns/BUILD.gn                                 |  3 ++-
+ net/dns/dns_response.cc                          |  4 ++++
+ net/dns/host_cache.cc                            |  8 ++++++++
+ net/dns/host_resolver_cache.cc                   |  4 ++++
+ net/dns/host_resolver_dns_task.cc                |  4 ++++
+ net/dns/host_resolver_internal_result.cc         |  6 ++++++
+ net/dns/host_resolver_manager.cc                 |  4 ++++
  net/filter/filter_source_stream.cc               |  5 ++++-
  net/filter/gzip_source_stream.cc                 |  4 +++-
  net/http/http_server_properties_manager.cc       |  4 ++++
@@ -29,7 +37,7 @@ Enable jumbo build for the following component(s)/source_set(s):
  net/websockets/websocket_frame.cc                | 16 ++++++++++++++++
  .../websocket_http2_handshake_stream.cc          |  4 ++++
  .../websocket_http3_handshake_stream.cc          |  4 ++++
- 21 files changed, 130 insertions(+), 7 deletions(-)
+ 28 files changed, 162 insertions(+), 8 deletions(-)
 
 diff --git a/net/BUILD.gn b/net/BUILD.gn
 index c86b77ce4d..dc2cbba2d2 100644
@@ -111,6 +119,146 @@ index 2ae43a2377..480f569a12 100644
  }  // namespace net
 +
 +#undef kValuePortKey
+diff --git a/net/dns/BUILD.gn b/net/dns/BUILD.gn
+index 543b8ae16c..f95737faaf 100644
+--- a/net/dns/BUILD.gn
++++ b/net/dns/BUILD.gn
+@@ -2,13 +2,14 @@
+ # Use of this source code is governed by a BSD-style license that can be
+ # found in the LICENSE file.
+ 
++import("//build/config/jumbo.gni")
+ import("//net/features.gni")
+ import("//testing/libfuzzer/fuzzer_test.gni")
+ import("//third_party/protobuf/proto_library.gni")
+ 
+ enable_built_in_dns = use_blink
+ 
+-source_set("dns") {
++jumbo_source_set("dns") {
+   # Due to circular dependencies, should only be depended on through //net.
+   visibility = [
+     "//net",
+diff --git a/net/dns/dns_response.cc b/net/dns/dns_response.cc
+index b6b9cdbe12..13835c7485 100644
+--- a/net/dns/dns_response.cc
++++ b/net/dns/dns_response.cc
+@@ -31,6 +31,8 @@
+ #include "net/dns/public/dns_protocol.h"
+ #include "net/dns/record_rdata.h"
+ 
++#define kHeaderSize kHeaderSize_DnsResponse
++
+ namespace net {
+ 
+ namespace {
+@@ -629,3 +631,5 @@ bool DnsResponse::WriteAnswer(base::SpanWriter<uint8_t>* writer,
+ }
+ 
+ }  // namespace net
++
++#undef kHeaderSize
+diff --git a/net/dns/host_cache.cc b/net/dns/host_cache.cc
+index 040c1a789d..e8a7edcbd1 100644
+--- a/net/dns/host_cache.cc
++++ b/net/dns/host_cache.cc
+@@ -44,6 +44,10 @@
+ #include "third_party/abseil-cpp/absl/types/variant.h"
+ #include "url/scheme_host_port.h"
+ 
++#define kSecureKey                    kSecureKey_HostCache
++#define EndpointMetadataPairToValue   EndpointMetadataPairToValue_HostCache
++#define EndpointMetadataPairFromValue EndpointMetadataPairFromValue_HostCache
++
+ namespace net {
+ 
+ namespace {
+@@ -1331,3 +1335,7 @@ std::ostream& operator<<(std::ostream& out,
+   return out << "EntryStaleness{" << s.expired_by << ", " << s.network_changes
+              << ", " << s.stale_hits << "}";
+ }
++
++#undef kSecureKey
++#undef EndpointMetadataPairToValue
++#undef EndpointMetadataPairFromValue
+diff --git a/net/dns/host_resolver_cache.cc b/net/dns/host_resolver_cache.cc
+index 93032e14bb..a8e8ce6f22 100644
+--- a/net/dns/host_resolver_cache.cc
++++ b/net/dns/host_resolver_cache.cc
+@@ -24,6 +24,8 @@
+ #include "url/url_canon.h"
+ #include "url/url_canon_stdstring.h"
+ 
++#define kSecureKey kSecureKey_HostResolverCache
++
+ namespace net {
+ 
+ namespace {
+@@ -453,3 +455,5 @@ base::Value HostResolverCache::SerializeEntries(
+ }
+ 
+ }  // namespace net
++
++#undef kSecureKey
+diff --git a/net/dns/host_resolver_dns_task.cc b/net/dns/host_resolver_dns_task.cc
+index 4d27b54802..15f6db924b 100644
+--- a/net/dns/host_resolver_dns_task.cc
++++ b/net/dns/host_resolver_dns_task.cc
+@@ -25,6 +25,8 @@
+ #include "net/dns/public/util.h"
+ #include "third_party/abseil-cpp/absl/types/variant.h"
+ 
++#define NetLogResults NetLogResults_HostResolverDnsTask
++
+ namespace net {
+ 
+ namespace {
+@@ -1160,3 +1162,5 @@ bool HostResolverDnsTask::ShouldTriggerHttpToHttpsUpgrade(
+ }
+ 
+ }  // namespace net
++
++#undef NetLogResults
+diff --git a/net/dns/host_resolver_internal_result.cc b/net/dns/host_resolver_internal_result.cc
+index b8fbaee25c..426f3edaee 100644
+--- a/net/dns/host_resolver_internal_result.cc
++++ b/net/dns/host_resolver_internal_result.cc
+@@ -27,6 +27,9 @@
+ #include "url/url_canon.h"
+ #include "url/url_canon_stdstring.h"
+ 
++#define EndpointMetadataPairToValue   EndpointMetadataPairToValue_HostResolverInternalResult
++#define EndpointMetadataPairFromValue EndpointMetadataPairFromValue_HostResolverInternalResult
++
+ namespace net {
+ 
+ namespace {
+@@ -635,3 +638,6 @@ HostResolverInternalAliasResult::HostResolverInternalAliasResult(
+       alias_target_(MaybeCanonicalizeName(std::move(alias_target))) {}
+ 
+ }  // namespace net
++
++#undef EndpointMetadataPairToValue
++#undef EndpointMetadataPairFromValue
+diff --git a/net/dns/host_resolver_manager.cc b/net/dns/host_resolver_manager.cc
+index db5b04abd7..f6856ce714 100644
+--- a/net/dns/host_resolver_manager.cc
++++ b/net/dns/host_resolver_manager.cc
+@@ -140,6 +140,8 @@
+ #endif  // BUILDFLAG(IS_ANDROID)
+ #endif  // BUILDFLAG(IS_POSIX) || BUILDFLAG(IS_FUCHSIA)
+ 
++#define NetLogResults NetLogResults_HostResolverManager
++
+ namespace net {
+ 
+ namespace {
+@@ -1822,3 +1824,5 @@ std::unique_ptr<DnsProbeRunner> HostResolverManager::CreateDohProbeRunner(
+ }
+ 
+ }  // namespace net
++
++#undef NetLogResults
 diff --git a/net/filter/filter_source_stream.cc b/net/filter/filter_source_stream.cc
 index 9a2bf8eec5..fa41a55b89 100644
 --- a/net/filter/filter_source_stream.cc

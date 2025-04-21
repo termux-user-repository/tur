@@ -5,7 +5,18 @@ Subject: [PATCH] reland jumbo 9
 
 Enable jumbo build for the following component(s)/source_set(s):
 
-- //content/*
+- //content:browser
+- //content:devtools_protocol
+- //content/child:child
+- //content/common:common
+- //content/gpu:gpu_sources
+- //content/public/browser:browser_sources
+- //content/public/child:child_sources
+- //content/public/common:common_sources
+- //content/public/renderer:renderer_sources
+- //content/renderer:renderer
+- //content/services/auction_worklet:auction_worklet
+- //content/utility:utility
 
 ---
  content/browser/BUILD.gn                      | 190 +++++++++++-------

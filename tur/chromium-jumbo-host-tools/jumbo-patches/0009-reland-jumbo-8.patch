@@ -1,4 +1,3 @@
-
 From b0672f17cc84794dac9399bf69d371756a7d94d7 Mon Sep 17 00:00:00 2001
 From: Chongyun Lee <licy183@termux.dev>
 Date: Fri, 18 Apr 2025 20:35:28 +0800
@@ -6,7 +5,84 @@ Subject: [PATCH] reland jumbo 8
 
 Enable jumbo build for the following component(s)/source_set(s):
 
-- //ui/*
+- //ui/accessibility:ax_base
+- //ui/accessibility:accessibility_internal
+- //ui/accessibility/platform:platform
+- //ui/aura:aura
+- //ui/base:base
+- //ui/base/clipboard:clipboard_types
+- //ui/base/clipboard:url_file_parser
+- //ui/base/clipboard:clipboard
+- //ui/base/ime:ime_types
+- //ui/base/ime:ime
+- //ui/base/ime/init:init
+- //ui/base/ime/linux:linux
+- //ui/base/prediction:prediction
+- //ui/base/x:x
+- //ui/color:color_headers
+- //ui/color:color_provider_key
+- //ui/color:color
+- //ui/color:mixers
+- //ui/compositor:compositor
+- //ui/display:display
+- //ui/display/manager:manager
+- //ui/display/types:types
+- //ui/display/util:util
+- //ui/events:dom_keycode_converter
+- //ui/events:events_base
+- //ui/events:events
+- //ui/events:keyboard_hook
+- //ui/events:gesture_detection
+- //ui/events:velocity_tracker
+- //ui/events/blink:blink_features
+- //ui/events/blink:blink
+- //ui/events/devices:devices
+- //ui/events/devices/x11:x11
+- //ui/events/ipc:ipc
+- //ui/events/keycodes:xkb
+- //ui/events/keycodes:x11
+- //ui/events/platform:platform
+- //ui/events/platform/x11:x11
+- //ui/gfx:color_utils
+- //ui/gfx:gfx_skia
+- //ui/gfx:gfx
+- //ui/gfx:color_space
+- //ui/gfx:memory_buffer_sources
+- //ui/gfx:gfx_switches
+- //ui/gfx/animation:animation
+- //ui/gfx/codec:codec
+- //ui/gfx/geometry:geometry
+- //ui/gfx/ipc:ipc
+- //ui/gfx/ipc/buffer_types:buffer_types
+- //ui/gfx/ipc/color:color
+- //ui/gfx/ipc/geometry:geometry
+- //ui/gfx/ipc/skia:skia
+- //ui/gfx/range:range
+- //ui/gfx/x:x
+- //ui/gl:gl
+- //ui/gl/init:init
+- //ui/gtk:gtk
+- //ui/latency:latency
+- //ui/message_center:message_center
+- //ui/message_center/public/cpp:cpp
+- //ui/native_theme:native_theme
+- //ui/native_theme:native_theme_browser
+- //ui/ozone:ozone_base
+- //ui/ozone:ozone
+- //ui/platform_window/stub:stub
+- //ui/platform_window/win:win
+# - //ui/resources:?
+- //ui/shell_dialogs:shell_dialogs
+- //ui/snapshot:snapshot
+- //ui/snapshot:snapshot_export
+- //ui/surface:surface
+- //ui/touch_selection:touch_selection
+- //ui/views:views
+- //ui/views/controls/webview:webview
+- //ui/views_content_client:views_content_client
+- //ui/web_dialogs:web_dialogs
+- //ui/wm:wm
+- //ui/wm/public:public
 
 ---
  ui/accessibility/BUILD.gn                         |  5 +++--
