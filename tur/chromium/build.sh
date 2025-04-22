@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://www.chromium.org/Home
 TERMUX_PKG_DESCRIPTION="Chromium web browser"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="@licy183"
-TERMUX_PKG_VERSION=132.0.6834.159
+TERMUX_PKG_VERSION=133.0.6943.141
 TERMUX_PKG_SRCURL=https://commondatastorage.googleapis.com/chromium-browser-official/chromium-$TERMUX_PKG_VERSION.tar.xz
-TERMUX_PKG_SHA256=564cc8a258b16d1c6151721a2a72e43ba80642326b33aa79439bba354e686068
+TERMUX_PKG_SHA256=0b3b15aa03f128a6b3d7ff67a7492bfaa2ffbb4acd80664b9ff320fd470c68be
 TERMUX_PKG_DEPENDS="atk, cups, dbus, fontconfig, gtk3, krb5, libc++, libdrm, libevdev, libxkbcommon, libminizip, libnss, libwayland, libx11, mesa, openssl, pango, pulseaudio, zlib"
 # TODO: Split chromium-common and chromium-headless
 # TERMUX_PKG_DEPENDS+=", chromium-common"
@@ -38,9 +38,9 @@ termux_step_make_install() {
 	mkdir -p $TERMUX_PREFIX/lib/$TERMUX_PKG_NAME
 
 	local __sha256sums="
-0608708285e14e070dd0091ad47932978a84c402339602b38261877701efec39 chromium-v132.0.6834.159-linux-aarch64.zip
-e8a8bbb8d3dcb2ce7e8d79f584ca7b8b93b1910269cc4d141f60c8c8ed7b717d chromium-v132.0.6834.159-linux-arm.zip
-ae19dda49bd7df3b0372dd28274aaccd7af5c5843fd431be7056b1d1eaae4d02 chromium-v132.0.6834.159-linux-x86_64.zip
+440c0cc054eb50d81c1f6e89213a25c9ca8ea4a697c433fa2a773614f37481d6 chromium-v133.0.6943.141-linux-aarch64.zip
+2e5bb8c79319957429aad2926e3d52ee654c7b66ddfdf4ced79c8d72cbd65999 chromium-v133.0.6943.141-linux-arm.zip
+465be1d14c8c0969d092207f22e832fa7bc9e56ee19746b943f1e6b86fbc04ea chromium-v133.0.6943.141-linux-x86_64.zip
 	"
 	local __checksum
 	local __file
@@ -89,7 +89,7 @@ ae19dda49bd7df3b0372dd28274aaccd7af5c5843fd431be7056b1d1eaae4d02 chromium-v132.0
 	done
 
 	# Install AppStream metadata file
-	install -Dm644 $TERMUX_PKG_SRCDIR/chrome/installer/linux/common/chromium-browser/chromium-browser.appdata.xml \
+	install -Dm644 $TERMUX_PKG_SRCDIR/chrome/installer/linux/common/appdata.xml.template \
 		"$TERMUX_PREFIX/share/metainfo/chromium.appdata.xml"
 	sed -ni \
 		-e 's/chromium-browser\.desktop/chromium.desktop/' \
