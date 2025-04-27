@@ -1,0 +1,29 @@
+Disable this error handler as it is only written for ARM (32-bit).
+
+--- a/gcc/ada/init.c
++++ b/gcc/ada/init.c
+@@ -2631,7 +2631,7 @@
+   __gnat_handler_installed = 1;
+ }
+ 
+-#elif defined(__ANDROID__)
++#elif 0
+ 
+ /*******************/
+ /* Android Section */
+@@ -2737,6 +2737,15 @@
+ /* Default Section */
+ /*******************/
+ 
++#ifdef __ANDROID__
++#ifdef __arm__
++/* This must be in keeping with System.OS_Interface.Alternate_Stack_Size.  */
++char __gnat_alternate_stack[16 * 1024];
++#else
++char __gnat_alternate_stack[32 * 1024];
++#endif
++#endif
++
+ void
+ __gnat_install_handler (void)
+ {

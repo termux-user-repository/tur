@@ -1,0 +1,23 @@
+Use stubs for `pthread_mutexattr_setprotocol` and `pthread_mutexattr_setprioceiling` on Android
+
+--- a/gcc/ada/libgnarl/s-osinte__linux.ads
++++ b/gcc/ada/libgnarl/s-osinte__linux.ads
+@@ -464,14 +464,12 @@
+    PTHREAD_PRIO_PROTECT : constant := 2;
+ 
+    function pthread_mutexattr_setprotocol
+-     (attr     : access pthread_mutexattr_t;
+-      protocol : int) return int;
+-   pragma Import (C, pthread_mutexattr_setprotocol);
++     (ignored_attr     : access pthread_mutexattr_t;
++      ignored_protocol : int) return int is (0);
+ 
+    function pthread_mutexattr_setprioceiling
+-     (attr        : access pthread_mutexattr_t;
+-      prioceiling : int) return int;
+-   pragma Import (C, pthread_mutexattr_setprioceiling);
++     (ignored_attr        : access pthread_mutexattr_t;
++      ignored_prioceiling : int) return int is (0);
+ 
+    type struct_sched_param is record
+       sched_priority : int;  --  scheduling priority
