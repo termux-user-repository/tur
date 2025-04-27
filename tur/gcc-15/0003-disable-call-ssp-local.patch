@@ -1,0 +1,19 @@
+GCC uses a wrapper of function `__stack_chk_fail` (named `__stack_chk_fail_local`)
+to optimize for PIC code on x86 architecture, but this function is now removed from
+the prebuilt crtbegin.o, so we should make GCC NOT call this wrapper. 
+
+[1]: https://android.googlesource.com/platform/bionic/+/5501003be73b73de59044b44b12f6e20ba6e0021
+[2]: https://android.googlesource.com/platform/bionic/+/8f7120b/libc/arch-x86/bionic/__stack_chk_fail_local.h
+--- a/gcc/config/i386/i386.cc
++++ b/gcc/config/i386/i386.cc
+@@ -21810,9 +21810,7 @@
+ static tree ATTRIBUTE_UNUSED
+ ix86_stack_protect_fail (void)
+ {
+-  return TARGET_64BIT
+-	 ? default_external_stack_protect_fail ()
+-	 : default_hidden_stack_protect_fail ();
++  return default_external_stack_protect_fail ();
+ }
+ 
+ /* Select a format to encode pointers in exception handling data.  CODE
