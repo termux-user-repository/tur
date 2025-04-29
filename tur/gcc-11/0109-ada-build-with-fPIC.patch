@@ -1,0 +1,20 @@
+--- a/gcc/ada/gcc-interface/Makefile.in
++++ b/gcc/ada/gcc-interface/Makefile.in
+@@ -629,7 +629,7 @@
+ 		CC="`echo \"$(GCC_FOR_TARGET)\" \
+ 		| sed -e 's,\./xgcc,../../xgcc,' -e 's,-B\./,-B../../,'`" \
+ 	        INCLUDES="$(INCLUDES_FOR_SUBDIR) -I./../.." \
+-                CFLAGS="$(GNATLIBCFLAGS_FOR_C)" \
++                CFLAGS="$(GNATLIBCFLAGS_FOR_C) $(PICFLAG_FOR_TARGET)" \
+ 	        FORCE_DEBUG_ADAFLAGS="$(FORCE_DEBUG_ADAFLAGS)" \
+ 		srcdir=$(fsrcdir) \
+ 	        -f ../Makefile $(LIBGNAT_OBJS) $(EXTRA_ADALIB_OBJS)
+@@ -639,7 +639,7 @@
+ 		| sed -e 's,\./xgcc,../../xgcc,' -e 's,-B\./,-B../../,'`" \
+ 	        ADA_INCLUDES="" \
+                 CFLAGS="$(GNATLIBCFLAGS)" \
+-	        ADAFLAGS="$(GNATLIBFLAGS)" \
++	        ADAFLAGS="$(GNATLIBFLAGS) $(PICFLAG_FOR_TARGET)" \
+ 	        FORCE_DEBUG_ADAFLAGS="$(FORCE_DEBUG_ADAFLAGS)" \
+ 		srcdir=$(fsrcdir) \
+ 	        -f ../Makefile $(GNATRTL_OBJS)
