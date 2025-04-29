@@ -12,6 +12,11 @@ TERMUX_PKG_BUILD_IN_SRC=true
 termux_step_pre_configure() {
 	termux_setup_rust
 
+	if [ "$TERMUX_ARCH" = "i686" ]; then
+		local env_host=$(printf $CARGO_TARGET_NAME | tr a-z A-Z | sed s/-/_/g)
+		export CARGO_TARGET_${env_host}_RUSTFLAGS+=" -C link-arg=$($CC -print-libgcc-file-name)"
+	fi
+
 	: "${CARGO_HOME:=$HOME/.cargo}"
 	export CARGO_HOME
 
