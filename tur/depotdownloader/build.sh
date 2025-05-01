@@ -26,6 +26,9 @@ termux_step_make_install() {
 
 	find out -name "*.dll" -exec chmod 0644 "{}" \;
 
+	#Exclude LICENSE file from being copied because same thing is already added in other folder.
+	rm out/LICENSE
+
 	mkdir -p "${TERMUX_PREFIX}/lib"
 	cp -r out "${TERMUX_PREFIX}/lib/${TERMUX_PKG_NAME}"
 
