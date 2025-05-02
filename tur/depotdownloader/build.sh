@@ -12,6 +12,7 @@ TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_EXCLUDED_ARCHES="arm"
 TERMUX_DOTNET_VERSION=9.0
 TERMUX_PKG_UPDATE_TAG_TYPE="latest-release-tag"
+TERMUX_PKG_UPDATE_VERSION_SED_REGEXP='s/DepotDownloader_//g'
 
 termux_step_pre_configure() {
 	termux_setup_dotnet
