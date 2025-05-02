@@ -2039,3 +2039,37 @@ index 2221c3969c..aa5a301ba0 100644
    # Only the public target should depend on this. All other targets (even
    # internal content ones other than test) should depend on the public one.
    visibility = [
+--- a/content/browser/renderer_host/media/render_frame_audio_input_stream_factory.cc
++++ b/content/browser/renderer_host/media/render_frame_audio_input_stream_factory.cc
+@@ -42,6 +42,8 @@
+ 
+ using blink::mojom::MediaDeviceType;
+ 
++#define GotSaltAndOrigin GotSaltAndOrigin_RenderFrameAudioInputStreamFactory
++
+ namespace content {
+ 
+ namespace {
+@@ -378,3 +380,5 @@
+ }
+ 
+ }  // namespace content
++
++#undef GotSaltAndOrigin
+--- a/content/browser/interest_group/trusted_signals_fetcher.cc
++++ b/content/browser/interest_group/trusted_signals_fetcher.cc
+@@ -58,6 +58,8 @@
+ #include "url/gurl.h"
+ #include "url/origin.h"
+ 
++#define kOhttpHeaderSize kOhttpHeaderSize_TrustedSignalsFetcher
++
+ namespace content {
+ 
+ namespace {
+@@ -613,3 +615,5 @@
+ }
+ 
+ }  // namespace content
++
++#undef kOhttpHeaderSize
