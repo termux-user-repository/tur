@@ -1,5 +1,5 @@
 TERMUX_PKG_HOMEPAGE=https://github.com/SteamRE/DepotDownloader
-TERMUX_PKG_DESCRIPTION="Steam depot downloader utilizing the SteamKit2 library."
+TERMUX_PKG_DESCRIPTION="Steam depot downloader utilizing the SteamKit2 library"
 TERMUX_PKG_LICENSE="GPL-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="3.4.0"
