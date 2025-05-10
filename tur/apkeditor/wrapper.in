@@ -1,4 +1,4 @@
-#!@TERMUX_PREFIX@/bin/sh
+#!/bin/sh
 #
 # Copyright (C) 2016 The Android Open Source Project
 # Copyright (C) 2022 github.com/REAndroid
@@ -15,9 +15,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-
+libdir="@TERMUX_PREFIX@/libexec/apkeditor"
 jarfile=apkeditor.jar
-jarpath="@TERMUX_PREFIX@/libexec/apkeditor/$jarfile"
+
+# Find the highest version of APKEditor-*.jar in the directory.
+highest_jarfile=$(ls "$libdir"/APKEditor-*.jar 2>/dev/null | sort -V | tail -n 1)
+if [ -n "$highest_jarfile" ]; then
+    jarfile=$(basename "$highest_jarfile")
+fi
+
+if [ ! -r "$libdir/$jarfile" ]; then
+    echo "$(basename "$0"): can't find $jarfile"
+    exit 1
+fi
 
 # By default, give apkeditor a max heap size of 1 gig. This can be overridden
 # by using a "-J" option (see below).
@@ -36,8 +46,6 @@ while expr "x$1" : 'x-J' >/dev/null; do
     javaOpts="${javaOpts} -${opt}"
     if expr "x${opt}" : "xXmx[0-9]" >/dev/null; then
         defaultMx="no"
-    elif expr "x${opt}" : "xDjava.library.path=" >/dev/null; then
-        defaultLibdir="no"
     fi
     shift
 done
@@ -46,8 +54,6 @@ if [ "${defaultMx}" != "no" ]; then
     javaOpts="${javaOpts} ${defaultMx}"
 fi
 
-if [ "${defaultLibdir}" != "no" ] && [ -n $providerLibdir ]; then
-    javaOpts="${javaOpts} -Djava.library.path=$providerLibdir"
-fi
+jarpath="$libdir/$jarfile"
 
 exec java $javaOpts -jar "$jarpath" "$@"
