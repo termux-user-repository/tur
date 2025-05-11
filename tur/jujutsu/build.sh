@@ -1,7 +1,7 @@
 TERMUX_PKG_HOMEPAGE=https://jj-vcs.github.io/jj/
 TERMUX_PKG_DESCRIPTION="A Git-compatible VCS that is both simple and powerful"
 TERMUX_PKG_LICENSE="Apache-2.0"
-TERMUX_PKG_MAINTAINER="@termux"
+TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="0.29.0"
 TERMUX_PKG_GIT_BRANCH="v$TERMUX_PKG_VERSION"
 TERMUX_PKG_SRCURL=git+https://github.com/jj-vcs/jj
