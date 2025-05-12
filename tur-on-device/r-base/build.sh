@@ -3,7 +3,8 @@ TERMUX_PKG_DESCRIPTION="A free software environment for statistical computing an
 TERMUX_PKG_LICENSE="GPL-2.0-or-later, LGPL-2.1"
 TERMUX_PKG_MAINTAINER="@termux"
 TERMUX_PKG_VERSION=4.4.0
-TERMUX_PKG_SRCURL=https://mirrors.tuna.tsinghua.edu.cn/CRAN/src/base/R-${TERMUX_PKG_VERSION::1}/R-$TERMUX_PKG_VERSION.tar.gz
+TERMUX_PKG_REVISION=1
+TERMUX_PKG_SRCURL=https://cran.r-project.org/src/base/R-${TERMUX_PKG_VERSION::1}/R-$TERMUX_PKG_VERSION.tar.gz
 TERMUX_PKG_SHA256=ace4125f9b976d2c53bcc5fca30c75e30d4edc401584859cbadb080e72b5f030
 TERMUX_PKG_DEPENDS="libandroid-glob, libiconv, libbz2, libcurl, liblzma, pcre2, readline, zlib"
 TERMUX_PKG_BUILD_DEPENDS="binutils, gcc-11, openjdk-21, which"
@@ -11,7 +12,7 @@ TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 ac_cv_have_decl_wctrans=yes
 --with-x=no
 --enable-R-shlib
---with-readline=no
+--with-readline=yes
 "
 
 termux_step_pre_configure() {
