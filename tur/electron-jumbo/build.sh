@@ -2,8 +2,8 @@ TERMUX_PKG_HOMEPAGE=https://github.com/electron/electron
 TERMUX_PKG_DESCRIPTION="Build cross-platform desktop apps with JavaScript, HTML, and CSS"
 TERMUX_PKG_LICENSE="MIT, BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="@licy183"
-_CHROMIUM_VERSION=128.0.6613.186
-TERMUX_PKG_VERSION=32.2.6
+_CHROMIUM_VERSION=132.0.6834.210
+TERMUX_PKG_VERSION=34.5.1
 TERMUX_PKG_SRCURL=git+https://github.com/electron/electron
 TERMUX_PKG_DEPENDS="atk, cups, dbus, fontconfig, gtk3, krb5, libc++, libdrm, libevdev, libxkbcommon, libminizip, libnss, libwayland, libx11, mesa, openssl, pango, pulseaudio, zlib"
 TERMUX_PKG_BUILD_DEPENDS="electron-jumbo-host-tools, libnotify, libffi-static"
@@ -208,8 +208,8 @@ treat_warnings_as_errors = false
 # Use system libraries as little as possible
 use_bundled_fontconfig = false
 use_system_freetype = false
-use_system_libdrm = true
-use_system_libffi = false
+# use_system_libdrm = true
+# use_system_libffi = false
 use_custom_libcxx = false
 use_custom_libcxx_for_host = true
 use_allocator_shim = false
@@ -303,40 +303,40 @@ termux_step_make() {
 						run_mksnapshot_default \
 						run_torque \
 						generate_bytecode_builtins_list \
-						v8:run_gen-regexp-special-case -k 0
+						v8:run_gen-regexp-special-case
 
 	# Build host tools
 	time ninja -C out/Release \
 						character_data \
 						gen_root_store_inc \
 						generate_transport_security_state \
-						generate_top_domains_trie -k 0
+						generate_top_domains_trie
 
 	# Build node_js2c
 	time ninja -C out/Release \
-						third_party/electron_node:node_js2c_exec -k 0
+						third_party/electron_node:node_js2c_exec
 
 	# Build swiftshader
 	time ninja -C out/Release \
 						third_party/swiftshader/src/Vulkan:icd_file \
-						third_party/swiftshader/src/Vulkan:swiftshader_libvulkan -k 0
+						third_party/swiftshader/src/Vulkan:swiftshader_libvulkan
 
 	# Build pdfium
 	time ninja -C out/Release \
 						third_party/pdfium \
-						third_party/pdfium:pdfium_public_headers -k 0
+						third_party/pdfium:pdfium_public_headers
 
 	# Build node headers of electron
 	time ninja -C out/Release \
-						electron:node_headers -k 0
+						electron:node_headers
 
 	# Build electron binary
-	time ninja -C out/Release electron -k 0
+	time ninja -C out/Release electron
 
 	# Build licenses
 	time ninja -C out/Release \
 						electron_license \
-						chromium_licenses -k 0
+						chromium_licenses
 }
 
 termux_step_make_install() {
