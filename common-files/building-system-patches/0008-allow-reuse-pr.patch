@@ -36,7 +36,7 @@
  				object(oid: \"$PR_HEAD_COMMIT\") { ...workflowRun }
  			}
  		}
-@@ -228,7 +228,7 @@
+@@ -228,10 +228,10 @@
  				| .workflowRun.databaseId][0] // empty' <<< "$RESPONSE" || :
  		)"
  		if [[ -n "${WORKFLOW_ID}" ]]; then
@@ -44,7 +44,11 @@
 +			echo "We can safely reuse CI artifacts from https://github.com/termux-user-repository/tur/actions/runs/${WORKFLOW_ID}"
  			if download_ci_artifacts "${WORKFLOW_ID}"; then
  				# Notify CI about skipping packages building because we reuse PR artifact.
- 				echo "skip-building=true" >> "${GITHUB_OUTPUT:-/dev/null}"
+-				echo "skip-building=true" >> "${GITHUB_OUTPUT:-/dev/null}"
++				echo "skip-building=true" >> "${GITHUB_OUTPUT}"
+ 				echo "::notice::Reusing PR #${PRS[0]} (workflow run ${WORKFLOW_ID}) build artifacts, building is skipped."
+ 			else
+ 				infoexit "Failed to download and unpack PR artifacts"
 @@ -253,7 +253,7 @@
  	# to allow CI reuse artifacts of other PRs in the case if current PR diverged from another PR branch.
  	WORKFLOW_COMMITS_QUERY="
