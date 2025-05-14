@@ -59,30 +59,50 @@ jobs:
       run: ./setup-environment.sh
 
     - name: Gather build summary
+      id: build-info
+      env:
+        MANUAL_INPUT_PACKAGES: ${{ github.event.inputs.packages }}
       run: |
+        # We are intentionally not using .commits[0].id and .commits[-1].id as github seems to
+        # only send 20 commits in the payload for github action runs instead of the 2048 documented
+        # limit. Perhaps 2048 is the limit just for webhooks, where they haven't documented
+        # properly that the limit for github actions is only 20:
+        #
+        # https://docs.github.com/en/webhooks/webhook-events-and-payloads#push
+        OLD_COMMIT="${{ github.event.before }}"
+        HEAD_COMMIT="${{ github.event.after }}"
         if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
-          BASE_COMMIT=$(jq --raw-output .pull_request.base.sha "$GITHUB_EVENT_PATH")
-          OLD_COMMIT=$(jq --raw-output .commits[0].id "$GITHUB_EVENT_PATH")
-          HEAD_COMMIT=$(jq --raw-output .commits[-1].id "$GITHUB_EVENT_PATH")
-          if [ "$BASE_COMMIT" = "null" ]; then
-            if [ "$OLD_COMMIT" = "$HEAD_COMMIT" ]; then
-              # Single-commit push.
-              echo "Processing commit: ${HEAD_COMMIT}"
-              CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r "${HEAD_COMMIT}")
-            else
-              # Multi-commit push.
-              OLD_COMMIT="${OLD_COMMIT}~1"
-              echo "Processing commit range: ${OLD_COMMIT}..${HEAD_COMMIT}"
-              CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r "${OLD_COMMIT}" "${HEAD_COMMIT}")
+          BASE_REF="${{ github.event.pull_request.base.ref }}"
+          git fetch origin "${BASE_REF:-master}" 2>/dev/null
+          BASE_COMMIT="$(git merge-base "origin/${BASE_REF:-master}" "HEAD")"
+          if [ -z "${{ github.event.pull_request.base.sha }}" ]; then
+            if ! git log "$OLD_COMMIT" > /dev/null; then
+              if [ "$(git branch --show-current)" = "master" ]; then
+                echo "Force push detected on master branch. Unable to proceed."
+                exit 1
+              else
+                OLD_COMMIT=$(git fetch origin master >&2; git merge-base origin/master $HEAD_COMMIT)
+              fi
             fi
+            echo "Processing commit range: ${OLD_COMMIT}..${HEAD_COMMIT}"
+            CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r "${OLD_COMMIT}" "${HEAD_COMMIT}")
           else
             # Pull requests.
-            echo "Processing pull request #$(jq --raw-output .pull_request.number "$GITHUB_EVENT_PATH"): ${BASE_COMMIT}..HEAD"
+            echo "Processing pull request #${{ github.event.pull_request.number }}: ${BASE_COMMIT}..HEAD"
             CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r "${BASE_COMMIT}" "HEAD")
           fi
         fi
         mkdir -p ./artifacts ./debs
         touch ./debs/.placeholder
+
+        if [[ "${{ github.event_name }}" == "pull_request" && -n "$(git rev-list --merges "$(git fetch origin master >&2; git merge-base origin/master $HEAD_COMMIT)..$HEAD_COMMIT")" ]]; then
+          # Github does not allow multiline errors, but it will interpret the escape sequence %0A as a line break.
+          echo "::error ::Merge commits are not allowed in pull requests.%0AYou should rebase your commits or squash them.%0Ahttps://docs.github.com/en/get-started/using-git/using-git-rebase-on-the-command-line"
+          exit 1
+        fi
+
+        GITHUB_OUTPUT="$GITHUB_OUTPUT" OLD_COMMIT="$OLD_COMMIT" HEAD_COMMIT="$HEAD_COMMIT" GITHUB_TOKEN="${{ secrets.GH_TOKEN }}" scripts/utils/termux_reuse_pr_build_artifacts.sh "${{ github.event_name }}" "${{ matrix.target_arch }}" || true
+
         if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
           # Process tag '%ci:no-build' that may be added as line to commit message.
           # Forces CI to cancel current build with status 'passed'
@@ -134,7 +154,10 @@ jobs:
             done<<<${CHANGED_FILES}
           done
         else
-          for pkg in ${{ github.event.inputs.packages }}; do
+          # Ensure MANUAL_INPUT_PACKAGES is newline free, and put it
+          # into an array
+          read -a PACKAGES <<< "${MANUAL_INPUT_PACKAGES//$'\n'/ }"
+          for pkg in "${PACKAGES[@]}"; do
             repo_paths=$(jq --raw-output 'keys | .[]' repo.json)
             found=false
             for repo_path in $repo_paths; do
@@ -168,14 +191,6 @@ jobs:
             mv ./deleted_${repo}_packages.txt.tmp ./deleted_${repo}_packages.txt
           fi
         done
-    - name: Free additional disk space (if necessary)
-      run: |
-        if grep -Eq "^($(paste -s -d '|' ./big-pkgs.list))$" ./built_tur_packages.txt; then
-          sudo apt purge -yq $(dpkg -l | grep '^ii' | awk '{ print $2 }' | grep -P '(aspnetcore|cabal-|dotnet-|ghc-|libmono|mongodb-|mysql-|php)') \
-            firefox google-chrome-stable microsoft-edge-stable mono-devel mono-runtime-common monodoc-manual ruby
-          sudo apt autoremove -yq
-          sudo rm -rf /opt/hostedtoolcache /usr/local /usr/share/dotnet /usr/share/swift
-        fi
     - name: Lint packages
       run: |
         declare -a package_recipes
@@ -188,7 +203,17 @@ jobs:
         if [ ! -z "$package_recipes" ]; then
           ./scripts/lint-packages.sh $package_recipes
         fi
+    - name: Free additional disk space (if necessary)
+      if: ${{ steps.build-info.outputs.skip-building != 'true' }}
+      run: |
+        if grep -Eq "^($(paste -s -d '|' ./big-pkgs.list))$" ./built_tur_packages.txt; then
+          sudo apt purge -yq $(dpkg -l | grep '^ii' | awk '{ print $2 }' | grep -P '(aspnetcore|cabal-|dotnet-|ghc-|libmono|mongodb-|mysql-|php)') \
+            firefox google-chrome-stable microsoft-edge-stable mono-devel mono-runtime-common monodoc-manual ruby
+          sudo apt autoremove -yq
+          sudo rm -rf /opt/hostedtoolcache /usr/local /usr/share/dotnet /usr/share/swift
+        fi
     - name: Build packages
+      if: ${{ steps.build-info.outputs.skip-building != 'true' }}
       run: |
         declare -a packages
         for repo_path in $(jq --raw-output 'keys | .[]' repo.json); do
