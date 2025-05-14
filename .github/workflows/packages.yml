@@ -59,6 +59,8 @@ jobs:
       run: ./setup-environment.sh
 
     - name: Gather build summary
+      env:
+        MANUAL_INPUT_PACKAGES: ${{ github.event.inputs.packages }}
       run: |
         # We are intentionally not using .commits[0].id and .commits[-1].id as github seems to
         # only send 20 commits in the payload for github action runs instead of the 2048 documented
@@ -151,7 +153,10 @@ jobs:
             done<<<${CHANGED_FILES}
           done
         else
-          for pkg in ${{ github.event.inputs.packages }}; do
+          # Ensure MANUAL_INPUT_PACKAGES is newline free, and put it
+          # into an array
+          read -a PACKAGES <<< "${MANUAL_INPUT_PACKAGES//$'\n'/ }"
+          for pkg in "${PACKAGES[@]}"; do
             repo_paths=$(jq --raw-output 'keys | .[]' repo.json)
             found=false
             for repo_path in $repo_paths; do
@@ -185,14 +190,6 @@ jobs:
             mv ./deleted_${repo}_packages.txt.tmp ./deleted_${repo}_packages.txt
           fi
         done
-    - name: Free additional disk space (if necessary)
-      run: |
-        if grep -Eq "^($(paste -s -d '|' ./big-pkgs.list))$" ./built_tur_packages.txt; then
-          sudo apt purge -yq $(dpkg -l | grep '^ii' | awk '{ print $2 }' | grep -P '(aspnetcore|cabal-|dotnet-|ghc-|libmono|mongodb-|mysql-|php)') \
-            firefox google-chrome-stable microsoft-edge-stable mono-devel mono-runtime-common monodoc-manual ruby
-          sudo apt autoremove -yq
-          sudo rm -rf /opt/hostedtoolcache /usr/local /usr/share/dotnet /usr/share/swift
-        fi
     - name: Lint packages
       run: |
         declare -a package_recipes
@@ -205,7 +202,17 @@ jobs:
         if [ ! -z "$package_recipes" ]; then
           ./scripts/lint-packages.sh $package_recipes
         fi
+    - name: Free additional disk space (if necessary)
+      if: ${{ steps.build-info.outputs.skip-building != 'true' }}
+      run: |
+        if grep -Eq "^($(paste -s -d '|' ./big-pkgs.list))$" ./built_tur_packages.txt; then
+          sudo apt purge -yq $(dpkg -l | grep '^ii' | awk '{ print $2 }' | grep -P '(aspnetcore|cabal-|dotnet-|ghc-|libmono|mongodb-|mysql-|php)') \
+            firefox google-chrome-stable microsoft-edge-stable mono-devel mono-runtime-common monodoc-manual ruby
+          sudo apt autoremove -yq
+          sudo rm -rf /opt/hostedtoolcache /usr/local /usr/share/dotnet /usr/share/swift
+        fi
     - name: Build packages
+      if: ${{ steps.build-info.outputs.skip-building != 'true' }}
       run: |
         declare -a packages
         for repo_path in $(jq --raw-output 'keys | .[]' repo.json); do
