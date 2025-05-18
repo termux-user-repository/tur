@@ -5,6 +5,5 @@ packages/arpack-ng
 packages/qrupdate-ng
 packages/octave
 packages/virglrenderer-android
-packages/vkmark
 x11-packages/octave-x
 x11-packages/wine-stable
