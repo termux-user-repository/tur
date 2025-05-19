@@ -1,11 +1,11 @@
 TERMUX_PKG_HOMEPAGE=https://www.chromium.org/Home
 TERMUX_PKG_DESCRIPTION="Chromium web browser (Host tools)"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
-TERMUX_PKG_MAINTAINER="Chongyun Lee <uchkks@protonmail.com>"
-TERMUX_PKG_VERSION=136.0.7103.59
+TERMUX_PKG_MAINTAINER="@licy183"
+TERMUX_PKG_VERSION=137.0.7151.27
 TERMUX_PKG_SRCURL=https://commondatastorage.googleapis.com/chromium-browser-official/chromium-$TERMUX_PKG_VERSION.tar.xz
-TERMUX_PKG_SHA256=3ce1ef863767b3a72058a0f0ceb150cc7b8a9ba8bc24e19c98d25f8b395a8cfe
-TERMUX_PKG_DEPENDS="atk, cups, dbus, fontconfig, gtk3, krb5, libc++, libdrm, libevdev, libxkbcommon, libminizip, libnss, libwayland, libx11, mesa, openssl, pango, pulseaudio, zlib"
+TERMUX_PKG_SHA256=19d4d5c1e253509239bc19c4bd432c824e433266ecef5a3a85a2908638ca2498
+TERMUX_PKG_DEPENDS="atk, cups, dbus, fontconfig, gtk3, krb5, libc++, libdrm, libevdev, libxkbcommon, libminizip, libnss, libx11, mesa, openssl, pango, pulseaudio, zlib"
 TERMUX_PKG_BUILD_DEPENDS="libffi-static"
 # TODO: Split chromium-common and chromium-headless
 # TERMUX_PKG_DEPENDS+=", chromium-common"
@@ -60,6 +60,7 @@ termux_step_configure() {
 		touch "$TERMUX_PKG_CACHEDIR/.depot_tools-fetched"
 	fi
 	export PATH="$TERMUX_PKG_CACHEDIR/depot_tools:$PATH"
+	$TERMUX_PKG_CACHEDIR/depot_tools/ensure_bootstrap
 
 	# Remove termux's dummy pkg-config
 	local _target_pkg_config=$(command -v pkg-config)
@@ -184,7 +185,7 @@ treat_warnings_as_errors = false
 # Use system libraries as little as possible
 use_system_freetype = false
 # use_system_libdrm = true
-use_system_libffi = false
+# use_system_libffi = false
 use_custom_libcxx = false
 use_custom_libcxx_for_host = true
 use_allocator_shim = false
@@ -201,7 +202,7 @@ use_ozone = true
 ozone_auto_platforms = false
 ozone_platform = \"x11\"
 ozone_platform_x11 = true
-ozone_platform_wayland = true
+ozone_platform_wayland = false
 ozone_platform_headless = true
 angle_enable_vulkan = true
 angle_enable_swiftshader = true
@@ -223,6 +224,9 @@ enable_nacl = false
 is_cfi = false
 use_cfi_icall = false
 use_thin_lto = false
+# OpenCL doesn't work out of box in Termux, use NNAPI instead
+build_tflite_with_opencl = false
+build_tflite_with_nnapi = true
 # Enable rust
 custom_target_rust_abi_target = \"$CARGO_TARGET_NAME\"
 llvm_android_mainline = true
@@ -303,6 +307,9 @@ termux_step_make() {
 	time ninja -C out/Release \
 						third_party/pdfium \
 						third_party/pdfium:pdfium_public_headers
+
+	# Build other components
+	# ninja -C out/Release chromedriver chrome chrome_crashpad_handler headless_shell
 }
 
 termux_step_make_install() {
