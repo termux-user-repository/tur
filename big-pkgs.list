@@ -1,6 +1,6 @@
 .*-jumbo
 .*-jumbo-host-tools
-chromium
+chromium-beta
 code-server
 code-oss
 electron-headers-.*
