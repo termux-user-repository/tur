@@ -2640,3 +2640,23 @@ index 3813e46e04..3dd851f91c 100644
  }  // namespace performance_manager
 +
 +#undef g_instance
+--- a/components/autofill/core/browser/ui/autofill_resource_utils.cc
++++ b/components/autofill/core/browser/ui/autofill_resource_utils.cc
+@@ -23,7 +23,7 @@
+ // Used in the IDS_ space as a placeholder for resources that don't exist.
+ constexpr int kResourceNotFoundId = 0;
+ 
+-bool ShouldUseNewFopDisplay() {
++bool ShouldUseNewFopDisplay2() {
+ #if BUILDFLAG(IS_IOS) || BUILDFLAG(IS_ANDROID)
+   return false;
+ #else
+@@ -95,7 +95,7 @@
+ }  // namespace
+ 
+ int GetIconResourceID(Suggestion::Icon resource_name) {
+-  if (ShouldUseNewFopDisplay()) {
++  if (ShouldUseNewFopDisplay2()) {
+     auto it = kDataResources.find(resource_name);
+     return it == kDataResources.end() ? kResourceNotFoundId : it->second;
+   }
