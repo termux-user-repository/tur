@@ -2540,19 +2540,6 @@ index 10747f5a7a..41c3306dec 100644
  
    if (previously_syncing_gaia_id.empty()) {
      // It is known that no previous gaia ID existed that turned sync on.
-diff --git a/components/autofill/core/browser/ui/autofill_resource_utils.cc b/components/autofill/core/browser/ui/autofill_resource_utils.cc
-index 9befae5bf4..60f0338adc 100644
---- a/components/autofill/core/browser/ui/autofill_resource_utils.cc
-+++ b/components/autofill/core/browser/ui/autofill_resource_utils.cc
-@@ -28,7 +28,7 @@ bool ShouldUseNewFopDisplay2() {
-   return false;
- #else
-   return base::FeatureList::IsEnabled(
--      features::kAutofillEnableNewFopDisplayDesktop);
-+      ::features::kAutofillEnableNewFopDisplayDesktop);
- #endif
- }
- 
 diff --git a/components/autofill/core/browser/webdata/addresses/address_autofill_table.cc b/components/autofill/core/browser/webdata/addresses/address_autofill_table.cc
 index 644fd60c0c..581aeb73cf 100644
 --- a/components/autofill/core/browser/webdata/addresses/address_autofill_table.cc
