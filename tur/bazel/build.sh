@@ -2,21 +2,17 @@ TERMUX_PKG_HOMEPAGE=https://bazel.build/
 TERMUX_PKG_DESCRIPTION="Correct, reproducible, and fast builds for everyone"
 TERMUX_PKG_LICENSE="Apache-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="7.5.0"
+TERMUX_PKG_VERSION="7.6.1"
 TERMUX_PKG_SRCURL=https://github.com/bazelbuild/bazel/releases/download/$TERMUX_PKG_VERSION/bazel-$TERMUX_PKG_VERSION-dist.zip
-TERMUX_PKG_SHA256=9d3d9b74cf3cbba0401874c3a1f70efc6531878d34146b22d4fd209276efafdd
+TERMUX_PKG_SHA256=c1106db93eb8a719a6e2e1e9327f41b003b6d7f7e9d04f206057990775a7760e
 TERMUX_PKG_DEPENDS="libarchive, openjdk-21, patch, unzip, zip"
-TERMUX_PKG_BUILD_DEPENDS="libandroid-spawn-static, which"
+TERMUX_PKG_BUILD_DEPENDS="libandroid-spawn-static, patch, unzip, zip"
+TERMUX_PKG_ANTI_BUILD_DEPENDS="openjdk-21"
 TERMUX_PKG_BREAKS="openjdk-11, openjdk-17"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_EXCLUDED_ARCHES="arm, i686"
 TERMUX_PKG_NO_STRIP=true
-
-__ensure_is_on_device_compile() {
-	if [ "${TERMUX_ON_DEVICE_BUILD}" = false ]; then
-		termux_error_exit "This package doesn't support cross-compiling."
-	fi
-}
+TERMUX_PKG_ON_DEVICE_BUILD_NOT_SUPPORTED=true
 
 __sed_verbose() {
 	local path=$1; shift;
@@ -65,13 +61,26 @@ __fix_harcoded_paths() {
 		rm -rf builtins_bzl
 	popd &>/dev/null
 	rmdir src/main/java/com/google/devtools/build/lib/bazel/rules/builtins_bzl_zip
+}
 
-	# Fix shebangs
-	while IFS= read -r -d '' file; do
-		if head -c 100 "$file" | head -n 1 | grep -E "^#!.*/bin/.*" | grep -q -E -v "^#! ?$TERMUX_PREFIX"; then
-			__sed_verbose "$file" -E "1 s@^#\!(.*)/bin/(.*)@#\!$TERMUX_PREFIX/bin/\2@"
-		fi
-	done < <(find -L . -type f -print0)
+__setup_bazelisk() {
+	local TERMUX_BAZELISK_VERSION=1.26.0
+	local TERMUX_BAZELISK_SHA256=6539c12842ad76966f3d493e8f80d67caa84ec4a000e220d5459833c967c12bc
+	local TERMUX_BAZELISK_URL="https://github.com/bazelbuild/bazelisk/releases/download/v$TERMUX_BAZELISK_VERSION/bazelisk-linux-amd64"
+	local TERMUX_BAZELISK_FOLDER="${TERMUX_COMMON_CACHEDIR}/bazelisk-${TERMUX_BAZELISK_VERSION}"
+	local TERMUX_BAZELISK_FILE="${TERMUX_BAZELISK_FOLDER}/bazelisk"
+
+	mkdir -p "${TERMUX_BAZELISK_FOLDER}"
+	if [ ! -e "${TERMUX_BAZELISK_FILE}" ]; then
+		termux_download "${TERMUX_BAZELISK_URL}" \
+			"${TERMUX_BAZELISK_FILE}"-tmp \
+			"${TERMUX_BAZELISK_SHA256}"
+		chmod +x "${TERMUX_BAZELISK_FILE}"-tmp
+		mv "${TERMUX_BAZELISK_FILE}"-tmp "${TERMUX_BAZELISK_FILE}"
+	fi
+
+	export PATH="${TERMUX_BAZELISK_FOLDER}:${PATH}"
+	export BAZELISK_HOME="${TERMUX_BAZELISK_FOLDER}/bazelisk-home"
 }
 
 termux_step_get_source() {
@@ -84,6 +93,20 @@ termux_step_get_source() {
 	unzip -d "$TERMUX_PKG_SRCDIR" "$TERMUX_PKG_CACHEDIR/${f}" > /dev/null
 }
 
+termux_pkg_auto_update() {
+	local api_url="https://api.github.com/repos/bazelbuild/bazel/git/refs/tags"
+	local latest_refs_tags=$(
+		curl -s "$api_url" | jq -r .[].ref | cut -d'/' -f 3 |
+			grep "^7" | grep -v -E "(rc)|(pre)"
+	)
+	if [[ -z "${latest_refs_tags}" ]]; then
+		echo "WARN: Unable to get latest refs tags from upstream. Try again later." >&2
+		return
+	fi
+	local latest_version=$(echo "${latest_refs_tags}" | sort -V | tail -n1)
+	termux_pkg_upgrade_version "${latest_version}"
+}
+
 termux_step_post_get_source() {
 	# Fix hardcoded paths
 	__fix_harcoded_paths
@@ -94,34 +117,68 @@ termux_step_post_get_source() {
 	cp -Rfv $TERMUX_PKG_BUILDER_DIR/dep-patches/* third_party/termux-patches/
 }
 
-termux_step_pre_configure() {
-	__ensure_is_on_device_compile
+termux_step_configure() {
+	# Setup bazelisk
+	__setup_bazelisk
+	export USE_BAZEL_VERSION="$TERMUX_PKG_VERSION"
 
-	# Ensure openjdk-21 is installed
-	apt autoremove --purge openjdk* -y
-	apt install --reinstall openjdk-21 -y
+	# Copy toolchain to tmp
+	rm -rf $TERMUX_PREFIX/tmp/custom-toolchain
+	mkdir -p $TERMUX_PREFIX/tmp/custom-toolchain
+	cp -Rf $TERMUX_STANDALONE_TOOLCHAIN/* $TERMUX_PREFIX/tmp/custom-toolchain/
+	# Bazel's glob doesn't support nested symlink
+	rm -rf $TERMUX_PREFIX/tmp/custom-toolchain/toolchains
 
-	export JAVA_HOME="$TERMUX_PREFIX/lib/jvm/java-21-openjdk"
+	# Copy cross files
+	rm -rf termux-cross/
+	mkdir -p termux-cross/
+	cp -Rfv $TERMUX_PKG_BUILDER_DIR/termux-cross/* termux-cross/
+
+	# Instantiate termux-cross template
+	mv termux-cross/toolchain/template termux-cross/toolchain/$TERMUX_ARCH
+	local _file
+	for _file in $AR $CC $CXX $LD $NM $OBJDUMP $STRIP; do
+		ln -sf wrapper.sh termux-cross/toolchain/$TERMUX_ARCH/bin/$(basename $_file)
+	done
+	for _file in termux-cross/toolchain/$TERMUX_ARCH/{BUILD,cc_toolchain_config.bzl}; do
+		sed -i "s|@TERMUX_ARCH@|$TERMUX_ARCH|g
+				s|@TERMUX_PREFIX@|$TERMUX_PREFIX|g
+				s|@AR@|$(basename $AR)|g
+				s|@CC@|$(basename $CC)|g
+				s|@CPP@|$(basename $CPP)|g
+				s|@CXX@|$(basename $CXX)|g
+				s|@LD@|$(basename $LD)|g
+				s|@NM@|$(basename $NM)|g
+				s|@OBJDUMP@|$(basename $OBJDUMP)|g
+				s|@STRIP@|$(basename $STRIP)|g" $_file
+	done
+
+	# Add elf-cleaner to PATH
+	mkdir -p $TERMUX_PKG_TMPDIR/elf-cleaner-bin
+	ln -sf $(command -v $TERMUX_ELF_CLEANER) $TERMUX_PKG_TMPDIR/elf-cleaner-bin/
+	export PATH="$TERMUX_PKG_TMPDIR/elf-cleaner-bin:$PATH"
 }
 
 termux_step_make() {
-	# Compile bazel
-	local EXTRA_BAZEL_ARGS=""
-	# EXTRA_BAZEL_ARGS+=" --keep_going"
-	EXTRA_BAZEL_ARGS+=" --verbose_failures"
-	EXTRA_BAZEL_ARGS+=" --action_env=ANDROID_DATA"
-	EXTRA_BAZEL_ARGS+=" --action_env=ANDROID_ROOT"
-	EXTRA_BAZEL_ARGS+=" --action_env=LD_PRELOAD"
-	EXTRA_BAZEL_ARGS+=" --tool_java_runtime_version=local_jdk"
-	EMBED_LABEL=$TERMUX_PKG_VERSION EXTRA_BAZEL_ARGS="$EXTRA_BAZEL_ARGS" VERBOSE=1 ./compile.sh
+	(set +e +u
+	unset CC CXX CFLAGS CXXFLAGS CPPFLAGS LDFLAGS AR AS CPP LD RANLIB READELF STRIP
+	export XDG_CACHE_HOME="$TERMUX_PKG_TMPDIR/fake-xdg-cache-home"
+	bazelisk build \
+		--extra_toolchains=//termux-cross/toolchain/$TERMUX_ARCH:${TERMUX_ARCH}_linux_toolchain \
+		--host_crosstool_top=@bazel_tools//tools/cpp:toolchain \
+		--crosstool_top=//termux-cross/toolchain/${TERMUX_ARCH}:gcc_toolchain \
+		--host_platform=@platforms//host \
+		--platforms=//termux-cross/platforms:termux_${TERMUX_ARCH} --cpu=${TERMUX_ARCH} \
+		--enable_bzlmod --verbose_failures \
+			//src:bazel_nojdk
+	bazelisk shutdown) || (set +e +u
+		bazelisk shutdown
+		termux_error_exit "ERROR: \`bazelisk build\` failed."
+	)
 }
 
 termux_step_make_install() {
 	install -Dm700 ./scripts/packages/bazel.sh $TERMUX_PREFIX/bin/bazel
-	install -Dm700 ./output/bazel $TERMUX_PREFIX/bin/bazel-real
-	install -Dm700 ./output/bazel $TERMUX_PREFIX/bin/bazel-$TERMUX_PKG_VERSION
-}
-
-termux_step_post_massage() {
-	rm -rf lib var share/doc/openjdk-21
+	install -Dm700 ./bazel-bin/src/bazel_nojdk $TERMUX_PREFIX/bin/bazel-real
+	install -Dm700 ./bazel-bin/src/bazel_nojdk $TERMUX_PREFIX/bin/bazel-$TERMUX_PKG_VERSION
 }
