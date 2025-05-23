@@ -2,12 +2,11 @@ TERMUX_PKG_HOMEPAGE=https://www.chromium.org/Home
 TERMUX_PKG_DESCRIPTION="Chromium web browser"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="@licy183"
-TERMUX_PKG_VERSION=137.0.7151.27
+TERMUX_PKG_VERSION=137.0.7151.40
 TERMUX_PKG_SRCURL=https://commondatastorage.googleapis.com/chromium-browser-official/chromium-$TERMUX_PKG_VERSION.tar.xz
-TERMUX_PKG_SHA256=19d4d5c1e253509239bc19c4bd432c824e433266ecef5a3a85a2908638ca2498
+TERMUX_PKG_SHA256=6c7ae4d5c2455caf13fd1d31c5a4e076492b9dbcecd27b990a68ba8bd3eae3a8
 TERMUX_PKG_DEPENDS="atk, cups, dbus, fontconfig, gtk3, krb5, libc++, libdrm, libevdev, libxkbcommon, libminizip, libnss, libwayland, libx11, mesa, openssl, pango, pulseaudio, zlib"
-# TODO: rename `chromium-jumbo-host-tools` to `chromium-beta-host-tools`
-TERMUX_PKG_BUILD_DEPENDS="chromium-jumbo-host-tools, libffi-static"
+TERMUX_PKG_BUILD_DEPENDS="chromium-beta-host-tools, libffi-static"
 # TODO: Split chromium-common and chromium-headless
 # TERMUX_PKG_DEPENDS+=", chromium-common"
 # TERMUX_PKG_SUGGESTS="chromium-headless, chromium-driver"
@@ -20,14 +19,14 @@ SYSTEM_LIBRARIES="    fontconfig"
 termux_step_post_get_source() {
 	# Apply patches related to chromium
 	local f
-	for f in $(find "$TERMUX_PKG_BUILDER_DIR/../chromium-jumbo-host-tools/cr-patches" -maxdepth 1 -type f -name *.patch | sort); do
+	for f in $(find "$TERMUX_PKG_BUILDER_DIR/../chromium-beta-host-tools/cr-patches" -maxdepth 1 -type f -name *.patch | sort); do
 		echo "Applying patch: $(basename $f)"
 		patch -p1 --silent < "$f"
 	done
 
 	# Apply patches for jumbo build
 	local f
-	for f in $(find "$TERMUX_PKG_BUILDER_DIR/../chromium-jumbo-host-tools/jumbo-patches" -maxdepth 1 -type f -name *.patch | sort); do
+	for f in $(find "$TERMUX_PKG_BUILDER_DIR/../chromium-beta-host-tools/jumbo-patches" -maxdepth 1 -type f -name *.patch | sort); do
 		echo "Applying patch: $(basename $f)"
 		patch -p1 --silent < "$f"
 	done
