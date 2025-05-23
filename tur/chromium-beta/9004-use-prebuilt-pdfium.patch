@@ -15,7 +15,7 @@
 +
 +config("pdfium_prebuilt") {
 +  lib_dirs = [ ]
-+  libs = [ "@TERMUX_PREFIX@/opt/chromium-jumbo-host-tools/obj/third_party/pdfium/libpdfium.a" ]
++  libs = [ "@TERMUX_PREFIX@/opt/chromium-beta-host-tools/obj/third_party/pdfium/libpdfium.a" ]
 +
 +  configs = [ ":pdfium_public_config" ]
 +  visibility = [ ":pdfium" ]

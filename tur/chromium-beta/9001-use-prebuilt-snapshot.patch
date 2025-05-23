@@ -22,7 +22,7 @@
 +    args = [
 +      "bash", "-c", 
 +      "cp -f" + " " +
-+      "@TERMUX_PREFIX@/opt/chromium-jumbo-host-tools/$output_path" + " " +
++      "@TERMUX_PREFIX@/opt/chromium-beta-host-tools/$output_path" + " " +
 +      "$output_path",
 +    ]
 +    outputs = [ output_file ]

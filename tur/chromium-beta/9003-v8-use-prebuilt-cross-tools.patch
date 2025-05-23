@@ -17,7 +17,7 @@
 +if (false) {
 +    arg0_prefix = "./"
 +} else {
-+    arg0_prefix = "@TERMUX_PREFIX@/opt/chromium-jumbo-host-tools/"
++    arg0_prefix = "@TERMUX_PREFIX@/opt/chromium-beta-host-tools/"
 +}
 +
      args = [
@@ -37,7 +37,7 @@
 +if (false) {
 +  arg0_prefix = "./"
 +} else {
-+  arg0_prefix = "@TERMUX_PREFIX@/opt/chromium-jumbo-host-tools/"
++  arg0_prefix = "@TERMUX_PREFIX@/opt/chromium-beta-host-tools/"
 +}
 +
    args = [
@@ -80,7 +80,7 @@
 +if (false) {
 +    arg0_prefix = "./"
 +} else {
-+    arg0_prefix = "@TERMUX_PREFIX@/opt/chromium-jumbo-host-tools/"
++    arg0_prefix = "@TERMUX_PREFIX@/opt/chromium-beta-host-tools/"
 +}
  
      args += [
@@ -104,7 +104,7 @@
 +if (false) {
 +    arg0_prefix = "./"
 +} else {
-+    arg0_prefix = "@TERMUX_PREFIX@/opt/chromium-jumbo-host-tools/"
++    arg0_prefix = "@TERMUX_PREFIX@/opt/chromium-beta-host-tools/"
 +}
 +
      args = [
