@@ -1,8 +1,7 @@
 https://github.com/termux/termux-packages/tree/88d3e0f154a40740a0a09822fac96450a360b01f/packages/c-ares
 
-diff -u -r ../c-ares-cares-1_15_0/ares_android.c ./ares_android.c
---- ../c-ares-cares-1_15_0/ares_android.c	2018-10-23 13:49:22.000000000 +0000
-+++ ./ares_android.c	2018-11-01 02:26:38.968483738 +0000
+--- a/ares_android.c
++++ b/ares_android.c
 @@ -12,7 +12,7 @@
   * this software for any purpose.  It is provided "as is"
   * without express or implied warranty.
@@ -12,9 +11,8 @@ diff -u -r ../c-ares-cares-1_15_0/ares_android.c ./ares_android.c
  
  #include <jni.h>
  
-diff -u -r ../c-ares-cares-1_15_0/ares_init.c ./ares_init.c
---- ../c-ares-cares-1_15_0/ares_init.c	2018-10-23 13:49:22.000000000 +0000
-+++ ./ares_init.c	2018-11-01 02:29:03.106824681 +0000
+--- a/ares_init.c
++++ b/ares_init.c
 @@ -44,7 +44,6 @@
  
  #if defined(ANDROID) || defined(__ANDROID__)
@@ -59,9 +57,8 @@ diff -u -r ../c-ares-cares-1_15_0/ares_init.c ./ares_init.c
  #  ifdef HAVE___SYSTEM_PROPERTY_GET
    /* Old way using the system property still in place as
     * a fallback. Older android versions can still use this.
-diff -u -r ../c-ares-cares-1_15_0/ares_library_init.c ./ares_library_init.c
---- ../c-ares-cares-1_15_0/ares_library_init.c	2018-10-23 13:49:22.000000000 +0000
-+++ ./ares_library_init.c	2018-11-01 02:26:38.972483691 +0000
+--- a/ares_library_init.c
++++ b/ares_library_init.c
 @@ -30,10 +30,6 @@
  fpGetBestRoute2_t ares_fpGetBestRoute2 = ZERO_NULL;
  #endif
@@ -84,15 +81,14 @@ diff -u -r ../c-ares-cares-1_15_0/ares_library_init.c ./ares_library_init.c
    ares_init_flags = ARES_LIB_INIT_NONE;
    ares_malloc = malloc;
    ares_realloc = realloc;
-diff -uNr c-ares-1.13.0/ares_private.h c-ares-1.13.0.mod/ares_private.h
---- c-ares-1.13.0/ares_private.h	2017-06-16 15:53:03.000000000 +0300
-+++ c-ares-1.13.0.mod/ares_private.h	2017-09-12 11:24:17.332992105 +0300
+--- a/ares_private.h
++++ b/ares_private.h
 @@ -84,7 +84,7 @@
  #ifdef ETC_INET
  #define PATH_HOSTS              "/etc/inet/hosts"
  #else
 -#define PATH_HOSTS              "/etc/hosts"
-+#define PATH_HOSTS              "@TERMUX_PREFIX@/etc/hosts"
++#define PATH_HOSTS              "/data/data/com.termux/files/usr/etc/hosts"
  #endif
  
  #endif
