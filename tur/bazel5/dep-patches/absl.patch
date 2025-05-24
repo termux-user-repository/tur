@@ -1,12 +1,24 @@
 --- a/absl/base/config.h
 +++ b/absl/base/config.h
-@@ -48,6 +48,9 @@
+@@ -48,6 +48,11 @@
  #ifndef ABSL_BASE_CONFIG_H_
  #define ABSL_BASE_CONFIG_H_
  
-+#pragma GCC diagnostic ignored "-Wdeprecated-builtins"
-+#pragma GCC diagnostic ignored "-Wgnu-offsetof-extensions"
++#ifdef __clang__
++#pragma clang diagnostic ignored "-Wdeprecated-builtins"
++#pragma clang diagnostic ignored "-Wgnu-offsetof-extensions"
++#endif
 +
  // Included for the __GLIBC__ macro (or similar macros on other systems).
  #include <limits.h>
+ 
+--- a/absl/strings/internal/str_format/extension.h
++++ b/absl/strings/internal/str_format/extension.h
+@@ -19,6 +19,7 @@
+ #include <limits.h>
+ 
+ #include <cstddef>
++#include <cstdint>
+ #include <cstring>
+ #include <ostream>
  
