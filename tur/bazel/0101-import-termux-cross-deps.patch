@@ -1,9 +1,9 @@
 --- a/MODULE.bazel
 +++ b/MODULE.bazel
-@@ -442,3 +442,29 @@
- 
- remote_android_extensions = use_extension("//tools/android:android_extensions.bzl", "remote_android_tools_extensions")
- use_repo(remote_android_extensions, "android_gmaven_r8", "android_tools")
+@@ -479,3 +479,29 @@
+         "patch -p1 -i termux-patches/rules_cc.patch",
+     ]
+ )
 +
 +new_local_repository_ = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.bzl", "new_local_repository")
 +
