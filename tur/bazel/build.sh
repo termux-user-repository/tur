@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://bazel.build/
 TERMUX_PKG_DESCRIPTION="Correct, reproducible, and fast builds for everyone"
 TERMUX_PKG_LICENSE="Apache-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="7.6.1"
+TERMUX_PKG_VERSION="8.2.1"
 TERMUX_PKG_SRCURL=https://github.com/bazelbuild/bazel/releases/download/$TERMUX_PKG_VERSION/bazel-$TERMUX_PKG_VERSION-dist.zip
-TERMUX_PKG_SHA256=c1106db93eb8a719a6e2e1e9327f41b003b6d7f7e9d04f206057990775a7760e
+TERMUX_PKG_SHA256=b12b95cc02cc5ee19ff7a6a7f71f9496631f937c8e13a8f53ee0ff7b7700bc16
 TERMUX_PKG_DEPENDS="libarchive, openjdk-21, patch, unzip, zip"
 TERMUX_PKG_BUILD_DEPENDS="libandroid-spawn-static, patch, unzip, zip"
 TERMUX_PKG_ANTI_BUILD_DEPENDS="openjdk-21"
@@ -98,7 +98,7 @@ termux_pkg_auto_update() {
 	local api_url="https://api.github.com/repos/bazelbuild/bazel/git/refs/tags"
 	local latest_refs_tags=$(
 		curl -s "$api_url" | jq -r .[].ref | cut -d'/' -f 3 |
-			grep "^7" | grep -v -E "(rc)|(pre)"
+			grep "^8" | grep -v -E "(rc)|(pre)"
 	)
 	if [[ -z "${latest_refs_tags}" ]]; then
 		echo "WARN: Unable to get latest refs tags from upstream. Try again later." >&2
@@ -122,6 +122,15 @@ termux_step_configure() {
 	# Setup bazelisk
 	__setup_bazelisk
 	export USE_BAZEL_VERSION="$TERMUX_PKG_VERSION"
+
+	# Add elf-cleaner to PATH
+	mkdir -p $TERMUX_PKG_TMPDIR/elf-cleaner-bin
+	ln -sf $(command -v $TERMUX_ELF_CLEANER) $TERMUX_PKG_TMPDIR/elf-cleaner-bin/
+	export PATH="$TERMUX_PKG_TMPDIR/elf-cleaner-bin:$PATH"
+
+	if [ "$TERMUX_CONTINUE_BUILD" = true ]; then
+		return
+	fi
 
 	# Copy toolchain to tmp
 	rm -rf $TERMUX_PREFIX/tmp/custom-toolchain
@@ -153,15 +162,10 @@ termux_step_configure() {
 				s|@OBJDUMP@|$(basename $OBJDUMP)|g
 				s|@STRIP@|$(basename $STRIP)|g" $_file
 	done
-
-	# Add elf-cleaner to PATH
-	mkdir -p $TERMUX_PKG_TMPDIR/elf-cleaner-bin
-	ln -sf $(command -v $TERMUX_ELF_CLEANER) $TERMUX_PKG_TMPDIR/elf-cleaner-bin/
-	export PATH="$TERMUX_PKG_TMPDIR/elf-cleaner-bin:$PATH"
 }
 
 termux_step_make() {
-	(set +e +u
+	(set -e -u -o pipefail
 	unset CC CXX CFLAGS CXXFLAGS CPPFLAGS LDFLAGS AR AS CPP LD RANLIB READELF STRIP
 	export XDG_CACHE_HOME="$TERMUX_PKG_TMPDIR/fake-xdg-cache-home"
 	bazelisk build \
@@ -171,10 +175,11 @@ termux_step_make() {
 		--host_platform=@platforms//host \
 		--platforms=//termux-cross/platforms:termux_${TERMUX_ARCH} --cpu=${TERMUX_ARCH} \
 		--enable_bzlmod --verbose_failures \
-			//src:bazel_nojdk
-	bazelisk shutdown) || (set +e +u
+			//src:bazel_nojdk && \
+	bazelisk shutdown) || (set -e -u -o pipefail
+		export XDG_CACHE_HOME="$TERMUX_PKG_TMPDIR/fake-xdg-cache-home"
 		bazelisk shutdown
-		termux_error_exit "ERROR: \`bazelisk build\` failed."
+		termux_error_exit "\`bazelisk build\` failed."
 	)
 }
 
