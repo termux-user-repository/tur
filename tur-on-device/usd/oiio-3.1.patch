@@ -1,0 +1,40 @@
+From 43dd3261d50373c9bd6c95f98fd9058bb29adb5a Mon Sep 17 00:00:00 2001
+From: Matt Johnson <matt.johnson@epicgames.com>
+Date: Fri, 3 Oct 2025 22:33:09 -0400
+Subject: [PATCH] hioOiio: remove use of OIIO_NAMESPACE_USING macro
+
+This macro was removed in OpenImageIO 3.1, but it previously expanded
+simply to "using namespace OIIO;" and had been that way since at least
+OpenImageIO v2.0.14, so we can just use that directly instead.
+---
+ pxr/imaging/plugin/hioOiio/metadata.cpp  | 2 +-
+ pxr/imaging/plugin/hioOiio/oiioImage.cpp | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/pxr/imaging/plugin/hioOiio/metadata.cpp b/pxr/imaging/plugin/hioOiio/metadata.cpp
+index 938ce06c605..f22527c1d56 100644
+--- a/pxr/imaging/plugin/hioOiio/metadata.cpp
++++ b/pxr/imaging/plugin/hioOiio/metadata.cpp
+@@ -18,7 +18,7 @@ PXR_NAMESPACE_OPEN_SCOPE
+ class TfToken;
+ class VtValue;
+ 
+-OIIO_NAMESPACE_USING
++using namespace OIIO;
+ 
+ bool
+ HioOIIO_ExtractCustomMetadata(
+diff --git a/pxr/imaging/plugin/hioOiio/oiioImage.cpp b/pxr/imaging/plugin/hioOiio/oiioImage.cpp
+index 675374c0059..9d88256d466 100644
+--- a/pxr/imaging/plugin/hioOiio/oiioImage.cpp
++++ b/pxr/imaging/plugin/hioOiio/oiioImage.cpp
+@@ -33,7 +33,7 @@ ARCH_PRAGMA_POP
+ 
+ PXR_NAMESPACE_OPEN_SCOPE
+ 
+-OIIO_NAMESPACE_USING
++using namespace OIIO;
+ 
+ // _ioProxySupportedExtensions is a list of hardcoded file extensions that
+ // support ioProxy. Although OIIO has an api call for checking whether or
+

@@ -1,0 +1,121 @@
+From b49b026b8eb6b289c59ff9ecb741f52531c22170 Mon Sep 17 00:00:00 2001
+From: Brecht Van Lommel <brecht@blender.org>
+Date: Thu, 2 Oct 2025 20:01:32 +0200
+Subject: [PATCH] Color Management: Support build against OpenColorIO 2.5.0
+
+But do not yet take advantage of any of its new features.
+
+Ref #147227
+---
+ .../ocio_color_space_conversion_shader.cc     | 63 ++++++++++++++-----
+ 1 file changed, 46 insertions(+), 17 deletions(-)
+
+diff --git a/source/blender/compositor/realtime_compositor/cached_resources/intern/ocio_color_space_conversion_shader.cc b/source/blender/compositor/realtime_compositor/cached_resources/intern/ocio_color_space_conversion_shader.cc
+index 7e876e9..bf490b7 100644
+--- a/source/blender/compositor/realtime_compositor/cached_resources/intern/ocio_color_space_conversion_shader.cc
++++ b/source/blender/compositor/realtime_compositor/cached_resources/intern/ocio_color_space_conversion_shader.cc
+@@ -164,7 +164,12 @@ class GPUShaderCreator : public OCIO::GpuShaderCreator {
+ 
+   bool addUniform(const char *name,
+                   const SizeGetter &get_size,
+-                  const VectorFloatGetter &get_vector_float) override
++                  const VectorFloatGetter &get_vector_float
++#  if OCIO_VERSION_HEX >= 0x02050000
++                  ,
++                  const unsigned /*maxSize*/
++#  endif
++                  ) override
+   {
+     /* Check if a resource exists with the same name and assert if it is the case, returning false
+      * indicates failure to add the uniform for the shader creator. */
+@@ -186,7 +191,12 @@ class GPUShaderCreator : public OCIO::GpuShaderCreator {
+ 
+   bool addUniform(const char *name,
+                   const SizeGetter &get_size,
+-                  const VectorIntGetter &get_vector_int) override
++                  const VectorIntGetter &get_vector_int
++#  if OCIO_VERSION_HEX >= 0x02050000
++                  ,
++                  const unsigned /*maxSize*/
++#  endif
++                  ) override
+   {
+     /* Check if a resource exists with the same name and assert if it is the case, returning false
+      * indicates failure to add the uniform for the shader creator. */
+@@ -206,16 +216,21 @@ class GPUShaderCreator : public OCIO::GpuShaderCreator {
+     return true;
+   }
+ 
+-  void addTexture(const char *texture_name,
+-                  const char *sampler_name,
+-                  unsigned width,
+-                  unsigned height,
+-                  TextureType channel,
++#  if OCIO_VERSION_HEX >= 0x02050000
++  unsigned
++#  else
++  void
++#  endif
++  addTexture(const char *texture_name,
++             const char *sampler_name,
++             uint width,
++             uint height,
++             TextureType channel,
+ #  if OCIO_VERSION_HEX >= 0x02030000
+-                  OCIO::GpuShaderDesc::TextureDimensions dimensions,
++             OCIO::GpuShaderDesc::TextureDimensions dimensions,
+ #  endif
+-                  OCIO::Interpolation interpolation,
+-                  const float *values) override
++             OCIO::Interpolation interpolation,
++             const float *values) override
+   {
+     /* Check if a resource exists with the same name and assert if it is the case. */
+     if (!resource_names_.add(std::make_unique<std::string>(sampler_name))) {
+@@ -246,13 +261,21 @@ class GPUShaderCreator : public OCIO::GpuShaderCreator {
+     GPU_texture_filter_mode(texture, interpolation != OCIO::INTERP_NEAREST);
+ 
+     textures_.add(sampler_name, texture);
++#  if OCIO_VERSION_HEX >= 0x02050000
++    return textures_.size() - 1;
++#  endif
+   }
+ 
+-  void add3DTexture(const char *texture_name,
+-                    const char *sampler_name,
+-                    unsigned size,
+-                    OCIO::Interpolation interpolation,
+-                    const float *values) override
++#  if OCIO_VERSION_HEX >= 0x02050000
++  unsigned
++#  else
++  void
++#  endif
++  add3DTexture(const char *texture_name,
++               const char *sampler_name,
++               uint size,
++               OCIO::Interpolation interpolation,
++               const float *values) override
+   {
+     /* Check if a resource exists with the same name and assert if it is the case. */
+     if (!resource_names_.add(std::make_unique<std::string>(sampler_name))) {
+@@ -269,12 +292,18 @@ class GPUShaderCreator : public OCIO::GpuShaderCreator {
+     GPU_texture_filter_mode(texture, interpolation != OCIO::INTERP_NEAREST);
+ 
+     textures_.add(sampler_name, texture);
++#  if OCIO_VERSION_HEX >= 0x02050000
++    return textures_.size() - 1;
++#  endif
+   }
+ 
+   /* This gets called before the finalize() method to construct the shader code. We just
+    * concatenate the code except for the declarations section. That's because the ShaderCreateInfo
+    * will add the declaration itself. */
+-  void createShaderText(const char *declarations,
++  void createShaderText(const char * /*parameter_declarations*/,
++#  if OCIO_VERSION_HEX >= 0x02050000
++                        const char * /*texture_declarations*/,
++#  endif
+                         const char *helper_methods,
+                         const char *function_header,
+                         const char *function_body,

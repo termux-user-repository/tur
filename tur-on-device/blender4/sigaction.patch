@@ -1,0 +1,27 @@
+Partially revert https://github.com/blender/blender/commit/e2e1984e60f6876f967dfcacdb0a82ea7155a93c
+
+BLI_mmap.c was translated from C into C++ (BLI_mmap.cc),
+
+but an error happened:
+
+source/blender/blenlib/intern/BLI_mmap.cc:102:33: error: cannot initialize a member subobject of type 'int' with an rvalue of type 'std::nullptr_t'
+  102 |     struct sigaction newact = {{nullptr}}, oldact = {{nullptr}};
+      |                                 ^~~~~~~
+
+This reverts this line back to the way it was in BLI_mmap.c,
+
+which makes the error stop happening.
+
+C++ is a very C-like language, so this might work acceptably.
+
+--- a/source/blender/blenlib/intern/BLI_mmap.cc
++++ b/source/blender/blenlib/intern/BLI_mmap.cc
+@@ -97,7 +97,7 @@ static void sigbus_handler(int sig, siginfo_t *siginfo, void *ptr)
+ static bool sigbus_handler_setup()
+ {
+   if (!error_handler.configured) {
+-    struct sigaction newact = {{nullptr}}, oldact = {{nullptr}};
++    struct sigaction newact = {0}, oldact = {0};
+ 
+     newact.sa_sigaction = sigbus_handler;
+     newact.sa_flags = SA_SIGINFO;

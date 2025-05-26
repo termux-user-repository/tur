@@ -127,6 +127,10 @@ jobs:
           # fi
           for repo_path in $(jq --raw-output 'keys | .[]' repo.json); do
             repo=$(jq --raw-output '.["'${repo_path}'"].name' repo.json)
+            # tur-on-device packages cannot be built in packages.yml, only package_on_device.yml
+            if [[ "${repo}" == "tur-on-device" ]]; then
+              continue
+            fi
             # Parse changed files and identify new packages and deleted packages.
             # Create lists of those packages that will be passed to upload job for
             # further processing.

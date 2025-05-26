@@ -1,0 +1,11 @@
+--- a/pxr/base/arch/align.cpp
++++ b/pxr/base/arch/align.cpp
+@@ -24,7 +24,7 @@ PXR_NAMESPACE_OPEN_SCOPE
+ void *
+ ArchAlignedAlloc(size_t alignment, size_t size)
+ {
+-#if defined(ARCH_OS_DARWIN) || (defined(ARCH_OS_LINUX) && defined(__GLIBCXX__) && !defined(_GLIBCXX_HAVE_ALIGNED_ALLOC))
++#if defined(ARCH_OS_DARWIN) || defined(__ANDROID__) || (defined(ARCH_OS_LINUX) && defined(__GLIBCXX__) && !defined(_GLIBCXX_HAVE_ALIGNED_ALLOC))
+     // alignment must be >= sizeof(void*)
+     if (alignment < sizeof(void*)) {
+         alignment = sizeof(void*);

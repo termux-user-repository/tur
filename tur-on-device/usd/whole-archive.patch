@@ -1,0 +1,26 @@
+ld.lld: error: unknown argument '-force_load' happened,
+but in termux-packages, '-Wl,--whole-archive' is used in some packages like hwinfo,
+so assume it works instead of '-force_load' for Android.
+
+--- a/cmake/macros/Private.cmake
++++ b/cmake/macros/Private.cmake
+@@ -944,7 +944,7 @@ function(_pxr_target_link_libraries NAME)
+                     #
+                     list(APPEND final -WHOLEARCHIVE:$<TARGET_FILE:${lib}>)
+                     list(APPEND final ${lib})
+-                elseif(CMAKE_COMPILER_IS_GNUCXX)
++                elseif(CMAKE_COMPILER_IS_GNUCXX OR ${CMAKE_SYSTEM_NAME} STREQUAL Android)
+                     list(APPEND final -Wl,--whole-archive ${lib} -Wl,--no-whole-archive)
+                 elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
+                     list(APPEND final -Wl,-force_load ${lib})
+--- a/cmake/macros/Public.cmake
++++ b/cmake/macros/Public.cmake
+@@ -1161,7 +1161,7 @@ function(pxr_toplevel_epilogue)
+                 PRIVATE
+                     -WHOLEARCHIVE:$<BUILD_INTERFACE:$<TARGET_FILE:usd_m>>
+             )
+-        elseif(CMAKE_COMPILER_IS_GNUCXX)
++        elseif(CMAKE_COMPILER_IS_GNUCXX OR ${CMAKE_SYSTEM_NAME} STREQUAL Android)
+             target_link_libraries(usd_ms
+                 PRIVATE
+                     -Wl,--whole-archive $<BUILD_INTERFACE:$<TARGET_FILE:usd_m>> -Wl,--no-whole-archive

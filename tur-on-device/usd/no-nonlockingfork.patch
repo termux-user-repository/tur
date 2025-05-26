@@ -1,0 +1,26 @@
+error: use of undeclared identifier '__environ'; did you mean 'environ' occured,
+so try to take the codepath that upstream made for MacOS
+
+--- a/pxr/base/arch/stackTrace.cpp
++++ b/pxr/base/arch/stackTrace.cpp
+@@ -93,9 +93,9 @@ using namespace std;
+ // total hack -- no idea if this will work if we die in malloc...
+ typedef int (*ForkFunc)(void);
+ ForkFunc Arch_nonLockingFork =
+-#if defined(ARCH_OS_LINUX)
++#if defined(ARCH_OS_LINUX) && !defined(__ANDROID__)
+     (ForkFunc)dlsym(RTLD_DEFAULT, "_Fork");
+-#elif defined(ARCH_OS_DARWIN) || defined(ARCH_OS_WASM_VM)
++#elif defined(ARCH_OS_DARWIN) || defined(ARCH_OS_WASM_VM) || defined(__ANDROID__)
+     NULL;
+ #else
+ #error Unknown architecture.
+@@ -647,7 +647,7 @@ nonLockingLinux__execve (const char *file,
+ static int
+ nonLockingExecv(const char *path, char *const argv[])
+ {
+-#if defined(ARCH_OS_LINUX)
++#if defined(ARCH_OS_LINUX) && !defined(__ANDROID__)
+      return nonLockingLinux__execve (path, argv, __environ);
+ #else
+      return execv(path, argv);
