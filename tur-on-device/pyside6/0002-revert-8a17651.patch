@@ -1,0 +1,197 @@
+Reverts https://github.com/qtproject/pyside-pyside-setup/commit/8a176515c1a9a0b542434d31e5e5d0f2adb6e4b3 ,
+which fixes the build error
+ImportError: dlopen failed: cannot locate symbol "PepEval_GetFrameBuiltins"
+referenced by "/data/data/com.termux/files/home/.termux-build/pyside6/build/sources/pyside6/PySide6/QtCore.cpython-312.so"...
+while building using Python 3.12 (it is assumed that building with Python 3.13 would have a different result)
+
+diff --git a/sources/pyside6/PySide6/glue/qtcore.cpp b/sources/pyside6/PySide6/glue/qtcore.cpp
+index 3cbc22b..29b5442 100644
+--- a/sources/pyside6/PySide6/glue/qtcore.cpp
++++ b/sources/pyside6/PySide6/glue/qtcore.cpp
+@@ -2178,9 +2178,7 @@ Q_IMPORT_PLUGIN(QDarwinCalendarPermissionPlugin)
+ // @snippet qt-modifier
+ PyObject *_inputDict = PyDict_New();
+ // Note: The builtins line is no longer needed since Python 3.10. Undocumented!
+-Shiboken::AutoDecRef builtins(PepEval_GetFrameBuiltins());
+-PyDict_SetItemString(_inputDict, "__builtins__", builtins.object());
+-builtins.reset(nullptr);
++PyDict_SetItemString(_inputDict, "__builtins__", PyEval_GetBuiltins());
+ PyDict_SetItemString(_inputDict, "QtCore", module);
+ PyDict_SetItemString(_inputDict, "Qt", reinterpret_cast<PyObject *>(pyType));
+ // Explicitly not dereferencing the result.
+diff --git a/sources/shiboken6/libshiboken/basewrapper.cpp b/sources/shiboken6/libshiboken/basewrapper.cpp
+index ced8145..8de94a4 100644
+--- a/sources/shiboken6/libshiboken/basewrapper.cpp
++++ b/sources/shiboken6/libshiboken/basewrapper.cpp
+@@ -539,10 +539,9 @@ PyObject *MakeQAppWrapper(PyTypeObject *type)
+ 
+     // monitoring the last application state
+     PyObject *qApp_curr = type != nullptr ? _Sbk_NewVarObject(type) : Py_None;
+-    Shiboken::AutoDecRef builtins(PepEval_GetFrameBuiltins());
+-    if (PyDict_SetItem(builtins.object(), Shiboken::PyName::qApp(), qApp_curr) < 0)
++    static PyObject *builtins = PyEval_GetBuiltins();
++    if (PyDict_SetItem(builtins, Shiboken::PyName::qApp(), qApp_curr) < 0)
+         return nullptr;
+-    builtins.reset(nullptr);
+     qApp_last = qApp_curr;
+     // Note: This Py_INCREF would normally be wrong because the qApp
+     // object already has a reference from PyObject_GC_New. But this is
+diff --git a/sources/shiboken6/libshiboken/pep384impl.cpp b/sources/shiboken6/libshiboken/pep384impl.cpp
+index 581b444..df18240 100644
+--- a/sources/shiboken6/libshiboken/pep384impl.cpp
++++ b/sources/shiboken6/libshiboken/pep384impl.cpp
+@@ -824,13 +824,10 @@ PepRun_GetResult(const char *command)
+      * Evaluate a string and return the variable `result`
+      */
+     PyObject *d = PyDict_New();
+-    if (d == nullptr)
++    if (d == nullptr
++        || PyDict_SetItem(d, Shiboken::PyMagicName::builtins(), PyEval_GetBuiltins()) < 0) {
+         return nullptr;
+-
+-    Shiboken::AutoDecRef builtins(PepEval_GetFrameBuiltins());
+-    if (PyDict_SetItem(d, Shiboken::PyMagicName::builtins(), PyEval_GetBuiltins()) < 0)
+-        return nullptr;
+-    builtins.reset(nullptr);
++    }
+ 
+     PyObject *v = PyRun_String(command, Py_file_input, d, d);
+     PyObject *res = v ? PyDict_GetItem(d, Shiboken::PyName::result()) : nullptr;
+@@ -1156,19 +1153,6 @@ PyObject *PepEval_GetFrameGlobals()
+ #endif
+ }
+ 
+-PyObject *PepEval_GetFrameBuiltins()
+-{
+-    // PepEval_GetFrameBuiltins() (added to stable ABI in 3.13) returns a new reference
+-    // as opposed to deprecated PyEval_GetBuiltins() which returns a borrowed reference
+-#if !defined(PYPY_VERSION) && ((!defined(Py_LIMITED_API) && PY_VERSION_HEX >= 0x030D0000) || (defined(Py_LIMITED_API) && Py_LIMITED_API >= 0x030D0000))
+-    return PyEval_GetFrameBuiltins();
+-#else
+-    PyObject *result = PyEval_GetBuiltins();
+-    Py_XINCREF(result);
+-    return result;
+-#endif
+-}
+-
+ /***************************************************************************
+  *
+  * PYSIDE-535: The enum/flag error
+diff --git a/sources/shiboken6/libshiboken/pep384impl.h b/sources/shiboken6/libshiboken/pep384impl.h
+index 6cd9dfa..99b38a7 100644
+--- a/sources/shiboken6/libshiboken/pep384impl.h
++++ b/sources/shiboken6/libshiboken/pep384impl.h
+@@ -554,9 +554,6 @@ LIBSHIBOKEN_API void *PepType_GetSlot(PyTypeObject *type, int aSlot);
+ // Return dictionary of the global variables in the current execution frame
+ LIBSHIBOKEN_API PyObject *PepEval_GetFrameGlobals();
+ 
+-// Return a dictionary of the builtins in the current execution frame
+-LIBSHIBOKEN_API PyObject *PepEval_GetFrameBuiltins();
+-
+ /*****************************************************************************
+  *
+  * Module Initialization
+diff --git a/sources/shiboken6/libshiboken/sbkmodule.cpp b/sources/shiboken6/libshiboken/sbkmodule.cpp
+index 810940a..0ff354f 100644
+--- a/sources/shiboken6/libshiboken/sbkmodule.cpp
++++ b/sources/shiboken6/libshiboken/sbkmodule.cpp
+@@ -486,6 +486,7 @@ static PyMethodDef lazy_methods[] = {
+ PyObject *create(const char * /* modName */, void *moduleData)
+ {
+     static auto *sysModules = PyImport_GetModuleDict();
++    static auto *builtins = PyEval_GetBuiltins();
+     static auto *partial = Pep_GetPartialFunction();
+     static bool lazy_init{};
+ 
+@@ -510,11 +511,10 @@ PyObject *create(const char * /* modName */, void *moduleData)
+         origModuleGetattro = PyModule_Type.tp_getattro;
+         PyModule_Type.tp_getattro = PyModule_lazyGetAttro;
+         // Add the lazy import redirection, keeping a reference.
+-        Shiboken::AutoDecRef builtins(PepEval_GetFrameBuiltins());
+-        origImportFunc = PyDict_GetItemString(builtins.object(), "__import__");
++        origImportFunc = PyDict_GetItemString(builtins, "__import__");
+         Py_INCREF(origImportFunc);
+         AutoDecRef func(PyCFunction_NewEx(lazy_methods, nullptr, nullptr));
+-        PyDict_SetItemString(builtins.object(), "__import__", func);
++        PyDict_SetItemString(builtins, "__import__", func);
+         lazy_init = true;
+     }
+     // PYSIDE-2404: Nuitka inserts some additional code in standalone mode
+diff --git a/sources/shiboken6/libshiboken/signature/signature.cpp b/sources/shiboken6/libshiboken/signature/signature.cpp
+index ec06d4b..fc0663b 100644
+--- a/sources/shiboken6/libshiboken/signature/signature.cpp
++++ b/sources/shiboken6/libshiboken/signature/signature.cpp
+@@ -303,18 +303,18 @@ static PyObject *feature_import(PyObject * /* self */, PyObject *args, PyObject
+         return ret;
+     // feature_import did not handle it, so call the normal import.
+     Py_DECREF(ret);
+-    Shiboken::AutoDecRef builtins(PepEval_GetFrameBuiltins());
+-    PyObject *origImportFunc = PyDict_GetItemString(builtins.object(), "__orig_import__");
++    static PyObject *builtins = PyEval_GetBuiltins();
++    PyObject *origImportFunc = PyDict_GetItemString(builtins, "__orig_import__");
+     if (origImportFunc == nullptr) {
+         Py_FatalError("builtins has no \"__orig_import__\" function");
+     }
+     // PYSIDE-3054: Instead of just calling the original import, we temporarily
+     //              reset the whole import function to the previous version.
+     //              This prevents unforeseen recursions like in settrace.
+-    PyObject *featureImportFunc = PyDict_GetItemString(builtins.object(), "__import__");
++    PyObject *featureImportFunc = PyDict_GetItemString(builtins, "__import__");
+     Py_INCREF(origImportFunc);
+     Py_INCREF(featureImportFunc);
+-    PyDict_SetItemString(builtins.object(), "__import__", origImportFunc);
++    PyDict_SetItemString(builtins, "__import__", origImportFunc);
+     ret = PyObject_Call(origImportFunc, args, kwds);
+     if (ret) {
+         // PYSIDE-2029: Intercept after the import to search for PySide usage.
+@@ -326,7 +326,7 @@ static PyObject *feature_import(PyObject * /* self */, PyObject *args, PyObject
+             ret = nullptr;
+         }
+     }
+-    PyDict_SetItemString(builtins.object(), "__import__", featureImportFunc);
++    PyDict_SetItemString(builtins, "__import__", featureImportFunc);
+     Py_DECREF(origImportFunc);
+     Py_DECREF(featureImportFunc);
+     return ret;
+diff --git a/sources/shiboken6/libshiboken/signature/signature_globals.cpp b/sources/shiboken6/libshiboken/signature/signature_globals.cpp
+index 32d65e1..e83624e 100644
+--- a/sources/shiboken6/libshiboken/signature/signature_globals.cpp
++++ b/sources/shiboken6/libshiboken/signature/signature_globals.cpp
+@@ -57,11 +57,9 @@ static safe_globals_struc *init_phase_1()
+         if (bytes.isNull())
+             break;
+ 
+-        AutoDecRef builtins;
+ #if defined(Py_LIMITED_API) || defined(SHIBOKEN_NO_EMBEDDING_PYC)
+-        builtins.reset(PepEval_GetFrameBuiltins());
+-        PyObject *compile = PyDict_GetItem(builtins.object(), PyName::compile());
+-        builtins.reset(nullptr);
++        PyObject *builtins = PyEval_GetBuiltins();
++        PyObject *compile = PyDict_GetItem(builtins, PyName::compile());
+         if (compile == nullptr)
+             break;
+         AutoDecRef code_obj(PyObject_CallFunction(compile, "Oss",
+@@ -77,10 +75,8 @@ static safe_globals_struc *init_phase_1()
+             break;
+         // Initialize the module
+         PyObject *mdict = PyModule_GetDict(p->helper_module);
+-        builtins.reset(PepEval_GetFrameBuiltins());
+-        if (PyDict_SetItem(mdict, PyMagicName::builtins(), builtins.object()) < 0)
++        if (PyDict_SetItem(mdict, PyMagicName::builtins(), PyEval_GetBuiltins()) < 0)
+             break;
+-        builtins.reset(nullptr);
+ 
+         /*********************************************************************
+          *
+@@ -146,9 +142,8 @@ static int init_phase_2(safe_globals_struc *p, PyMethodDef *methods)
+             Py_DECREF(v);
+         }
+         // The first entry is __feature_import__, add documentation.
+-        Shiboken::AutoDecRef builtins(PepEval_GetFrameBuiltins());
+-        PyObject *imp_func = PyDict_GetItemString(builtins.object(), "__import__");
+-        builtins.reset(nullptr);
++        PyObject *builtins = PyEval_GetBuiltins();
++        PyObject *imp_func = PyDict_GetItemString(builtins, "__import__");
+         PyObject *imp_doc = PyObject_GetAttrString(imp_func, "__doc__");
+         signature_methods[0].ml_doc = String::toCString(imp_doc);
+ 
