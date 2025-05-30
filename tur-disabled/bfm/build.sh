@@ -1,3 +1,4 @@
+# Origin repo: tur
 TERMUX_PKG_HOMEPAGE=https://github.com/codedsprit/bfm
 TERMUX_PKG_DESCRIPTION="🌼 ez file manager slokes in bash"
 TERMUX_PKG_LICENSE="MIT"
