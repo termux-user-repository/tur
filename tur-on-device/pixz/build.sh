@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="A xz(1) compatible compressor featuring parallel decompr
 TERMUX_PKG_LICENSE="BSD 2-Clause"
 TERMUX_PKG_MAINTAINER="@flosnvjx"
 TERMUX_PKG_VERSION="1.0.7"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL="https://github.com/vasi/pixz/releases/download/v$TERMUX_PKG_VERSION/pixz-$TERMUX_PKG_VERSION.tar.xz"
 TERMUX_PKG_SHA256=e5e32c6eb0bf112b98e74a5da8fb63b9f2cae71800f599d97ce540e150c8ddc5
 TERMUX_PKG_BUILD_DEPENDS="xz-utils"
@@ -25,6 +26,7 @@ termux_step_pre_configure() {
 	## upstream developer's duty to fix this anyway)
 	sed -e "/^[\t ]*cppcheck-src.sh \\\\ *$/d" -i test/Makefile.am && \
 	aclocal
+	autoreconf -fi
 }
 
 termux_step_post_make_install() {
