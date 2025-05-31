@@ -6,6 +6,7 @@ import typing
 
 COMPLIER_PATH = "@COMPILER@"
 TERMUX_PREFIX = "@TERMUX_PREFIX@"
+TERMUX_ARCH = "@TERMUX_ARCH@"
 
 def main(argv: typing.List[str]):
     cwd = os.getcwd()
@@ -13,14 +14,19 @@ def main(argv: typing.List[str]):
     argv_new = []
     searched_shared = False
     need_shared = False
+    fortran_file = ""
     for i, arg in enumerate(argv[1:]):
-        if arg != "-static-openmp":
+        if arg != "-static-openmp" and arg != "":
             argv_new.append(arg)
         if arg == "-shared":
             searched_shared = True
+        if arg.endswith(".f"):
+            fortran_file = arg
         if arg == "-o":
             if argv[i+2].endswith(".so"):
                 need_shared = True
+            if argv[i+2] == "" and fortran_file:
+                argv_new.append("build/temp.linux-" + TERMUX_ARCH + "-2.7/" + fortran_file[:-1] + "o")
     if not searched_shared and need_shared:
         argv_new = ["-shared"] + argv_new
     args = [COMPLIER_PATH] + argv_new
