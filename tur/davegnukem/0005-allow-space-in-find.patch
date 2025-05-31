@@ -1,0 +1,11 @@
+--- a/Makefile
++++ b/Makefile
+@@ -71,7 +71,7 @@
+ 	cp -fR data/* $(DESTDIR)$(DATA_DIR)
+ 	rm -f $(DESTDIR)$(DATA_DIR)README.md
+ 	find $(DESTDIR)$(DATA_DIR) -type d | xargs chmod 755
+-	find $(DESTDIR)$(DATA_DIR) -type f | xargs chmod 644
++	find $(DESTDIR)$(DATA_DIR) -type f -print0 | xargs -0 chmod 644
+ 	# data doc
+ 	mkdir -p $(DESTDIR)$(PREFIX)/share/doc/$(BIN)-data
+ 	cp -f data/README.md $(DESTDIR)$(PREFIX)/share/doc/$(BIN)-data
