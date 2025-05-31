@@ -1,0 +1,20 @@
+--- a/lib/simde/simde/simde-math.h
++++ b/lib/simde/simde/simde-math.h
+@@ -1166,7 +1166,7 @@
+ 
+ #if !defined(simde_math_roundeven)
+   #if \
+-      HEDLEY_HAS_BUILTIN(__builtin_roundeven) || \
++      (!(defined(__ANDROID__) && defined(__arm__)) && HEDLEY_HAS_BUILTIN(__builtin_roundeven)) || \
+       HEDLEY_GCC_VERSION_CHECK(10,0,0)
+     #define simde_math_roundeven(v) __builtin_roundeven(v)
+   #elif defined(simde_math_round) && defined(simde_math_fabs)
+@@ -1186,7 +1186,7 @@
+ 
+ #if !defined(simde_math_roundevenf)
+   #if \
+-      HEDLEY_HAS_BUILTIN(__builtin_roundevenf) || \
++      (!(defined(__ANDROID__) && defined(__arm__)) && HEDLEY_HAS_BUILTIN(__builtin_roundevenf)) || \
+       HEDLEY_GCC_VERSION_CHECK(10,0,0)
+     #define simde_math_roundevenf(v) __builtin_roundevenf(v)
+   #elif defined(simde_math_roundf) && defined(simde_math_fabsf)
