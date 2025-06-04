@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://www.chromium.org/Home
 TERMUX_PKG_DESCRIPTION="Chromium web browser (Beta Version, Host tools)"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="@licy183"
-TERMUX_PKG_VERSION=137.0.7151.40
+TERMUX_PKG_VERSION=138.0.7204.4
 TERMUX_PKG_SRCURL=https://commondatastorage.googleapis.com/chromium-browser-official/chromium-$TERMUX_PKG_VERSION.tar.xz
-TERMUX_PKG_SHA256=6c7ae4d5c2455caf13fd1d31c5a4e076492b9dbcecd27b990a68ba8bd3eae3a8
+TERMUX_PKG_SHA256=43212a2cc23e6edb336b940879b1a091f84dc57bb03e0ed6d61d36e3c4782140
 TERMUX_PKG_DEPENDS="atk, cups, dbus, fontconfig, gtk3, krb5, libc++, libdrm, libevdev, libxkbcommon, libminizip, libnss, libx11, mesa, openssl, pango, pulseaudio, zlib"
 TERMUX_PKG_BUILD_DEPENDS="libffi-static"
 # TODO: Split chromium-common and chromium-headless
@@ -14,6 +14,7 @@ TERMUX_PKG_BUILD_DEPENDS="libffi-static"
 TERMUX_PKG_EXCLUDED_ARCHES="i686"
 TERMUX_PKG_NO_STRIP=true
 TERMUX_PKG_NO_ELF_CLEANER=true
+TERMUX_PKG_ON_DEVICE_BUILD_NOT_SUPPORTED=true
 
 SYSTEM_LIBRARIES="    fontconfig"
 # TERMUX_PKG_DEPENDS="fontconfig"
@@ -23,14 +24,14 @@ termux_step_post_get_source() {
 	local f
 	for f in $(find "$TERMUX_PKG_BUILDER_DIR/cr-patches" -maxdepth 1 -type f -name *.patch | sort); do
 		echo "Applying patch: $(basename $f)"
-		patch -p1 < "$f"
+		patch -p1 --silent < "$f"
 	done
 
 	# Apply patches for jumbo build
 	local f
 	for f in $(find "$TERMUX_PKG_BUILDER_DIR/jumbo-patches" -maxdepth 1 -type f -name *.patch | sort); do
 		echo "Applying patch: $(basename $f)"
-		patch -p1 < "$f"
+		patch -p1 --silent < "$f"
 	done
 
 	# Use some system libs
@@ -39,14 +40,6 @@ termux_step_post_get_source() {
 
 	# Remove the source file to keep more space
 	rm -f "$TERMUX_PKG_CACHEDIR/chromium-$TERMUX_PKG_VERSION.tar.xz"
-}
-
-termux_step_pre_configure() {
-	# Certain packages are not safe to build on device because their
-	# build.sh script deletes specific files in $TERMUX_PREFIX.
-	if $TERMUX_ON_DEVICE_BUILD; then
-		termux_error_exit "Package '$TERMUX_PKG_NAME' is not safe for on-device builds."
-	fi
 }
 
 termux_step_configure() {
@@ -287,7 +280,7 @@ termux_step_make() {
 						run_mksnapshot_default \
 						run_torque \
 						generate_bytecode_builtins_list \
-						v8:run_gen-regexp-special-case
+						v8:run_gen-regexp-special-case -k 0 || bash
 
 	# Build host tools
 	time ninja -C out/Release \
