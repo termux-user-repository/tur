@@ -280,7 +280,7 @@ termux_step_make() {
 						run_mksnapshot_default \
 						run_torque \
 						generate_bytecode_builtins_list \
-						v8:run_gen-regexp-special-case -k 0 || bash
+						v8:run_gen-regexp-special-case
 
 	# Build host tools
 	time ninja -C out/Release \
