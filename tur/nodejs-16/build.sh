@@ -1,9 +1,9 @@
 TERMUX_PKG_HOMEPAGE=https://nodejs.org/
-TERMUX_PKG_DESCRIPTION="Open Source, cross-platform JavaScript runtime environment"
+TERMUX_PKG_DESCRIPTION="Open Source, cross-platform JavaScript runtime environment (Version 16, EOL at Aug 08, 2023)"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION=16.20.2
-TERMUX_PKG_REVISION=2
+TERMUX_PKG_REVISION=3
 TERMUX_PKG_SRCURL=https://nodejs.org/dist/v${TERMUX_PKG_VERSION}/node-v${TERMUX_PKG_VERSION}.tar.xz
 TERMUX_PKG_SHA256=576f1a03c455e491a8d132b587eb6b3b84651fc8974bb3638433dd44d22c8f49
 # Note that we do not use a shared libuv to avoid an issue with the Android
@@ -69,6 +69,7 @@ termux_step_configure() {
 	LDFLAGS="-Wl,-rpath=$TERMUX_PREFIX/$_INSTALL_PREFIX/lib $LDFLAGS"
 
 	# See note above TERMUX_PKG_DEPENDS why we do not use a shared libuv.
+	export NODEJS_CONFIGURE_SKIP_PY_VERSION_CHECK=1
 	./configure \
 		--prefix=$TERMUX_PREFIX/$_INSTALL_PREFIX \
 		--dest-cpu=$DEST_CPU \
