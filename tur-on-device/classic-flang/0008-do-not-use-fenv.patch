@@ -1,4 +1,3 @@
-diff -uNr a/runtime/libpgmath/lib/common/fltfenv.c b/runtime/libpgmath/lib/common/fltfenv.c
 --- a/runtime/libpgmath/lib/common/fltfenv.c
 +++ b/runtime/libpgmath/lib/common/fltfenv.c
 @@ -573,7 +573,7 @@

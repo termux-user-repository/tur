@@ -5,6 +5,7 @@ TERMUX_PKG_LICENSE_FILE="LICENSE.txt"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 _DATE=2023.05.20
 TERMUX_PKG_VERSION=${_DATE//./}
+TERMUX_PKG_REVISION=1
 _FLANG_COMMIT=5caea370cd46260de6f48fed72b34c79c5702378
 TERMUX_PKG_SRCURL=https://github.com/flang-compiler/flang/archive/${_FLANG_COMMIT}.zip
 TERMUX_PKG_SHA256=635b984acd554674cdbc6395567ff5c71d97710083aa1d9470a057105231387b
@@ -40,9 +41,12 @@ termux_step_pre_configure() {
 	# Build libpgmath
 	pushd $TERMUX_PKG_SRCDIR/runtime/libpgmath
 	mkdir -p build && cd build
-	cmake -DCMAKE_INSTALL_PREFIX=$TERMUX_PREFIX ..
-	make -j$TERMUX_PKG_MAKE_PROCESSES
-	make install
+	cmake \
+		-G Ninja \
+		-DCMAKE_INSTALL_PREFIX=$TERMUX_PREFIX \
+		..
+	ninja -j$TERMUX_PKG_MAKE_PROCESSES
+	ninja install
 	cd .. && rm -rf build
 	popd
 

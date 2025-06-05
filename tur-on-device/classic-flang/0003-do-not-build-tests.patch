@@ -1,0 +1,11 @@
+--- a/runtime/libpgmath/CMakeLists.txt
++++ b/runtime/libpgmath/CMakeLists.txt
+@@ -125,7 +129,7 @@
+
+ # Setup Source Code And Tests
+ add_subdirectory(lib)
+-add_subdirectory(test)
++# add_subdirectory(test)
+
+ if(0)
+ get_cmake_property(_variableNames VARIABLES)
