@@ -1,4 +1,3 @@
-diff -uNr a/runtime/flangrti/tempnam.c b/runtime/flangrti/tempnam.c
 --- a/runtime/flangrti/tempnam.c
 +++ b/runtime/flangrti/tempnam.c
 @@ -11,7 +11,9 @@
@@ -11,12 +10,3 @@ diff -uNr a/runtime/flangrti/tempnam.c b/runtime/flangrti/tempnam.c
  
  extern unsigned long strlen(const char *);
  /* FIXME: #include <stdlib.h> , may have to keep externs for Windows */
-@@ -64,7 +64,7 @@
- static char *
- gentmp(char *dir, char *pfx)
- {
--  extern long getpid(void);
-+  extern pid_t getpid(void);
-   extern long time(void *);
-   char *buf;
-   char *p, *q;
