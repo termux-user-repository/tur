@@ -1,8 +1,9 @@
 TERMUX_PKG_HOMEPAGE=https://github.com/openjdk/mobile
-TERMUX_PKG_DESCRIPTION="Java development kit and runtime"
+TERMUX_PKG_DESCRIPTION="Java development kit and runtime (Version 11)"
 TERMUX_PKG_LICENSE="GPL-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION=11.0.23+9
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://openjdk-sources.osci.io/openjdk11/openjdk-$TERMUX_PKG_VERSION.tar.xz
 TERMUX_PKG_SHA256=f51be67721f6cb8d14b0cd75cc9b53634e7d83e808148940d64e67c8b77accfc
 TERMUX_PKG_DEPENDS="libiconv, libjpeg-turbo, zlib, libandroid-spawn"
@@ -17,11 +18,13 @@ termux_step_pre_configure() {
 	unset JAVA_HOME
 
 	env -i PATH="$PATH" sudo apt update
-	env -i PATH="$PATH" sudo apt install openjdk-11-jdk openjdk-11-jre -y
+	env -i PATH="$PATH" sudo apt install openjdk-11-jdk openjdk-11-jre zip -y
 }
 
 termux_step_configure() {
 	unset JAVA_HOME
+
+	local _llvm_base_path="/usr/lib/llvm-18"
 
 	local jdk_ldflags="-L${TERMUX_PREFIX}/lib -Wl,-rpath=$TERMUX_PREFIX/lib/jvm/java-11-openjdk/lib -Wl,-rpath=${TERMUX_PREFIX}/lib -Wl,--enable-new-dtags"
 	bash ./configure \
@@ -52,12 +55,12 @@ termux_step_configure() {
 		OBJDUMP="$OBJDUMP" \
 		STRIP="$STRIP" \
 		CXXFILT="llvm-cxxfilt" \
-		BUILD_CC="/usr/bin/clang-16" \
-		BUILD_CXX="/usr/bin/clang++-16" \
-		BUILD_NM="/usr/bin/llvm-nm-16" \
-		BUILD_AR="/usr/bin/llvm-ar-16" \
-		BUILD_OBJCOPY="/usr/bin/llvm-objcopy-16" \
-		BUILD_STRIP="/usr/bin/llvm-strip-16"
+		BUILD_CC="$_llvm_base_path/bin/clang" \
+		BUILD_CXX="$_llvm_base_path/bin/clang++" \
+		BUILD_NM="$_llvm_base_path/bin/llvm-nm" \
+		BUILD_AR="$_llvm_base_path/bin/llvm-ar" \
+		BUILD_OBJCOPY="$_llvm_base_path/bin/llvm-objcopy" \
+		BUILD_STRIP="$_llvm_base_path/bin/llvm-strip"
 }
 
 termux_step_make() {
@@ -82,7 +85,7 @@ termux_step_post_make_install() {
 	mkdir -p $TERMUX_PREFIX/lib/jvm/java-11-openjdk/lib/security/
 	ln -sfr $TERMUX_PREFIX/lib/jvm/java-17-openjdk/lib/security/jssecacerts \
 		$TERMUX_PREFIX/lib/jvm/java-11-openjdk/lib/security/jssecacerts
-	
+
 	cd $TERMUX_PREFIX/lib/jvm/java-11-openjdk/man/man1
 	for manpage in *.1; do
 		gzip "$manpage"
