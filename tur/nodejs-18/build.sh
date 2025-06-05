@@ -1,5 +1,5 @@
 TERMUX_PKG_HOMEPAGE=https://nodejs.org/
-TERMUX_PKG_DESCRIPTION="Open Source, cross-platform JavaScript runtime environment (Version 18, EOF at Mar 27, 2025)"
+TERMUX_PKG_DESCRIPTION="Open Source, cross-platform JavaScript runtime environment (Version 18, EOL at Mar 27, 2025)"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION=18.20.8
