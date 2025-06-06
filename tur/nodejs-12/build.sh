@@ -1,18 +1,14 @@
 TERMUX_PKG_HOMEPAGE=https://nodejs.org/
-TERMUX_PKG_DESCRIPTION="Open Source, cross-platform JavaScript runtime environment"
+TERMUX_PKG_DESCRIPTION="Open Source, cross-platform JavaScript runtime environment (Version 12, EOL at Apr 05, 2022)"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION=12.18.3
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_REVISION=2
 TERMUX_PKG_SRCURL=https://nodejs.org/dist/v${TERMUX_PKG_VERSION}/node-v${TERMUX_PKG_VERSION}.tar.xz
 TERMUX_PKG_SHA256=71158026579487422fd13cc2553b34cddb76519098aa6030faab52f88c6e0d0e
 # Note that we do not use a shared libuv to avoid an issue with the Android
 # linker, which does not use symbols of linked shared libraries when resolving
 # symbols on dlopen(). See https://github.com/termux/termux-packages/issues/462.
-#
-# Node.js 16.x does not support `NODE_OPTIONS=--openssl-legacy-provider` option.
-# See https://github.com/termux/termux-packages/issues/9266. Please revert back
-# to depending on openssl (instead of openssl-1.1) when migrating to next LTS.
 TERMUX_PKG_DEPENDS="libc++, openssl-1.1, c-ares, zlib"
 TERMUX_PKG_SUGGESTS="clang, make, pkg-config, python"
 _INSTALL_PREFIX=opt/nodejs-12
@@ -69,7 +65,7 @@ termux_step_configure() {
 	LDFLAGS="-Wl,-rpath=$TERMUX_PREFIX/$_INSTALL_PREFIX/lib $LDFLAGS"
 
 	# See note above TERMUX_PKG_DEPENDS why we do not use a shared libuv.
-	./configure \
+	python configure.py \
 		--prefix=$TERMUX_PREFIX/$_INSTALL_PREFIX \
 		--dest-cpu=$DEST_CPU \
 		--dest-os=android \
