@@ -208,7 +208,7 @@ index e6556a7300..e8f9cb027d 100644
      "affiliation_backend.cc",
      "affiliation_backend.h",
 diff --git a/components/autofill/content/browser/BUILD.gn b/components/autofill/content/browser/BUILD.gn
-index e523618f2f..e0ae7fb051 100644
+index 903cad0821..e054941146 100644
 --- a/components/autofill/content/browser/BUILD.gn
 +++ b/components/autofill/content/browser/BUILD.gn
 @@ -2,13 +2,14 @@
@@ -1292,7 +1292,7 @@ index ad535382f8..12da9fed8c 100644
 +
 +#undef kIsDesktop
 diff --git a/components/omnibox/browser/autocomplete_result.cc b/components/omnibox/browser/autocomplete_result.cc
-index ca626875a2..5e77290aae 100644
+index d1026d8f7e..cc612f6940 100644
 --- a/components/omnibox/browser/autocomplete_result.cc
 +++ b/components/omnibox/browser/autocomplete_result.cc
 @@ -69,6 +69,9 @@ using metrics::OmniboxEventProto;
@@ -1305,7 +1305,7 @@ index ca626875a2..5e77290aae 100644
  namespace {
  
  constexpr bool is_android = !!BUILDFLAG(IS_ANDROID);
-@@ -1659,3 +1662,6 @@ std::ostream& operator<<(std::ostream& os, const AutocompleteResult& result) {
+@@ -1661,3 +1664,6 @@ std::ostream& operator<<(std::ostream& os, const AutocompleteResult& result) {
    os << "}" << std::endl;
    return os;
  }
@@ -1407,7 +1407,7 @@ index ee92615a2b..2f63f890e5 100644
      "bad_message.cc",
      "bad_message.h",
 diff --git a/components/password_manager/core/browser/BUILD.gn b/components/password_manager/core/browser/BUILD.gn
-index e874cba1f9..1c20851409 100644
+index 4d343194b0..8fefd65872 100644
 --- a/components/password_manager/core/browser/BUILD.gn
 +++ b/components/password_manager/core/browser/BUILD.gn
 @@ -4,6 +4,7 @@
@@ -1425,9 +1425,9 @@ index e874cba1f9..1c20851409 100644
 -static_library("browser") {
 +jumbo_static_library("browser") {
    sources = [
-     "browser_save_password_progress_logger.cc",
-     "browser_save_password_progress_logger.h",
-@@ -346,7 +347,7 @@ if (is_android) {
+     "browser_credential_manager_factory.cc",
+     "browser_credential_manager_factory.h",
+@@ -348,7 +349,7 @@ if (is_android) {
    }
  }
  
@@ -1436,7 +1436,7 @@ index e874cba1f9..1c20851409 100644
    sources = [
      "password_hash_data.cc",
      "password_hash_data.h",
-@@ -375,7 +376,7 @@ static_library("hash_password_manager") {
+@@ -377,7 +378,7 @@ static_library("hash_password_manager") {
    configs += [ "//build/config/compiler:wexit_time_destructors" ]
  }
  
