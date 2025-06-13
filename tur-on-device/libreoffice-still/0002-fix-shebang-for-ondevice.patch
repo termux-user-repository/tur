@@ -1,0 +1,23 @@
+From 72e2caaba9acf182f6e7807d06b3344a03c39845 Mon Sep 17 00:00:00 2001
+From: Ronald Y <knyipab@gmail.com>
+Date: Sun, 22 Sep 2024 09:24:40 +0800
+Subject: [PATCH 2/8] fix-shebang-for-ondevice
+
+Change-Id: I272c11cb236cfa7cac305b449cd64b82d7e8f0f2
+---
+ solenv/bin/install-gdb-printers | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/solenv/bin/install-gdb-printers b/solenv/bin/install-gdb-printers
+index 3eae4d9ef..2db5b9953 100755
+--- a/solenv/bin/install-gdb-printers
++++ b/solenv/bin/install-gdb-printers
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env bash
++#!/data/data/com.termux/files/usr/bin/env bash
+ #
+ # This file is part of the LibreOffice project.
+ #
+-- 
+2.46.1
+
