@@ -3,7 +3,7 @@
     "name": "termux-main",
     "distribution": "stable",
     "component": "main",
-    "url": "https://packages-cf.termux.dev/apt/termux-main"
+    "url": "https://mirrors.ustc.edu.cn/termux/apt/termux-main"
   },
   "tur": {
     "name": "tur",
@@ -39,12 +39,12 @@
     "name": "termux-root",
     "distribution": "root",
     "component": "stable",
-    "url": "https://packages-cf.termux.dev/apt/termux-root"
+    "url": "https://mirrors.ustc.edu.cn/termux/apt/termux-root"
   },
   "x11-packages": {
     "name": "termux-x11",
     "distribution": "x11",
     "component": "main",
-    "url": "https://packages-cf.termux.dev/apt/termux-x11"
+    "url": "https://mirrors.ustc.edu.cn/termux/apt/termux-x11"
   }
 }
