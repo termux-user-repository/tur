@@ -1,0 +1,12 @@
+https://github.com/chromium/chromium/commit/18681c656c989a954657a559b9c123f046b04250
+
+--- a/chrome/browser/resources/new_tab_page/BUILD.gn
++++ b/chrome/browser/resources/new_tab_page/BUILD.gn
+@@ -101,6 +101,7 @@
+     "//ui/webui/resources/cr_components/color_change_listener:build_ts",
+     "//ui/webui/resources/cr_components/customize_themes:build_ts",
+     "//ui/webui/resources/cr_components/help_bubble:build_ts",
++    "//ui/webui/resources/cr_components/history_clusters:build_ts",
+     "//ui/webui/resources/cr_components/most_visited:build_ts",
+     "//ui/webui/resources/cr_components/omnibox:build_ts",
+     "//ui/webui/resources/cr_components/page_image_service:build_ts",
