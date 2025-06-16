@@ -1436,7 +1436,7 @@ index dc98ce8281..def91dbc0b 100644
      ]
 +    jumbo_excluded_sources += [
 +      # invalid operands to binary expression ('x11::EventMask' and 'x11::EventMask')
-+      "ime_compat_check.cc",
++      "x/gtk_event_loop_x11.cc",
 +      "x/gtk_ui_platform_x11.cc",
 +    ]
      deps += [
