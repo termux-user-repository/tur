@@ -69,7 +69,7 @@ Enable jumbo build for the following component(s)/source_set(s):
  .../spare_render_process_host_manager_impl.cc |  14 +-
  .../cross_origin_opener_policy_reporter.cc    |   4 +
  .../dip/document_isolation_policy_reporter.cc |   4 +
- .../webid/federated_auth_request_impl.cc      |   4 +-
+ .../webid/federated_auth_request_impl.cc      |   4 +
  content/child/BUILD.gn                        |   5 +-
  content/common/BUILD.gn                       |   6 +-
  content/gpu/BUILD.gn                          |   5 +-
@@ -83,7 +83,7 @@ Enable jumbo build for the following component(s)/source_set(s):
  content/services/auction_worklet/BUILD.gn     |   7 +-
  content/test/BUILD.gn                         |   5 +-
  content/utility/BUILD.gn                      |   3 +-
- 64 files changed, 395 insertions(+), 197 deletions(-)
+ 64 files changed, 397 insertions(+), 195 deletions(-)
 
 diff --git a/content/browser/BUILD.gn b/content/browser/BUILD.gn
 index 933abcca12..a32e41518a 100644
@@ -911,7 +911,7 @@ index 094f65438e..3e8057ba79 100644
 +
 +#undef BrowserContextFromFrameTreeNodeId
 diff --git a/content/browser/preloading/prefetch/prefetch_url_loader_interceptor.cc b/content/browser/preloading/prefetch/prefetch_url_loader_interceptor.cc
-index dfc00646a0..2702020405 100644
+index 7b5682d768..67cb8fdebe 100644
 --- a/content/browser/preloading/prefetch/prefetch_url_loader_interceptor.cc
 +++ b/content/browser/preloading/prefetch/prefetch_url_loader_interceptor.cc
 @@ -28,6 +28,8 @@
@@ -923,7 +923,7 @@ index dfc00646a0..2702020405 100644
  namespace content {
  namespace {
  
-@@ -293,3 +295,5 @@ void PrefetchURLLoaderInterceptor::OnGetPrefetchComplete(
+@@ -304,3 +306,5 @@ void PrefetchURLLoaderInterceptor::OnGetPrefetchComplete(
  }
  
  }  // namespace content
@@ -1759,7 +1759,7 @@ index e6235611a2..8f2d10dc75 100644
        selection_controller_client_.get(), tsc_config);
  }
 diff --git a/content/browser/renderer_host/spare_render_process_host_manager_impl.cc b/content/browser/renderer_host/spare_render_process_host_manager_impl.cc
-index 0591c57616..579912fff1 100644
+index debe95af98..a614ed6c5f 100644
 --- a/content/browser/renderer_host/spare_render_process_host_manager_impl.cc
 +++ b/content/browser/renderer_host/spare_render_process_host_manager_impl.cc
 @@ -203,7 +203,7 @@ size_t GetSpareRPHCount() {
@@ -1771,7 +1771,7 @@ index 0591c57616..579912fff1 100644
  }
  
  void LogAllocationContext(const std::string& source_uma_name,
-@@ -704,17 +704,17 @@ void SpareRenderProcessHostManagerImpl::PrepareForFutureRequests(
+@@ -705,17 +705,17 @@ void SpareRenderProcessHostManagerImpl::PrepareForFutureRequests(
    if (RenderProcessHostImpl::IsSpareProcessKeptAtAllTimes()) {
      std::optional<base::TimeDelta> timeout = std::nullopt;
      if (base::FeatureList::IsEnabled(
@@ -1794,7 +1794,7 @@ index 0591c57616..579912fff1 100644
        }
      }
      // Always keep around a spare process for the most recently requested
-@@ -832,7 +832,7 @@ void SpareRenderProcessHostManagerImpl::RenderProcessReady(
+@@ -833,7 +833,7 @@ void SpareRenderProcessHostManagerImpl::RenderProcessReady(
    UMA_HISTOGRAM_TIMES("BrowserRenderProcessHost.SpareProcessStartupTime",
                        process_startup_timer_->Elapsed());
  
@@ -1842,27 +1842,24 @@ index 464954acf9..696389fd45 100644
 +
 +#undef kType
 diff --git a/content/browser/webid/federated_auth_request_impl.cc b/content/browser/webid/federated_auth_request_impl.cc
-index 5458912939..2dc75608cf 100644
+index 5458912939..4362cd0a6f 100644
 --- a/content/browser/webid/federated_auth_request_impl.cc
 +++ b/content/browser/webid/federated_auth_request_impl.cc
-@@ -122,7 +122,7 @@ std::string GetTopFrameOriginForDisplay(const url::Origin& top_frame_origin) {
-   return FormatOriginForDisplay(top_frame_origin);
+@@ -82,6 +82,8 @@ using CompleteRequestWithErrorCallback =
+                             std::optional<content::FedCmRequestIdTokenStatus>,
+                             bool)>;
+ 
++#define IsFrameActive IsFrameActive_FederatedAuthRequestImpl
++
+ namespace content {
+ 
+ namespace {
+@@ -2730,3 +2732,5 @@ RelyingPartyData FederatedAuthRequestImpl::CreateRpData() const {
  }
  
--bool IsFrameActive(RenderFrameHost* frame) {
-+bool IsFrameActive2(RenderFrameHost* frame) {
-   return frame && frame->IsActive();
- }
- 
-@@ -1097,7 +1097,7 @@ void FederatedAuthRequestImpl::MaybeShowAccountsDialog() {
-   // if the RenderFrameHost is hidden because the user does not seem interested
-   // in the contents of the current page.
-   if (idps_user_tried_to_signin_to_.empty()) {
--    bool is_active = IsFrameActive(render_frame_host().GetMainFrame());
-+    bool is_active = IsFrameActive2(render_frame_host().GetMainFrame());
-     fedcm_metrics_->RecordWebContentsStatusUponReadyToShowDialog(
-         IsFrameVisible(render_frame_host().GetMainFrame()), is_active);
- 
+ }  // namespace content
++
++#undef IsFrameActive
 diff --git a/content/child/BUILD.gn b/content/child/BUILD.gn
 index cecc5e382a..7ab8f08117 100644
 --- a/content/child/BUILD.gn

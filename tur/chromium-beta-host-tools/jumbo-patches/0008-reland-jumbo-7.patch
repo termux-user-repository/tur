@@ -81,14 +81,14 @@ Enable jumbo build for the following component(s)/source_set(s):
  ...iple_request_payments_network_interface_base.cc |  8 ++++++++
  .../payments/payments_network_interface_base.cc    |  8 ++++++++
  .../payments/payments_suggestion_generator.cc      |  6 ++++++
- .../core/browser/ui/autofill_resource_utils.cc     |  4 ++--
+ .../core/browser/ui/autofill_resource_utils.cc     |  4 ++++
  .../webdata/addresses/address_autofill_table.cc    | 14 ++++++++++++++
  .../addresses/autofill_profile_sync_util.cc        |  6 ++++++
  .../webdata/addresses/contact_info_sync_util.cc    |  6 ++++++
  .../webdata/autocomplete/autocomplete_table.cc     |  6 ++++++
  .../browser/webdata/autofill_ai/entity_table.cc    |  4 ++++
  .../webdata/autofill_sync_metadata_table.cc        |  6 ++++++
- .../webdata/valuables/valuable_sync_bridge.cc      |  4 ++--
+ .../webdata/valuables/valuable_sync_bridge.cc      |  4 ++++
  .../browser/webdata/valuables/valuables_table.cc   |  6 ++++++
  components/autofill/core/common/BUILD.gn           |  4 ++--
  components/cdm/browser/BUILD.gn                    |  5 +++--
@@ -137,7 +137,7 @@ Enable jumbo build for the following component(s)/source_set(s):
  .../decorators/page_live_state_decorator.cc        |  4 ++++
  .../decorators/page_load_tracker_decorator.cc      |  4 ++++
  .../decorators/process_priority_aggregator.cc      |  4 ++++
- .../decorators/site_data_recorder.cc               |  4 ++--
+ .../decorators/site_data_recorder.cc               |  4 ++++
  .../decorators/tab_page_decorator.cc               |  2 +-
  .../frame_audible_voter.cc                         |  6 ++++++
  .../frame_capturing_media_stream_voter.cc          |  6 ++++++
@@ -184,7 +184,7 @@ Enable jumbo build for the following component(s)/source_set(s):
  components/variations/variations_ids_provider.cc   |  4 ++++
  components/webauthn/content/browser/BUILD.gn       |  4 +++-
  components/wifi/BUILD.gn                           |  6 ++++--
- 113 files changed, 451 insertions(+), 103 deletions(-)
+ 113 files changed, 457 insertions(+), 97 deletions(-)
 
 diff --git a/components/affiliations/core/browser/BUILD.gn b/components/affiliations/core/browser/BUILD.gn
 index e6556a7300..e8f9cb027d 100644
@@ -422,27 +422,24 @@ index 7c3b745dbb..e0d25a19dc 100644
 +#undef CreateSeparator
 +#undef CreateUndoOrClearFormSuggestion
 diff --git a/components/autofill/core/browser/ui/autofill_resource_utils.cc b/components/autofill/core/browser/ui/autofill_resource_utils.cc
-index db548c5cac..60f0338adc 100644
+index db548c5cac..86ddfdc48b 100644
 --- a/components/autofill/core/browser/ui/autofill_resource_utils.cc
 +++ b/components/autofill/core/browser/ui/autofill_resource_utils.cc
-@@ -23,7 +23,7 @@ namespace {
- // Used in the IDS_ space as a placeholder for resources that don't exist.
- constexpr int kResourceNotFoundId = 0;
+@@ -16,6 +16,8 @@
+ #include "components/resources/android/theme_resources.h"
+ #endif  // BUILDFLAG(IS_ANDROID)
  
--bool ShouldUseNewFopDisplay() {
-+bool ShouldUseNewFopDisplay2() {
- #if BUILDFLAG(IS_IOS) || BUILDFLAG(IS_ANDROID)
-   return false;
- #else
-@@ -95,7 +95,7 @@ constexpr auto kDataResources = base::MakeFixedFlatMap<Suggestion::Icon, int>({
- }  // namespace
++#define ShouldUseNewFopDisplay ShouldUseNewFopDisplay_AutoFillResouceUtils
++
+ namespace autofill {
  
- int GetIconResourceID(Suggestion::Icon resource_name) {
--  if (ShouldUseNewFopDisplay()) {
-+  if (ShouldUseNewFopDisplay2()) {
-     auto it = kDataResources.find(resource_name);
-     return it == kDataResources.end() ? kResourceNotFoundId : it->second;
-   }
+ namespace {
+@@ -104,3 +106,5 @@ int GetIconResourceID(Suggestion::Icon resource_name) {
+ }
+ 
+ }  // namespace autofill
++
++#undef ShouldUseNewFopDisplay
 diff --git a/components/autofill/core/browser/webdata/addresses/address_autofill_table.cc b/components/autofill/core/browser/webdata/addresses/address_autofill_table.cc
 index ff5fd522ed..581aeb73cf 100644
 --- a/components/autofill/core/browser/webdata/addresses/address_autofill_table.cc
@@ -576,27 +573,24 @@ index 0e5e713651..2b226ef7b0 100644
 +#undef kValue
 +#undef GetKey
 diff --git a/components/autofill/core/browser/webdata/valuables/valuable_sync_bridge.cc b/components/autofill/core/browser/webdata/valuables/valuable_sync_bridge.cc
-index 715acb8a3c..81cb32b93f 100644
+index 715acb8a3c..22af907f1b 100644
 --- a/components/autofill/core/browser/webdata/valuables/valuable_sync_bridge.cc
 +++ b/components/autofill/core/browser/webdata/valuables/valuable_sync_bridge.cc
-@@ -28,7 +28,7 @@ namespace {
- static const int kAutofillValuableSyncBridgeUserDataKey = 0;
+@@ -21,6 +21,8 @@
+ #include "components/sync/protocol/entity_data.h"
+ #include "components/webdata/common/web_database.h"
  
- template <class Item>
--bool AreAnyItemsDifferent(const std::vector<Item>& old_data,
-+bool AreAnyItemsDifferent2(const std::vector<Item>& old_data,
-                           const std::vector<Item>& new_data) {
-   if (old_data.size() != new_data.size()) {
-     return true;
-@@ -272,7 +272,7 @@ std::optional<syncer::ModelError> ValuableSyncBridge::SetSyncData(
-     }
-   }
++#define AreAnyItemsDifferent AreAnyItemsDifferent_ValuableSyncBridge
++
+ namespace autofill {
+ namespace {
  
--  const bool valuables_data_changed = AreAnyItemsDifferent(
-+  const bool valuables_data_changed = AreAnyItemsDifferent2(
-       GetValuablesTable()->GetLoyaltyCards(), loyalty_cards);
+@@ -298,3 +300,5 @@ ValuablesTable* ValuableSyncBridge::GetValuablesTable() {
+ }
  
-   if (valuables_data_changed &&
+ }  // namespace autofill
++
++#undef AreAnyItemsDifferent
 diff --git a/components/autofill/core/browser/webdata/valuables/valuables_table.cc b/components/autofill/core/browser/webdata/valuables/valuables_table.cc
 index 981b6e83af..db7d6060c9 100644
 --- a/components/autofill/core/browser/webdata/valuables/valuables_table.cc
@@ -1736,27 +1730,24 @@ index 7cac469094..215802e16f 100644
 +
 +#undef kDescriberName
 diff --git a/components/performance_manager/decorators/site_data_recorder.cc b/components/performance_manager/decorators/site_data_recorder.cc
-index 64ae5fb9ca..a95fe6dd6a 100644
+index 64ae5fb9ca..2c67830b0e 100644
 --- a/components/performance_manager/decorators/site_data_recorder.cc
 +++ b/components/performance_manager/decorators/site_data_recorder.cc
-@@ -42,7 +42,7 @@ constexpr base::TimeDelta kFeatureUsagePostBackgroundGracePeriod =
+@@ -23,6 +23,8 @@
+ #include "components/performance_manager/public/graph/graph.h"
+ #include "components/performance_manager/public/persistence/site_data/site_data_reader.h"
  
- SiteDataRecorder* g_site_data_recorder = nullptr;
++#define GetPageNodeVisibility GetPageNodeVisibility_SiteDataRecorder
++
+ namespace performance_manager {
  
--TabVisibility GetPageNodeVisibility(const PageNode* page_node) {
-+TabVisibility GetPageNodeVisibility2(const PageNode* page_node) {
-   return page_node->IsVisible() ? TabVisibility::kForeground
-                                 : TabVisibility::kBackground;
- }
-@@ -300,7 +300,7 @@ bool SiteDataRecorderHeuristics::DefaultIsLoadedIdle(
- // static
- bool SiteDataRecorderHeuristics::DefaultIsInBackground(
-     const PageNode* page_node) {
--  return GetPageNodeVisibility(page_node) != TabVisibility::kForeground;
-+  return GetPageNodeVisibility2(page_node) != TabVisibility::kForeground;
+ namespace {
+@@ -356,3 +358,5 @@ void WaitForSiteDataReader(
  }
  
- // static
+ }  // namespace performance_manager
++
++#undef GetPageNodeVisibility
 diff --git a/components/performance_manager/decorators/tab_page_decorator.cc b/components/performance_manager/decorators/tab_page_decorator.cc
 index 9b3d86f632..302b02cde7 100644
 --- a/components/performance_manager/decorators/tab_page_decorator.cc

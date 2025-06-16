@@ -63,7 +63,7 @@ termux_step_configure() {
 	ln -s $_host_pkg_config $TERMUX_PKG_CACHEDIR/host-pkg-config-bin/pkg-config
 	export PATH="$TERMUX_PKG_CACHEDIR/host-pkg-config-bin:$PATH"
 
-	# Install amd64 rootfs and deps
+	# Install amd64 rootfs
 	build/linux/sysroot_scripts/install-sysroot.py --arch=amd64
 	local _amd64_sysroot_path="$(pwd)/build/linux/$(ls build/linux | grep 'amd64-sysroot')"
 
@@ -137,7 +137,7 @@ termux_step_configure() {
 		_v8_sysroot_path="$_amd64_sysroot_path"
 		_v8_toolchain_name="host"
 	elif [ "$TERMUX_ARCH" = "arm" ]; then
-		# Install i386 rootfs and deps
+		# Install i386 rootfs
 		build/linux/sysroot_scripts/install-sysroot.py --arch=i386
 		local _i386_sysroot_path="$(pwd)/build/linux/$(ls build/linux | grep 'i386-sysroot')"
 		_target_cpu="arm"

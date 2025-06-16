@@ -67,7 +67,7 @@ Enable jumbo build for the following template(s):
  .../enterprise_warn_controller_client.cc      |  4 ++
  .../reporting/crash_reporting_context.cc      |  4 ++
  .../extension_install_event_router.cc         |  4 ++
- .../reporting/telomere_reporting_context.cc   | 14 +++----
+ .../reporting/telomere_reporting_context.cc   | 10 ++++-
  .../reporting/telomere_reporting_context.h    |  2 +-
  .../identifiers/profile_id_service_factory.h  |  2 +-
  chrome/browser/extensions/BUILD.gn            |  8 +++-
@@ -94,7 +94,7 @@ Enable jumbo build for the following template(s):
  .../providers/cast/mirroring_activity.cc      |  4 ++
  .../dial/dial_media_route_provider.cc         |  4 ++
  chrome/browser/media/webrtc/BUILD.gn          |  3 +-
- .../media/webrtc/tab_desktop_media_list.cc    |  4 +-
+ .../media/webrtc/tab_desktop_media_list.cc    |  4 ++
  .../metrics/tab_stats/tab_stats_tracker.cc    |  2 +-
  .../modules/file_suggestion/drive_service.cc  |  6 +++
  .../calendar/google_calendar_page_handler.cc  |  6 +++
@@ -102,7 +102,7 @@ Enable jumbo build for the following template(s):
  .../gws_hp_page_load_metrics_observer.cc      |  2 +
  ...th_predictor_page_load_metrics_observer.cc |  5 +++
  ..._deprecation_page_load_metrics_observer.cc |  4 ++
- .../password_change_submission_verifier.cc    |  4 +-
+ .../password_change_submission_verifier.cc    |  4 ++
  .../metrics/metrics_provider_common.cc        |  2 +-
  .../policies/background_tab_loading_policy.cc |  4 ++
  .../policies/working_set_trimmer_policy.cc    |  4 ++
@@ -111,7 +111,7 @@ Enable jumbo build for the following template(s):
  .../user_fm_registration_token_uploader.cc    |  4 ++
  .../lcp_critical_path_predictor_util.cc       |  4 ++
  .../prewarm_http_disk_cache_manager.cc        |  4 ++
- .../push_messaging_unsubscribed_entry.cc      | 12 +++---
+ .../push_messaging_unsubscribed_entry.cc      |  6 +++
  chrome/browser/safe_browsing/BUILD.gn         |  3 +-
  .../multipart_uploader.cc                     |  8 ++++
  .../cookies_get_signal_processor.cc           |  4 ++
@@ -209,7 +209,7 @@ Enable jumbo build for the following template(s):
  chrome/utility/BUILD.gn                       |  3 +-
  .../inspector_protocol/crdtp/protocol_core.h  |  2 +-
  .../json_schema_compiler/json_schema_api.gni  | 10 ++++-
- 166 files changed, 711 insertions(+), 68 deletions(-)
+ 166 files changed, 716 insertions(+), 53 deletions(-)
 
 diff --git a/chrome/browser/BUILD.gn b/chrome/browser/BUILD.gn
 index efb9b948ac..91bd50b85d 100644
@@ -723,36 +723,29 @@ index dac22e5538..37a506b258 100644
 +
 +#undef kKeyVersion
 diff --git a/chrome/browser/enterprise/connectors/reporting/telomere_reporting_context.cc b/chrome/browser/enterprise/connectors/reporting/telomere_reporting_context.cc
-index 91e05b5395..b2584f3496 100644
+index 91e05b5395..3f93c2b881 100644
 --- a/chrome/browser/enterprise/connectors/reporting/telomere_reporting_context.cc
 +++ b/chrome/browser/enterprise/connectors/reporting/telomere_reporting_context.cc
-@@ -31,12 +31,12 @@ constexpr char kTelomerePollingIntervalFlag[] = "telomere-polling-interval";
- constexpr char kTelomereLogsPathFlag[] = "telomere-logs-path";
- constexpr int kDefaultTelomerePollingIntervalSeconds = 1;
+@@ -23,6 +23,9 @@
+ #include "components/prefs/pref_service.h"
+ #include "components/version_info/version_info.h"
  
--policy::ChromeBrowserCloudManagementController* GetCBCMController() {
-+policy::ChromeBrowserCloudManagementController* GetCBCMController2() {
-   return g_browser_process->browser_policy_connector()
-       ->chrome_browser_cloud_management_controller();
- }
++#define GetCBCMController       GetCBCMController_TelomereReportingContext
++#define GetNewReports           GetNewReports_TelomereReportingContext
++
+ namespace enterprise_connectors {
  
--std::vector<std::pair<std::string, time_t>> GetNewReports(
-+std::vector<std::pair<std::string, time_t>> GetNewReports2(
-     time_t latest_creation_time) {
-   base::CommandLine* cmd = base::CommandLine::ForCurrentProcess();
-   base::FilePath::StringType sysmon_logs_path =
-@@ -68,8 +68,8 @@ void ReportTelomereLogs() {
-       GetLatestTelomereReportTime(g_browser_process->local_state());
+ namespace {
+@@ -69,7 +72,7 @@ void ReportTelomereLogs() {
    base::ThreadPool::PostTaskAndReplyWithResult(
        FROM_HERE, {base::MayBlock()},
--      base::BindOnce(&GetNewReports, latest_creation_time),
+       base::BindOnce(&GetNewReports, latest_creation_time),
 -      base::BindOnce(&UploadToReportingServer,
-+      base::BindOnce(&GetNewReports2, latest_creation_time),
 +      base::BindOnce(&UploadToReportingServer2,
                       reporting_client->AsWeakPtrImpl(),
                       g_browser_process->local_state()));
  }
-@@ -136,7 +136,7 @@ void SetLatestTelomereReportTime(PrefService* local_state, time_t timestamp) {
+@@ -136,7 +139,7 @@ void SetLatestTelomereReportTime(PrefService* local_state, time_t timestamp) {
    local_state->SetInt64(kLatestTelomereReportCreationTime, timestamp);
  }
  
@@ -761,24 +754,13 @@ index 91e05b5395..b2584f3496 100644
      base::WeakPtr<RealtimeReportingClient> reporting_client,
      PrefService* local_state,
      std::vector<std::pair<std::string, time_t>> reports) {
-@@ -160,7 +160,7 @@ void UploadToReportingServer(
- }
+@@ -230,3 +233,6 @@ void TelomereReportingContext::RemoveProfile(TelomereEventRouter* router) {
+ TelomereReportingContext::~TelomereReportingContext() = default;
  
- TelomereReportingContext::TelomereReportingContext() {
--  GetCBCMController()->AddObserver(this);
-+  GetCBCMController2()->AddObserver(this);
- }
- 
- void TelomereReportingContext::AddProfile(TelomereEventRouter* router,
-@@ -216,7 +216,7 @@ void TelomereReportingContext::OnCloudReportingLaunched(
- }
- 
- void TelomereReportingContext::OnShutdown() {
--  GetCBCMController()->RemoveObserver(this);
-+  GetCBCMController2()->RemoveObserver(this);
- }
- 
- void TelomereReportingContext::RemoveProfile(TelomereEventRouter* router) {
+ }  // namespace enterprise_connectors
++
++#undef GetCBCMController
++#undef GetNewReports
 diff --git a/chrome/browser/enterprise/connectors/reporting/telomere_reporting_context.h b/chrome/browser/enterprise/connectors/reporting/telomere_reporting_context.h
 index a1c9bd816d..5f6ef60efc 100644
 --- a/chrome/browser/enterprise/connectors/reporting/telomere_reporting_context.h
@@ -1284,27 +1266,24 @@ index b287f2b977..1daddc979e 100644
      "audio_debug_recordings_handler.cc",
      "audio_debug_recordings_handler.h",
 diff --git a/chrome/browser/media/webrtc/tab_desktop_media_list.cc b/chrome/browser/media/webrtc/tab_desktop_media_list.cc
-index fa393d8461..64c2e67d39 100644
+index fa393d8461..ca74e8e060 100644
 --- a/chrome/browser/media/webrtc/tab_desktop_media_list.cc
 +++ b/chrome/browser/media/webrtc/tab_desktop_media_list.cc
-@@ -75,7 +75,7 @@ gfx::ImageSkia CreateEnclosedFaviconImage(gfx::Size size,
- // Update the list once per second.
- const int kDefaultTabDesktopMediaListUpdatePeriod = 1000;
+@@ -42,6 +42,8 @@ using content::BrowserThread;
+ using content::DesktopMediaID;
+ using content::WebContents;
  
--void HandleCapturedBitmap(
-+void HandleCapturedBitmap2(
-     base::OnceCallback<void(uint32_t, const gfx::ImageSkia&)> reply,
-     std::optional<uint32_t> last_hash,
-     const SkBitmap& bitmap) {
-@@ -327,7 +327,7 @@ void TabDesktopMediaList::ScreenshotReceived(
-                               weak_factory_.GetWeakPtr(), id,
-                               std::move(refresh_completer));
-   image_resize_task_runner_.get()->PostTask(
--      FROM_HERE, base::BindOnce(&HandleCapturedBitmap, std::move(reply),
-+      FROM_HERE, base::BindOnce(&HandleCapturedBitmap2, std::move(reply),
-                                 last_hash_, bitmap));
++#define HandleCapturedBitmap HandleCapturedBitmap_TabDesktopMediaList
++
+ namespace {
+ 
+ gfx::ImageSkia CreateEnclosedFaviconImage(gfx::Size size,
+@@ -393,3 +395,5 @@ TabDesktopMediaList::RefreshCompleter::~RefreshCompleter() {
+     list_->CompleteRefreshAfterThumbnailProcessing();
+   }
  }
- 
++
++#undef HandleCapturedBitmap
 diff --git a/chrome/browser/metrics/tab_stats/tab_stats_tracker.cc b/chrome/browser/metrics/tab_stats/tab_stats_tracker.cc
 index d2f7e955e9..e840cdb641 100644
 --- a/chrome/browser/metrics/tab_stats/tab_stats_tracker.cc
@@ -1426,27 +1405,24 @@ index 528272b33b..829f11034b 100644
 +
 +#undef IsSameSite
 diff --git a/chrome/browser/password_manager/password_change/password_change_submission_verifier.cc b/chrome/browser/password_manager/password_change/password_change_submission_verifier.cc
-index fd0b92ac31..7339e612bf 100644
+index fd0b92ac31..338104be9f 100644
 --- a/chrome/browser/password_manager/password_change/password_change_submission_verifier.cc
 +++ b/chrome/browser/password_manager/password_change/password_change_submission_verifier.cc
-@@ -104,7 +104,7 @@ void RecordOutcomeMetrics(
-   }
+@@ -26,6 +26,8 @@
+ #include "third_party/abseil-cpp/absl/cleanup/cleanup.h"
+ #include "ui/accessibility/ax_tree_update.h"
+ 
++#define GetAIPageContentOptions GetAIPageContentOptions_PasswordChangeSubmissionVerifier
++
+ namespace {
+ 
+ using PasswordChangeOutcome = optimization_guide::proto ::
+@@ -256,3 +258,5 @@ void PasswordChangeSubmissionVerifier::OnExecutionResponseCallback(
+   // Password change was successfully completed.
+   std::move(callback_).Run(true);
  }
- 
--blink::mojom::AIPageContentOptionsPtr GetAIPageContentOptions() {
-+blink::mojom::AIPageContentOptionsPtr GetAIPageContentOptions2() {
-   auto options = blink::mojom::AIPageContentOptions::New();
-   // WebContents where password change is happening is hidden, and renderer
-   // won't capture a snapshot unless it becomes visible again or
-@@ -122,7 +122,7 @@ PasswordChangeSubmissionVerifier::PasswordChangeSubmissionVerifier(
-       capture_annotated_page_content_(
-           base::BindOnce(&optimization_guide::GetAIPageContent,
-                          web_contents,
--                         GetAIPageContentOptions())),
-+                         GetAIPageContentOptions2())),
-       logs_uploader_(logs_uploader) {}
- 
- PasswordChangeSubmissionVerifier::~PasswordChangeSubmissionVerifier() = default;
++
++#undef GetAIPageContentOptions
 diff --git a/chrome/browser/performance_manager/metrics/metrics_provider_common.cc b/chrome/browser/performance_manager/metrics/metrics_provider_common.cc
 index 442aaf8698..bf4ab54dba 100644
 --- a/chrome/browser/performance_manager/metrics/metrics_provider_common.cc
@@ -1607,51 +1583,26 @@ index a4d4119b82..ae8aa9a2c3 100644
 +
 +#undef IsSameSite
 diff --git a/chrome/browser/push_messaging/push_messaging_unsubscribed_entry.cc b/chrome/browser/push_messaging/push_messaging_unsubscribed_entry.cc
-index 4a85002201..7651f0a582 100644
+index 4a85002201..6d5dc1e6c7 100644
 --- a/chrome/browser/push_messaging/push_messaging_unsubscribed_entry.cc
 +++ b/chrome/browser/push_messaging/push_messaging_unsubscribed_entry.cc
-@@ -23,19 +23,19 @@
+@@ -20,6 +20,9 @@
+ #include "components/prefs/pref_service.h"
+ #include "components/prefs/scoped_user_pref_update.h"
+ 
++#define kPrefValueSeparator kPrefValueSeparator_PushMessagingUnsubscribedEntry
++#define MakePrefValue       MakePrefValue_PushMessagingUnsubscribedEntry
++
  namespace {
  
  // Ok to use '#' as separator since only the origin of the url is used.
--constexpr char kPrefValueSeparator = '#';
-+constexpr char kPrefValueSeparator2 = '#';
- 
--std::string MakePrefValue(const GURL& origin,
-+std::string MakePrefValue2(const GURL& origin,
-                           int64_t service_worker_registration_id) {
-   CHECK(!origin.has_ref());
--  return origin.spec() + kPrefValueSeparator +
-+  return origin.spec() + kPrefValueSeparator2 +
-          base::NumberToString(service_worker_registration_id);
+@@ -132,3 +135,6 @@ void PushMessagingUnsubscribedEntry::DCheckValid() const {
+   DCHECK_EQ(origin_.DeprecatedGetOriginAsURL(), origin_);
+ #endif  // DCHECK_IS_ON()
  }
- 
- std::optional<PushMessagingUnsubscribedEntry> DisassemblePrefValue(
-     std::string_view pref_value) {
-   std::vector<std::string_view> parts =
--      base::SplitStringPiece(pref_value, std::string(1, kPrefValueSeparator),
-+      base::SplitStringPiece(pref_value, std::string(1, kPrefValueSeparator2),
-                              base::TRIM_WHITESPACE, base::SPLIT_WANT_ALL);
- 
-   if (parts.size() < 2) {
-@@ -104,7 +104,7 @@ void PushMessagingUnsubscribedEntry::PersistToPrefs(Profile* profile) const {
-   base::Value::List& list = update.Get();
- 
-   std::string pref_value =
--      MakePrefValue(origin_, service_worker_registration_id_);
-+      MakePrefValue2(origin_, service_worker_registration_id_);
-   // Delete any stale entry with the same origin and Service Worker.
-   list.EraseIf([&pref_value](const base::Value& entry) {
-     return !entry.is_string() || entry.GetString() == pref_value;
-@@ -118,7 +118,7 @@ void PushMessagingUnsubscribedEntry::DeleteFromPrefs(Profile* profile) const {
-                               prefs::kPushMessagingUnsubscribedEntriesList);
-   base::Value::List& list = update.Get();
-   std::string pref_value =
--      MakePrefValue(origin_, service_worker_registration_id_);
-+      MakePrefValue2(origin_, service_worker_registration_id_);
-   list.EraseIf([&pref_value](const base::Value& entry) {
-     return !entry.is_string() || entry.GetString() == pref_value;
-   });
++
++#undef kPrefValueSeparator
++#undef MakePrefValue
 diff --git a/chrome/browser/safe_browsing/BUILD.gn b/chrome/browser/safe_browsing/BUILD.gn
 index d92165e685..76c9516867 100644
 --- a/chrome/browser/safe_browsing/BUILD.gn

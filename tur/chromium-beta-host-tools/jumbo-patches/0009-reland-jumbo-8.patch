@@ -135,7 +135,7 @@ Enable jumbo build for the following component(s)/source_set(s):
  ui/gl/BUILD.gn                                    | 15 ++++++++++++---
  ui/gl/gl_display_egl_util.cc                      |  4 ++++
  ui/gl/init/BUILD.gn                               |  3 ++-
- ui/gtk/BUILD.gn                                   |  9 +++++++--
+ ui/gtk/BUILD.gn                                   | 10 ++++++++--
  ui/gtk/ime_compat_check.cc                        |  6 ++++++
  ui/latency/BUILD.gn                               |  5 +++--
  ui/message_center/BUILD.gn                        |  3 ++-
@@ -161,7 +161,7 @@ Enable jumbo build for the following component(s)/source_set(s):
  ui/web_dialogs/BUILD.gn                           |  6 ++++--
  ui/wm/BUILD.gn                                    |  5 +++--
  ui/wm/public/BUILD.gn                             |  3 ++-
- 76 files changed, 282 insertions(+), 107 deletions(-)
+ 76 files changed, 283 insertions(+), 107 deletions(-)
 
 diff --git a/ui/accessibility/BUILD.gn b/ui/accessibility/BUILD.gn
 index c32f5a6380..99788856e9 100644
@@ -1399,7 +1399,7 @@ index 8ecd6bdc7e..377240cc6d 100644
  
    public = [
 diff --git a/ui/gtk/BUILD.gn b/ui/gtk/BUILD.gn
-index dc98ce8281..b08e23a566 100644
+index dc98ce8281..def91dbc0b 100644
 --- a/ui/gtk/BUILD.gn
 +++ b/ui/gtk/BUILD.gn
 @@ -3,6 +3,7 @@
@@ -1430,12 +1430,13 @@ index dc98ce8281..b08e23a566 100644
    defines = [ "IS_GTK_IMPL" ]
    configs += [
      "//build/config/linux/pangocairo",
-@@ -159,6 +160,10 @@ component("gtk") {
+@@ -159,6 +160,11 @@ component("gtk") {
        "x/gtk_ui_platform_x11.cc",
        "x/gtk_ui_platform_x11.h",
      ]
 +    jumbo_excluded_sources += [
 +      # invalid operands to binary expression ('x11::EventMask' and 'x11::EventMask')
++      "ime_compat_check.cc",
 +      "x/gtk_ui_platform_x11.cc",
 +    ]
      deps += [

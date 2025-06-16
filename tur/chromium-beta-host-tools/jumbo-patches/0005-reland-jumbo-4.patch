@@ -23,9 +23,8 @@ Enable jumbo build for the following template(s):
  v8/src/heap/code-range.cc                     |  14 +--
  v8/src/heap/cppgc/concurrent-marker.cc        |   4 +
  v8/src/heap/cppgc/marker.cc                   |   4 +
- v8/src/heap/minor-mark-sweep.cc               |   6 +-
+ v8/src/heap/minor-mark-sweep.cc               |   4 +
  v8/src/inspector/BUILD.gn                     |   1 +
- v8/src/inspector/value-mirror.cc              |  10 +-
  .../default-thread-isolated-allocator.cc      |   2 +
  v8/src/maglev/arm/maglev-ir-arm.cc            |   2 +
  v8/src/maglev/maglev-assembler-inl.h          |   4 +-
@@ -38,14 +37,14 @@ Enable jumbo build for the following template(s):
  v8/src/objects/js-list-format.cc              |   4 +-
  v8/src/objects/js-plural-rules.cc             |   4 +
  .../experimental/experimental-compiler.cc     |   4 +-
- v8/src/regexp/regexp-compiler-tonode.cc       |  16 +--
+ v8/src/regexp/regexp-compiler-tonode.cc       |   4 +
  v8/src/sandbox/testing.cc                     |   1 +
- v8/src/snapshot/read-only-deserializer.cc     |   4 +-
- v8/src/torque/csa-generator.cc                |   8 +-
+ v8/src/snapshot/read-only-deserializer.cc     |   4 +
+ v8/src/torque/csa-generator.cc                |   4 +
  v8/src/utils/sha-256.cc                       |   3 +
  v8/src/wasm/wasm-external-refs.cc             |   3 +
  v8/src/wasm/wrappers.cc                       |   2 +
- 36 files changed, 216 insertions(+), 56 deletions(-)
+ 35 files changed, 210 insertions(+), 34 deletions(-)
 
 diff --git a/v8/BUILD.gn b/v8/BUILD.gn
 index f2f72a02c6..4045513c07 100644
@@ -592,36 +591,27 @@ index a4ac8b6e8a..d582998d71 100644
 +
 +#undef kDefaultDeadlineCheckInterval
 diff --git a/v8/src/heap/minor-mark-sweep.cc b/v8/src/heap/minor-mark-sweep.cc
-index 2930486325..74d60c485a 100644
+index 2930486325..34b44eb912 100644
 --- a/v8/src/heap/minor-mark-sweep.cc
 +++ b/v8/src/heap/minor-mark-sweep.cc
-@@ -865,7 +865,7 @@ namespace {
+@@ -861,6 +861,8 @@ void MinorMarkSweepCollector::TraceFragmentation() {
+                free_bytes_of_class[3]);
+ }
+ 
++#define NewSpacePageEvacuationThreshold NewSpacePageEvacuationThreshold_MinorMarkSweep
++
+ namespace {
  
  // NewSpacePages with more live bytes than this threshold qualify for fast
- // evacuation.
--intptr_t NewSpacePageEvacuationThreshold() {
-+intptr_t NewSpacePageEvacuationThreshold2() {
-   return v8_flags.minor_ms_page_promotion_threshold *
-          MemoryChunkLayout::AllocatableMemoryInDataPage() / 100;
- }
-@@ -877,7 +877,7 @@ bool ShouldMovePage(PageMetadata* p, intptr_t live_bytes,
-   Heap* heap = p->heap();
-   DCHECK(!p->Chunk()->NeverEvacuate());
-   const bool should_move_page =
--      ((live_bytes + wasted_bytes) > NewSpacePageEvacuationThreshold() ||
-+      ((live_bytes + wasted_bytes) > NewSpacePageEvacuationThreshold2() ||
-        (p->AllocatedLabSize() == 0)) &&
-       (heap->new_space()->IsPromotionCandidate(p)) &&
-       heap->CanExpandOldGeneration(live_bytes);
-@@ -888,7 +888,7 @@ bool ShouldMovePage(PageMetadata* p, intptr_t live_bytes,
-         ", live bytes = %zu, wasted bytes = %zu, promotion threshold = %zu"
-         ", allocated labs size = %zu\n",
-         p, should_move_page, live_bytes, wasted_bytes,
--        NewSpacePageEvacuationThreshold(), p->AllocatedLabSize());
-+        NewSpacePageEvacuationThreshold2(), p->AllocatedLabSize());
-   }
-   if (!should_move_page &&
-       (p->AgeInNewSpace() == v8_flags.minor_ms_max_page_age)) {
+@@ -902,6 +904,8 @@ bool ShouldMovePage(PageMetadata* p, intptr_t live_bytes,
+ 
+ }  // namespace
+ 
++#undef NewSpacePageEvacuationThreshold
++
+ void MinorMarkSweepCollector::EvacuateExternalPointerReferences(
+     MutablePageMetadata* p) {
+ #ifdef V8_COMPRESS_POINTERS
 diff --git a/v8/src/inspector/BUILD.gn b/v8/src/inspector/BUILD.gn
 index 9a86323237..422ea6032d 100644
 --- a/v8/src/inspector/BUILD.gn
@@ -634,55 +624,6 @@ index 9a86323237..422ea6032d 100644
  }
  
  #Target to generate all .cc files.
-diff --git a/v8/src/inspector/value-mirror.cc b/v8/src/inspector/value-mirror.cc
-index de7284afa7..33b2599f9f 100644
---- a/v8/src/inspector/value-mirror.cc
-+++ b/v8/src/inspector/value-mirror.cc
-@@ -201,7 +201,7 @@ String16 abbreviateString(const String16& value, AbbreviateMode mode) {
-   return String16::concat(value.substring(0, maxLength - 1), ellipsis);
- }
- 
--String16 descriptionForSymbol(v8::Local<v8::Context> context,
-+String16 descriptionForSymbol2(v8::Local<v8::Context> context,
-                               v8::Local<v8::Symbol> symbol) {
-   v8::Isolate* isolate = v8::Isolate::GetCurrent();
-   return String16::concat(
-@@ -757,7 +757,7 @@ class SymbolMirror final : public ValueMirrorBase {
-         v8Value(v8::Isolate::GetCurrent()).As<v8::Symbol>();
-     *result = RemoteObject::create()
-                   .setType(RemoteObject::TypeEnum::Symbol)
--                  .setDescription(descriptionForSymbol(context, value))
-+                  .setDescription(descriptionForSymbol2(context, value))
-                   .build();
-     return Response::Success();
-   }
-@@ -772,7 +772,7 @@ class SymbolMirror final : public ValueMirrorBase {
-                    .setName(name)
-                    .setType(RemoteObject::TypeEnum::Symbol)
-                    .setValue(abbreviateString(
--                       descriptionForSymbol(context, value), kEnd))
-+                       descriptionForSymbol2(context, value), kEnd))
-                    .build();
-   }
- 
-@@ -784,7 +784,7 @@ class SymbolMirror final : public ValueMirrorBase {
-     *preview =
-         ObjectPreview::create()
-             .setType(RemoteObject::TypeEnum::Symbol)
--            .setDescription(descriptionForSymbol(context, value))
-+            .setDescription(descriptionForSymbol2(context, value))
-             .setOverflow(false)
-             .setProperties(std::make_unique<protocol::Array<PropertyPreview>>())
-             .build();
-@@ -1577,7 +1577,7 @@ bool ValueMirror::getProperties(v8::Local<v8::Context> context,
-       name = toProtocolString(isolate, v8Name.As<v8::String>());
-     } else {
-       v8::Local<v8::Symbol> symbol = v8Name.As<v8::Symbol>();
--      name = descriptionForSymbol(context, symbol);
-+      name = descriptionForSymbol2(context, symbol);
-       symbolMirror = ValueMirror::create(context, symbol);
-     }
- 
 diff --git a/v8/src/libplatform/default-thread-isolated-allocator.cc b/v8/src/libplatform/default-thread-isolated-allocator.cc
 index bda0e43cef..36a365b257 100644
 --- a/v8/src/libplatform/default-thread-isolated-allocator.cc
@@ -907,74 +848,24 @@ index 7bee9f1179..391dac8cad 100644
  
  }  // namespace internal
 diff --git a/v8/src/regexp/regexp-compiler-tonode.cc b/v8/src/regexp/regexp-compiler-tonode.cc
-index d021885646..a96a7f7899 100644
+index d021885646..f777324990 100644
 --- a/v8/src/regexp/regexp-compiler-tonode.cc
 +++ b/v8/src/regexp/regexp-compiler-tonode.cc
-@@ -23,7 +23,7 @@ namespace internal {
+@@ -18,6 +18,8 @@
+ #include "unicode/utypes.h"
+ #endif  // V8_INTL_SUPPORT
  
- using namespace regexp_compiler_constants;  // NOLINT(build/namespaces)
++#define kMaxCodePoint kMaxCodePoint_RegExpCompilerToNode
++
+ namespace v8 {
+ namespace internal {
  
--constexpr base::uc32 kMaxCodePoint = 0x10ffff;
-+constexpr base::uc32 kMaxCodePoint2 = 0x10ffff;
- constexpr int kMaxUtf16CodeUnit = 0xffff;
- constexpr uint32_t kMaxUtf16CodeUnitU = 0xffff;
+@@ -2071,3 +2073,5 @@ RegExpNode* RegExpQuantifier::ToNode(int min, int max, bool is_greedy,
  
-@@ -71,7 +71,7 @@ bool CompareInverseRanges(ZoneList<CharacterRange>* ranges,
-     }
-   }
- 
--  return range.to() == kMaxCodePoint;
-+  return range.to() == kMaxCodePoint2;
- }
- 
- bool CompareRanges(ZoneList<CharacterRange>* ranges, const int* special_class,
-@@ -480,7 +480,7 @@ RegExpNode* RegExpClassRanges::ToNode(RegExpCompiler* compiler,
-     // internally created for an empty set.
-     DCHECK_IMPLIES(
-         IsUnicodeSets(compiler->flags()),
--        ranges->length() == 1 && ranges->first().IsEverything(kMaxCodePoint));
-+        ranges->length() == 1 && ranges->first().IsEverything(kMaxCodePoint2));
-     ZoneList<CharacterRange>* negated =
-         zone->New<ZoneList<CharacterRange>>(2, zone);
-     CharacterRange::Negate(ranges, negated, zone);
-@@ -1377,7 +1377,7 @@ void AddClassNegated(const int* elmv, int elmc,
-   elmc--;
-   DCHECK_EQ(kRangeEndMarker, elmv[elmc]);
-   DCHECK_NE(0x0000, elmv[0]);
--  DCHECK_NE(kMaxCodePoint, elmv[elmc - 1]);
-+  DCHECK_NE(kMaxCodePoint2, elmv[elmc - 1]);
-   base::uc16 last = 0x0000;
-   for (int i = 0; i < elmc; i += 2) {
-     DCHECK(last <= elmv[i] - 1);
-@@ -1385,7 +1385,7 @@ void AddClassNegated(const int* elmv, int elmc,
-     ranges->Add(CharacterRange::Range(last, elmv[i] - 1), zone);
-     last = elmv[i + 1];
-   }
--  ranges->Add(CharacterRange::Range(last, kMaxCodePoint), zone);
-+  ranges->Add(CharacterRange::Range(last, kMaxCodePoint2), zone);
- }
- 
- }  // namespace
-@@ -1730,8 +1730,8 @@ void CharacterRange::Negate(const ZoneList<CharacterRange>* ranges,
-     from = range.to() + 1;
-     i++;
-   }
--  if (from < kMaxCodePoint) {
--    negated_ranges->Add(CharacterRange::Range(from, kMaxCodePoint), zone);
-+  if (from < kMaxCodePoint2) {
-+    negated_ranges->Add(CharacterRange::Range(from, kMaxCodePoint2), zone);
-   }
- }
- 
-@@ -1782,7 +1782,7 @@ void SafeAdvanceRange(const ZoneList<CharacterRange>* range, int* index,
-     *from = range->at(*index).from();
-     *to = range->at(*index).to();
-   } else {
--    *from = kMaxCodePoint + 1;
-+    *from = kMaxCodePoint2 + 1;
-   }
- }
- 
+ }  // namespace internal
+ }  // namespace v8
++
++#undef kMaxCodePoint
 diff --git a/v8/src/sandbox/testing.cc b/v8/src/sandbox/testing.cc
 index 5fd8a5572d..a049f497a4 100644
 --- a/v8/src/sandbox/testing.cc
@@ -988,60 +879,43 @@ index 5fd8a5572d..a049f497a4 100644
  
  #ifdef V8_USE_ADDRESS_SANITIZER
 diff --git a/v8/src/snapshot/read-only-deserializer.cc b/v8/src/snapshot/read-only-deserializer.cc
-index c6eb069415..64222999c0 100644
+index c6eb069415..a79565a75c 100644
 --- a/v8/src/snapshot/read-only-deserializer.cc
 +++ b/v8/src/snapshot/read-only-deserializer.cc
-@@ -188,7 +188,7 @@ void ReadOnlyDeserializer::DeserializeIntoIsolate() {
-   }
- }
+@@ -14,6 +14,8 @@
+ #include "src/snapshot/read-only-serializer-deserializer.h"
+ #include "src/snapshot/snapshot-data.h"
  
--void NoExternalReferencesCallback() {
-+void NoExternalReferencesCallback2() {
-   // The following check will trigger if a function or object template with
-   // references to native functions have been deserialized from snapshot, but
-   // no actual external references were provided when the isolate was created.
-@@ -240,7 +240,7 @@ class ObjectPostProcessor final {
-       const intptr_t* refs = isolate_->api_external_references();
-       Address address =
-           refs == nullptr
--              ? reinterpret_cast<Address>(NoExternalReferencesCallback)
-+              ? reinterpret_cast<Address>(NoExternalReferencesCallback2)
-               : static_cast<Address>(refs[index]);
-       DCHECK_NE(address, kNullAddress);
-       return address;
++#define NoExternalReferencesCallback NoExternalReferencesCallback_ReadOnlyDeserializer
++
+ namespace v8 {
+ namespace internal {
+ 
+@@ -387,3 +389,5 @@ void ReadOnlyDeserializer::PostProcessNewObjects() {
+ 
+ }  // namespace internal
+ }  // namespace v8
++
++#undef NoExternalReferencesCallback
 diff --git a/v8/src/torque/csa-generator.cc b/v8/src/torque/csa-generator.cc
-index 4495f0b100..0b4d7f92e4 100644
+index 4495f0b100..cc61f718a6 100644
 --- a/v8/src/torque/csa-generator.cc
 +++ b/v8/src/torque/csa-generator.cc
-@@ -946,8 +946,8 @@ void CSAGenerator::EmitInstruction(const StoreReferenceInstruction& instruction,
+@@ -12,6 +12,8 @@
+ #include "src/torque/types.h"
+ #include "src/torque/utils.h"
+ 
++#define GetBitFieldSpecialization GetBitFieldSpecialization_CSAGenerator
++
+ namespace v8::internal::torque {
+ 
+ std::optional<Stack<std::string>> CSAGenerator::EmitGraph(
+@@ -1083,3 +1085,5 @@ void CSAGenerator::EmitCSAValue(VisitResult result,
  }
  
- namespace {
--std::string GetBitFieldSpecialization(const Type* container,
--                                      const BitField& field) {
-+std::string GetBitFieldSpecialization2(const Type* container,
-+                                       const BitField& field) {
-   auto smi_tagged_type =
-       Type::MatchUnaryGeneric(container, TypeOracle::GetSmiTaggedGeneric());
-   std::string container_type = smi_tagged_type
-@@ -1000,7 +1000,7 @@ void CSAGenerator::EmitInstruction(const LoadBitFieldInstruction& instruction,
-   out() << "    " << result_name << " = ca_.UncheckedCast<"
-         << field_type->GetGeneratedTNodeTypeName()
-         << ">(CodeStubAssembler(state_)." << decoder << "<"
--        << GetBitFieldSpecialization(struct_type, instruction.bit_field)
-+        << GetBitFieldSpecialization2(struct_type, instruction.bit_field)
-         << ">(ca_.UncheckedCast<" << struct_word_type << ">("
-         << bit_field_struct << ")));\n";
- }
-@@ -1042,7 +1042,7 @@ void CSAGenerator::EmitInstruction(const StoreBitFieldInstruction& instruction,
- 
-   std::string result_expression =
-       "CodeStubAssembler(state_)." + encoder + "<" +
--      GetBitFieldSpecialization(struct_type, instruction.bit_field) +
-+      GetBitFieldSpecialization2(struct_type, instruction.bit_field) +
-       ">(ca_.UncheckedCast<" + struct_word_type + ">(" + bit_field_struct +
-       "), ca_.UncheckedCast<" + field_word_type + ">(" + value + ")" +
-       (instruction.starts_as_zero ? ", true" : "") + ")";
+ }  // namespace v8::internal::torque
++
++#undef GetBitFieldSpecialization
 diff --git a/v8/src/utils/sha-256.cc b/v8/src/utils/sha-256.cc
 index 4b1d2bd42b..f55c0b4aec 100644
 --- a/v8/src/utils/sha-256.cc
