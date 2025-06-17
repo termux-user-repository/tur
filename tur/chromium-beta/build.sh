@@ -1,10 +1,10 @@
 TERMUX_PKG_HOMEPAGE=https://www.chromium.org/Home
-TERMUX_PKG_DESCRIPTION="Chromium web browser"
+TERMUX_PKG_DESCRIPTION="Chromium web browser (Beta Version)"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="@licy183"
-TERMUX_PKG_VERSION=138.0.7204.15
+TERMUX_PKG_VERSION=138.0.7204.23
 TERMUX_PKG_SRCURL=https://commondatastorage.googleapis.com/chromium-browser-official/chromium-$TERMUX_PKG_VERSION.tar.xz
-TERMUX_PKG_SHA256=3a289be4600b099f67b0e0d37b50eb766444e68d82fa9fde3bf8f828b2250397
+TERMUX_PKG_SHA256=8f4f18c7730022b96d2002ff40d4d2e3d46031be070f9fb3d94321bc6cb1bab3
 TERMUX_PKG_DEPENDS="atk, cups, dbus, fontconfig, gtk3, krb5, libc++, libdrm, libevdev, libxkbcommon, libminizip, libnss, libwayland, libx11, mesa, openssl, pango, pulseaudio, zlib"
 TERMUX_PKG_BUILD_DEPENDS="chromium-beta-host-tools, libffi-static"
 # TODO: Split chromium-common and chromium-headless
@@ -68,7 +68,7 @@ termux_step_configure() {
 	ln -s $_host_pkg_config $TERMUX_PKG_CACHEDIR/host-pkg-config-bin/pkg-config
 	export PATH="$TERMUX_PKG_CACHEDIR/host-pkg-config-bin:$PATH"
 
-	# Install amd64 rootfs and deps
+	# Install amd64 rootfs
 	build/linux/sysroot_scripts/install-sysroot.py --arch=amd64
 	local _amd64_sysroot_path="$(pwd)/build/linux/$(ls build/linux | grep 'amd64-sysroot')"
 
@@ -142,7 +142,7 @@ termux_step_configure() {
 		_v8_sysroot_path="$_amd64_sysroot_path"
 		_v8_toolchain_name="host"
 	elif [ "$TERMUX_ARCH" = "arm" ]; then
-		# Install i386 rootfs and deps
+		# Install i386 rootfs
 		build/linux/sysroot_scripts/install-sysroot.py --arch=i386
 		local _i386_sysroot_path="$(pwd)/build/linux/$(ls build/linux | grep 'i386-sysroot')"
 		_target_cpu="arm"
