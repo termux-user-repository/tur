@@ -17,7 +17,7 @@ termux_step_make() {
 	if [ "$TERMUX_ON_DEVICE_BUILD" = "false" ]; then
 		LDFALAGS+=" -extldflags=-static"
 	fi
-	go build -ldflags=$LDFALAGS -trimpath -o termshot ./cmd/termshot
+	go build -ldflags="$LDFALAGS" -trimpath -o termshot ./cmd/termshot
 }
 
 termux_step_make_install() {
