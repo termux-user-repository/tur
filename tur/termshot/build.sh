@@ -10,6 +10,9 @@ TERMUX_PKG_DEPENDS="imagemagick"
 
 termux_step_pre_configure() {
 	termux_setup_golang
+
+	go mod init || :
+	go mod tidy
 }
 
 termux_step_make() {
@@ -17,5 +20,5 @@ termux_step_make() {
 }
 
 termux_step_make_install() {
-	install -Dm700 termshot "${TERMUX_PREFIX}/bin/termshot"
+	install -Dm700 -t "${TERMUX_PREFIX}"/bin "$TERMUX_PKG_SRCDIR"/termshot
 }
