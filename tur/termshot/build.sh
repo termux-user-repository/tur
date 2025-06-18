@@ -16,7 +16,7 @@ termux_step_pre_configure() {
 }
 
 termux_step_make() {
-	go build -ldflags="-s -w -X github.com/homeport/termshot/internal/cmd.version=$TERMUX_PKG_VERSION" -o termshot ./cmd/termshot
+	go build -ldflags="-s -w go build -linkmode=internal -X github.com/homeport/termshot/internal/cmd.version=$TERMUX_PKG_VERSION" -o termshot ./cmd/termshot
 }
 
 termux_step_make_install() {
