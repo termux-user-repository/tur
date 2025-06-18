@@ -1,0 +1,19 @@
+--- a/vendor/go.etcd.io/bbolt/bolt_android.go
++++ b/vendor/go.etcd.io/bbolt/bolt_android.go
+@@ -7,6 +7,7 @@
+ 	"unsafe"
+ 
+ 	"golang.org/x/sys/unix"
++	"go.etcd.io/bbolt/internal/common"
+ )
+ 
+ // flock acquires an advisory lock on a file descriptor.
+@@ -69,7 +70,7 @@
+ 
+ 	// Save the original byte slice and convert to a byte array pointer.
+ 	db.dataref = b
+-	db.data = (*[maxMapSize]byte)(unsafe.Pointer(&b[0]))
++	db.data = (*[common.MaxMapSize]byte)(unsafe.Pointer(&b[0]))
+ 	db.datasz = sz
+ 	return nil
+ }
