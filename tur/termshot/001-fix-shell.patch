@@ -1,0 +1,13 @@
+diff --git a/internal/ptexec/exec.go b/internal/ptexec/exec.go
+index 85b5998..b2e340c 100644
+--- a/internal/ptexec/exec.go
++++ b/internal/ptexec/exec.go
+@@ -53,7 +53,7 @@ type PseudoTerminal struct {
+ // New creates a new pseudo terminal builder
+ func New() *PseudoTerminal {
+ 	return &PseudoTerminal{
+-		shell:  "/bin/sh",
++		shell:  "/data/data/com.termux/files/usr/bin/sh",
+ 		resize: true,
+ 		stdout: os.Stdout,
+ 	}
