@@ -13,7 +13,11 @@ termux_step_pre_configure() {
 }
 
 termux_step_make() {
-	go build -ldflags="-s -w -X github.com/homeport/termshot/internal/cmd.version=$TERMUX_PKG_VERSION" -trimpath -o termshot ./cmd/termshot
+	LDFALAGS="-s -w -X github.com/homeport/termshot/internal/cmd.version=$TERMUX_PKG_VERSION"
+	if [ "$TERMUX_ON_DEVICE_BUILD" = "false" ]; then
+		LDFALAGS+=" -extldflags=-static"
+	fi
+	go build -ldflags=$LDFALAGS -trimpath -o termshot ./cmd/termshot
 }
 
 termux_step_make_install() {
