@@ -1,0 +1,36 @@
+diff -ur orig/src/OpenThreads/pthreads/PThread.cpp mod/src/OpenThreads/pthreads/PThread.cpp
+--- orig/src/OpenThreads/pthreads/PThread.cpp	2025-03-09 23:42:15.000000000 +0100
++++ mod/src/OpenThreads/pthreads/PThread.cpp	2025-03-12 17:10:48.006488947 +0100
+@@ -757,6 +757,7 @@
+ //
+ int Thread::testCancel()
+ {
++#undef HAVE_PTHREAD_TESTCANCEL
+ #if defined(HAVE_PTHREAD_TESTCANCEL)
+     PThreadPrivateData *pd = static_cast<PThreadPrivateData *> (_prvData);
+ 
+@@ -779,6 +780,7 @@
+ // Use: public
+ //
+ int Thread::cancel()
++#undef HAVE_PTHREAD_CANCEL
+ {
+ #if defined(HAVE_PTHREAD_CANCEL)
+     PThreadPrivateData *pd = static_cast<PThreadPrivateData *> (_prvData);
+@@ -802,6 +804,7 @@
+ //
+ int Thread::setCancelModeDisable()
+ {
++#undef HAVE_PTHREAD_SETCANCELSTATE
+ #if defined(HAVE_PTHREAD_SETCANCELSTATE)
+     return pthread_setcancelstate( PTHREAD_CANCEL_DISABLE, 0 );
+ #else
+@@ -816,7 +819,7 @@
+ // Use: public
+ //
+ int Thread::setCancelModeAsynchronous() {
+-
++#undef HAVE_PTHREAD_SETCANCELSTATE
+ #if defined(HAVE_PTHREAD_SETCANCELSTATE)
+     int status = pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, 0);
+     if(status != 0) return status;
