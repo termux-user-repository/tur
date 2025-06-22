@@ -2,10 +2,10 @@ TERMUX_PKG_HOMEPAGE=https://github.com/coder/code-server
 TERMUX_PKG_DESCRIPTION="Run VS Code on any machine anywhere and access it in the browser"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="4.100.3"
+TERMUX_PKG_VERSION="4.101.0"
 TERMUX_PKG_SRCURL=git+https://github.com/coder/code-server
-TERMUX_PKG_DEPENDS="libandroid-spawn, libsecret, krb5, nodejs-20, ripgrep"
-TERMUX_PKG_ANTI_DEPENDS="nodejs-20"
+TERMUX_PKG_DEPENDS="libandroid-spawn, libsecret, krb5, nodejs-22, ripgrep"
+TERMUX_PKG_ANTI_DEPENDS="nodejs-22"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_HOSTBUILD=true
 TERMUX_PKG_NO_STATICSPLIT=true
@@ -15,23 +15,24 @@ TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_UPDATE_TAG_TYPE="latest-release-tag"
 
 termux_step_post_get_source() {
+	local f
 	for f in $(cat ./patches/series); do
 		echo "Applying patch: $(basename $f)"
 		patch -d . -p1 < "./patches/$f";
 	done
 
-	# Ensure that code-server supports node 20
+	# Ensure that code-server supports node 22
 	local _node_version=$(cat .node-version | cut -d. -f1 -)
-	if [ "$_node_version" != 20 ]; then
-		termux_error_exit "Version mismatch: Expected 20, got $_node_version."
+	if [ "$_node_version" != 22 ]; then
+		termux_error_exit "Version mismatch: Expected 22, got $_node_version."
 	fi
 
 	# Remove this marker all the time
 	rm -rf $TERMUX_HOSTBUILD_MARKER
 }
 
-_setup_nodejs_20() {
-	local NODEJS_VERSION=20.18.1
+_setup_nodejs_22() {
+	local NODEJS_VERSION=22.15.1
 	local NODEJS_FOLDER=${TERMUX_PKG_CACHEDIR}/build-tools/nodejs-${NODEJS_VERSION}
 
 	if [ ! -x "$NODEJS_FOLDER/bin/node" ]; then
@@ -39,7 +40,7 @@ _setup_nodejs_20() {
 		local NODEJS_TAR_FILE=$TERMUX_PKG_TMPDIR/nodejs-$NODEJS_VERSION.tar.xz
 		termux_download https://nodejs.org/dist/v${NODEJS_VERSION}/node-v${NODEJS_VERSION}-linux-x64.tar.xz \
 			"$NODEJS_TAR_FILE" \
-			c6fa75c841cbffac851678a472f2a5bd612fff8308ef39236190e1f8dbb0e567
+			7dca2ab34ec817aa4781e2e99dfd34d349eff9be86e5d5fbaa7e96cae8ee3179
 		tar -xf "$NODEJS_TAR_FILE" -C "$NODEJS_FOLDER" --strip-components=1
 	fi
 	export PATH="$NODEJS_FOLDER/bin:$PATH"
@@ -51,7 +52,7 @@ termux_step_host_build() {
 	mv $TERMUX_PREFIX/bin $TERMUX_PREFIX/bin.bp
 	env -i PATH="$PATH" sudo apt update
 	env -i PATH="$PATH" sudo apt install -yq libxkbfile-dev libsecret-1-dev libkrb5-dev
-	_setup_nodejs_20
+	_setup_nodejs_22
 	cd $TERMUX_PKG_SRCDIR
 	npm ci
 	npm install ternary-stream
@@ -62,7 +63,7 @@ termux_step_host_build() {
 }
 
 termux_step_configure() {
-	_setup_nodejs_20
+	_setup_nodejs_22
 }
 
 termux_step_make() {
@@ -104,7 +105,7 @@ termux_step_make_install() {
 	cp -Rf ./release-standalone/* $TERMUX_PREFIX/lib/code-server/
 
 	# Replace nodejs
-	ln -sf $TERMUX_PREFIX/opt/nodejs-20/bin/node $TERMUX_PREFIX/lib/code-server/lib/node
+	ln -sf $TERMUX_PREFIX/opt/nodejs-22/bin/node $TERMUX_PREFIX/lib/code-server/lib/node
 
 	# Replace ripgrep
 	ln -sf $TERMUX_PREFIX/bin/rg $TERMUX_PREFIX/lib/code-server/lib/vscode/node_modules/@vscode/ripgrep/bin/rg
