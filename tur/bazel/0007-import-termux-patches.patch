@@ -1,13 +1,13 @@
 --- a/third_party/BUILD
 +++ b/third_party/BUILD
-@@ -34,6 +34,7 @@
+@@ -35,6 +35,7 @@
          "//third_party/py/mock:srcs",
          "//third_party/py/six:srcs",
          "//third_party/remoteapis:srcs",
 +        "//third_party/termux-patches:srcs",
-         "//third_party/zlib:srcs",
      ],
  )
+ 
 --- a/MODULE.bazel
 +++ b/MODULE.bazel
 @@ -418,3 +418,64 @@
