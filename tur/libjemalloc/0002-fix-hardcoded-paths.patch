@@ -1,0 +1,14 @@
+--- a/src/jemalloc.c
++++ b/src/jemalloc.c
+@@ -1008,9 +1008,9 @@
+ 		int saved_errno = errno;
+ 		const char *linkname =
+ #  ifdef JEMALLOC_PREFIX
+-		    "/etc/"JEMALLOC_PREFIX"malloc.conf"
++		    "@TERMUX_PREFIX@/etc/"JEMALLOC_PREFIX"malloc.conf"
+ #  else
+-		    "/etc/malloc.conf"
++		    "@TERMUX_PREFIX@/etc/malloc.conf"
+ #  endif
+ 		    ;
+ 
