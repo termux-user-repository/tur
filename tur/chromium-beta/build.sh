@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://www.chromium.org/Home
 TERMUX_PKG_DESCRIPTION="Chromium web browser (Beta Version)"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="@licy183"
-TERMUX_PKG_VERSION=138.0.7204.35
+TERMUX_PKG_VERSION=139.0.7258.5
 TERMUX_PKG_SRCURL=https://commondatastorage.googleapis.com/chromium-browser-official/chromium-$TERMUX_PKG_VERSION.tar.xz
-TERMUX_PKG_SHA256=d415a98709ff1692d852cdfe7c94797d943233008de668ba2c87d5d86fdb0da6
+TERMUX_PKG_SHA256=71eff54d267defd16c511d4477beffc1652a22143934f7627c0d49db79a33e76
 TERMUX_PKG_DEPENDS="atk, cups, dbus, fontconfig, gtk3, krb5, libc++, libdrm, libevdev, libxkbcommon, libminizip, libnss, libwayland, libx11, mesa, openssl, pango, pulseaudio, zlib"
 TERMUX_PKG_BUILD_DEPENDS="chromium-beta-host-tools, libffi-static"
 # TODO: Split chromium-common and chromium-headless
@@ -216,8 +216,8 @@ use_alsa = false
 use_pulseaudio = true
 rtc_use_pipewire = false
 use_vaapi = false
-# See comments below
-enable_nacl = false
+# NaCl is no longer supported starting M139.
+# enable_nacl = false
 # Host compiler (clang-13) doesn't support LTO well
 is_cfi = false
 use_cfi_icall = false
@@ -383,14 +383,6 @@ termux_step_post_make_install() {
 # Name in Chromium | libdrm fontconfig
 # Name in Termux   | libdrm fontconfig
 #
-# #############################################################################
-
-# ######################### About Native Client ###############################
-# When set `enable_nacl = true`, the following error occurs.
-# ninja: error: 'native_client/toolchain/linux_x86/pnacl_newlib/bin/arm-nacl-objcopy', needed by 'nacl_irt_arm.nexe', missing and no known rule to make it.
-# If we want to enable NaCi, maybe we should build the toolchain of NaCl too.
-# But I don't think this is necessary. NaCl existing or not will take little
-# influence on Chromium. So I'd like to disable NaCl.
 # #############################################################################
 
 # ############################ About Sandbox ##################################
