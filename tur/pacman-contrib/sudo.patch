@@ -1,17 +1,15 @@
-diff --git a/src/paccache.sh.in b/src/paccache.sh.in
-index 2f74539..b1e6d72 100644
 --- a/src/paccache.sh.in
 +++ b/src/paccache.sh.in
-@@ -137,16 +137,7 @@ pkgfilter() {
+@@ -134,16 +134,7 @@
  m4_include(../lib/size_to_human.sh)
  
- runcmd() {
+ runasroot() {
 -	if (( needsroot && EUID != 0 )); then
--		msg 'Escalating privileges using sudo'
--		if sudo -v &>/dev/null && sudo -l &>/dev/null; then
--			sudo "$@"
+-		if ! type -p sudo; then
+-			error 'Cannot find the sudo binary!'
+-			die 'Either install "sudo" or run as root.'
 -		else
--			die 'Failed to escalate'
+-			sudo "$@"
 -		fi
 -	else
  		"$@"
@@ -19,24 +17,21 @@ index 2f74539..b1e6d72 100644
  }
  
  summarize() {
-diff --git a/src/pacscripts.sh.in b/src/pacscripts.sh.in
-index 7c6d67d..22cb0d2 100644
 --- a/src/pacscripts.sh.in
 +++ b/src/pacscripts.sh.in
-@@ -63,17 +63,7 @@ version() {
+@@ -63,16 +63,7 @@
  }
  
- spacman() {
--	if [ $EUID -eq 0 ]; then
- 		pacman "$@"
--	else
+ runasroot() {
+-	if (( EUID != 0 )); then
 -		if ! type -p sudo; then
--			error "Cannot find the sudo binary!"
--			error "${myname} requires root privileges. Either install \"sudo\" or run as root."
--			exit 1
+-			error 'Cannot find the sudo binary!'
+-			die "${myname} requires root privileges. Either install \"sudo\" or run as root."
 -		else
--			sudo pacman "$@"
+-			sudo "$@"
 -		fi
+-	else
+ 		"$@"
 -	fi
  }
  
