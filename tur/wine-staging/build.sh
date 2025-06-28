@@ -3,7 +3,7 @@ TERMUX_PKG_DESCRIPTION="A compatibility layer for running Windows programs"
 TERMUX_PKG_LICENSE="LGPL-2.1"
 TERMUX_PKG_LICENSE_FILE="LICENSE, LICENSE.OLD, COPYING.LIB"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="10.10"
+TERMUX_PKG_VERSION="10.11"
 _REAL_VERSION="${TERMUX_PKG_VERSION/\~/-}"
 _VERSION_FOLDER="$(test "${_REAL_VERSION:3:1}" = 0 && echo ${_REAL_VERSION:0:4} || echo ${_REAL_VERSION:0:3}x)"
 TERMUX_PKG_SRCURL=(
@@ -11,8 +11,8 @@ TERMUX_PKG_SRCURL=(
 	https://github.com/wine-staging/wine-staging/archive/v$_REAL_VERSION.tar.gz
 )
 TERMUX_PKG_SHA256=(
-	e76466a5ca3197f399ddf8069b0a79e5eb2dffe5b3b7db9eb7272288330c8596
-	17a636a76d5775bc7eb25a4a908d1ff5d40ecbcee46fefca10ae292a0a83f6e1
+	185be98699b914bc29e724430947986bb78a867e62e422f00c75341932b678ce
+	de0e30ebb11bd4cdcf5f70d1349dc26bf1ed2ac6e089d91be7a18ce13855ebc3
 )
 TERMUX_PKG_DEPENDS="fontconfig, freetype, krb5, libandroid-spawn, libc++, libgmp, libgnutls, libxcb, libxcomposite, libxcursor, libxfixes, libxrender, opengl, pulseaudio, sdl2, vulkan-loader, xorg-xrandr"
 TERMUX_PKG_ANTI_BUILD_DEPENDS="vulkan-loader"
@@ -117,6 +117,11 @@ termux_pkg_auto_update() {
 }
 
 termux_step_post_get_source() {
+	# Check if eventfd enabled again
+	if ! grep -i -q "disabled: true" ./wine-staging-$_REAL_VERSION/patches/eventfd_synchronization/definition; then
+		termux_error_exit "eventfd_synchronization is enabled again."
+	fi
+
 	python ./wine-staging-$_REAL_VERSION/staging/patchinstall.py --all
 }
 
