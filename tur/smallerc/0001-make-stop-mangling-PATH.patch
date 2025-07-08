@@ -1,0 +1,34 @@
+From 876cdc70e48a9ac8a9a2a9f3777659dc611a1116 Mon Sep 17 00:00:00 2001
+From: Stas Sergeev <stsp2@yandex.ru>
+Date: Sun, 6 Jul 2025 22:53:03 +0300
+Subject: [PATCH] make: stop mangling PATH
+
+This breaks cross-compilation environments.
+---
+ GNUmakefile | 1 -
+ Makefile    | 3 ---
+ 2 files changed, 4 deletions(-)
+
+diff --git a/GNUmakefile b/GNUmakefile
+index ca91e8c..64bc74f 100644
+--- a/GNUmakefile
++++ b/GNUmakefile
+@@ -1,5 +1,4 @@
+ srcdir := $(dir $(shell readlink -f \
+ 	$(word $(words $(MAKEFILE_LIST)),$(MAKEFILE_LIST))))v0100
+ VPATH = $(srcdir) $(srcdir)/srclib
+-export PATH := $(CURDIR):$(PATH)
+ include $(srcdir)/../common.mk
+diff --git a/Makefile b/Makefile
+index 9b40881..9ba9728 100644
+--- a/Makefile
++++ b/Makefile
+@@ -1,5 +1,2 @@
+ srcdir != readlink -f $(.PARSEDIR)/$(.PARSEFILE) | sed 's@[^/]*$$@v0100@'
+-.PATH: $(srcdir) $(srcdir)/srclib
+-PATH := $(.CURDIR):$(PATH)
+-.export PATH
+ .include "$(srcdir)/../common.mk"
+-- 
+2.48.1
+
