@@ -1,0 +1,12 @@
+diff --git a/sources/jamfiles/posix-build.jam b/sources/jamfiles/posix-build.jam
+index 47b798368..0d878f54f 100644
+--- a/sources/jamfiles/posix-build.jam
++++ b/sources/jamfiles/posix-build.jam
+@@ -53,6 +53,7 @@ OBJCOPY   ?= objcopy ;
+ STRIP     ?= strip ;
+ 
+ CCFLAGS   += -fPIC ;
++echo $(CCFLAGS) ;
+ 
+ LINK      ?= $(CC) ;
+ UNIFYLINK ?= $(CC) -Bstatic ;
