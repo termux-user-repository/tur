@@ -1,0 +1,32 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+--- a/CMakeLists.txt	2025-07-01 00:01:01.000000000 +0700
++++ b/CMakeLists.txt	2025-07-28 09:20:55.513478596 +0700
+@@ -131,7 +131,7 @@
+     ConfigWidgets
+     CoreAddons
+     Crash
+-    DocTools
++    #DocTools
+     GuiAddons
+     I18n
+     IconThemes
+diff --git a/doc/CMakeLists.txt b/doc/CMakeLists.txt
+--- a/doc/CMakeLists.txt	2025-07-01 00:01:01.000000000 +0700
++++ b/doc/CMakeLists.txt	2025-07-28 09:31:40.429478134 +0700
+@@ -1,8 +1,10 @@
+-add_subdirectory(calligra)
+-if(SHOULD_BUILD_STAGE)
+-    add_subdirectory(stage)
+-endif()
+-if(SHOULD_BUILD_SHEETS)
+-    add_subdirectory(sheets)
++if(KF6DocTools_FOUND)
++    add_subdirectory(calligra)
++    if(SHOULD_BUILD_STAGE)
++        add_subdirectory(stage)
++    endif()
++    if(SHOULD_BUILD_SHEETS)
++        add_subdirectory(sheets)
++    endif()
+ endif()
+ install(FILES   calligra.desktop DESTINATION ${KDE_INSTALL_APPDIR})
