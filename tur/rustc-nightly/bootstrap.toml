@@ -1,5 +1,7 @@
 # See documentation at
-# https://github.com/rust-lang/rust/blob/master/config.example.toml
+# https://github.com/rust-lang/rust/blob/master/bootstrap.example.toml
+
+change-id = "ignore"
 
 [llvm]
 download-ci-llvm = false
@@ -25,7 +27,6 @@ tools = [
     "rust-analyzer-proc-macro-srv",
     "analysis",
     "src",
-    "rust-demangler",
 ]
 sanitizers = false
 local-rebuild = true
