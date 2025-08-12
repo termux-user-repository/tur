@@ -5,7 +5,7 @@ TERMUX_PKG_MAINTAINER="@IntinteDAO"
 TERMUX_PKG_VERSION=3.13.0
 TERMUX_PKG_SRCURL=https://github.com/MegaGlest/megaglest-source/archive/refs/tags/${TERMUX_PKG_VERSION}.tar.gz
 TERMUX_PKG_SHA256=e02e58c2329558cc5d67374b5e5f9b3cfaafc300b96feff71df8d4b0d39e1eaa
-TERMUX_PKG_DEPENDS="glib, openal-soft, sdl2, libvorbis, libjpeg-turbo, libpng, freetype, curl, libxml2, wxwidgets, lua52, fribidi, libandroid-glob, libftgl2"
+TERMUX_PKG_DEPENDS="glib, openal-soft, sdl2, libvorbis, libjpeg-turbo, libpng, freetype, curl, libxml2, wxwidgets, lua52, fribidi, libandroid-glob, libftgl2, glew"
 
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 -DCMAKE_POLICY_VERSION_MINIMUM=3.5
