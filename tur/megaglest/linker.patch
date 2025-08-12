@@ -1,0 +1,88 @@
+diff -ur orig/source/shared_lib/include/feathery_ftp/ftpTypes.h mod/source/shared_lib/include/feathery_ftp/ftpTypes.h
+--- orig/source/shared_lib/include/feathery_ftp/ftpTypes.h	2017-03-08 21:39:12.000000000 +0100
++++ mod/source/shared_lib/include/feathery_ftp/ftpTypes.h	2025-07-17 11:03:14.934302633 +0200
+@@ -69,7 +69,7 @@
+ extern "C" {
+ #endif
+ 
+-int VERBOSE_MODE_ENABLED;
++extern int VERBOSE_MODE_ENABLED;
+ 
+ typedef ip_t (*ftpFindExternalFTPServerIpType)(ip_t clientIp);
+ typedef void (*ftpAddUPNPPortForwardType)(int internalPort, int externalPort);
+@@ -77,11 +77,11 @@
+ typedef int (*ftpIsValidClientType)(ip_t clientIp);
+ typedef int (*ftpIsClientAllowedToGetFileType)(ip_t clientIp, const char *username, const char *filename);
+ 
+-ftpFindExternalFTPServerIpType	ftpFindExternalFTPServerIp;
+-ftpAddUPNPPortForwardType		ftpAddUPNPPortForward;
+-ftpRemoveUPNPPortForwardType	ftpRemoveUPNPPortForward;
+-ftpIsValidClientType            ftpIsValidClient;
+-ftpIsClientAllowedToGetFileType ftpIsClientAllowedToGetFile;
++extern ftpFindExternalFTPServerIpType	ftpFindExternalFTPServerIp;
++extern ftpAddUPNPPortForwardType		ftpAddUPNPPortForward;
++extern ftpRemoveUPNPPortForwardType	ftpRemoveUPNPPortForward;
++extern ftpIsValidClientType            ftpIsValidClient;
++extern ftpIsClientAllowedToGetFileType ftpIsClientAllowedToGetFile;
+ 
+ #ifdef	__cplusplus
+ }
+diff -ur orig/source/shared_lib/sources/feathery_ftp/ftpRuntime.c mod/source/shared_lib/sources/feathery_ftp/ftpRuntime.c
+--- orig/source/shared_lib/sources/feathery_ftp/ftpRuntime.c	2017-03-08 21:39:12.000000000 +0100
++++ mod/source/shared_lib/sources/feathery_ftp/ftpRuntime.c	2025-07-17 11:04:27.524309864 +0200
+@@ -30,6 +30,13 @@
+ #include "ftp.h"
+ #include "ftpMessages.h"
+ 
++int VERBOSE_MODE_ENABLED = 0;
++ftpFindExternalFTPServerIpType  ftpFindExternalFTPServerIp = NULL;
++ftpAddUPNPPortForwardType       ftpAddUPNPPortForward = NULL;
++ftpRemoveUPNPPortForwardType    ftpRemoveUPNPPortForward = NULL;
++ftpIsValidClientType            ftpIsValidClient = NULL;
++ftpIsClientAllowedToGetFileType ftpIsClientAllowedToGetFile = NULL;
++
+ 
+ /**
+  * @brief server-sockets that listens for incoming connections
+diff -ur orig/source/shared_lib/sources/platform/posix/miniftpserver.cpp mod/source/shared_lib/sources/platform/posix/miniftpserver.cpp
+--- orig/source/shared_lib/sources/platform/posix/miniftpserver.cpp	2017-03-08 21:39:12.000000000 +0100
++++ mod/source/shared_lib/sources/platform/posix/miniftpserver.cpp	2025-07-17 11:06:54.287657818 +0200
+@@ -40,7 +40,7 @@
+ static std::map<uint32,uint32> clientToFTPServerList;
+ FTPClientValidationInterface * FTPServerThread::ftpValidationIntf = NULL;
+ 
+-ip_t FindExternalFTPServerIp(ip_t clientIp) {
++static ip_t FindExternalFTPServerIp(ip_t clientIp) {
+     ip_t result = clientToFTPServerList[clientIp];
+ 
+     if(SystemFlags::VERBOSE_MODE_ENABLED) printf("===> FTP Server thread clientIp = %u, result = %u\n",clientIp,result);
+@@ -49,7 +49,7 @@
+     return result;
+ }
+ 
+-int isValidClientType(ip_t clientIp) {
++static int isValidClientType(ip_t clientIp) {
+     int result = 0;
+     if(FTPServerThread::getFtpValidationIntf() != NULL) {
+         result = FTPServerThread::getFtpValidationIntf()->isValidClientType(clientIp);
+@@ -57,7 +57,7 @@
+     return result;
+ }
+ 
+-int isClientAllowedToGetFile(ip_t clientIp, const char *username, const char *filename) {
++static int isClientAllowedToGetFile(ip_t clientIp, const char *username, const char *filename) {
+     int result = 1;
+ 
+     //printf("In [%s::%s] Line: %d username [%s] file [%s]\n",__FILE__,__FUNCTION__,__LINE__,username,filename);
+@@ -87,9 +87,9 @@
+     this->ftpValidationIntf     = ftpValidationIntf;
+     this->tempFilesPath			= tempFilesPath;
+ 
+-	ftpInit(&FindExternalFTPServerIp,&UPNP_Tools::AddUPNPPortForward,&UPNP_Tools::RemoveUPNPPortForward,
++	ftpInit(&FindExternalFTPServerIp, &UPNP_Tools::AddUPNPPortForward, &UPNP_Tools::RemoveUPNPPortForward,
+ 			&isValidClientType, &isClientAllowedToGetFile);
+-    VERBOSE_MODE_ENABLED        = SystemFlags::VERBOSE_MODE_ENABLED;
++    //VERBOSE_MODE_ENABLED        = SystemFlags::VERBOSE_MODE_ENABLED;
+ 
+     if(SystemFlags::VERBOSE_MODE_ENABLED) printf("***FTP SERVER STARTED [%p]\n",this);
+ }
