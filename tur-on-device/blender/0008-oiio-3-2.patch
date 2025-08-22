@@ -1,0 +1,308 @@
+From c3c05559d6a7e10981ad8e3c13a8ee7862399c78 Mon Sep 17 00:00:00 2001
+From: Brecht Van Lommel <brecht@blender.org>
+Date: Sun, 5 Jan 2025 00:44:41 +0100
+Subject: [PATCH] OpenImageIO: Compatibility with version 3.0
+
+Pull Request: https://projects.blender.org/blender/blender/pulls/132654
+---
+ intern/cycles/app/cycles_standalone.cpp       | 111 ++++++++----------
+ intern/cycles/scene/osl.cpp                   |  27 +++++
+ intern/cycles/scene/osl.h                     |   4 +
+ intern/cycles/util/string.cpp                 |  19 ++-
+ .../imbuf/intern/oiio/openimageio_support.cc  |   7 +-
+ 5 files changed, 101 insertions(+), 67 deletions(-)
+
+diff --git a/intern/cycles/app/cycles_standalone.cpp b/intern/cycles/app/cycles_standalone.cpp
+index 8e1ba65..55ef086 100644
+--- a/intern/cycles/app/cycles_standalone.cpp
++++ b/intern/cycles/app/cycles_standalone.cpp
+@@ -344,12 +344,16 @@ static void keyboard(unsigned char key)
+ }
+ #endif
+ 
+-static int files_parse(int argc, const char *argv[])
++static void parse_int(OIIO::cspan<const char *> argv, int *i)
+ {
+-  if (argc > 0)
+-    options.filepath = argv[0];
++  assert(argv.size() == 2);
++  *i = atoi(argv[1]);
++}
+ 
+-  return 0;
++static void parse_string(OIIO::cspan<const char *> argv, std::string *s)
++{
++  assert(argv.size() == 2);
++  *s = argv[1];
+ }
+ 
+ static void options_parse(int argc, const char **argv)
+@@ -384,67 +388,57 @@ static void options_parse(int argc, const char **argv)
+   bool help = false, profile = false, debug = false, version = false;
+   int verbosity = 1;
+ 
+-  ap.options("Usage: cycles [options] file.xml",
+-             "%*",
+-             files_parse,
+-             "",
+-             "--device %s",
+-             &devicename,
+-             ("Devices to use: " + device_names).c_str(),
++  ap.usage("cycles [options] file.xml");
++  ap.arg("filename").hidden().action([&](auto argv) { options.filepath = argv[0]; });
++  ap.arg("--device %s:DEVICE").help("Devices to use: " + device_names).action([&](auto argv) {
++    parse_string(argv, &devicename);
++  });
+ #ifdef WITH_OSL
+-             "--shadingsys %s",
+-             &ssname,
+-             "Shading system to use: svm, osl",
++  ap.arg("--shadingsys %s:SHADINGSYSTEM")
++      .help("Shading system to use: svm, osl")
++      .action([&](auto argv) { parse_string(argv, &ssname); });
+ #endif
+-             "--background",
+-             &options.session_params.background,
+-             "Render in background, without user interface",
+-             "--quiet",
+-             &options.quiet,
+-             "In background mode, don't print progress messages",
+-             "--samples %d",
+-             &options.session_params.samples,
+-             "Number of samples to render",
+-             "--output %s",
+-             &options.output_filepath,
+-             "File path to write output image",
+-             "--threads %d",
+-             &options.session_params.threads,
+-             "CPU Rendering Threads",
+-             "--width  %d",
+-             &options.width,
+-             "Window width in pixel",
+-             "--height %d",
+-             &options.height,
+-             "Window height in pixel",
+-             "--tile-size %d",
+-             &options.session_params.tile_size,
+-             "Tile size in pixels",
+-             "--list-devices",
+-             &list,
+-             "List information about all available devices",
+-             "--profile",
+-             &profile,
+-             "Enable profile logging",
++  ap.arg("--background", &options.session_params.background)
++      .help("Render in background, without user interface");
++  ap.arg("--quiet", &options.quiet).help("In background mode, don't print progress messages");
++  ap.arg("--samples %d:SAMPLES").help("Number of samples to render").action([&](auto argv) {
++    parse_int(argv, &options.session_params.samples);
++  });
++  ap.arg("--output %s:OUTPUT").help("File path to write output image").action([&](auto argv) {
++    parse_string(argv, &options.output_filepath);
++  });
++  ap.arg("--threads %d:THREADS").help("CPU Rendering Threads").action([&](auto argv) {
++    parse_int(argv, &options.session_params.threads);
++  });
++  ap.arg("--width %d:WIDTH").help("Image width in pixelx").action([&](auto argv) {
++    parse_int(argv, &options.width);
++  });
++  ap.arg("--height %d:HEIGHT").help("Image height in pixel").action([&](auto argv) {
++    parse_int(argv, &options.height);
++  });
++  ap.arg("--tile-size %d:TILE_SIZE").help("Tile size in pixels").action([&](auto argv) {
++    parse_int(argv, &options.session_params.tile_size);
++  });
++  ap.arg("--list-devices", &list).help("List information about all available devices");
++  ap.arg("--profile", &profile).help("Enable profile logging");
+ #ifdef WITH_CYCLES_LOGGING
+-             "--debug",
+-             &debug,
+-             "Enable debug logging",
+-             "--verbose %d",
+-             &verbosity,
+-             "Set verbosity of the logger",
++  ap.arg("--debug", &debug).help("Enable debug logging");
++  ap.arg("--verbose %d:VERBOSE").help("Set verbosity of the logger").action([&](auto argv) {
++    parse_int(argv, &verbosity);
++  });
+ #endif
+-             "--help",
+-             &help,
+-             "Print help message",
+-             "--version",
+-             &version,
+-             "Print version number",
+-             NULL);
++  ap.arg("--help", &help).help("Print help message");
++  ap.arg("--version", &version).help("Print version number");
++
++  if (ap.parse_args(argc, argv) < 0) {
++     fprintf(stderr, "%s\n", ap.geterror().c_str());
++     ap.print_help();
++     exit(EXIT_FAILURE);
++  }
+ 
+   if (ap.parse(argc, argv) < 0) {
+     fprintf(stderr, "%s\n", ap.geterror().c_str());
+-    ap.usage();
++    ap.print_help();
+     exit(EXIT_FAILURE);
+   }
+ 
+diff --git a/intern/cycles/scene/osl.cpp b/intern/cycles/scene/osl.cpp
+index ceddb5e73eee..5bc5fe58cba4 100644
+--- a/intern/cycles/scene/osl.cpp
++++ b/intern/cycles/scene/osl.cpp
+@@ -34,7 +34,11 @@ CCL_NAMESPACE_BEGIN
+ 
+ /* Shared Texture and Shading System */
+ 
++#  if OIIO_VERSION_MAJOR >= 3
++std::shared_ptr<OSL::TextureSystem> OSLShaderManager::ts_shared;
++#  else
+ OSL::TextureSystem *OSLShaderManager::ts_shared = NULL;
++#  endif
+ int OSLShaderManager::ts_shared_users = 0;
+ thread_mutex OSLShaderManager::ts_shared_mutex;
+ 
+@@ -111,7 +115,11 @@ void OSLShaderManager::device_update_specific(Device *device,
+ 
+   /* set texture system (only on CPU devices, since GPU devices cannot use OIIO) */
+   if (device->info.type == DEVICE_CPU) {
++#  if OIIO_VERSION_MAJOR >= 3
++    scene->image_manager->set_osl_texture_system((void *)ts_shared.get());
++#  else
+     scene->image_manager->set_osl_texture_system((void *)ts_shared);
++#  endif
+   }
+ 
+   /* create shaders */
+@@ -165,7 +173,11 @@ void OSLShaderManager::device_update_specific(Device *device,
+     OSL::ShadingSystem *ss = ss_shared[sub_device->info.type].get();
+ 
+     og->ss = ss;
++#  if OIIO_VERSION_MAJOR >= 3
++    og->ts = ts_shared.get();
++#  else
+     og->ts = ts_shared;
++#  endif
+     og->services = static_cast<OSLRenderServices *>(ss->renderer());
+ 
+     og->use = true;
+@@ -274,8 +278,13 @@ void OSLShaderManager::texture_system_free()
+ 
+   if (--ts_shared_users == 0) {
+     ts_shared->invalidate_all(true);
++#  if OIIO_VERSION_MAJOR >= 3
++    OSL::TextureSystem::destroy(ts_shared);
++    ts_shared.reset();
++#  else
+     OSL::TextureSystem::destroy(ts_shared);
+     ts_shared = NULL;
++#  endif
+   }
+ }
+ 
+@@ -296,7 +313,12 @@ void OSLShaderManager::shading_system_init()
+ 
+     if (ss_shared_users++ == 0 || ss_shared.find(device_type) == ss_shared.end()) {
+       /* Must use aligned new due to concurrent hash map. */
++#  if OIIO_VERSION_MAJOR >= 3
++      OSLRenderServices *services = util_aligned_new<OSLRenderServices>(ts_shared.get(),
++                                                                        device_type);
++#  else
+       OSLRenderServices *services = util_aligned_new<OSLRenderServices>(ts_shared, device_type);
++#  endif
+ 
+ #  ifdef _WIN32
+       /* Annoying thing, Cycles stores paths in UTF-8 codepage, so it can
+@@ -309,7 +318,11 @@ void OSLShaderManager::shading_system_init()
+       shader_path = string_to_ansi(shader_path);
+ #  endif
+ 
++#  if OIIO_VERSION_MAJOR >= 3
++      OSL::ShadingSystem *ss = new OSL::ShadingSystem(services, ts_shared.get(), &errhandler);
++#  else
+       OSL::ShadingSystem *ss = new OSL::ShadingSystem(services, ts_shared, &errhandler);
++#  endif
+       ss->attribute("lockgeom", 1);
+       ss->attribute("commonspace", "world");
+       ss->attribute("searchpath:shader", shader_path);
+diff --git a/intern/cycles/scene/osl.h b/intern/cycles/scene/osl.h
+index 3365c80e6c0c..bf6d260f2928 100644
+--- a/intern/cycles/scene/osl.h
++++ b/intern/cycles/scene/osl.h
+@@ -103,7 +103,11 @@ class OSLShaderManager : public ShaderManager {
+   Device *device_;
+   map<string, OSLShaderInfo> loaded_shaders;
+ 
++#  if OIIO_VERSION_MAJOR >= 3
++  static std::shared_ptr<OSL::TextureSystem> ts_shared;
++#  else
+   static OSL::TextureSystem *ts_shared;
++#  endif
+   static thread_mutex ts_shared_mutex;
+   static int ts_shared_users;
+ 
+diff --git a/intern/cycles/util/string.cpp b/intern/cycles/util/string.cpp
+index 95c3aea43360..878f0dbebbf5 100644
+--- a/intern/cycles/util/string.cpp
++++ b/intern/cycles/util/string.cpp
+@@ -104,23 +104,34 @@ void string_split(vector<string> &tokens,
+ bool string_startswith(const string_view s, const string_view start)
+ {
+   const size_t len = start.size();
+-
+   if (len > s.size()) {
+     return false;
+   }
+ 
+-  return strncmp(s.c_str(), start.data(), len) == 0;
++  for (size_t i = 0; i < len; i++) {
++    if (s[i] != start[i]) {
++      return false;
++    }
++  }
++
++  return true;
+ }
+ 
+ bool string_endswith(const string_view s, const string_view end)
+ {
+   const size_t len = end.size();
+-
+   if (len > s.size()) {
+     return false;
+   }
+ 
+-  return strncmp(s.c_str() + s.size() - len, end.data(), len) == 0;
++  const size_t offset = s.size() - len;
++  for (size_t i = 0; i < len; i++) {
++    if (s[offset + i] != end[i]) {
++      return false;
++    }
++  }
++
++  return true;
+ }
+ 
+ string string_strip(const string &s)
+diff --git a/source/blender/imbuf/intern/oiio/openimageio_support.cc b/source/blender/imbuf/intern/oiio/openimageio_support.cc
+index 6c45b77..e182f21 100644
+--- a/source/blender/imbuf/intern/oiio/openimageio_support.cc
++++ b/source/blender/imbuf/intern/oiio/openimageio_support.cc
+@@ -301,8 +301,13 @@ bool imb_oiio_write(const WriteContext &ctx, const char *filepath, const ImageSp
+    * using a single channel from the source. */
+   if (ctx.ibuf->channels > 1 && file_spec.nchannels == 1) {
+     float weights[4]{};
++#if OIIO_VERSION_MAJOR >= 3
++    const size_t nchannels = orig_buf.nchannels();
++#else
++    const int nchannels = orig_buf.nchannels();
++#endif
+     IMB_colormanagement_get_luminance_coefficients(weights);
+-    ImageBufAlgo::channel_sum(final_buf, orig_buf, {weights, orig_buf.nchannels()});
++    ImageBufAlgo::channel_sum(final_buf, orig_buf, {weights, nchannels});
+   }
+   else {
+     /* If we are moving from an 1-channel format to n-channel we need to

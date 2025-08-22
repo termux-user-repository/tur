@@ -1,0 +1,893 @@
+From 4f4c3f73b697436922464e087823f53e8681d7e8 Mon Sep 17 00:00:00 2001
+From: Jesse Yurkovich <jesse.y@gmail.com>
+Date: Thu, 17 Oct 2024 19:48:38 +0200
+Subject: [PATCH] Cleanup: Replace deprecated OIIO APIs with modern ones
+
+Noticed while helping validate the soon to be released OpenImageIO 3.x.
+
+This cleanup makes 2 sets of changes to accommodate removed APIs [1]:
+- Remove `ustringHash` since it's been defined as `std::hash<ustring>`
+  for quite some time and is fully removed in 3.0.
+- Replace `TypeDesc::Type*` types with just `Type*` as the former has
+  been removed in 3.0. Cycles was using a mix of the deprecated and
+  modern forms anyhow.
+
+[1] https://github.com/AcademySoftwareFoundation/OpenImageIO/blob/main/docs/Deprecations-3.0.md
+
+Pull Request: https://projects.blender.org/blender/blender/pulls/129136
+---
+ intern/cycles/blender/mesh.cpp              |  4 +-
+ intern/cycles/blender/object.cpp            |  2 +-
+ intern/cycles/blender/volume.cpp            |  2 +-
+ intern/cycles/graph/node_enum.h             |  6 +-
+ intern/cycles/graph/node_type.cpp           |  6 +-
+ intern/cycles/graph/node_type.h             |  2 +-
+ intern/cycles/hydra/volume.cpp              |  3 +-
+ intern/cycles/kernel/osl/closures.cpp       |  2 +-
+ intern/cycles/kernel/osl/services.cpp       | 26 ++----
+ intern/cycles/scene/attribute.cpp           | 99 ++++++++++-----------
+ intern/cycles/scene/colorspace.cpp          |  4 +-
+ intern/cycles/scene/geometry_attributes.cpp | 12 +--
+ intern/cycles/scene/mesh_subdivision.cpp    |  4 +-
+ intern/cycles/scene/object.cpp              |  4 +-
+ intern/cycles/scene/osl.cpp                 | 60 ++++++-------
+ intern/cycles/scene/shader.cpp              |  2 +-
+ intern/cycles/scene/shader.h                |  2 +-
+ intern/cycles/scene/stats.h                 |  2 +-
+ 18 files changed, 114 insertions(+), 128 deletions(-)
+
+diff --git a/intern/cycles/blender/mesh.cpp b/intern/cycles/blender/mesh.cpp
+index 46bdd68..dde4a87 100644
+--- a/intern/cycles/blender/mesh.cpp
++++ b/intern/cycles/blender/mesh.cpp
+@@ -195,7 +195,7 @@ static void mikk_compute_tangents(
+     attr = attributes.add(ATTR_STD_UV_TANGENT, name);
+   }
+   else {
+-    attr = attributes.add(name, TypeDesc::TypeVector, ATTR_ELEMENT_CORNER);
++    attr = attributes.add(name, TypeVector, ATTR_ELEMENT_CORNER);
+   }
+   float3 *tangent = attr->data_float3();
+   /* Create bitangent sign attribute. */
+@@ -214,7 +214,7 @@ static void mikk_compute_tangents(
+       attr_sign = attributes.add(ATTR_STD_UV_TANGENT_SIGN, name_sign);
+     }
+     else {
+-      attr_sign = attributes.add(name_sign, TypeDesc::TypeFloat, ATTR_ELEMENT_CORNER);
++      attr_sign = attributes.add(name_sign, TypeFloat, ATTR_ELEMENT_CORNER);
+     }
+     tangent_sign = attr_sign->data_float();
+   }
+diff --git a/intern/cycles/blender/object.cpp b/intern/cycles/blender/object.cpp
+index 6f1437e..e4d9c2b 100644
+--- a/intern/cycles/blender/object.cpp
++++ b/intern/cycles/blender/object.cpp
+@@ -437,7 +437,7 @@ bool BlenderSync::sync_object_attributes(BL::DepsgraphObjectInstance &b_instance
+       }
+ 
+       /* Replace or add the value. */
+-      ParamValue new_param(name, TypeDesc::TypeFloat4, 1, &value);
++      ParamValue new_param(name, TypeFloat4, 1, &value);
+       assert(new_param.datasize() == sizeof(value));
+ 
+       if (!param) {
+diff --git a/intern/cycles/blender/volume.cpp b/intern/cycles/blender/volume.cpp
+index 864ddd2..303320e 100644
+--- a/intern/cycles/blender/volume.cpp
++++ b/intern/cycles/blender/volume.cpp
+@@ -341,7 +341,7 @@ static void sync_volume_object(BL::BlendData &b_data,
+     {
+       Attribute *attr = (std != ATTR_STD_NONE) ?
+                             volume->attributes.add(std) :
+-                            volume->attributes.add(name, TypeDesc::TypeFloat, ATTR_ELEMENT_VOXEL);
++                            volume->attributes.add(name, TypeFloat, ATTR_ELEMENT_VOXEL);
+ 
+       ImageLoader *loader = new BlenderVolumeLoader(
+           b_data, b_volume, name.string(), b_render.precision());
+diff --git a/intern/cycles/graph/node_enum.h b/intern/cycles/graph/node_enum.h
+index 6c8bfed..bda20d7 100644
+--- a/intern/cycles/graph/node_enum.h
++++ b/intern/cycles/graph/node_enum.h
+@@ -47,17 +47,17 @@ struct NodeEnum {
+     return right.find(y)->second;
+   }
+ 
+-  unordered_map<ustring, int, ustringHash>::const_iterator begin() const
++  unordered_map<ustring, int>::const_iterator begin() const
+   {
+     return left.begin();
+   }
+-  unordered_map<ustring, int, ustringHash>::const_iterator end() const
++  unordered_map<ustring, int>::const_iterator end() const
+   {
+     return left.end();
+   }
+ 
+  private:
+-  unordered_map<ustring, int, ustringHash> left;
++  unordered_map<ustring, int> left;
+   unordered_map<int, ustring> right;
+ };
+ 
+diff --git a/intern/cycles/graph/node_type.cpp b/intern/cycles/graph/node_type.cpp
+index 4dc0746..292be5c 100644
+--- a/intern/cycles/graph/node_type.cpp
++++ b/intern/cycles/graph/node_type.cpp
+@@ -195,9 +195,9 @@ const SocketType *NodeType::find_output(ustring name) const
+ 
+ /* Node Type Registry */
+ 
+-unordered_map<ustring, NodeType, ustringHash> &NodeType::types()
++unordered_map<ustring, NodeType> &NodeType::types()
+ {
+-  static unordered_map<ustring, NodeType, ustringHash> _types;
++  static unordered_map<ustring, NodeType> _types;
+   return _types;
+ }
+ 
+@@ -221,7 +221,7 @@ NodeType *NodeType::add(const char *name_, CreateFunc create_, Type type_, const
+ 
+ const NodeType *NodeType::find(ustring name)
+ {
+-  unordered_map<ustring, NodeType, ustringHash>::iterator it = types().find(name);
++  unordered_map<ustring, NodeType>::iterator it = types().find(name);
+   return (it == types().end()) ? NULL : &it->second;
+ }
+ 
+diff --git a/intern/cycles/graph/node_type.h b/intern/cycles/graph/node_type.h
+index 7725396..a8e3c10 100644
+--- a/intern/cycles/graph/node_type.h
++++ b/intern/cycles/graph/node_type.h
+@@ -126,7 +126,7 @@ struct NodeType {
+                        Type type = NONE,
+                        const NodeType *base = NULL);
+   static const NodeType *find(ustring name);
+-  static unordered_map<ustring, NodeType, ustringHash> &types();
++  static unordered_map<ustring, NodeType> &types();
+ };
+ 
+ /* Node Definition Macros
+diff --git a/intern/cycles/hydra/volume.cpp b/intern/cycles/hydra/volume.cpp
+index fe19195..2734ad0 100644
+--- a/intern/cycles/hydra/volume.cpp
++++ b/intern/cycles/hydra/volume.cpp
+@@ -77,8 +77,7 @@ void HdCyclesVolume::Populate(HdSceneDelegate *sceneDelegate, HdDirtyBits dirtyB
+         {
+           Attribute *const attr = (std != ATTR_STD_NONE) ?
+                                       _geom->attributes.add(std) :
+-                                      _geom->attributes.add(
+-                                          name, TypeDesc::TypeFloat, ATTR_ELEMENT_VOXEL);
++                                      _geom->attributes.add(name, TypeFloat, ATTR_ELEMENT_VOXEL);
+           attr->data_voxel() = openvdbAsset->GetImageHandle();
+         }
+       }
+diff --git a/intern/cycles/kernel/osl/closures.cpp b/intern/cycles/kernel/osl/closures.cpp
+index 6800c76..4a591cc 100644
+--- a/intern/cycles/kernel/osl/closures.cpp
++++ b/intern/cycles/kernel/osl/closures.cpp
+@@ -119,7 +119,7 @@ void osl_eval_nodes<SHADER_TYPE_SURFACE>(const KernelGlobalsCPU *kg,
+         bool found = kg->osl->services->get_attribute(sd,
+                                                       true,
+                                                       OSLRenderServices::u_empty,
+-                                                      TypeDesc::TypeVector,
++                                                      TypeVector,
+                                                       OSLRenderServices::u_geom_undisplaced,
+                                                       data);
+         (void)found;
+diff --git a/intern/cycles/kernel/osl/services.cpp b/intern/cycles/kernel/osl/services.cpp
+index 21da699..0be1040 100644
+--- a/intern/cycles/kernel/osl/services.cpp
++++ b/intern/cycles/kernel/osl/services.cpp
+@@ -426,9 +426,7 @@ static bool set_attribute_float2(float2 f[3], TypeDesc type, bool derivatives, v
+     }
+     return true;
+   }
+-  else if (type == TypeDesc::TypePoint || type == TypeDesc::TypeVector ||
+-           type == TypeDesc::TypeNormal || type == TypeDesc::TypeColor)
+-  {
++  else if (type == TypePoint || type == TypeVector || type == TypeNormal || type == TypeColor) {
+     float *fval = (float *)val;
+ 
+     fval[0] = f[0].x;
+@@ -447,7 +445,7 @@ static bool set_attribute_float2(float2 f[3], TypeDesc type, bool derivatives, v
+ 
+     return true;
+   }
+-  else if (type == TypeDesc::TypeFloat) {
++  else if (type == TypeFloat) {
+     float *fval = (float *)val;
+     fval[0] = average(f[0]);
+ 
+@@ -497,9 +495,7 @@ static bool set_attribute_float3(float3 f[3], TypeDesc type, bool derivatives, v
+     }
+     return true;
+   }
+-  else if (type == TypeDesc::TypePoint || type == TypeDesc::TypeVector ||
+-           type == TypeDesc::TypeNormal || type == TypeDesc::TypeColor)
+-  {
++  else if (type == TypePoint || type == TypeVector || type == TypeNormal || type == TypeColor) {
+     float *fval = (float *)val;
+ 
+     fval[0] = f[0].x;
+@@ -518,7 +514,7 @@ static bool set_attribute_float3(float3 f[3], TypeDesc type, bool derivatives, v
+ 
+     return true;
+   }
+-  else if (type == TypeDesc::TypeFloat) {
++  else if (type == TypeFloat) {
+     float *fval = (float *)val;
+     fval[0] = average(f[0]);
+ 
+@@ -574,9 +570,7 @@ static bool set_attribute_float4(float4 f[3], TypeDesc type, bool derivatives, v
+     }
+     return true;
+   }
+-  else if (type == TypeDesc::TypePoint || type == TypeDesc::TypeVector ||
+-           type == TypeDesc::TypeNormal || type == TypeDesc::TypeColor)
+-  {
++  else if (type == TypePoint || type == TypeVector || type == TypeNormal || type == TypeColor) {
+     fval[0] = f[0].x;
+     fval[1] = f[0].y;
+     fval[2] = f[0].z;
+@@ -592,7 +586,7 @@ static bool set_attribute_float4(float4 f[3], TypeDesc type, bool derivatives, v
+     }
+     return true;
+   }
+-  else if (type == TypeDesc::TypeFloat) {
++  else if (type == TypeFloat) {
+     fval[0] = average(float4_to_float3(f[0]));
+ 
+     if (derivatives) {
+@@ -639,9 +633,7 @@ static bool set_attribute_float(float f[3], TypeDesc type, bool derivatives, voi
+     }
+     return true;
+   }
+-  else if (type == TypeDesc::TypePoint || type == TypeDesc::TypeVector ||
+-           type == TypeDesc::TypeNormal || type == TypeDesc::TypeColor)
+-  {
++  else if (type == TypePoint || type == TypeVector || type == TypeNormal || type == TypeColor) {
+     float *fval = (float *)val;
+     fval[0] = f[0];
+     fval[1] = f[0];
+@@ -659,7 +651,7 @@ static bool set_attribute_float(float f[3], TypeDesc type, bool derivatives, voi
+ 
+     return true;
+   }
+-  else if (type == TypeDesc::TypeFloat) {
++  else if (type == TypeFloat) {
+     float *fval = (float *)val;
+     fval[0] = f[0];
+ 
+@@ -750,7 +742,7 @@ static bool set_attribute_float3_3(float3 P[3], TypeDesc type, bool derivatives,
+ 
+ static bool set_attribute_matrix(const Transform &tfm, TypeDesc type, void *val)
+ {
+-  if (type == TypeDesc::TypeMatrix) {
++  if (type == TypeMatrix) {
+     copy_matrix(*(OSL::Matrix44 *)val, tfm);
+     return true;
+   }
+diff --git a/intern/cycles/scene/attribute.cpp b/intern/cycles/scene/attribute.cpp
+index 42c3f7e..f471af6 100644
+--- a/intern/cycles/scene/attribute.cpp
++++ b/intern/cycles/scene/attribute.cpp
+@@ -20,10 +20,9 @@ Attribute::Attribute(
+     : name(name), std(ATTR_STD_NONE), type(type), element(element), flags(0), modified(true)
+ {
+   /* string and matrix not supported! */
+-  assert(type == TypeDesc::TypeFloat || type == TypeDesc::TypeColor ||
+-         type == TypeDesc::TypePoint || type == TypeDesc::TypeVector ||
+-         type == TypeDesc::TypeNormal || type == TypeDesc::TypeMatrix || type == TypeFloat2 ||
+-         type == TypeFloat4 || type == TypeRGBA);
++  assert(type == TypeFloat || type == TypeColor || type == TypePoint || type == TypeVector ||
++         type == TypeNormal || type == TypeMatrix || type == TypeFloat2 || type == TypeFloat4 ||
++         type == TypeRGBA);
+ 
+   if (element == ATTR_ELEMENT_VOXEL) {
+     buffer.resize(sizeof(ImageHandle));
+@@ -161,15 +160,15 @@ size_t Attribute::data_sizeof() const
+     return sizeof(ImageHandle);
+   else if (element == ATTR_ELEMENT_CORNER_BYTE)
+     return sizeof(uchar4);
+-  else if (type == TypeDesc::TypeFloat)
++  else if (type == TypeFloat)
+     return sizeof(float);
+   else if (type == TypeFloat2)
+     return sizeof(float2);
+-  else if (type == TypeDesc::TypeMatrix)
++  else if (type == TypeMatrix)
+     return sizeof(Transform);
+   // The float3 type is not interchangeable with float4
+   // as it is now a packed type.
+-  else if (type == TypeDesc::TypeFloat4)
++  else if (type == TypeFloat4)
+     return sizeof(float4);
+   else if (type == TypeRGBA)
+     return sizeof(float4);
+@@ -277,12 +276,8 @@ bool Attribute::same_storage(TypeDesc a, TypeDesc b)
+   if (a == b)
+     return true;
+ 
+-  if (a == TypeDesc::TypeColor || a == TypeDesc::TypePoint || a == TypeDesc::TypeVector ||
+-      a == TypeDesc::TypeNormal)
+-  {
+-    if (b == TypeDesc::TypeColor || b == TypeDesc::TypePoint || b == TypeDesc::TypeVector ||
+-        b == TypeDesc::TypeNormal)
+-    {
++  if (a == TypeColor || a == TypePoint || a == TypeVector || a == TypeNormal) {
++    if (b == TypeColor || b == TypePoint || b == TypeVector || b == TypeNormal) {
+       return true;
+     }
+   }
+@@ -301,13 +296,13 @@ void Attribute::add_with_weight(void *dst, void *src, float weight)
+       ((uchar *)dst)[i] += uchar(((uchar *)src)[i] * weight);
+     }
+   }
+-  else if (same_storage(type, TypeDesc::TypeFloat)) {
++  else if (same_storage(type, TypeFloat)) {
+     *((float *)dst) += *((float *)src) * weight;
+   }
+   else if (same_storage(type, TypeFloat2)) {
+     *((float2 *)dst) += *((float2 *)src) * weight;
+   }
+-  else if (same_storage(type, TypeDesc::TypeVector)) {
++  else if (same_storage(type, TypeVector)) {
+     // Points are float3s and not float4s
+     *((float3 *)dst) += *((float3 *)src) * weight;
+   }
+@@ -409,7 +404,7 @@ AttrKernelDataType Attribute::kernel_type(const Attribute &attr)
+     return AttrKernelDataType::UCHAR4;
+   }
+ 
+-  if (attr.type == TypeDesc::TypeFloat) {
++  if (attr.type == TypeFloat) {
+     return AttrKernelDataType::FLOAT;
+   }
+ 
+@@ -417,7 +412,7 @@ AttrKernelDataType Attribute::kernel_type(const Attribute &attr)
+     return AttrKernelDataType::FLOAT2;
+   }
+ 
+-  if (attr.type == TypeFloat4 || attr.type == TypeRGBA || attr.type == TypeDesc::TypeMatrix) {
++  if (attr.type == TypeFloat4 || attr.type == TypeRGBA || attr.type == TypeMatrix) {
+     return AttrKernelDataType::FLOAT4;
+   }
+ 
+@@ -518,19 +513,19 @@ Attribute *AttributeSet::add(AttributeStandard std, ustring name)
+   if (geometry->geometry_type == Geometry::MESH) {
+     switch (std) {
+       case ATTR_STD_VERTEX_NORMAL:
+-        attr = add(name, TypeDesc::TypeNormal, ATTR_ELEMENT_VERTEX);
++        attr = add(name, TypeNormal, ATTR_ELEMENT_VERTEX);
+         break;
+       case ATTR_STD_FACE_NORMAL:
+-        attr = add(name, TypeDesc::TypeNormal, ATTR_ELEMENT_FACE);
++        attr = add(name, TypeNormal, ATTR_ELEMENT_FACE);
+         break;
+       case ATTR_STD_UV:
+         attr = add(name, TypeFloat2, ATTR_ELEMENT_CORNER);
+         break;
+       case ATTR_STD_UV_TANGENT:
+-        attr = add(name, TypeDesc::TypeVector, ATTR_ELEMENT_CORNER);
++        attr = add(name, TypeVector, ATTR_ELEMENT_CORNER);
+         break;
+       case ATTR_STD_UV_TANGENT_SIGN:
+-        attr = add(name, TypeDesc::TypeFloat, ATTR_ELEMENT_CORNER);
++        attr = add(name, TypeFloat, ATTR_ELEMENT_CORNER);
+         break;
+       case ATTR_STD_VERTEX_COLOR:
+         attr = add(name, TypeRGBA, ATTR_ELEMENT_CORNER_BYTE);
+@@ -538,28 +533,28 @@ Attribute *AttributeSet::add(AttributeStandard std, ustring name)
+       case ATTR_STD_GENERATED:
+       case ATTR_STD_POSITION_UNDEFORMED:
+       case ATTR_STD_POSITION_UNDISPLACED:
+-        attr = add(name, TypeDesc::TypePoint, ATTR_ELEMENT_VERTEX);
++        attr = add(name, TypePoint, ATTR_ELEMENT_VERTEX);
+         break;
+       case ATTR_STD_MOTION_VERTEX_POSITION:
+-        attr = add(name, TypeDesc::TypePoint, ATTR_ELEMENT_VERTEX_MOTION);
++        attr = add(name, TypePoint, ATTR_ELEMENT_VERTEX_MOTION);
+         break;
+       case ATTR_STD_MOTION_VERTEX_NORMAL:
+-        attr = add(name, TypeDesc::TypeNormal, ATTR_ELEMENT_VERTEX_MOTION);
++        attr = add(name, TypeNormal, ATTR_ELEMENT_VERTEX_MOTION);
+         break;
+       case ATTR_STD_PTEX_FACE_ID:
+-        attr = add(name, TypeDesc::TypeFloat, ATTR_ELEMENT_FACE);
++        attr = add(name, TypeFloat, ATTR_ELEMENT_FACE);
+         break;
+       case ATTR_STD_PTEX_UV:
+-        attr = add(name, TypeDesc::TypePoint, ATTR_ELEMENT_VERTEX);
++        attr = add(name, TypePoint, ATTR_ELEMENT_VERTEX);
+         break;
+       case ATTR_STD_GENERATED_TRANSFORM:
+-        attr = add(name, TypeDesc::TypeMatrix, ATTR_ELEMENT_MESH);
++        attr = add(name, TypeMatrix, ATTR_ELEMENT_MESH);
+         break;
+       case ATTR_STD_POINTINESS:
+-        attr = add(name, TypeDesc::TypeFloat, ATTR_ELEMENT_VERTEX);
++        attr = add(name, TypeFloat, ATTR_ELEMENT_VERTEX);
+         break;
+       case ATTR_STD_RANDOM_PER_ISLAND:
+-        attr = add(name, TypeDesc::TypeFloat, ATTR_ELEMENT_FACE);
++        attr = add(name, TypeFloat, ATTR_ELEMENT_FACE);
+         break;
+       default:
+         assert(0);
+@@ -572,16 +567,16 @@ Attribute *AttributeSet::add(AttributeStandard std, ustring name)
+         attr = add(name, TypeFloat2, ATTR_ELEMENT_VERTEX);
+         break;
+       case ATTR_STD_GENERATED:
+-        attr = add(name, TypeDesc::TypePoint, ATTR_ELEMENT_VERTEX);
++        attr = add(name, TypePoint, ATTR_ELEMENT_VERTEX);
+         break;
+       case ATTR_STD_MOTION_VERTEX_POSITION:
+-        attr = add(name, TypeDesc::TypeFloat4, ATTR_ELEMENT_VERTEX_MOTION);
++        attr = add(name, TypeFloat4, ATTR_ELEMENT_VERTEX_MOTION);
+         break;
+       case ATTR_STD_POINT_RANDOM:
+-        attr = add(name, TypeDesc::TypeFloat, ATTR_ELEMENT_VERTEX);
++        attr = add(name, TypeFloat, ATTR_ELEMENT_VERTEX);
+         break;
+       case ATTR_STD_GENERATED_TRANSFORM:
+-        attr = add(name, TypeDesc::TypeMatrix, ATTR_ELEMENT_MESH);
++        attr = add(name, TypeMatrix, ATTR_ELEMENT_MESH);
+         break;
+       default:
+         assert(0);
+@@ -591,10 +586,10 @@ Attribute *AttributeSet::add(AttributeStandard std, ustring name)
+   else if (geometry->geometry_type == Geometry::VOLUME) {
+     switch (std) {
+       case ATTR_STD_VERTEX_NORMAL:
+-        attr = add(name, TypeDesc::TypeNormal, ATTR_ELEMENT_VERTEX);
++        attr = add(name, TypeNormal, ATTR_ELEMENT_VERTEX);
+         break;
+       case ATTR_STD_FACE_NORMAL:
+-        attr = add(name, TypeDesc::TypeNormal, ATTR_ELEMENT_FACE);
++        attr = add(name, TypeNormal, ATTR_ELEMENT_FACE);
+         break;
+       case ATTR_STD_VOLUME_DENSITY:
+       case ATTR_STD_VOLUME_FLAME:
+@@ -603,13 +598,13 @@ Attribute *AttributeSet::add(AttributeStandard std, ustring name)
+       case ATTR_STD_VOLUME_VELOCITY_X:
+       case ATTR_STD_VOLUME_VELOCITY_Y:
+       case ATTR_STD_VOLUME_VELOCITY_Z:
+-        attr = add(name, TypeDesc::TypeFloat, ATTR_ELEMENT_VOXEL);
++        attr = add(name, TypeFloat, ATTR_ELEMENT_VOXEL);
+         break;
+       case ATTR_STD_VOLUME_COLOR:
+-        attr = add(name, TypeDesc::TypeColor, ATTR_ELEMENT_VOXEL);
++        attr = add(name, TypeColor, ATTR_ELEMENT_VOXEL);
+         break;
+       case ATTR_STD_VOLUME_VELOCITY:
+-        attr = add(name, TypeDesc::TypeVector, ATTR_ELEMENT_VOXEL);
++        attr = add(name, TypeVector, ATTR_ELEMENT_VOXEL);
+         break;
+       default:
+         assert(0);
+@@ -622,31 +617,31 @@ Attribute *AttributeSet::add(AttributeStandard std, ustring name)
+         attr = add(name, TypeFloat2, ATTR_ELEMENT_CURVE);
+         break;
+       case ATTR_STD_GENERATED:
+-        attr = add(name, TypeDesc::TypePoint, ATTR_ELEMENT_CURVE);
++        attr = add(name, TypePoint, ATTR_ELEMENT_CURVE);
+         break;
+       case ATTR_STD_MOTION_VERTEX_POSITION:
+-        attr = add(name, TypeDesc::TypeFloat4, ATTR_ELEMENT_CURVE_KEY_MOTION);
++        attr = add(name, TypeFloat4, ATTR_ELEMENT_CURVE_KEY_MOTION);
+         break;
+       case ATTR_STD_CURVE_INTERCEPT:
+-        attr = add(name, TypeDesc::TypeFloat, ATTR_ELEMENT_CURVE_KEY);
++        attr = add(name, TypeFloat, ATTR_ELEMENT_CURVE_KEY);
+         break;
+       case ATTR_STD_CURVE_LENGTH:
+-        attr = add(name, TypeDesc::TypeFloat, ATTR_ELEMENT_CURVE);
++        attr = add(name, TypeFloat, ATTR_ELEMENT_CURVE);
+         break;
+       case ATTR_STD_CURVE_RANDOM:
+-        attr = add(name, TypeDesc::TypeFloat, ATTR_ELEMENT_CURVE);
++        attr = add(name, TypeFloat, ATTR_ELEMENT_CURVE);
+         break;
+       case ATTR_STD_GENERATED_TRANSFORM:
+-        attr = add(name, TypeDesc::TypeMatrix, ATTR_ELEMENT_MESH);
++        attr = add(name, TypeMatrix, ATTR_ELEMENT_MESH);
+         break;
+       case ATTR_STD_POINTINESS:
+-        attr = add(name, TypeDesc::TypeFloat, ATTR_ELEMENT_VERTEX);
++        attr = add(name, TypeFloat, ATTR_ELEMENT_VERTEX);
+         break;
+       case ATTR_STD_RANDOM_PER_ISLAND:
+-        attr = add(name, TypeDesc::TypeFloat, ATTR_ELEMENT_FACE);
++        attr = add(name, TypeFloat, ATTR_ELEMENT_FACE);
+         break;
+       case ATTR_STD_SHADOW_TRANSPARENCY:
+-        attr = add(name, TypeDesc::TypeFloat, ATTR_ELEMENT_CURVE_KEY);
++        attr = add(name, TypeFloat, ATTR_ELEMENT_CURVE_KEY);
+         break;
+       default:
+         assert(0);
+@@ -813,12 +808,12 @@ AttributeRequest::AttributeRequest(ustring name_)
+   name = name_;
+   std = ATTR_STD_NONE;
+ 
+-  type = TypeDesc::TypeFloat;
++  type = TypeFloat;
+   desc.element = ATTR_ELEMENT_NONE;
+   desc.offset = 0;
+   desc.type = NODE_ATTR_FLOAT;
+ 
+-  subd_type = TypeDesc::TypeFloat;
++  subd_type = TypeFloat;
+   subd_desc.element = ATTR_ELEMENT_NONE;
+   subd_desc.offset = 0;
+   subd_desc.type = NODE_ATTR_FLOAT;
+@@ -829,12 +824,12 @@ AttributeRequest::AttributeRequest(AttributeStandard std_)
+   name = ustring();
+   std = std_;
+ 
+-  type = TypeDesc::TypeFloat;
++  type = TypeFloat;
+   desc.element = ATTR_ELEMENT_NONE;
+   desc.offset = 0;
+   desc.type = NODE_ATTR_FLOAT;
+ 
+-  subd_type = TypeDesc::TypeFloat;
++  subd_type = TypeFloat;
+   subd_desc.element = ATTR_ELEMENT_NONE;
+   subd_desc.offset = 0;
+   subd_desc.type = NODE_ATTR_FLOAT;
+diff --git a/intern/cycles/scene/colorspace.cpp b/intern/cycles/scene/colorspace.cpp
+index 14b35e2..b7271ee 100644
+--- a/intern/cycles/scene/colorspace.cpp
++++ b/intern/cycles/scene/colorspace.cpp
+@@ -27,8 +27,8 @@ ustring u_colorspace_srgb("__builtin_srgb");
+ #ifdef WITH_OCIO
+ static thread_mutex cache_colorspaces_mutex;
+ static thread_mutex cache_processors_mutex;
+-static unordered_map<ustring, ustring, ustringHash> cached_colorspaces;
+-static unordered_map<ustring, OCIO::ConstProcessorRcPtr, ustringHash> cached_processors;
++static unordered_map<ustring, ustring> cached_colorspaces;
++static unordered_map<ustring, OCIO::ConstProcessorRcPtr> cached_processors;
+ #endif
+ 
+ ColorSpaceProcessor *ColorSpaceManager::get_processor(ustring colorspace)
+diff --git a/intern/cycles/scene/geometry_attributes.cpp b/intern/cycles/scene/geometry_attributes.cpp
+index c8f2d4a..6a258c0 100644
+--- a/intern/cycles/scene/geometry_attributes.cpp
++++ b/intern/cycles/scene/geometry_attributes.cpp
+@@ -97,9 +97,9 @@ static void emit_attribute_map_entry(AttributeMap *attr_map,
+   attr_map[index].element = desc.element;
+   attr_map[index].offset = as_uint(desc.offset);
+ 
+-  if (type == TypeDesc::TypeFloat)
++  if (type == TypeFloat)
+     attr_map[index].type = NODE_ATTR_FLOAT;
+-  else if (type == TypeDesc::TypeMatrix)
++  else if (type == TypeMatrix)
+     attr_map[index].type = NODE_ATTR_MATRIX;
+   else if (type == TypeFloat2)
+     attr_map[index].type = NODE_ATTR_FLOAT2;
+@@ -302,7 +302,7 @@ void GeometryManager::update_attribute_element_offset(Geometry *geom,
+       }
+       attr_uchar4_offset += size;
+     }
+-    else if (mattr->type == TypeDesc::TypeFloat) {
++    else if (mattr->type == TypeFloat) {
+       float *data = mattr->data_float();
+       offset = attr_float_offset;
+ 
+@@ -328,7 +328,7 @@ void GeometryManager::update_attribute_element_offset(Geometry *geom,
+       }
+       attr_float2_offset += size;
+     }
+-    else if (mattr->type == TypeDesc::TypeMatrix) {
++    else if (mattr->type == TypeMatrix) {
+       Transform *tfm = mattr->data_transform();
+       offset = attr_float4_offset;
+ 
+@@ -435,13 +435,13 @@ static void update_attribute_element_size(Geometry *geom,
+     else if (mattr->element == ATTR_ELEMENT_CORNER_BYTE) {
+       *attr_uchar4_size += size;
+     }
+-    else if (mattr->type == TypeDesc::TypeFloat) {
++    else if (mattr->type == TypeFloat) {
+       *attr_float_size += size;
+     }
+     else if (mattr->type == TypeFloat2) {
+       *attr_float2_size += size;
+     }
+-    else if (mattr->type == TypeDesc::TypeMatrix) {
++    else if (mattr->type == TypeMatrix) {
+       *attr_float4_size += size * 4;
+     }
+     else if (mattr->type == TypeFloat4 || mattr->type == TypeRGBA) {
+diff --git a/intern/cycles/scene/mesh_subdivision.cpp b/intern/cycles/scene/mesh_subdivision.cpp
+index 31ac22c..f5a0f5a 100644
+--- a/intern/cycles/scene/mesh_subdivision.cpp
++++ b/intern/cycles/scene/mesh_subdivision.cpp
+@@ -253,7 +253,7 @@ class OsdData {
+       for (int i = 0; i < refiner->GetMaxLevel(); i++) {
+         char *dest = src + refiner->GetLevel(i).GetNumVertices() * attr.data_sizeof();
+ 
+-        if (attr.same_storage(attr.type, TypeDesc::TypeFloat)) {
++        if (attr.same_storage(attr.type, TypeFloat)) {
+           primvar_refiner.Interpolate(i + 1, (OsdValue<float> *)src, (OsdValue<float> *&)dest);
+         }
+         else if (attr.same_storage(attr.type, TypeFloat2)) {
+@@ -272,7 +272,7 @@ class OsdData {
+       }
+ 
+       if (num_local_points) {
+-        if (attr.same_storage(attr.type, TypeDesc::TypeFloat)) {
++        if (attr.same_storage(attr.type, TypeFloat)) {
+           patch_table->ComputeLocalPointValues(
+               (OsdValue<float> *)&attr.buffer[0],
+               (OsdValue<float> *)&attr.buffer[num_refiner_verts * attr.data_sizeof()]);
+diff --git a/intern/cycles/scene/object.cpp b/intern/cycles/scene/object.cpp
+index 1791e63..e48d91a 100644
+--- a/intern/cycles/scene/object.cpp
++++ b/intern/cycles/scene/object.cpp
+@@ -1056,7 +1056,7 @@ string ObjectManager::get_cryptomatte_objects(Scene *scene)
+ {
+   string manifest = "{";
+ 
+-  unordered_set<ustring, ustringHash> objects;
++  unordered_set<ustring> objects;
+   foreach (Object *object, scene->objects) {
+     if (objects.count(object->name)) {
+       continue;
+@@ -1072,7 +1072,7 @@ string ObjectManager::get_cryptomatte_objects(Scene *scene)
+ string ObjectManager::get_cryptomatte_assets(Scene *scene)
+ {
+   string manifest = "{";
+-  unordered_set<ustring, ustringHash> assets;
++  unordered_set<ustring> assets;
+   foreach (Object *ob, scene->objects) {
+     if (assets.count(ob->asset_name)) {
+       continue;
+diff --git a/intern/cycles/scene/osl.cpp b/intern/cycles/scene/osl.cpp
+index 7637e57..d449dd4 100644
+--- a/intern/cycles/scene/osl.cpp
++++ b/intern/cycles/scene/osl.cpp
+@@ -916,37 +916,37 @@ void OSLCompiler::parameter(ShaderNode *node, const char *name)
+   switch (socket.type) {
+     case SocketType::BOOLEAN: {
+       int value = node->get_bool(socket);
+-      ss->Parameter(name, TypeDesc::TypeInt, &value);
++      ss->Parameter(name, TypeInt, &value);
+       break;
+     }
+     case SocketType::FLOAT: {
+       float value = node->get_float(socket);
+-      ss->Parameter(uname, TypeDesc::TypeFloat, &value);
++      ss->Parameter(uname, TypeFloat, &value);
+       break;
+     }
+     case SocketType::INT: {
+       int value = node->get_int(socket);
+-      ss->Parameter(uname, TypeDesc::TypeInt, &value);
++      ss->Parameter(uname, TypeInt, &value);
+       break;
+     }
+     case SocketType::COLOR: {
+       float3 value = node->get_float3(socket);
+-      ss->Parameter(uname, TypeDesc::TypeColor, &value);
++      ss->Parameter(uname, TypeColor, &value);
+       break;
+     }
+     case SocketType::VECTOR: {
+       float3 value = node->get_float3(socket);
+-      ss->Parameter(uname, TypeDesc::TypeVector, &value);
++      ss->Parameter(uname, TypeVector, &value);
+       break;
+     }
+     case SocketType::POINT: {
+       float3 value = node->get_float3(socket);
+-      ss->Parameter(uname, TypeDesc::TypePoint, &value);
++      ss->Parameter(uname, TypePoint, &value);
+       break;
+     }
+     case SocketType::NORMAL: {
+       float3 value = node->get_float3(socket);
+-      ss->Parameter(uname, TypeDesc::TypeNormal, &value);
++      ss->Parameter(uname, TypeNormal, &value);
+       break;
+     }
+     case SocketType::POINT2: {
+@@ -956,19 +956,19 @@ void OSLCompiler::parameter(ShaderNode *node, const char *name)
+     }
+     case SocketType::STRING: {
+       ustring value = node->get_string(socket);
+-      ss->Parameter(uname, TypeDesc::TypeString, &value);
++      ss->Parameter(uname, TypeString, &value);
+       break;
+     }
+     case SocketType::ENUM: {
+       ustring value = node->get_string(socket);
+-      ss->Parameter(uname, TypeDesc::TypeString, &value);
++      ss->Parameter(uname, TypeString, &value);
+       break;
+     }
+     case SocketType::TRANSFORM: {
+       Transform value = node->get_transform(socket);
+       ProjectionTransform projection(value);
+       projection = projection_transpose(projection);
+-      ss->Parameter(uname, TypeDesc::TypeMatrix, &projection);
++      ss->Parameter(uname, TypeMatrix, &projection);
+       break;
+     }
+     case SocketType::BOOLEAN_ARRAY: {
+@@ -977,17 +977,17 @@ void OSLCompiler::parameter(ShaderNode *node, const char *name)
+       array<int> intvalue(value.size());
+       for (size_t i = 0; i < value.size(); i++)
+         intvalue[i] = value[i];
+-      ss->Parameter(uname, array_typedesc(TypeDesc::TypeInt, value.size()), intvalue.data());
++      ss->Parameter(uname, array_typedesc(TypeInt, value.size()), intvalue.data());
+       break;
+     }
+     case SocketType::FLOAT_ARRAY: {
+       const array<float> &value = node->get_float_array(socket);
+-      ss->Parameter(uname, array_typedesc(TypeDesc::TypeFloat, value.size()), value.data());
++      ss->Parameter(uname, array_typedesc(TypeFloat, value.size()), value.data());
+       break;
+     }
+     case SocketType::INT_ARRAY: {
+       const array<int> &value = node->get_int_array(socket);
+-      ss->Parameter(uname, array_typedesc(TypeDesc::TypeInt, value.size()), value.data());
++      ss->Parameter(uname, array_typedesc(TypeInt, value.size()), value.data());
+       break;
+     }
+     case SocketType::COLOR_ARRAY:
+@@ -998,16 +998,16 @@ void OSLCompiler::parameter(ShaderNode *node, const char *name)
+ 
+       switch (socket.type) {
+         case SocketType::COLOR_ARRAY:
+-          typedesc = TypeDesc::TypeColor;
++          typedesc = TypeColor;
+           break;
+         case SocketType::VECTOR_ARRAY:
+-          typedesc = TypeDesc::TypeVector;
++          typedesc = TypeVector;
+           break;
+         case SocketType::POINT_ARRAY:
+-          typedesc = TypeDesc::TypePoint;
++          typedesc = TypePoint;
+           break;
+         case SocketType::NORMAL_ARRAY:
+-          typedesc = TypeDesc::TypeNormal;
++          typedesc = TypeNormal;
+           break;
+         default:
+           assert(0);
+@@ -1036,7 +1036,7 @@ void OSLCompiler::parameter(ShaderNode *node, const char *name)
+     }
+     case SocketType::STRING_ARRAY: {
+       const array<ustring> &value = node->get_string_array(socket);
+-      ss->Parameter(uname, array_typedesc(TypeDesc::TypeString, value.size()), value.data());
++      ss->Parameter(uname, array_typedesc(TypeString, value.size()), value.data());
+       break;
+     }
+     case SocketType::TRANSFORM_ARRAY: {
+@@ -1045,7 +1045,7 @@ void OSLCompiler::parameter(ShaderNode *node, const char *name)
+       for (size_t i = 0; i < value.size(); i++) {
+         fvalue[i] = projection_transpose(ProjectionTransform(value[i]));
+       }
+-      ss->Parameter(uname, array_typedesc(TypeDesc::TypeMatrix, fvalue.size()), fvalue.data());
++      ss->Parameter(uname, array_typedesc(TypeMatrix, fvalue.size()), fvalue.data());
+       break;
+     }
+     case SocketType::CLOSURE:
+@@ -1061,55 +1061,55 @@ void OSLCompiler::parameter(ShaderNode *node, const char *name)
+ 
+ void OSLCompiler::parameter(const char *name, float f)
+ {
+-  ss->Parameter(name, TypeDesc::TypeFloat, &f);
++  ss->Parameter(name, TypeFloat, &f);
+ }
+ 
+ void OSLCompiler::parameter_color(const char *name, float3 f)
+ {
+-  ss->Parameter(name, TypeDesc::TypeColor, &f);
++  ss->Parameter(name, TypeColor, &f);
+ }
+ 
+ void OSLCompiler::parameter_point(const char *name, float3 f)
+ {
+-  ss->Parameter(name, TypeDesc::TypePoint, &f);
++  ss->Parameter(name, TypePoint, &f);
+ }
+ 
+ void OSLCompiler::parameter_normal(const char *name, float3 f)
+ {
+-  ss->Parameter(name, TypeDesc::TypeNormal, &f);
++  ss->Parameter(name, TypeNormal, &f);
+ }
+ 
+ void OSLCompiler::parameter_vector(const char *name, float3 f)
+ {
+-  ss->Parameter(name, TypeDesc::TypeVector, &f);
++  ss->Parameter(name, TypeVector, &f);
+ }
+ 
+ void OSLCompiler::parameter(const char *name, int f)
+ {
+-  ss->Parameter(name, TypeDesc::TypeInt, &f);
++  ss->Parameter(name, TypeInt, &f);
+ }
+ 
+ void OSLCompiler::parameter(const char *name, const char *s)
+ {
+-  ss->Parameter(name, TypeDesc::TypeString, &s);
++  ss->Parameter(name, TypeString, &s);
+ }
+ 
+ void OSLCompiler::parameter(const char *name, ustring s)
+ {
+   const char *str = s.c_str();
+-  ss->Parameter(name, TypeDesc::TypeString, &str);
++  ss->Parameter(name, TypeString, &str);
+ }
+ 
+ void OSLCompiler::parameter(const char *name, const Transform &tfm)
+ {
+   ProjectionTransform projection(tfm);
+   projection = projection_transpose(projection);
+-  ss->Parameter(name, TypeDesc::TypeMatrix, (float *)&projection);
++  ss->Parameter(name, TypeMatrix, (float *)&projection);
+ }
+ 
+ void OSLCompiler::parameter_array(const char *name, const float f[], int arraylen)
+ {
+-  TypeDesc type = TypeDesc::TypeFloat;
++  TypeDesc type = TypeFloat;
+   type.arraylen = arraylen;
+   ss->Parameter(name, type, f);
+ }
+@@ -1125,7 +1125,7 @@ void OSLCompiler::parameter_color_array(const char *name, const array<float3> &f
+     table[i][2] = f[i].z;
+   }
+ 
+-  TypeDesc type = TypeDesc::TypeColor;
++  TypeDesc type = TypeColor;
+   type.arraylen = table.size();
+   ss->Parameter(name, type, table.data());
+ }
+diff --git a/intern/cycles/scene/shader.cpp b/intern/cycles/scene/shader.cpp
+index 0f2e5e0..be49138 100644
+--- a/intern/cycles/scene/shader.cpp
++++ b/intern/cycles/scene/shader.cpp
+@@ -749,7 +749,7 @@ float3 ShaderManager::rec709_to_scene_linear(float3 c)
+ string ShaderManager::get_cryptomatte_materials(Scene *scene)
+ {
+   string manifest = "{";
+-  unordered_set<ustring, ustringHash> materials;
++  unordered_set<ustring> materials;
+   foreach (Shader *shader, scene->shaders) {
+     if (materials.count(shader->name)) {
+       continue;
+diff --git a/intern/cycles/scene/shader.h b/intern/cycles/scene/shader.h
+index fab09fc..6cf6275 100644
+--- a/intern/cycles/scene/shader.h
++++ b/intern/cycles/scene/shader.h
+@@ -228,7 +228,7 @@ class ShaderManager {
+ 
+   uint32_t update_flags;
+ 
+-  typedef unordered_map<ustring, uint64_t, ustringHash> AttributeIDMap;
++  typedef unordered_map<ustring, uint64_t> AttributeIDMap;
+   AttributeIDMap unique_attribute_id;
+ 
+   static thread_mutex lookup_table_mutex;
+diff --git a/intern/cycles/scene/stats.h b/intern/cycles/scene/stats.h
+index b1ce2c8..5c02875 100644
+--- a/intern/cycles/scene/stats.h
++++ b/intern/cycles/scene/stats.h
+@@ -130,7 +130,7 @@ class NamedSampleCountStats {
+   string full_report(int indent_level = 0);
+   void add(const ustring &name, uint64_t samples, uint64_t hits);
+ 
+-  typedef unordered_map<ustring, NamedSampleCountPair, ustringHash> entry_map;
++  typedef unordered_map<ustring, NamedSampleCountPair> entry_map;
+   entry_map entries;
+ };
+ 
