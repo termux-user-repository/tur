@@ -30,6 +30,7 @@ TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 TERMUX_PKG_RM_AFTER_INSTALL="
 lib/python*
 "
+TERMUX_DEBUG_BUILD=true
 # tls: failed to verify certificate: x509: certificate signed by unknown authority
 # this problem happens a lot in termux-docker and I don't know how to fix it
 export GIT_SSL_NO_VERIFY=1
@@ -53,6 +54,13 @@ termux_step_pre_configure() {
 		_ARCH=$TERMUX_ARCH
 	fi
 	python3 ./build_files/utils/make_update.py --architecture $_ARCH
+
+	# TEMPORARY for debugging
+	local dir="include/oneapi/tbb"
+	find "$TERMUX_PREFIX/$dir" -type f | \
+		xargs -n 1 sed -i \
+		-e 's| _DEBUG| _DEBUG_DISABLING_THIS_TEMPORARILY|g'
+	TERMUX_PKG_RM_AFTER_INSTALL+=" $dir"
 }
 
 termux_step_post_make_install() {
