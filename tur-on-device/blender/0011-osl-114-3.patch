@@ -1,0 +1,83 @@
+From faa17e2cc673421efd48969d4ddbb60d01f649ee Mon Sep 17 00:00:00 2001
+From: Brecht Van Lommel <brecht@blender.org>
+Date: Sun, 5 Jan 2025 01:19:04 +0100
+Subject: [PATCH] OpenShadingLanguage: Compatibility with version 1.14 (beta)
+
+Pull Request: https://projects.blender.org/blender/blender/pulls/132654
+---
+ intern/cycles/kernel/osl/compat.h     | 4 ++++
+ intern/cycles/kernel/osl/services.cpp | 8 ++++++++
+ intern/cycles/kernel/osl/services.h   | 9 +++++++++
+ 3 files changed, 21 insertions(+)
+
+diff --git a/intern/cycles/kernel/osl/compat.h b/intern/cycles/kernel/osl/compat.h
+index a9fc52e8570b..feeb598091b0 100644
+--- a/intern/cycles/kernel/osl/compat.h
++++ b/intern/cycles/kernel/osl/compat.h
+@@ -10,7 +10,11 @@ CCL_NAMESPACE_BEGIN
+ 
+ #if OSL_LIBRARY_VERSION_CODE >= 11302
+ typedef OSL::ustringhash OSLUStringHash;
++#  if OSL_LIBRARY_VERSION_CODE >= 11400
++typedef OSL::ustringhash OSLUStringRep;
++#  else
+ typedef OSL::ustringrep OSLUStringRep;
++#  endif
+ 
+ static inline OSL::ustring to_ustring(OSLUStringHash h)
+ {
+diff --git a/intern/cycles/kernel/osl/services.cpp b/intern/cycles/kernel/osl/services.cpp
+index 91fa0ebd96bb..e5d601d58b5f 100644
+--- a/intern/cycles/kernel/osl/services.cpp
++++ b/intern/cycles/kernel/osl/services.cpp
+@@ -1640,7 +1640,11 @@ int OSLRenderServices::pointcloud_search(OSL::ShaderGlobals *sg,
+                                          const float radius,
+                                          const int max_points,
+                                          bool sort,
++#if OSL_LIBRARY_VERSION_CODE >= 11400
++                                         int *indices,
++#else
+                                          size_t *out_indices,
++#endif
+                                          float *out_distances,
+                                          const int derivs_offset)
+ {
+@@ -1649,7 +1653,11 @@ int OSLRenderServices::pointcloud_search(OSL::ShaderGlobals *sg,
+ 
+ int OSLRenderServices::pointcloud_get(OSL::ShaderGlobals *sg,
+                                       OSLUStringHash filename,
++#if OSL_LIBRARY_VERSION_CODE >= 11400
++                                      const int *indices,
++#else
+                                       size_t *indices,
++#endif
+                                       int count,
+                                       OSLUStringHash attr_name,
+                                       TypeDesc attr_type,
+diff --git a/intern/cycles/kernel/osl/services.h b/intern/cycles/kernel/osl/services.h
+index d832c0195a89..e9f59eea4255 100644
+--- a/intern/cycles/kernel/osl/services.h
++++ b/intern/cycles/kernel/osl/services.h
+@@ -142,13 +142,22 @@ class OSLRenderServices : public OSL::RendererServices {
+                         float radius,
+                         int max_points,
+                         bool sort,
++#if OSL_LIBRARY_VERSION_CODE >= 11400
++                        int *out_indices,
++#else
+                         size_t *out_indices,
++#endif
+                         float *out_distances,
+                         int derivs_offset) override;
+ 
+   int pointcloud_get(OSL::ShaderGlobals *sg,
+                      OSLUStringHash filename,
++#if OSL_LIBRARY_VERSION_CODE >= 11400
++                     const int *indices,
++#else
+                      size_t *indices,
++#endif
++
+                      int count,
+                      OSLUStringHash attr_name,
+                      TypeDesc attr_type,

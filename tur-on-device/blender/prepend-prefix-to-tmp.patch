@@ -1,0 +1,116 @@
+diff --git a/extern/ceres/include/ceres/solver.h b/extern/ceres/include/ceres/solver.h
+index 026fc1c..a70a9d5 100644
+--- a/extern/ceres/include/ceres/solver.h
++++ b/extern/ceres/include/ceres/solver.h
+@@ -672,7 +672,7 @@ class CERES_EXPORT Solver {
+     // non-empty if trust_region_minimizer_iterations_to_dump is
+     // non-empty and trust_region_problem_dump_format_type is not
+     // CONSOLE.
+-    std::string trust_region_problem_dump_directory = "/tmp";
++    std::string trust_region_problem_dump_directory = "@TERMUX_PREFIX@/tmp";
+     DumpFormatType trust_region_problem_dump_format_type = TEXTFILE;
+ 
+     // Finite differences options ----------------------------------------------
+diff --git a/extern/glog/src/logging.cc b/extern/glog/src/logging.cc
+index 0c86cf6..57df457 100644
+--- a/extern/glog/src/logging.cc
++++ b/extern/glog/src/logging.cc
+@@ -1862,7 +1862,7 @@ static void GetTempDirectories(vector<string>* list) {
+     getenv("TMPDIR"), getenv("TMP"),
+ 
+     // If all else fails
+-    "/tmp",
++    "@TERMUX_PREFIX@/tmp",
+   };
+ 
+   for (size_t i = 0; i < ARRAYSIZE(candidates); i++) {
+diff --git a/scripts/modules/bl_i18n_utils/settings.py b/scripts/modules/bl_i18n_utils/settings.py
+index 2733c2e..aa6ecc1 100644
+--- a/scripts/modules/bl_i18n_utils/settings.py
++++ b/scripts/modules/bl_i18n_utils/settings.py
+@@ -585,7 +585,7 @@ CUSTOM_PY_UI_FILES = [
+ SRC_POTFILES = ""
+ 
+ # A cache storing validated msgids, to avoid re-spellchecking them.
+-SPELL_CACHE = os.path.join("/tmp", ".spell_cache")
++SPELL_CACHE = os.path.join("@TERMUX_PREFIX@/tmp", ".spell_cache")
+ 
+ # Threshold defining whether a new msgid is similar enough with an old one to reuse its translation...
+ SIMILAR_MSGID_THRESHOLD = 0.75
+diff --git a/scripts/modules/graphviz_export.py b/scripts/modules/graphviz_export.py
+index 1af9fcb..4e7088a 100644
+--- a/scripts/modules/graphviz_export.py
++++ b/scripts/modules/graphviz_export.py
+@@ -186,6 +186,6 @@ def graph_armature(obj, filepath, FAKE_PARENT=True, CONSTRAINTS=True, DRIVERS=Tr
+ 
+ if __name__ == "__main__":
+     import os
+-    tmppath = "/tmp/test.dot"
++    tmppath = "@TERMUX_PREFIX@/tmp/test.dot"
+     graph_armature(bpy.context.object, tmppath, CONSTRAINTS=True, DRIVERS=True)
+     os.system("dot -Tpng %s > %s; eog %s &" % (tmppath, tmppath + '.png', tmppath + '.png'))
+diff --git a/source/blender/blenlib/intern/delaunay_2d.cc b/source/blender/blenlib/intern/delaunay_2d.cc
+index 4deb8f3..3bcee07 100644
+--- a/source/blender/blenlib/intern/delaunay_2d.cc
++++ b/source/blender/blenlib/intern/delaunay_2d.cc
+@@ -482,7 +482,7 @@ template<typename T> void cdt_draw(const std::string &label, const CDTArrangemen
+ #  ifdef _WIN32
+   const char *drawfile = "./cdt_debug_draw.html";
+ #  else
+-  const char *drawfile = "/tmp/cdt_debug_draw.html";
++  const char *drawfile = "@TERMUX_PREFIX@/tmp/cdt_debug_draw.html";
+ #  endif
+   constexpr int max_draw_width = 1800;
+   constexpr int max_draw_height = 1600;
+diff --git a/source/blender/blenlib/intern/mesh_boolean.cc b/source/blender/blenlib/intern/mesh_boolean.cc
+index 387990c..fd098e1 100644
+--- a/source/blender/blenlib/intern/mesh_boolean.cc
++++ b/source/blender/blenlib/intern/mesh_boolean.cc
+@@ -631,7 +631,7 @@ static void write_obj_cell_patch(const IMesh &m,
+ #  ifdef _WIN_32
+   const char *objdir = BLI_getenv("HOME");
+ #  else
+-  const char *objdir = "/tmp/";
++  const char *objdir = "@TERMUX_PREFIX@/tmp/";
+ #  endif
+ 
+   std::string fname = std::string(objdir) + name + std::string("_cellpatch.obj");
+diff --git a/source/blender/blenlib/intern/mesh_intersect.cc b/source/blender/blenlib/intern/mesh_intersect.cc
+index 401ee6e..a825894 100644
+--- a/source/blender/blenlib/intern/mesh_intersect.cc
++++ b/source/blender/blenlib/intern/mesh_intersect.cc
+@@ -3101,7 +3101,7 @@ void write_obj_mesh(IMesh &m, const std::string &objname)
+ #  ifdef _WIN_32
+   const char *objdir = BLI_getenv("HOME");
+ #  else
+-  const char *objdir = "/tmp/";
++  const char *objdir = "@TERMUX_PREFIX@/tmp/";
+ #  endif
+   if (m.face_size() == 0) {
+     return;
+diff --git a/source/blender/blenlib/intern/tempfile.c b/source/blender/blenlib/intern/tempfile.c
+index efdf2a8..f4c6e8f 100644
+--- a/source/blender/blenlib/intern/tempfile.c
++++ b/source/blender/blenlib/intern/tempfile.c
+@@ -31,7 +31,7 @@ void BLI_temp_directory_path_get(char *temp_directory, const size_t buffer_size)
+   }
+ 
+   if (temp_directory[0] == '\0') {
+-    BLI_strncpy(temp_directory, "/tmp/", buffer_size);
++    BLI_strncpy(temp_directory, "@TERMUX_PREFIX@/tmp/", buffer_size);
+   }
+   else {
+     /* Add a trailing slash if needed. */
+diff --git a/tools/utils/cycles_timeit.py b/tools/utils/cycles_timeit.py
+index bb5d0d5..71b34a3 100755
+--- a/tools/utils/cycles_timeit.py
++++ b/tools/utils/cycles_timeit.py
+@@ -130,7 +130,7 @@ def benchmarkFile(blender, blendfile, stats):
+     re_pipeline_time = re.compile(r"Time: ([0-9:\.]+) \(Saving: ([0-9:\.]+)\)")
+     # Prepare output folder.
+     # TODO(sergey): Use some proper output folder.
+-    output_folder = "/tmp/"
++    output_folder = "@TERMUX_PREFIX@/tmp/"
+     # Configure command for the current file.
+     command = (blender,
+                "--background",

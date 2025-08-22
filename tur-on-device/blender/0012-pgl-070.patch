@@ -1,0 +1,101 @@
+From 5d06b7b906b39dc6235ed00460df72c3b3f013a7 Mon Sep 17 00:00:00 2001
+From: bartus <szczepaniak.bartek+github@gmail.com>
+Date: Thu, 15 Feb 2024 14:27:55 +0100
+Subject: [PATCH] Cycles: Add support for OpenPGL 0.6.0
+
+Replace PGLFieldArguments with FieldConfig class for this version.
+
+Co-authored-by: Brecht Van Lommel <brecht@blender.org>
+
+Pull Request: https://projects.blender.org/blender/blender/pulls/118328
+---
+ intern/cycles/integrator/path_trace.cpp | 36 +++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
+
+diff --git a/intern/cycles/integrator/path_trace.cpp b/intern/cycles/integrator/path_trace.cpp
+index cbfab13..8eb92cb 100644
+--- a/intern/cycles/integrator/path_trace.cpp
++++ b/intern/cycles/integrator/path_trace.cpp
+@@ -1276,44 +1276,82 @@ void PathTrace::set_guiding_params(const GuidingParams &guiding_params, const bo
+   if (guiding_params_.modified(guiding_params)) {
+     guiding_params_ = guiding_params;
+ 
++#  if !(OPENPGL_VERSION_MAJOR == 0 && OPENPGL_VERSION_MINOR <= 5)
++#    define OPENPGL_USE_FIELD_CONFIG
++#  endif
++
+     if (guiding_params_.use) {
++#  ifdef OPENPGL_USE_FIELD_CONFIG
++      openpgl::cpp::FieldConfig field_config;
++#  else
+       PGLFieldArguments field_args;
++#  endif
++
+       switch (guiding_params_.type) {
+         default:
+         /* Parallax-aware von Mises-Fisher mixture models. */
+         case GUIDING_TYPE_PARALLAX_AWARE_VMM: {
++#  ifdef OPENPGL_USE_FIELD_CONFIG
++          field_config.Init(
++              PGL_SPATIAL_STRUCTURE_TYPE::PGL_SPATIAL_STRUCTURE_KDTREE,
++              PGL_DIRECTIONAL_DISTRIBUTION_TYPE::PGL_DIRECTIONAL_DISTRIBUTION_PARALLAX_AWARE_VMM,
++              guiding_params.deterministic);
++#  else
+           pglFieldArgumentsSetDefaults(
+               field_args,
+               PGL_SPATIAL_STRUCTURE_TYPE::PGL_SPATIAL_STRUCTURE_KDTREE,
+               PGL_DIRECTIONAL_DISTRIBUTION_TYPE::PGL_DIRECTIONAL_DISTRIBUTION_PARALLAX_AWARE_VMM);
++#  endif
+           break;
+         }
+         /* Directional quad-trees. */
+         case GUIDING_TYPE_DIRECTIONAL_QUAD_TREE: {
++#  ifdef OPENPGL_USE_FIELD_CONFIG
++          field_config.Init(
++              PGL_SPATIAL_STRUCTURE_TYPE::PGL_SPATIAL_STRUCTURE_KDTREE,
++              PGL_DIRECTIONAL_DISTRIBUTION_TYPE::PGL_DIRECTIONAL_DISTRIBUTION_QUADTREE,
++              guiding_params.deterministic);
++#  else
+           pglFieldArgumentsSetDefaults(
+               field_args,
+               PGL_SPATIAL_STRUCTURE_TYPE::PGL_SPATIAL_STRUCTURE_KDTREE,
+               PGL_DIRECTIONAL_DISTRIBUTION_TYPE::PGL_DIRECTIONAL_DISTRIBUTION_QUADTREE);
++#  endif
+           break;
+         }
+         /* von Mises-Fisher mixture models. */
+         case GUIDING_TYPE_VMM: {
++#  ifdef OPENPGL_USE_FIELD_CONFIG
++          field_config.Init(PGL_SPATIAL_STRUCTURE_TYPE::PGL_SPATIAL_STRUCTURE_KDTREE,
++                            PGL_DIRECTIONAL_DISTRIBUTION_TYPE::PGL_DIRECTIONAL_DISTRIBUTION_VMM,
++                            guiding_params.deterministic);
++#  else
+           pglFieldArgumentsSetDefaults(
+               field_args,
+               PGL_SPATIAL_STRUCTURE_TYPE::PGL_SPATIAL_STRUCTURE_KDTREE,
+               PGL_DIRECTIONAL_DISTRIBUTION_TYPE::PGL_DIRECTIONAL_DISTRIBUTION_VMM);
++#  endif
+           break;
+         }
+       }
++
++#  ifdef OPENPGL_USE_FIELD_CONFIG
++      field_config.SetSpatialStructureArgMaxDepth(16);
++#  else
+ #  if OPENPGL_VERSION_MINOR >= 4
+       field_args.deterministic = guiding_params.deterministic;
+ #  endif
+       reinterpret_cast<PGLKDTreeArguments *>(field_args.spatialSturctureArguments)->maxDepth = 16;
++#  endif
+       openpgl::cpp::Device *guiding_device = static_cast<openpgl::cpp::Device *>(
+           device_->get_guiding_device());
+       if (guiding_device) {
+         guiding_sample_data_storage_ = make_unique<openpgl::cpp::SampleStorage>();
++#  ifdef OPENPGL_USE_FIELD_CONFIG
++        guiding_field_ = make_unique<openpgl::cpp::Field>(guiding_device, field_config);
++#  else
+         guiding_field_ = make_unique<openpgl::cpp::Field>(guiding_device, field_args);
++#  endif
+       }
+       else {
+         guiding_sample_data_storage_ = nullptr;
