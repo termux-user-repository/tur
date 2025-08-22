@@ -37,6 +37,11 @@ on:
         description: "A space-separated names of packages selected for rebuilding"
         required: true
 
+# this is here because TUR packages.yml does not ever use setup-ubuntu.sh.
+# if that changes, make this conditional instead of global.
+env:
+  CLEAN_DOCKER_IMAGES: false
+
 jobs:
   build:
     runs-on: ubuntu-24.04
@@ -207,10 +212,7 @@ jobs:
       if: ${{ steps.build-info.outputs.skip-building != 'true' }}
       run: |
         if grep -Eq "^($(paste -s -d '|' ./big-pkgs.list))$" ./built_tur_packages.txt; then
-          sudo apt purge -yq $(dpkg -l | grep '^ii' | awk '{ print $2 }' | grep -P '(aspnetcore|cabal-|dotnet-|ghc-|libmono|mongodb-|mysql-|php)') \
-            firefox google-chrome-stable microsoft-edge-stable mono-devel mono-runtime-common monodoc-manual ruby
-          sudo apt autoremove -yq
-          sudo rm -rf /opt/hostedtoolcache /usr/local /usr/share/dotnet /usr/share/swift
+          ./scripts/free-space.sh
         fi
     - name: Build packages
       if: ${{ steps.build-info.outputs.skip-building != 'true' }}
