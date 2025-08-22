@@ -1,5 +1,7 @@
 .*-jumbo
 .*-jumbo-host-tools
+blender
+blender4
 chromium-beta
 chromium-beta-host-tools
 code-server
