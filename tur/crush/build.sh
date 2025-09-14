@@ -1,22 +1,21 @@
 TERMUX_PKG_HOMEPAGE=https://github.com/charmbracelet/crush
 TERMUX_PKG_DESCRIPTION="The glamourous AI coding agent for your favourite terminal"
-TERMUX_PKG_LICENSE="FSL-1.1-MIT"
-TERMUX_PKG_MAINTAINER="@termux"
-TERMUX_PKG_VERSION="0.6.2"
+TERMUX_PKG_LICENSE="custom"
+TERMUX_PKG_LICENSE_FILE="LICENSE.md"
+TERMUX_PKG_MAINTAINER="@ancientcatz"
+TERMUX_PKG_VERSION="0.8.1"
 TERMUX_PKG_SRCURL=https://github.com/charmbracelet/crush/archive/v${TERMUX_PKG_VERSION}.tar.gz
-TERMUX_PKG_SHA256=a84fa00092bf9253539713e3c50451faa44240b8aa151e846dcb1aab87f1bcd3
+TERMUX_PKG_SHA256=45de4d00032381a178b33bc1b9adf0cc87bb6d31632d0d26abca84ea99926496
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_AUTO_UPDATE=false
-TERMUX_PKG_SUGGESTS=git
+TERMUX_PKG_UPDATE_TAG_TYPE="latest-release-tag"
 
 termux_step_pre_configure() {
 	termux_setup_golang
 }
 
 termux_step_make() {
-	mkdir -p "${TERMUX_PKG_BUILDDIR}/src/github.com/charmbracelet"
-
-	go get -v
+	export GOEXPERIMENT='greenteagc'
 	go build -ldflags "-s -w -X github.com/charmbracelet/crush/internal/version.Version=${TERMUX_PKG_VERSION}"
 }
 
