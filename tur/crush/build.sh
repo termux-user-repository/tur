@@ -3,9 +3,9 @@ TERMUX_PKG_DESCRIPTION="The glamourous AI coding agent for your favourite termin
 TERMUX_PKG_LICENSE="custom"
 TERMUX_PKG_LICENSE_FILE="LICENSE.md"
 TERMUX_PKG_MAINTAINER="@ancientcatz"
-TERMUX_PKG_VERSION="0.8.1"
+TERMUX_PKG_VERSION="0.10.4"
 TERMUX_PKG_SRCURL=https://github.com/charmbracelet/crush/archive/v${TERMUX_PKG_VERSION}.tar.gz
-TERMUX_PKG_SHA256=45de4d00032381a178b33bc1b9adf0cc87bb6d31632d0d26abca84ea99926496
+TERMUX_PKG_SHA256=24074bbf98871966061ca364458d6dfa0c319dcd7910437cc3dcc9911e90113b
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_AUTO_UPDATE=false
 TERMUX_PKG_UPDATE_TAG_TYPE="latest-release-tag"
@@ -25,7 +25,6 @@ termux_step_make_install() {
 	mkdir -p "${TERMUX_PREFIX}/share/fish/vendor_completions.d"
 	mkdir -p "${TERMUX_PREFIX}/share/bash-completion/completions"
 
-	# borrowed from packages/gh
 	unset GOOS GOARCH CGO_LDFLAGS
 	unset CC CXX CFLAGS CXXFLAGS LDFLAGS
 	go run .             man > "${TERMUX_PREFIX}/share/man/man1/${TERMUX_PKG_NAME}.1"
