@@ -1,0 +1,41 @@
+--- a/src/utils/ipset.c
++++ b/src/utils/ipset.c
+@@ -22,6 +22,10 @@
+ #include <linux/netlink.h>
+ #include <linux/rtnetlink.h>
+ 
++#ifdef __ANDROID__
++#include <sys/endian.h>
++#endif
++
+ #define NFNL_SUBSYS_IPSET 6
+ 
+ #define IPSET_ATTR_DATA 7
+--- a/src/utils/neighbors.c
++++ b/src/utils/neighbors.c
+@@ -24,6 +24,12 @@
+ #include <stdlib.h>
+ #include <unistd.h>
+ 
++#ifdef __ANDROID__
++#include <netinet/in.h>
++#include <netinet/in6.h>
++#include <sys/endian.h>
++#endif
++
+ static int netlink_neighbor_fd;
+ 
+ int netlink_get_neighbors(int family,
+--- a/src/utils/misc.c
++++ b/src/utils/misc.c
+@@ -30,6 +30,10 @@
+ #include <time.h>
+ #include <unistd.h>
+ 
++#ifdef __ANDROID__
++#include <netinet/in.h>
++#endif
++
+ unsigned long get_tick_count(void)
+ {
+ 	struct timespec ts;

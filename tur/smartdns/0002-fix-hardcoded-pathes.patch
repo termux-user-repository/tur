@@ -11,16 +11,17 @@
  #define TMP_BUFF_LEN_32 32
  
  static int verbose_screen;
---- a/src/dns_conf.h
-+++ b/src/dns_conf.h
-@@ -57,13 +57,13 @@
- #define MAX_QTYPE_NUM 65535
- #define DNS_MAX_REPLY_IP_NUM 8
+--- a/src/include/smartdns/dns_conf.h
++++ b/src/include/smartdns/dns_conf.h
+@@ -65,14 +65,14 @@
+ #define DNS_MAX_SERVE_EXPIRED_TIME (3600 * 24 * 365)
+ #define MAX_INTERFACE_LEN 16
  
 -#define SMARTDNS_CONF_FILE "/etc/smartdns/smartdns.conf"
 -#define SMARTDNS_LOG_FILE "/var/log/smartdns/smartdns.log"
 -#define SMARTDNS_AUDIT_FILE "/var/log/smartdns/smartdns-audit.log"
 -#define SMARTDNS_CACHE_FILE "/var/cache/smartdns/smartdns.cache"
+-#define SMARTDNS_DATA_DIR "/var/lib/smartdns"
 -#define SMARTDNS_TMP_CACHE_FILE "/tmp/smartdns.cache"
 -#define SMARTDNS_DEBUG_DIR "/tmp/smartdns"
 -#define DNS_RESOLV_FILE "/etc/resolv.conf"
@@ -28,14 +29,15 @@
 +#define SMARTDNS_LOG_FILE "@TERMUX_PREFIX@/var/log/smartdns/smartdns.log"
 +#define SMARTDNS_AUDIT_FILE "@TERMUX_PREFIX@/var/log/smartdns/smartdns-audit.log"
 +#define SMARTDNS_CACHE_FILE "@TERMUX_PREFIX@/var/cache/smartdns/smartdns.cache"
++#define SMARTDNS_DATA_DIR "@TERMUX_PREFIX@/var/lib/smartdns"
 +#define SMARTDNS_TMP_CACHE_FILE "@TERMUX_PREFIX@/tmp/smartdns.cache"
 +#define SMARTDNS_DEBUG_DIR "@TERMUX_PREFIX@/tmp/smartdns"
 +#define DNS_RESOLV_FILE "@TERMUX_PREFIX@/etc/resolv.conf"
  
  enum domain_rule {
  	DOMAIN_RULE_FLAGS = 0,
---- a/src/dns_client.c
-+++ b/src/dns_client.c
+--- a/src/dns_client/client_tls.c
++++ b/src/dns_client/client_tls.c
 @@ -937,8 +937,8 @@
  
  		const STACK_OF(X509_NAME) *cas = SSL_CTX_get_client_CA_list(ssl_ctx);
@@ -73,8 +75,8 @@
  # cache-persist no
  
  # cache persist file
--# cache-file /tmp/smartdns.cache
-+# cache-file @TERMUX_PREFIX@/tmp/smartdns.cache
+-# cache-file /var/cache/smartdns.cache
++# cache-file @TERMUX_PREFIX@/var/cache/smartdns.cache
  
  # cache persist time
  # cache-checkpoint-time [second]
@@ -91,8 +93,8 @@
  # audit-enable yes
  # audit-SOA [yes|no]: enable or disable log soa result.
  # audit-size size of each audit file, support k,m,g
--# audit-file /var/log/smartdns-audit.log
-+# audit-file @TERMUX_PREFIX@/var/log/smartdns-audit.log
+-# audit-file /var/log/smartdns/smartdns-audit.log
++# audit-file @TERMUX_PREFIX@/var/log/smartdns/smartdns-audit.log
  # audit-console [yes|no]: output audit log to console.
  # audit-syslog [yes|no]: output audit log to syslog.
  # audit-file-mode [mode]: file mode of audit file.
@@ -115,7 +117,7 @@
  
  # remote udp dns server list
  # server [IP]:[PORT]|URL [-blacklist-ip] [-whitelist-ip] [-check-edns] [-group [group] ...] [-exclude-default-group]
-@@ -366,7 +366,7 @@
+@@ -399,7 +399,7 @@
  #   [-f] -file [path/to/set]: file path of domain set
  # 
  # example:
@@ -124,3 +126,20 @@
  # address /domain-set:domain-list/1.2.3.4
  # nameserver /domain-set:domain-list/server-group
  # ipset /domain-set:domain-list/ipset
+@@ -438,14 +438,14 @@
+ 
+ # data directory
+ # data-dir [path]
+-# data-dir /var/lib/smartdns
++# data-dir @TERMUX_PREFIX@/var/lib/smartdns
+ 
+ # load plugin
+ # plugin [path/to/file] [args]
+ 
+ # web ui plugin
+ # plugin smartdns_ui.so
+-# smartdns-ui.www-root /usr/share/smartdns/wwwroot
++# smartdns-ui.www-root @TERMUX_PREFIX@/share/smartdns/wwwroot
+ # smartdns-ui.ip http://0.0.0.0:6080
+ # smartdns-ui.ip https://[::]:6080
+ # smartdns-ui.token-expire 600
