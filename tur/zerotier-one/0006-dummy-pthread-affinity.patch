@@ -9,6 +9,6 @@
 +#else
 +				int rc = sched_setaffinity(pthread_gettid_np(self), sizeof(cpu_set_t), &cpuset);
 +#endif
- 				if (rc != 0)
- 				{
+ 				if (rc != 0) {
  					fprintf(stderr, "Failed to pin tap thread %d to core %d: %s\n", i, pinCore, strerror(errno));
+ 					exit(1);
