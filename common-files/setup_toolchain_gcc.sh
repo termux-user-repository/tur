@@ -193,7 +193,7 @@ _setup_standalone_toolchain_current_ndk_newer_gcc() {
 		cp -R $TERMUX_STANDALONE_TOOLCHAIN/sysroot/usr/include/* $GCC_STANDALONE_TOOLCHAIN_TMP/sysroot/usr/include
 		for f in $(find "$TERMUX_SCRIPTDIR/tur/ndk-sysroot-gcc-compact/" -maxdepth 1 -type f -name *.patch | sort); do
 			echo "Applying patch: $(basename $f)"
-			patch -d "$GCC_STANDALONE_TOOLCHAIN_TMP/sysroot/usr/include/" -p8 < "$f";
+			patch -d "$GCC_STANDALONE_TOOLCHAIN_TMP/sysroot/usr/include/" -p8 --silent < "$f";
 		done
 		cp -R $TERMUX_STANDALONE_TOOLCHAIN/sysroot/usr/lib/$TERMUX_HOST_PLATFORM/$TERMUX_PKG_API_LEVEL/* \
 			$GCC_STANDALONE_TOOLCHAIN_TMP/sysroot/usr/lib/
