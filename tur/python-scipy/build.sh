@@ -2,13 +2,14 @@ TERMUX_PKG_HOMEPAGE=https://scipy.org/
 TERMUX_PKG_DESCRIPTION="Fundamental algorithms for scientific computing in Python"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="1:1.16.0"
+TERMUX_PKG_VERSION="1:1.16.2"
 TERMUX_PKG_SRCURL=git+https://github.com/scipy/scipy
 TERMUX_PKG_DEPENDS="libc++, libopenblas, python, python-numpy"
 TERMUX_PKG_BUILD_DEPENDS="python-numpy-static"
 TERMUX_PKG_PYTHON_COMMON_DEPS="wheel, 'Cython>=3.0.4', meson-python, build"
 _NUMPY_VERSION=$(. $TERMUX_SCRIPTDIR/packages/python-numpy/build.sh; echo $TERMUX_PKG_VERSION)
 TERMUX_PKG_PYTHON_BUILD_DEPS="pythran, 'pybind11>=2.10.4', 'numpy==$_NUMPY_VERSION'"
+TERMUX_PKG_ON_DEVICE_BUILD_NOT_SUPPORTED=true
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_UPDATE_TAG_TYPE="latest-release-tag"
 
@@ -39,10 +40,6 @@ bin/
 source $TERMUX_SCRIPTDIR/common-files/setup_toolchain_gcc.sh
 
 termux_step_pre_configure() {
-	if $TERMUX_ON_DEVICE_BUILD; then
-		termux_error_exit "Package '$TERMUX_PKG_NAME' is not available for on-device builds."
-	fi
-
 	_setup_toolchain_ndk_gcc_15
 
 	LDFLAGS+=" -Wl,--no-as-needed,-lpython${TERMUX_PYTHON_VERSION},--as-needed"
