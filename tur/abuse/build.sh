@@ -12,6 +12,9 @@ TERMUX_PKG_SRCURL=https://github.com/Xenoveritas/abuse/archive/refs/tags/v$TERMU
 TERMUX_PKG_SHA256=73d41d11a1d3681d32a2073182a4132fe4cf92bf45db344b516aa915259bee09
 TERMUX_PKG_DEPENDS="sdl2, sdl2-mixer"
 TERMUX_PKG_AUTO_UPDATE=true
+TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
+-DCMAKE_POLICY_VERSION_MINIMUM=3.5
+"
 
 source $TERMUX_SCRIPTDIR/common-files/setup_toolchain_gcc.sh
 
