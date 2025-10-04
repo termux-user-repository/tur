@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="Cross-platform Rust rewrite of the GNU coreutils"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="0.2.2"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://github.com/uutils/coreutils/archive/refs/tags/$TERMUX_PKG_VERSION.tar.gz
 TERMUX_PKG_SHA256=4a847a3aaf241d11f07fdc04ef36d73c722759675858665bc17e94f56c4fbfb3
 TERMUX_PKG_BUILD_IN_SRC=true
@@ -26,9 +27,13 @@ termux_step_make() {
 	unset CXXFLAGS
 
 	make \
+		DESTDIR=/ \
+		PREFIX="$TERMUX_PREFIX" \
+		PROG_PREFIX=uu- \
 		PROFILE=release \
 		MULTICALL=y \
 		CARGOFLAGS="--target $CARGO_TARGET_NAME" \
+		LIBSTDBUF_DIR="$TERMUX_PREFIX/libexec/uutils-coreutils" \
 		SELINUX_ENABLED=0 \
 		MANPAGES=0 \
 		COMPLETIONS=0 \
@@ -44,6 +49,7 @@ termux_step_make_install() {
 		MULTICALL=y \
 		CARGOFLAGS="--target $CARGO_TARGET_NAME" \
 		CARGO_TARGET_DIR="$(pwd)/target/$CARGO_TARGET_NAME" \
+		LIBSTDBUF_DIR="$TERMUX_PREFIX/libexec/uutils-coreutils" \
 		SELINUX_ENABLED=0 \
 		MANPAGES=0 \
 		COMPLETIONS=0 \
