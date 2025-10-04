@@ -43,7 +43,7 @@ termux_step_pre_configure() {
 		termux_error_exit "Package '$TERMUX_PKG_NAME' is not available for on-device builds."
 	fi
 
-	_setup_toolchain_ndk_gcc_11
+	_setup_toolchain_ndk_gcc_15
 
 	LDFLAGS+=" -Wl,--no-as-needed,-lpython${TERMUX_PYTHON_VERSION},--as-needed"
 
