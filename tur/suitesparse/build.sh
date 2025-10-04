@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="A Suite of Sparse matrix packages."
 TERMUX_PKG_LICENSE="GPL-3.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="1:7.9.0"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://github.com/DrTimothyAldenDavis/SuiteSparse/archive/refs/tags/v${TERMUX_PKG_VERSION#*:}.tar.gz
 TERMUX_PKG_SHA256=bc0b3987a502913959581614ab67098f9f203a45bb424870f2342375f96dbcb7
 TERMUX_PKG_DEPENDS="libandroid-complex-math, blas-openblas, libopenblas, libgmp, libmpfr"
