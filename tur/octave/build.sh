@@ -53,7 +53,7 @@ termux_step_post_get_source() {
 }
 
 termux_step_pre_configure() {
-	_setup_toolchain_ndk_gcc_11
+	_setup_toolchain_ndk_gcc_15
 
 	LDFLAGS+=" -Wl,-rpath,$TERMUX_PREFIX/lib/octave/${TERMUX_PKG_VERSION#*:}"
 

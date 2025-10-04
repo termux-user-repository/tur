@@ -11,6 +11,6 @@ TERMUX_PKG_AUTO_UPDATE=true
 source $TERMUX_SCRIPTDIR/common-files/setup_toolchain_gcc.sh
 
 termux_step_pre_configure() {
-	_setup_toolchain_ndk_gcc_11
+	_setup_toolchain_ndk_gcc_15
 	_override_configure_cmake_for_gcc
 }
