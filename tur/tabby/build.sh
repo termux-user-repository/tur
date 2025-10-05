@@ -2,7 +2,7 @@ TERMUX_PKG_HOMEPAGE=https://tabby.tabbyml.com/
 TERMUX_PKG_DESCRIPTION="Self-hosted AI coding assistant"
 TERMUX_PKG_LICENSE="Apache-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="0.30.0"
+TERMUX_PKG_VERSION="0.31.2"
 TERMUX_PKG_SRCURL=git+https://github.com/TabbyML/tabby
 TERMUX_PKG_DEPENDS="graphviz, libc++, libopenblas, libsqlite"
 TERMUX_PKG_BUILD_IN_SRC=true
@@ -16,11 +16,29 @@ termux_step_pre_configure() {
 	termux_setup_rust
 	termux_setup_cmake
 
-	# Dummy CMake toolchain file to workaround build error:
-	# CMake Error at /home/builder/.termux-build/_cache/cmake-3.30.3/share/cmake-3.30/Modules/Platform/Android-Determine.cmake:218 (message):
-	# Android: Neither the NDK or a standalone toolchain was found.
-	export TARGET_CMAKE_TOOLCHAIN_FILE="${TERMUX_PKG_BUILDDIR}/android.toolchain.cmake"
-	touch "${TERMUX_PKG_BUILDDIR}/android.toolchain.cmake"
+	export TARGET_CMAKE_TOOLCHAIN_FILE="$TERMUX_PKG_TMPDIR/android.toolchain.cmake"
+	cat <<- EOL > "$TARGET_CMAKE_TOOLCHAIN_FILE"
+	set(CMAKE_ASM_FLAGS "\${CMAKE_ASM_FLAGS} --target=${CCTERMUX_HOST_PLATFORM}")
+	set(CMAKE_C_FLAGS "\${CMAKE_C_FLAGS} --target=${CCTERMUX_HOST_PLATFORM} ${CFLAGS}")
+	set(CMAKE_CXX_FLAGS "\${CMAKE_CXX_FLAGS} --target=${CCTERMUX_HOST_PLATFORM} ${CXXFLAGS}")
+	set(CMAKE_C_COMPILER "${TERMUX_STANDALONE_TOOLCHAIN}/bin/${CC}")
+	set(CMAKE_CXX_COMPILER "${TERMUX_STANDALONE_TOOLCHAIN}/bin/${CXX}")
+	set(CMAKE_AR "$(command -v ${AR})")
+	set(CMAKE_RANLIB "$(command -v ${RANLIB})")
+	set(CMAKE_STRIP "$(command -v ${STRIP})")
+	set(CMAKE_FIND_ROOT_PATH "${TERMUX_PREFIX}")
+	set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM "NEVER")
+	set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE "ONLY")
+	set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY "ONLY")
+	set(CMAKE_SKIP_INSTALL_RPATH "ON")
+	set(CMAKE_USE_SYSTEM_LIBRARIES "True")
+	set(CMAKE_CROSSCOMPILING "True")
+	set(CMAKE_LINKER "${TERMUX_STANDALONE_TOOLCHAIN}/bin/${LD} ${LDFLAGS}")
+	set(CMAKE_SYSTEM_NAME "Android")
+	set(CMAKE_SYSTEM_VERSION "${TERMUX_PKG_API_LEVEL}")
+	set(CMAKE_SYSTEM_PROCESSOR "${TERMUX_ARCH}")
+	set(CMAKE_ANDROID_STANDALONE_TOOLCHAIN "${TERMUX_STANDALONE_TOOLCHAIN}")
+	EOL
 
 	if [ "$TERMUX_ARCH" = "x86_64" ]; then
 		local env_host=$(printf $CARGO_TARGET_NAME | tr a-z A-Z | sed s/-/_/g)
