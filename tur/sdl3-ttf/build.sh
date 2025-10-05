@@ -1,0 +1,15 @@
+TERMUX_PKG_HOMEPAGE=https://github.com/libsdl-org/SDL_ttf
+TERMUX_PKG_DESCRIPTION="A library that allows you to use TrueType fonts in your SDL applications (version 3)"
+TERMUX_PKG_LICENSE="ZLIB"
+TERMUX_PKG_LICENSE_FILE="LICENSE.txt"
+TERMUX_PKG_MAINTAINER="@termux-user-repository"
+TERMUX_PKG_VERSION="3.2.2"
+TERMUX_PKG_SRCURL=https://github.com/libsdl-org/SDL_ttf/archive/refs/tags/release-${TERMUX_PKG_VERSION}.tar.gz
+TERMUX_PKG_SHA256=ff6b81d3dc39d843cc3ead6dedd68043a79513d266792ea89445547ef4e9b073
+TERMUX_PKG_AUTO_UPDATE=true
+TERMUX_PKG_UPDATE_VERSION_SED_REGEXP='s/.*-//'
+TERMUX_PKG_DEPENDS="freetype, opengl, sdl3"
+TERMUX_PKG_ANTI_BUILD_DEPENDS="sdl3"
+TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
+-DSDLTTF_VENDORED=OFF
+"
