@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://github.com/huggingface/tokenizers
 TERMUX_PKG_DESCRIPTION="Fast State-of-the-Art Tokenizers optimized for Research and Production"
 TERMUX_PKG_LICENSE="Apache-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="0.21.2"
+TERMUX_PKG_VERSION="0.22.1"
 TERMUX_PKG_SRCURL=https://github.com/huggingface/tokenizers/archive/refs/tags/v$TERMUX_PKG_VERSION.tar.gz
-TERMUX_PKG_SHA256=5b2140475bbaeb9dbbbbd72a39aff5f2490cdd66acc26d19b0c8310f51688872
+TERMUX_PKG_SHA256=89d784577087b814e57d8b0d11e5b0ecdcdf77808a05ed7960cfba171f94b7a7
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_DEPENDS="libc++, python, python-pip"
 TERMUX_PKG_PYTHON_COMMON_DEPS="wheel"
@@ -52,13 +52,14 @@ termux_step_make_install() {
 				-Z build-std
 
 	local _pyver="${TERMUX_PYTHON_VERSION/./}"
+	local _tag="cp39-abi3"
 	# Fix wheel name, although it it built with tag `cp39-abi3`, but it is linked against `python3.x.so`
 	# so it will not work on other pythons.
 	if [ "$TERMUX_ARCH" = "arm" ]; then
-		mv ./target/wheels/tokenizers-$TERMUX_PKG_VERSION-cp39-abi3-linux_armv7l.whl \
+		mv ./target/wheels/tokenizers-$TERMUX_PKG_VERSION-$_tag-linux_armv7l.whl \
 			./target/wheels/tokenizers-$TERMUX_PKG_VERSION-py$_pyver-none-any.whl
 	else
-		mv ./target/wheels/tokenizers-$TERMUX_PKG_VERSION-cp39-abi3-linux_$TERMUX_ARCH.whl \
+		mv ./target/wheels/tokenizers-$TERMUX_PKG_VERSION-$_tag-linux_$TERMUX_ARCH.whl \
 			./target/wheels/tokenizers-$TERMUX_PKG_VERSION-cp$_pyver-cp$_pyver-linux_$TERMUX_ARCH.whl
 	fi
 
