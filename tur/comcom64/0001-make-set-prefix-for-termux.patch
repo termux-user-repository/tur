@@ -1,0 +1,29 @@
+From 47731265b3b0ae82b71fd5768c1a24d84880b218 Mon Sep 17 00:00:00 2001
+From: Stas Sergeev <stsp2@yandex.ru>
+Date: Tue, 7 Oct 2025 23:03:45 +0300
+Subject: [PATCH] make: set prefix for termux
+
+---
+ src/makefile | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/src/makefile b/src/makefile
+index e4622d5..8ad8030 100644
+--- a/src/makefile
++++ b/src/makefile
+@@ -3,7 +3,12 @@ VERSION = 0.4
+ srcdir ?= $(CURDIR)
+ vpath %.c $(srcdir)
+ vpath %.S $(srcdir)
++# on Termux PREFIX is used
++ifneq ($(PREFIX),)
++prefix := $(PREFIX)
++else
+ prefix ?= /usr/local
++endif
+ DATADIR ?= $(prefix)/share/comcom64
+ CFLAGS ?= -Wall -O2 -Wmissing-declarations -Wwrite-strings \
+   -ggdb3 -Wunused -Wmissing-prototypes -flto=auto
+-- 
+2.48.1
+
