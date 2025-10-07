@@ -1,0 +1,26 @@
+From 910d092e27ec83467c775e4ba97c0cdf86d333db Mon Sep 17 00:00:00 2001
+From: Stas Sergeev <stsp@users.sourceforge.net>
+Date: Tue, 7 Oct 2025 22:59:16 +0300
+Subject: [PATCH 1/2] configure: set correct prefix on termux
+
+---
+ configure.ac | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/configure.ac b/configure.ac
+index 5ae1c99f8..624265a7f 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -23,6 +23,9 @@ AC_PROG_LN_S
+ AC_PROG_SED
+ AC_PROG_GREP
+ 
++# termux uses PREFIX var for default prefix
++AC_PREFIX_DEFAULT([${PREFIX:-/usr/local}])
++
+ AC_CHECK_PROGS([PKG_CONFIG], [pkg-config])
+ if test -z "$PKG_CONFIG"; then
+   AC_MSG_ERROR(Install pkg-config and retry.)
+-- 
+2.48.1
+
