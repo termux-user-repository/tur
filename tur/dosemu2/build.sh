@@ -3,13 +3,16 @@ TERMUX_PKG_DESCRIPTION="Run DOS programs under linux."
 TERMUX_PKG_LICENSE="GPL-2.0"
 TERMUX_PKG_MAINTAINER="@stsp"
 TERMUX_PKG_VERSION="2.0pre9-git"
-TERMUX_PKG_REVISION=4
+TERMUX_PKG_REVISION=5
 TERMUX_PKG_SRCURL=git+https://github.com/dosemu2/dosemu2
 TERMUX_PKG_GIT_BRANCH=devel
 _COMMIT=e368b3cd4c83a7491b208ced18c8421df613632f
 TERMUX_PKG_SHA256=2b1378a97030a1a5c4ae15c0618a8255c5dd553497138439010d5417cde1fb89
 TERMUX_PKG_BUILD_DEPENDS="libandroid-posix-semaphore, libandroid-glob, slang, libao, fluidsynth, ladspa-sdk, libslirp, libbsd, readline, json-c, libseccomp, libsearpc, sdl3, sdl3-ttf, fontconfig, fdpp, dj64dev"
-TERMUX_PKG_DEPENDS="comcom64, instfd, libandroid-posix-semaphore, libandroid-glob, slang, libao, fluidsynth, ladspa-sdk, libslirp, libbsd, readline, json-c, libseccomp, libsearpc, fdpp, dj64dev"
+TERMUX_PKG_DEPENDS="comcom64, instfd, libandroid-posix-semaphore, libandroid-glob, slang, libao, fluidsynth, ladspa-sdk, libslirp, libbsd, readline, json-c, libseccomp, libsearpc, sdl3, sdl3-ttf, fontconfig, fdpp, dj64dev"
+TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
+--disable-landlock
+"
 
 termux_step_post_get_source() {
 	git fetch --unshallow
