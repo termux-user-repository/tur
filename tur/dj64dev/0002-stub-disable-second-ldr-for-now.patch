@@ -1,0 +1,26 @@
+From 64fe342f0ede2464d59135271c73836537156ae4 Mon Sep 17 00:00:00 2001
+From: Stas Sergeev <stsp@users.sourceforge.net>
+Date: Tue, 7 Oct 2025 23:09:43 +0300
+Subject: [PATCH 2/2] stub: disable second ldr for now
+
+It fails on Android.
+---
+ src/djdev64/stub/stub.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/djdev64/stub/stub.c b/src/djdev64/stub/stub.c
+index 7455784c4..c0f4c80e8 100644
+--- a/src/djdev64/stub/stub.c
++++ b/src/djdev64/stub/stub.c
+@@ -424,7 +424,7 @@ int djstub_main(int argc, char *argv[], char *envp[],
+     ops->read_sections(handle, lin2ptr(mem_lin), va, pfile, dyn ? 0 : coffset);
+     ops->close(handle);
+     unregister_dosops();
+-#define PASS_EMBOV_TO_SECOND_LDR 1
++#define PASS_EMBOV_TO_SECOND_LDR 0
+     if (dyn && pl32
+ #if PASS_EMBOV_TO_SECOND_LDR
+         /* pass emb_ov format to another (libelf-based) loader */
+-- 
+2.48.1
+
