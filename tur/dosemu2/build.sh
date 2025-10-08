@@ -3,17 +3,16 @@ TERMUX_PKG_DESCRIPTION="Run DOS programs under linux."
 TERMUX_PKG_LICENSE="GPL-2.0"
 TERMUX_PKG_MAINTAINER="@stsp"
 TERMUX_PKG_VERSION="2.0pre9-git"
-TERMUX_PKG_REVISION=6
+TERMUX_PKG_REVISION=7
 TERMUX_PKG_SRCURL=git+https://github.com/dosemu2/dosemu2
 TERMUX_PKG_GIT_BRANCH=devel
-_COMMIT=1b3de44560587de5de6b73e701ecaadedb1ba645
-TERMUX_PKG_SHA256=c2038b8259109872acdb91d4517d826481dfa7400fb9df37158c9f75b6dbdb44
+_COMMIT=c7ad0d99415025b5a8ed756365de751582df8d99
+TERMUX_PKG_SHA256=b2cf6a905af5618bb6e40da7a278f852913e4812eb617d274f14878a61550b20
 TERMUX_PKG_BUILD_DEPENDS="libandroid-posix-semaphore, libandroid-glob, slang, libao, fluidsynth, ladspa-sdk, libslirp, libbsd, readline, json-c, libseccomp, libsearpc, sdl3, sdl3-ttf, fontconfig, fdpp, dj64dev"
 TERMUX_PKG_DEPENDS="comcom64, instfd, libandroid-posix-semaphore, libandroid-glob, slang, libao, fluidsynth, ladspa-sdk, libslirp, libbsd, readline, json-c, libseccomp, libsearpc, sdl3, sdl3-ttf, fontconfig, fdpp, dj64dev"
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 --disable-landlock
 --disable-solib
---disable-cpuemu-jit
 "
 
 termux_step_post_get_source() {
