@@ -14,10 +14,49 @@ TERMUX_PKG_BUILD_DEPENDS="libffi-static"
 TERMUX_PKG_EXCLUDED_ARCHES="i686"
 TERMUX_PKG_NO_STRIP=true
 TERMUX_PKG_NO_ELF_CLEANER=true
+TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_ON_DEVICE_BUILD_NOT_SUPPORTED=true
 
 SYSTEM_LIBRARIES="    fontconfig"
 # TERMUX_PKG_DEPENDS="fontconfig"
+
+termux_pkg_auto_update() {
+	local latest_version="$(curl -s 'https://chromiumdash.appspot.com/fetch_releases?channel=Beta&platform=Linux&num=10&offset=0' | jq -rc '.[].version' | sort -t. -k 1,1n -k 2,2n -k 3,3n -k 4,4n | tail -n 1)"
+
+	if ! termux_pkg_is_update_needed \
+		"${TERMUX_PKG_VERSION#*:}" "${latest_version}"; then
+		echo "INFO: No update needed. Already at version '${latest_version}'."
+		return 0
+	fi
+
+	local e=0
+	local uptime_now=$(cat /proc/uptime)
+	local uptime_s="${uptime_now//.*}"
+	local uptime_h_limit=4
+	local uptime_s_limit=$((uptime_h_limit*60*60))
+	[[ -z "${uptime_s}" ]] && [[ "$(uname -o)" != "Android" ]] && e=1
+	[[ "${uptime_s}" == 0 ]] && [[ "$(uname -o)" != "Android" ]] && e=1
+	[[ "${uptime_s}" -gt "${uptime_s_limit}" ]] && e=1
+
+	if [[ "${e}" != 0 ]]; then
+		cat <<- EOL >&2
+		WARN: Auto update failure!
+		latest_version=${latest_version}
+		uptime_now=${uptime_now}
+		uptime_s=${uptime_s}
+		uptime_s_limit=${uptime_s_limit}
+		EOL
+		return
+	fi
+
+	local tmpdir="$(mktemp -d)"
+	curl -sLo "${tmpdir}/tmpfile" "https://commondatastorage.googleapis.com/chromium-browser-official/chromium-$latest_version.tar.xz"
+	local sha="$(sha256sum "${tmpdir}/tmpfile" | cut -d ' ' -f 1)"
+	rm -fr "${tmpdir}"
+	printf '%s\n' 'INFO: Generated checksums:' "${sha}"
+
+	termux_error_exit "ERROR: current version '${TERMUX_PKG_VERSION}', latest version '${latest_version}'."
+}
 
 termux_step_post_get_source() {
 	# Apply patches related to chromium
