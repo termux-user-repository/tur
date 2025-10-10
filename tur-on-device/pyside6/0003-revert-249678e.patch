@@ -1,0 +1,123 @@
+Reverts https://github.com/qtproject/pyside-pyside-setup/commit/249678e5d19d5e9ef7f24d68a154da806aed4a81 ,
+which fixes the build error
+ImportError: dlopen failed: cannot locate symbol "PepEval_GetFrameGlobals"
+referenced by "/data/data/com.termux/files/home/.termux-build/pyside6/build/sources/pyside6/PySide6/QtCore.cpython-312.so"...
+while building using Python 3.12 (it is assumed that building with Python 3.13 would have a different result)
+
+diff --git a/sources/pyside6/libpyside/feature_select.cpp b/sources/pyside6/libpyside/feature_select.cpp
+index bc43239..dc4a29e 100644
+--- a/sources/pyside6/libpyside/feature_select.cpp
++++ b/sources/pyside6/libpyside/feature_select.cpp
+@@ -298,12 +298,13 @@ static inline int getFeatureSelectId()
+ {
+     static auto *undef = PyLong_FromLong(-1);
+     static auto *feature_dict = GetFeatureDict();
+-
+-    Shiboken::AutoDecRef globals(PepEval_GetFrameGlobals());
+-    if (globals.isNull() || globals.object() == cached_globals)
++    // these things are all borrowed
++    auto *globals = PyEval_GetGlobals();
++    if (globals == nullptr
++        || globals == cached_globals)
+         return last_select_id;
+ 
+-    auto *modname = PyDict_GetItem(globals.object(), PyMagicName::name());
++    auto *modname = PyDict_GetItem(globals, PyMagicName::name());
+     if (modname == nullptr)
+         return last_select_id;
+ 
+diff --git a/sources/pyside6/libpysideqml/pysideqmlregistertype.cpp b/sources/pyside6/libpysideqml/pysideqmlregistertype.cpp
+index 3148a6e..90b10e3 100644
+--- a/sources/pyside6/libpysideqml/pysideqmlregistertype.cpp
++++ b/sources/pyside6/libpysideqml/pysideqmlregistertype.cpp
+@@ -98,11 +98,8 @@ static inline bool isQmlParserStatus(const QMetaObject *o)
+ 
+ static QByteArray getGlobalString(const char *name)
+ {
+-    Shiboken::AutoDecRef globals(PepEval_GetFrameGlobals());
+-    if (globals.isNull())
+-        return {};
++    PyObject *globalVar = PyDict_GetItemString(PyEval_GetGlobals(), name);
+ 
+-    PyObject *globalVar = PyDict_GetItemString(globals, name);
+     if (globalVar == nullptr || PyUnicode_Check(globalVar) == 0)
+         return {};
+ 
+@@ -112,11 +109,7 @@ static QByteArray getGlobalString(const char *name)
+ 
+ static int getGlobalInt(const char *name)
+ {
+-    Shiboken::AutoDecRef globals(PepEval_GetFrameGlobals());
+-    if (globals.isNull())
+-        return -1;
+-
+-    PyObject *globalVar = PyDict_GetItemString(globals, name);
++    PyObject *globalVar = PyDict_GetItemString(PyEval_GetGlobals(), name);
+     if (globalVar == nullptr || PyLong_Check(globalVar) == 0)
+         return -1;
+ 
+diff --git a/sources/shiboken6/libshiboken/helper.cpp b/sources/shiboken6/libshiboken/helper.cpp
+index 2c10380..92f70f1 100644
+--- a/sources/shiboken6/libshiboken/helper.cpp
++++ b/sources/shiboken6/libshiboken/helper.cpp
+@@ -492,16 +492,10 @@ bool listToArgcArgv(PyObject *argList, int *argcIn, char ***argvIn, const char *
+         auto *argv = new char *[1];
+         *argvIn = argv;
+         *argcIn = 1;
+-
+-        const char *appNameC = nullptr;
+-        Shiboken::AutoDecRef globals(PepEval_GetFrameGlobals());
+-        if (!globals.isNull())  {
+-            if (PyObject *appName = PyDict_GetItem(globals, Shiboken::PyMagicName::file()))
+-                appNameC = Shiboken::String::toCString(appName);
+-        }
+-        if (appNameC == nullptr)
+-            appNameC = defaultAppName ? defaultAppName : "PySideApplication";
+-        argv[0] = strDup(appNameC);
++        if (PyObject *appName = PyDict_GetItem(PyEval_GetGlobals(), Shiboken::PyMagicName::file()))
++            argv[0] = strDup(Shiboken::String::toCString(appName));
++        else
++            argv[0] = strDup(defaultAppName ? defaultAppName : "PySideApplication");
+         return true;
+     }
+ 
+diff --git a/sources/shiboken6/libshiboken/pep384impl.cpp b/sources/shiboken6/libshiboken/pep384impl.cpp
+index df18240..1fb9a56 100644
+--- a/sources/shiboken6/libshiboken/pep384impl.cpp
++++ b/sources/shiboken6/libshiboken/pep384impl.cpp
+@@ -1140,19 +1140,6 @@ void *PepType_GetSlot(PyTypeObject *type, int aSlot)
+     return nullptr;
+ }
+ 
+-PyObject *PepEval_GetFrameGlobals()
+-{
+-    // PyEval_GetFrameGlobals() (added to stable ABI in 3.13) returns a new reference
+-    // as opposed to deprecated PyEval_GetGlobals() which returns a borrowed reference
+-#if !defined(PYPY_VERSION) && ((!defined(Py_LIMITED_API) && PY_VERSION_HEX >= 0x030D0000) || (defined(Py_LIMITED_API) && Py_LIMITED_API >= 0x030D0000))
+-    return PyEval_GetFrameGlobals();
+-#else
+-    PyObject *result = PyEval_GetGlobals();
+-    Py_XINCREF(result);
+-    return result;
+-#endif
+-}
+-
+ /***************************************************************************
+  *
+  * PYSIDE-535: The enum/flag error
+diff --git a/sources/shiboken6/libshiboken/pep384impl.h b/sources/shiboken6/libshiboken/pep384impl.h
+index 99b38a7..4c4e1b4 100644
+--- a/sources/shiboken6/libshiboken/pep384impl.h
++++ b/sources/shiboken6/libshiboken/pep384impl.h
+@@ -549,11 +549,6 @@ LIBSHIBOKEN_API int PepType_SetDict(PyTypeObject *type, PyObject *dict);
+ 
+ LIBSHIBOKEN_API void *PepType_GetSlot(PyTypeObject *type, int aSlot);
+ 
+-// Runtime support for Python 3.13 stable ABI
+-
+-// Return dictionary of the global variables in the current execution frame
+-LIBSHIBOKEN_API PyObject *PepEval_GetFrameGlobals();
+-
+ /*****************************************************************************
+  *
+  * Module Initialization
