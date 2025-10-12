@@ -118,7 +118,7 @@ index e69ef178a0..51a328057b 100644
    sources = [
      "bluetooth_adapter.cc",
      "bluetooth_adapter.h",
-@@ -172,6 +177,7 @@ component("bluetooth") {
+@@ -172,6 +177,7 @@
      "string_util_icu.cc",
      "string_util_icu.h",
    ]
@@ -126,17 +126,17 @@ index e69ef178a0..51a328057b 100644
  
    defines = [ "DEVICE_BLUETOOTH_IMPLEMENTATION" ]
  
-@@ -586,6 +592,10 @@ component("bluetooth") {
+@@ -582,6 +588,10 @@ component("bluetooth") {
          "floss/floss_version.h",
          "floss/test_helpers.h",
        ]
-+      jumbo_excluded_sources += [ 
-+        "floss/floss_advertiser_client.cc", # Fail to compile with floss_dbus_client.cc
-+        "bluez/metrics_recorder.cc",        # Conflict with //device/bluetooth:deprecated_experimental_mojo
-+      ] 
-       if (is_chromeos) {
-         import("//chromeos/dbus/config/use_real_dbus_clients.gni")
-         configs += [ "//chromeos/dbus/config:use_real_dbus_clients_config" ]
++      jumbo_excluded_sources += [
++        "floss/floss_dbus_client.cc", # Fail to compile with floss_dbus_client.cc
++        "bluez/metrics_recorder.cc",  # Conflict with //device/bluetooth:deprecated_experimental_mojo
++      ]
+       if (is_linux) {
+         sources += [
+           "dbus/dbus_bluez_manager_wrapper_linux.cc",
 diff --git a/device/bluetooth/bluez/bluetooth_remote_gatt_characteristic_bluez.cc b/device/bluetooth/bluez/bluetooth_remote_gatt_characteristic_bluez.cc
 index a46c7ee2c6..f3ec47a4fd 100644
 --- a/device/bluetooth/bluez/bluetooth_remote_gatt_characteristic_bluez.cc
@@ -1330,3 +1330,24 @@ index faa7895b72..cdb8aae6ea 100644
  }  // namespace extensions
 +
 +#undef kCancelReason
+diff --git a/device/fido/enclave/enclave_authenticator.cc b/device/fido/enclave/enclave_authenticator.cc
+index 09cf8e967b..bb60988229 100644
+--- a/device/fido/enclave/enclave_authenticator.cc
++++ b/device/fido/enclave/enclave_authenticator.cc
+@@ -31,6 +31,9 @@
+ #include "device/fido/public_key_credential_descriptor.h"
+ #include "services/data_decoder/public/cpp/data_decoder.h"
+ 
++#define kLargeBlobKey     kLargeBlobKey_EnclaveAuthenticator
++#define kLargeBlobSizeKey kLargeBlobSizeKey_EnclaveAuthenticator
++
+ namespace device::enclave {
+ 
+ namespace {
+@@ -677,3 +680,6 @@ base::WeakPtr<FidoAuthenticator> EnclaveAuthenticator::GetWeakPtr() {
+ }
+ 
+ }  // namespace device::enclave
++
++#undef kLargeBlobKey
++#undef kLargeBlobSizeKey
