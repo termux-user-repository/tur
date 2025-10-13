@@ -1,11 +1,11 @@
 TERMUX_PKG_HOMEPAGE=https://www.chromium.org/Home
-TERMUX_PKG_DESCRIPTION="Chromium web browser (Beta Version, Host tools)"
+TERMUX_PKG_DESCRIPTION="Chromium web browser (Host tools)"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="@licy183"
-TERMUX_PKG_VERSION=139.0.7258.5
+TERMUX_PKG_VERSION=142.0.7444.3
 TERMUX_PKG_SRCURL=https://commondatastorage.googleapis.com/chromium-browser-official/chromium-$TERMUX_PKG_VERSION.tar.xz
-TERMUX_PKG_SHA256=71eff54d267defd16c511d4477beffc1652a22143934f7627c0d49db79a33e76
-TERMUX_PKG_DEPENDS="atk, cups, dbus, fontconfig, gtk3, krb5, libc++, libdrm, libevdev, libxkbcommon, libminizip, libnss, libx11, mesa, openssl, pango, pulseaudio, zlib"
+TERMUX_PKG_SHA256=ccb380c1cedc07000145dac3e3489be8ba19b915244a632e22c147715c4bc4c2
+TERMUX_PKG_DEPENDS="atk, cups, dbus, fontconfig, gtk3, krb5, libc++, libevdev, libxkbcommon, libminizip, libnss, libx11, mesa, openssl, pango, pulseaudio, zlib"
 TERMUX_PKG_BUILD_DEPENDS="libffi-static"
 # TODO: Split chromium-common and chromium-headless
 # TERMUX_PKG_DEPENDS+=", chromium-common"
@@ -216,10 +216,9 @@ chrome_pgo_phase = 0
 treat_warnings_as_errors = false
 # Use system libraries as little as possible
 use_system_freetype = false
-# use_system_libdrm = true
-# use_system_libffi = false
 use_custom_libcxx = false
 use_custom_libcxx_for_host = true
+use_clang_modules = false
 use_allocator_shim = false
 use_partition_alloc_as_malloc = false
 enable_backup_ref_ptr_slow_checks = false
@@ -234,6 +233,7 @@ use_ozone = true
 ozone_auto_platforms = false
 ozone_platform = \"x11\"
 ozone_platform_x11 = true
+# TODO: Enable wayland
 ozone_platform_wayland = false
 ozone_platform_headless = true
 angle_enable_vulkan = true
@@ -250,8 +250,6 @@ use_alsa = false
 use_pulseaudio = true
 rtc_use_pipewire = false
 use_vaapi = false
-# NaCl is no longer supported starting M139.
-# enable_nacl = false
 # Host compiler (clang-13) doesn't support LTO well
 is_cfi = false
 use_cfi_icall = false
@@ -261,7 +259,7 @@ build_tflite_with_opencl = false
 build_tflite_with_nnapi = true
 # Enable rust
 custom_target_rust_abi_target = \"$CARGO_TARGET_NAME\"
-llvm_android_mainline = true
+clang_warning_suppression_file = \"\"
 exclude_unwind_tables = false
 # Enable jumbo build (unified build)
 use_jumbo_build = true
@@ -340,7 +338,7 @@ termux_step_make() {
 						third_party/pdfium \
 						third_party/pdfium:pdfium_public_headers
 
-	# Build other components
+	# # Build other components
 	# ninja -C out/Release chromedriver chrome chrome_crashpad_handler headless_shell
 }
 
