@@ -2,14 +2,14 @@ TERMUX_PKG_HOMEPAGE=https://www.rust-lang.org/
 TERMUX_PKG_DESCRIPTION="Rust compiler and utilities (nightly version)"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="1.90.0-2025.08.01-nightly"
+TERMUX_PKG_VERSION="1.91.0-2025.08.08-nightly"
 _RUST_VERSION=$(echo $TERMUX_PKG_VERSION | cut -d- -f1)
 _DATE="$(echo $TERMUX_PKG_VERSION | cut -d- -f2 | sed 's|\.|-|g')"
 _LLVM_MAJOR_VERSION=$(. $TERMUX_SCRIPTDIR/packages/libllvm/build.sh; echo $LLVM_MAJOR_VERSION)
 _LLVM_MAJOR_VERSION_NEXT=$((_LLVM_MAJOR_VERSION + 1))
 _LZMA_VERSION=$(. $TERMUX_SCRIPTDIR/packages/liblzma/build.sh; echo $TERMUX_PKG_VERSION)
 TERMUX_PKG_SRCURL=https://static.rust-lang.org/dist/$_DATE/rustc-nightly-src.tar.xz
-TERMUX_PKG_SHA256=35d57d5d37348fdc5541071942ed1e726573a5c20f8305e4205588471f066264
+TERMUX_PKG_SHA256=a62d107bddc94403ceb70119949d6f89321ea2502c115020b61c82194191ad37
 TERMUX_PKG_DEPENDS="clang, libandroid-execinfo, libc++, libllvm (<< ${_LLVM_MAJOR_VERSION_NEXT}), lld, openssl, zlib"
 TERMUX_PKG_BUILD_DEPENDS="wasi-libc"
 TERMUX_PKG_NO_REPLACE_GUESS_SCRIPTS=true
@@ -110,10 +110,10 @@ termux_step_pre_configure() {
 }
 
 termux_step_configure() {
-	# Use beta toolchain to build beta toolchain
+	# Use nightly toolchain to build nightly toolchain
 	if [[ "${TERMUX_ON_DEVICE_BUILD}" == "false" ]]; then
-		rustup install beta
-		export PATH="${HOME}/.rustup/toolchains/beta-x86_64-unknown-linux-gnu/bin:${PATH}"
+		rustup install nightly-$_DATE-x86_64-unknown-linux-gnu
+		export PATH="${HOME}/.rustup/toolchains/nightly-$_DATE-x86_64-unknown-linux-gnu/bin:${PATH}"
 	fi
 	local RUSTC=$(command -v rustc)
 	local CARGO=$(command -v cargo)
