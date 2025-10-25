@@ -1,0 +1,176 @@
+diff -ur orig/3rdparty/fonts/fntBitmap.cxx mod/3rdparty/fonts/fntBitmap.cxx
+--- orig/3rdparty/fonts/fntBitmap.cxx	2025-02-19 09:53:41.000000000 +0100
++++ mod/3rdparty/fonts/fntBitmap.cxx	2025-03-10 10:44:16.386768830 +0100
+@@ -23,7 +23,7 @@
+ 
+ 
+ #include "fnt.h"
+-
++#include <GL/gl.h>
+ 
+ fntBitmapFont::fntBitmapFont( const GLubyte **_data, int _first, int _height, 
+ 			      float _xorig, float _yorig )
+diff -ur orig/3rdparty/fonts/fnt.cxx mod/3rdparty/fonts/fnt.cxx
+--- orig/3rdparty/fonts/fnt.cxx	2025-02-19 09:53:41.000000000 +0100
++++ mod/3rdparty/fonts/fnt.cxx	2025-03-10 10:44:22.470680280 +0100
+@@ -22,7 +22,7 @@
+ */
+ 
+ #include "fntLocal.h"
+-
++#include <GL/gl.h>
+ #include <simgear/misc/sg_path.hxx>
+ #include <simgear/debug/logstream.hxx>
+ 
+diff -ur orig/3rdparty/fonts/fnt.h mod/3rdparty/fonts/fnt.h
+--- orig/3rdparty/fonts/fnt.h	2025-02-19 09:53:41.000000000 +0100
++++ mod/3rdparty/fonts/fnt.h	2025-03-10 10:44:13.342812959 +0100
+@@ -30,6 +30,7 @@
+ #include <plib/sg.h>
+ #include <osg/GL>
+ 
++#include <GL/gl.h>
+ #define FNTMAX_CHAR  256
+ #define FNT_TRUE  1
+ #define FNT_FALSE 0
+diff -ur orig/3rdparty/fonts/fntLocal.h mod/3rdparty/fonts/fntLocal.h
+--- orig/3rdparty/fonts/fntLocal.h	2025-02-19 09:53:41.000000000 +0100
++++ mod/3rdparty/fonts/fntLocal.h	2025-03-10 10:44:19.066729886 +0100
+@@ -23,7 +23,7 @@
+ 
+ 
+ #include "fnt.h"
+-
++#include <GL/gl.h>
+ 
+ extern int   _fntIsSwapped   ;
+ extern FILE *_fntCurrImageFd ;
+diff -ur orig/3rdparty/fonts/fntTXF.cxx mod/3rdparty/fonts/fntTXF.cxx
+--- orig/3rdparty/fonts/fntTXF.cxx	2025-02-19 09:53:41.000000000 +0100
++++ mod/3rdparty/fonts/fntTXF.cxx	2025-03-10 10:44:26.094627310 +0100
+@@ -23,7 +23,7 @@
+ 
+ 
+ #include "fntLocal.h"
+-
++#include <GL/gl.h>
+ #include <simgear/debug/logstream.hxx>
+ #include <simgear/misc/sg_path.hxx>
+ 
+diff -ur orig/src/Canvas/gui_mgr.cxx mod/src/Canvas/gui_mgr.cxx
+--- orig/src/Canvas/gui_mgr.cxx	2025-02-19 09:53:41.000000000 +0100
++++ mod/src/Canvas/gui_mgr.cxx	2025-03-10 10:45:01.874095940 +0100
+@@ -33,6 +33,8 @@
+ #include <osgViewer/View>
+ #include <osgGA/GUIEventHandler>
+ 
++#include <GL/gl.h>
++
+ class DesktopGroup;
+ typedef SGSharedPtr<DesktopGroup> DesktopPtr;
+ typedef SGWeakPtr<DesktopGroup> DesktopWeakPtr;
+diff -ur orig/src/Cockpit/render_area_2d.cxx mod/src/Cockpit/render_area_2d.cxx
+--- orig/src/Cockpit/render_area_2d.cxx	2025-02-19 09:53:41.000000000 +0100
++++ mod/src/Cockpit/render_area_2d.cxx	2025-03-10 10:48:52.702403957 +0100
+@@ -27,6 +27,7 @@
+ #endif
+ 
+ #include "render_area_2d.hxx"
++#include <GL/gl.h>
+ 
+ RA2DPrimitive::RA2DPrimitive() {
+     invert = false;
+diff -ur orig/src/Instrumentation/HUD/HUD.cxx mod/src/Instrumentation/HUD/HUD.cxx
+--- orig/src/Instrumentation/HUD/HUD.cxx	2025-02-19 09:53:41.000000000 +0100
++++ mod/src/Instrumentation/HUD/HUD.cxx	2025-03-10 11:36:57.996810605 +0100
+@@ -47,6 +47,8 @@
+ #include "HUD.hxx"
+ #include "HUD_private.hxx"
+ 
++#include <GL/gl.h>
++
+ using std::endl;
+ using std::ifstream;
+ using std::string;
+@@ -223,7 +225,7 @@
+     Matrixf proj
+         = Matrixf::perspective(view->get_v_fov(), 1/view->get_aspect_ratio(),
+                                0.1, 10);
+-    glLoadMatrix(proj.ptr());
++    glLoadMatrixf(proj.ptr());
+ 
+     glMatrixMode(GL_MODELVIEW);
+     glPushMatrix();
+@@ -237,7 +239,7 @@
+         lookat[1] = 9999; // FPU sanity
+     Matrixf mv = Matrixf::lookAt(Vec3f(0.0, 0.0, 0.0), lookat,
+                                  Vec3f(0.0, 1.0, 0.0));
+-    glLoadMatrix(mv.ptr());
++    glLoadMatrixf(mv.ptr());
+ 
+     // Map the -1:1 square to a 55.0x41.25 degree wide patch at z=1.
+     // This is the default fgfs field of view, which the HUD files are
+@@ -271,7 +273,7 @@
+     glMatrixMode(GL_PROJECTION);
+     glPushMatrix();
+     Matrixf proj = Matrixf::ortho2D(x_start, x_end, y_start, y_end);
+-    glLoadMatrix(proj.ptr());
++    glLoadMatrixf(proj.ptr());
+ 
+     glMatrixMode(GL_MODELVIEW);
+     glPushMatrix();
+diff -ur orig/src/Instrumentation/HUD/HUD.hxx mod/src/Instrumentation/HUD/HUD.hxx
+--- orig/src/Instrumentation/HUD/HUD.hxx	2025-02-19 09:53:41.000000000 +0100
++++ mod/src/Instrumentation/HUD/HUD.hxx	2025-03-10 10:59:54.559110928 +0100
+@@ -33,6 +33,7 @@
+ #include <simgear/constants.h>
+ #include <simgear/structure/subsystem_mgr.hxx>
+ #include <simgear/props/props.hxx>
++#include <GL/gl.h>
+ 
+ class FGFontCache;
+ class fntRenderer;
+diff -ur orig/src/Instrumentation/HUD/HUD_label.cxx mod/src/Instrumentation/HUD/HUD_label.cxx
+--- orig/src/Instrumentation/HUD/HUD_label.cxx	2025-02-19 09:53:41.000000000 +0100
++++ mod/src/Instrumentation/HUD/HUD_label.cxx	2025-03-10 10:53:46.937359099 +0100
+@@ -14,6 +14,7 @@
+ #include "HUD_private.hxx"
+ 
+ #include <Main/globals.hxx>
++#include <GL/gl.h>
+ 
+ HUD::Label::Label(HUD *hud, const SGPropertyNode *n, float x, float y) :
+     Item(hud, n, x, y),
+diff -ur orig/src/Instrumentation/HUD/HUD_misc.cxx mod/src/Instrumentation/HUD/HUD_misc.cxx
+--- orig/src/Instrumentation/HUD/HUD_misc.cxx	2025-02-19 09:53:41.000000000 +0100
++++ mod/src/Instrumentation/HUD/HUD_misc.cxx	2025-03-10 10:54:00.453123052 +0100
+@@ -26,6 +26,7 @@
+ #include "HUD_private.hxx"
+ 
+ #include <Main/globals.hxx>
++#include <GL/gl.h>
+ 
+ // MIL-STD-1787B aiming reticle
+ 
+diff -ur orig/src/Instrumentation/HUD/HUD_runway.cxx mod/src/Instrumentation/HUD/HUD_runway.cxx
+--- orig/src/Instrumentation/HUD/HUD_runway.cxx	2025-02-19 09:53:41.000000000 +0100
++++ mod/src/Instrumentation/HUD/HUD_runway.cxx	2025-03-10 11:00:08.242883462 +0100
+@@ -40,6 +40,7 @@
+ 
+ #include "HUD.hxx"
+ #include "HUD_private.hxx"
++#include <GL/gl.h>
+ 
+ HUD::Runway::Runway(HUD *hud, const SGPropertyNode *node, float x, float y) :
+     Item(hud, node, x, y),
+diff -ur orig/src/Scenery/marker.cxx mod/src/Scenery/marker.cxx
+--- orig/src/Scenery/marker.cxx	2025-02-19 09:53:41.000000000 +0100
++++ mod/src/Scenery/marker.cxx	2025-03-10 11:45:40.291898232 +0100
+@@ -20,6 +20,7 @@
+ #include <osgDB/ReadFile>
+ #include <osgDB/WriteFile>
+ #include <osgDB/Registry>
++#include <GL/gl.h>
+ 
+ osg::Node* fgCreateMarkerNode(const osgText::String& label, float font_size, float pin_height, float tip_height, const osg::Vec4f& color)
+ {
