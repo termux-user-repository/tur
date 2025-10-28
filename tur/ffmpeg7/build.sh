@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://ffmpeg.org
 TERMUX_PKG_DESCRIPTION="Tools and libraries to manipulate a wide range of multimedia formats and protocols"
 TERMUX_PKG_LICENSE="GPL-3.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION=7.0.2
+TERMUX_PKG_VERSION=7.1.2
 TERMUX_PKG_SRCURL=https://www.ffmpeg.org/releases/ffmpeg-${TERMUX_PKG_VERSION}.tar.xz
-TERMUX_PKG_SHA256=8646515b638a3ad303e23af6a3587734447cb8fc0a0c064ecdb8e95c4fd8b389
+TERMUX_PKG_SHA256=089bc60fb59d6aecc5d994ff530fd0dcb3ee39aa55867849a2bbc4e555f9c304
 TERMUX_PKG_DEPENDS="freetype, game-music-emu, libaom, libandroid-glob, libass, libbluray, libbz2, libdav1d, libgnutls, libiconv, liblzma, libmp3lame, libopus, librav1e, libsoxr, libtheora, libvorbis, libvpx, libvidstab, libwebp, libx264, libx265, libxml2, xvidcore, zlib"
 
 termux_step_configure() {
