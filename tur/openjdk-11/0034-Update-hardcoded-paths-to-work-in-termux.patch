@@ -549,19 +549,3 @@ index e147cdecaf9b..7a9b9d2706f7 100644
  
  /* The CRC used in gnu_debuglink, retrieved from
     http://sourceware.org/gdb/current/onlinedocs/gdb/Separate-Debug-Files.html#Separate-Debug-Files. */
---- a/src/jdk.internal.le/share/classes/jdk/internal/org/jline/utils/OSUtils.java~	2024-04-25 15:00:41.253855695 +0800
-+++ b/src/jdk.internal.le/share/classes/jdk/internal/org/jline/utils/OSUtils.java	2024-04-25 15:02:06.753858676 +0800
-@@ -95,8 +95,8 @@
-             stty = IS_OSX ? "/bin/stty" : "stty";
-             sttyfopt = IS_OSX ? "-f" : "-F";
-             infocmp = "infocmp";
--            test = isTestCommandValid("/usr/bin/test") ? "/usr/bin/test"
--                                                       : "/bin/test";
-+            test = isTestCommandValid("@TERMUX_PREFIX@/bin/test") ? "@TERMUX_PREFIX@/bin/test"
-+                                                       : "/system/bin/test";
-         }
-         TTY_COMMAND = tty;
-         STTY_COMMAND = stty;
--- 
-2.44.0
-

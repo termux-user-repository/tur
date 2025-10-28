@@ -25,14 +25,14 @@ diff --git a/make/modules/jdk.jdwp.agent/Lib.gmk b/make/modules/jdk.jdwp.agent/L
 index fbc1750bc58a..7ba77268ae1e 100644
 --- a/make/lib/Lib-jdk.jdwp.agent.gmk
 +++ b/make/lib/Lib-jdk.jdwp.agent.gmk
-@@ -54,6 +54,7 @@
+@@ -54,6 +54,7 @@ $(eval $(call SetupJdkLibrary, BUILD_LIBJDWP, \
      NAME := jdwp, \
      OPTIMIZATION := LOW, \
      CFLAGS := $(CFLAGS_JDKLIB) -DJDWP_LOGGING, \
 +    CXXFLAGS := $(CXXFLAGS_JDKLIB), \
+     DISABLED_WARNINGS_microsoft_debugInit.c := 5287, \
      EXTRA_HEADER_DIRS := \
        include \
-       libjdwp/export, \
 
 -- 
 2.44.0
