@@ -33,6 +33,7 @@ Enable jumbo build for the following component(s)/source_set(s):
  .../file_system_access_watcher_manager.cc     |   4 +
  content/browser/find_request_manager.cc       |   2 +-
  .../gpu/gpu_data_manager_impl_private.cc      |  10 +-
+ content/browser/gpu/gpu_process_host.cc       |   2 +-
  content/browser/guest_page_holder_impl.cc     |   2 +-
  content/browser/hid/hid_service.cc            |   4 +
  content/browser/host_zoom_map_impl.cc         |   2 +-
@@ -83,7 +84,7 @@ Enable jumbo build for the following component(s)/source_set(s):
  content/services/auction_worklet/BUILD.gn     |   7 +-
  content/test/BUILD.gn                         |   5 +-
  content/utility/BUILD.gn                      |   3 +-
- 64 files changed, 425 insertions(+), 214 deletions(-)
+ 65 files changed, 426 insertions(+), 215 deletions(-)
 
 diff --git a/content/browser/BUILD.gn b/content/browser/BUILD.gn
 index 5a1b57da76..de62ed0411 100644
@@ -636,6 +637,19 @@ index 9b6fec4029..d6f7437458 100644
            base::CommandLine::ForCurrentProcess())) {
      FallBackToNextGpuMode();
      DCHECK_NE(gpu_mode_, gpu::GpuMode::SOFTWARE_GL);
+diff --git a/content/browser/gpu/gpu_process_host.cc b/content/browser/gpu/gpu_process_host.cc
+index 980f31b217..ae49b7d807 100644
+--- a/content/browser/gpu/gpu_process_host.cc
++++ b/content/browser/gpu/gpu_process_host.cc
+@@ -539,7 +539,7 @@ void BindDiscardableMemoryReceiverOnUI(
+ // for all cache types.
+ void InitGpuPersistentCacheFileFactoryOnce() {
+ #if BUILDFLAG(SKIA_USE_DAWN)
+-  if (features::kSkiaGraphiteDawnUsePersistentCache.Get() &&
++  if (::features::kSkiaGraphiteDawnUsePersistentCache.Get() &&
+       !viz::PersistentCacheSandboxedFileFactory::GetInstance()) {
+     base::FilePath cache_root_dir =
+         GetContentClient()->browser()->GetShaderDiskCacheDirectory();
 diff --git a/content/browser/guest_page_holder_impl.cc b/content/browser/guest_page_holder_impl.cc
 index 6c8c488087..fb301afbf5 100644
 --- a/content/browser/guest_page_holder_impl.cc
