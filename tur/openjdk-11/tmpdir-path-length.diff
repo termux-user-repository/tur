@@ -1,0 +1,17 @@
+--- a/src/hotspot/os/linux/perfMemory_linux.cpp
++++ b/src/hotspot/os/linux/perfMemory_linux.cpp
+@@ -145,11 +145,11 @@ static void save_memory_to_file(char* addr, size_t size) {
+ //
+ // the caller is expected to free the allocated memory.
+ //
+-#define TMP_BUFFER_LEN (4+22)
++#define TMP_BUFFER_LEN (@TERMUX_TMPDIR_PATH_LENGTH@+22)
+ static char* get_user_tmp_dir(const char* user, int vmid, int nspid) {
+   char buffer[TMP_BUFFER_LEN];
+-  char* tmpdir = (char *)os::get_temp_directory();
+-  assert(strlen(tmpdir) == 4, "No longer using /tmp - update buffer size");
++  char* tmpdir = "@TERMUX_PREFIX@/tmp";
++  assert(strlen(tmpdir) == @TERMUX_TMPDIR_PATH_LENGTH@, "No longer using @TERMUX_PREFIX@/tmp - update buffer size");
+ 
+   if (nspid != -1) {
+     jio_snprintf(buffer, TMP_BUFFER_LEN, "/proc/%d/root%s", vmid, tmpdir);
