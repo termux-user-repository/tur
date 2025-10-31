@@ -978,3 +978,29 @@ index ddf3b81c7a..f6548579c7 100644
 +#undef TRACE
 +
  }  // namespace v8::internal::maglev
+diff --git a/v8/BUILD.gn b/v8/BUILD.gn
+index d91aea71f1..fe232e23b4 100644
+--- a/v8/BUILD.gn
++++ b/v8/BUILD.gn
+@@ -5344,6 +5344,10 @@ if (!v8_enable_maglev) {
+     "src/maglev/maglev-phi-representation-selector.cc",
+     "src/maglev/maglev-truncation.cc",
+   ]
++  v8_compiler_sources_jumbo_excluded += [
++    # call to 'DestructivelyIntersect' is ambiguous
++    "src/maglev/maglev-known-node-aspects.cc",
++  ]
+ }
+ 
+ if (v8_current_cpu == "x86") {
+@@ -6112,6 +6116,10 @@ v8_source_set("v8_base_without_compiler") {
+       "src/maglev/maglev-truncation.cc",
+       "src/maglev/maglev.cc",
+     ]
++    jumbo_excluded_sources += [
++      # call to 'DestructivelyIntersect' is ambiguous
++      "src/maglev/maglev-known-node-aspects.cc",
++    ]
+     if (v8_current_cpu == "arm") {
+       sources += [
+         "src/maglev/arm/maglev-assembler-arm.cc",

@@ -1182,3 +1182,46 @@ index dc38257ceb..e7187190de 100644
 +#undef is_sep
 +#undef skip_ws
 +#undef skip_sep
+diff --git a/third_party/skia/src/core/SkPath_editing.cpp b/third_party/skia/src/core/SkPath_editing.cpp
+index 9601b72078..dfbdcc06db 100644
+--- a/third_party/skia/src/core/SkPath_editing.cpp
++++ b/third_party/skia/src/core/SkPath_editing.cpp
+@@ -38,6 +38,11 @@
+ #include <limits.h>
+ #include <utility>
+ 
++#define arc_is_lone_point      arc_is_lone_point_SkPath_editing
++#define angles_to_unit_vectors angles_to_unit_vectors_SkPath_editing
++#define build_arc_conics       build_arc_conics_SkPath_editing
++#define subdivide_cubic_to     subdivide_cubic_to_SkPath_editing
++
+ class SkAutoAddSimpleShape {
+ public:
+     SkAutoAddSimpleShape(SkPath* path, SkPathDirection dir)
+@@ -1078,3 +1083,7 @@ void SkPath::transform(const SkMatrix& matrix, SkPath* dst) const {
+     }
+ }
+ 
++#undef arc_is_lone_point
++#undef angles_to_unit_vectors
++#undef build_arc_conics
++#undef subdivide_cubic_to
+diff --git a/third_party/skia/src/core/SkScan_Antihair.cpp b/third_party/skia/src/core/SkScan_Antihair.cpp
+index eb22c85e7c..8728f523d1 100644
+--- a/third_party/skia/src/core/SkScan_Antihair.cpp
++++ b/third_party/skia/src/core/SkScan_Antihair.cpp
+@@ -26,6 +26,8 @@
+ #include <algorithm>
+ #include <cstdint>
+ 
++#define fixed_to_alpha fixed_to_alpha_SkScan_Antihair
++
+ #define HLINE_STACK_BUFFER      100
+ 
+ static inline U8CPU scale_alpha_by_coverage(U8CPU value, SkFDot6 coverage) {
+@@ -1024,3 +1026,5 @@ void SkScan::AntiFrameRect(const SkRect& r, const SkPoint& strokeSize,
+         AntiFrameRect(r, strokeSize, &wrap.getRgn(), wrap.getBlitter());
+     }
+ }
++
++#undef fixed_to_alpha
