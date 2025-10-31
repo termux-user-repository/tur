@@ -831,3 +831,22 @@ index 270cbfcf40..19f5805390 100644
  }  // namespace net
 +
 +#undef TaskRunner
+diff --git a/net/disk_cache/sql/sql_backend_impl.cc b/net/disk_cache/sql/sql_backend_impl.cc
+index 73ab379a2b..a8f23eece0 100644
+--- a/net/disk_cache/sql/sql_backend_impl.cc
++++ b/net/disk_cache/sql/sql_backend_impl.cc
+@@ -33,6 +33,8 @@
+ #include "net/disk_cache/sql/sql_persistent_store.h"
+ #include "sql_backend_constants.h"
+ 
++#define IsBrowserIdle IsBrowserIdle_SqlBackendImpl
++
+ namespace disk_cache {
+ namespace {
+ 
+@@ -1417,3 +1419,5 @@ SqlBackendImpl::InFlightEntryModification::InFlightEntryModification(
+     InFlightEntryModification&&) = default;
+ 
+ }  // namespace disk_cache
++
++#undef IsBrowserIdle

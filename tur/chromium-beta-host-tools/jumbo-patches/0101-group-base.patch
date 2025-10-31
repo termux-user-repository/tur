@@ -404,3 +404,26 @@ index 9f18a00af5..870c7dbae4 100644
  
    defines = [ "VIZ_SERVICE_IMPLEMENTATION" ]
  
+diff --git a/cc/metrics/scroll_jank_v4_histogram_emitter.cc b/cc/metrics/scroll_jank_v4_histogram_emitter.cc
+index cbb688f8a2..64b5aedb8d 100644
+--- a/cc/metrics/scroll_jank_v4_histogram_emitter.cc
++++ b/cc/metrics/scroll_jank_v4_histogram_emitter.cc
+@@ -17,6 +17,10 @@
+ #include "cc/metrics/event_metrics.h"
+ #include "cc/metrics/scroll_jank_dropped_frame_tracker.h"
+ 
++#define kVsyncCountsMin     kVsyncCountsMin_ScrollJankV4HistogramEmitter
++#define kVsyncCountsMax     kVsyncCountsMax_ScrollJankV4HistogramEmitter
++#define kVsyncCountsBuckets kVsyncCountsBuckets_ScrollJankV4HistogramEmitter
++
+ namespace cc {
+ 
+ namespace {
+@@ -167,3 +171,7 @@ void ScrollJankV4HistogramEmitter::EmitPerScrollHistogramsAndResetCounters() {
+ }
+ 
+ }  // namespace cc
++
++#undef kVsyncCountsMin
++#undef kVsyncCountsMax
++#undef kVsyncCountsBuckets

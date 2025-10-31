@@ -316,9 +316,9 @@ index 87b3bbe9ae..d3d7f411fa 100644
  # found in the LICENSE file.
  
 +import("//build/config/jumbo.gni")
+ import("//mojo/public/tools/bindings/mojom_rust.gni")
  import("//third_party/closure_compiler/closure_args.gni")
  import("//third_party/closure_compiler/compile_js.gni")
- import("//third_party/protobuf/proto_library.gni")
 @@ -1029,7 +1030,7 @@ template("mojom") {
    }
  
@@ -3664,10 +3664,10 @@ diff --git a/third_party/blink/renderer/platform/BUILD.gn b/third_party/blink/re
 index 589dd18b99..d65ab808e7 100644
 --- a/third_party/blink/renderer/platform/BUILD.gn
 +++ b/third_party/blink/renderer/platform/BUILD.gn
-@@ -7,6 +7,7 @@ import("//build/buildflag_header.gni")
+@@ -6,6 +6,7 @@
+ import("//build/buildflag_header.gni")
  import("//build/compiled_action.gni")
  import("//build/config/compiler/compiler.gni")
- import("//build/config/features.gni")
 +import("//build/config/jumbo.gni")
  import("//build/config/ui.gni")
  import("//build/nocompile.gni")
@@ -4767,3 +4767,33 @@ index d7ec050e88..609a531b26 100644
 +#endif
 +
  #endif  // THIRD_PARTY_BLINK_RENDERER_PLATFORM_WTF_VECTOR_H_
+diff --git a/third_party/blink/renderer/platform/wtf/text/atomic_string.h b/third_party/blink/renderer/platform/wtf/text/atomic_string.h
+index 0d4bfa601d..f3c82b3d8e 100644
+--- a/third_party/blink/renderer/platform/wtf/text/atomic_string.h
++++ b/third_party/blink/renderer/platform/wtf/text/atomic_string.h
+@@ -326,3 +326,6 @@ WTF_ALLOW_MOVE_INIT_AND_COMPARE_WITH_MEM_FUNCTIONS(blink::AtomicString)
+ 
+ #include "third_party/blink/renderer/platform/wtf/text/string_operators_atomic.h"
+ #endif  // THIRD_PARTY_BLINK_RENDERER_PLATFORM_WTF_TEXT_ATOMIC_STRING_H_
++
++// FIXME: Where exactly did Google forget to include this file?
++#include "third_party/blink/renderer/platform/wtf/text/atomic_string_hash.h"
+diff --git a/third_party/blink/renderer/modules/peerconnection/rtc_transport/rtc_transport.cc b/third_party/blink/renderer/modules/peerconnection/rtc_transport/rtc_transport.cc
+index 3ebe4bb745..fba0084cb1 100644
+--- a/third_party/blink/renderer/modules/peerconnection/rtc_transport/rtc_transport.cc
++++ b/third_party/blink/renderer/modules/peerconnection/rtc_transport/rtc_transport.cc
+@@ -37,6 +37,8 @@
+ #include "third_party/webrtc/pc/ice_server_parsing.h"
+ #include "third_party/webrtc/rtc_base/rtc_certificate_generator.h"
+ 
++#define kMaxDigestSize kMaxDigestSize_RtcTransport
++
+ namespace blink {
+ namespace {
+ // Maximum known size (SHA-512). See
+@@ -548,3 +550,5 @@ void RtcTransport::Dispose() {
+ }
+ 
+ }  // namespace blink
++
++#undef kMaxDigestSize

@@ -722,48 +722,6 @@ index 71eae32794..7d39c7f2ee 100644
  }  // namespace webrtc
 +
 +#undef Dti
-diff --git a/third_party/webrtc/pc/jsep_session_description.cc b/third_party/webrtc/pc/jsep_session_description.cc
-index bbeb4c3c07..fb57d6e32c 100644
---- a/third_party/webrtc/pc/jsep_session_description.cc
-+++ b/third_party/webrtc/pc/jsep_session_description.cc
-@@ -36,6 +36,9 @@
- using webrtc::Candidate;
- using ::webrtc::SessionDescription;
- 
-+#define kDummyAddress kDummyAddress_JsepSessionDescription
-+#define kDummyPort    kDummyPort_JsepSessionDescription
-+
- namespace webrtc {
- namespace {
- 
-@@ -364,3 +367,6 @@ int JsepSessionDescription::GetMediasectionIndex(const Candidate& candidate) {
- }
- 
- }  // namespace webrtc
-+
-+#undef kDummyAddress
-+#undef kDummyPort
-diff --git a/third_party/webrtc/pc/webrtc_sdp.cc b/third_party/webrtc/pc/webrtc_sdp.cc
-index 6e434676f9..464aa79184 100644
---- a/third_party/webrtc/pc/webrtc_sdp.cc
-+++ b/third_party/webrtc/pc/webrtc_sdp.cc
-@@ -67,6 +67,9 @@
- #include "rtc_base/string_encode.h"
- #include "rtc_base/strings/string_builder.h"
- 
-+#define kDummyAddress kDummyAddress_WebRTCRDP
-+#define kDummyPort    kDummyPort_WebRTCRDP
-+
- namespace webrtc {
- 
- namespace {
-@@ -3619,3 +3622,6 @@ bool ParseFmtpParameterSet(absl::string_view line_params,
- }
- 
- }  // namespace webrtc
-+
-+#undef kDummyAddress
-+#undef kDummyPort
 diff --git a/third_party/webrtc/webrtc.gni b/third_party/webrtc/webrtc.gni
 index 103983dec4..58bbffea9c 100644
 --- a/third_party/webrtc/webrtc.gni
@@ -806,3 +764,39 @@ index 103983dec4..58bbffea9c 100644
    }
    target(target_type, target_name) {
      forward_variables_from(invoker,
+diff --git a/third_party/webrtc/api/jsep.cc b/third_party/webrtc/api/jsep.cc
+index 769e3807a5..2ae6ab3cf7 100644
+--- a/third_party/webrtc/api/jsep.cc
++++ b/third_party/webrtc/api/jsep.cc
+@@ -33,6 +33,9 @@
+ #include "rtc_base/net_helpers.h"
+ #include "rtc_base/socket_address.h"
+ 
++#define kDummyAddress kDummyAddress_Jsep
++#define kDummyPort    kDummyPort_Jsep
++
+ namespace webrtc {
+ namespace {
+ constexpr char kDummyAddress[] = "0.0.0.0";
+@@ -351,3 +354,6 @@ int SessionDescriptionInterface::GetMediasectionIndex(
+ }
+ 
+ }  // namespace webrtc
++
++#undef kDummyAddress
++#undef kDummyPort
+diff --git a/third_party/webrtc/video/adaptation/BUILD.gn b/third_party/webrtc/video/adaptation/BUILD.gn
+index b8a0ef65e3..2dab055931 100644
+--- a/third_party/webrtc/video/adaptation/BUILD.gn
++++ b/third_party/webrtc/video/adaptation/BUILD.gn
+@@ -29,6 +29,10 @@ rtc_library("video_adaptation") {
+     "video_stream_encoder_resource_manager.cc",
+     "video_stream_encoder_resource_manager.h",
+   ]
++  jumbo_excluded_sources = [
++    # functions that differ only in their return type cannot be overloaded
++    "pixel_limit_resource.cc",
++  ]
+ 
+   deps = [
+     "../../api:field_trials_view",
