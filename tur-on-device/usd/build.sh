@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://openusd.org/
 TERMUX_PKG_DESCRIPTION="High-performance extensible software platform for collaboratively constructing animated 3D scenes"
 TERMUX_PKG_LICENSE="Apache-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="25.08"
+TERMUX_PKG_VERSION="25.11"
 TERMUX_PKG_SRCURL="https://github.com/PixarAnimationStudios/OpenUSD/archive/refs/tags/v$TERMUX_PKG_VERSION.tar.gz"
-TERMUX_PKG_SHA256=2a93c2390ae35a3e312f3fb66e6f403a0e046893e3f0d706be82963345a08cb3
+TERMUX_PKG_SHA256=c37c633b5037a4552f61574670ecca8836229b78326bd62622f3422671188667
 TERMUX_PKG_DEPENDS="alembic, draco, embree, fmt, glew, imath, libc++, libx11, libxt, materialx, libandroid-glob, libtbb, opencolorio, openexr, openimageio, openshadinglanguage, opensubdiv, openvdb, ptex, pyside6, python-opengl"
 # a configuration error happens if shared and static opensubdiv are not both installed
 TERMUX_PKG_BUILD_DEPENDS="boost-headers, opensubdiv-static"
