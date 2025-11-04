@@ -1,0 +1,11 @@
+--- a/codex-rs/core/Cargo.toml
++++ b/codex-rs/core/Cargo.toml
+@@ -83,6 +83,8 @@
+ uuid = { workspace = true, features = ["serde", "v4"] }
+ which = { workspace = true }
+ wildmatch = { workspace = true }
++
++[target.'cfg(target_os = "windows")'.dependencies]
+ codex_windows_sandbox = { package = "codex-windows-sandbox", path = "../windows-sandbox-rs" }
+ 
+ 
