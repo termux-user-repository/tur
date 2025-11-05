@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="Virtual lighttable and darkroom for photographers"
 TERMUX_PKG_LICENSE="GPL-3.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="5.2.0"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://github.com/darktable-org/darktable/releases/download/release-${TERMUX_PKG_VERSION}/darktable-${TERMUX_PKG_VERSION}.tar.xz
 TERMUX_PKG_SHA256=53a46cd46ef7118485c4abf4ab407c181639bb8634243ec0ed1f7c1e8299bec6
 TERMUX_PKG_DEPENDS="exiv2, gdk-pixbuf, glib, graphicsmagick, gtk3, imath, json-glib, lensfun, libandroid-glob, libc++, libcairo, libcurl, libheif, libicu, libjpeg-turbo, libjxl, libllvm, liblua54, libpng, libpugixml, librsvg, libsqlite, libtiff, libwebp, libxml2, littlecms, ltrace, openexr, openjpeg, pango, portmidi, zlib"
