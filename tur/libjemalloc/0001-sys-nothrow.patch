@@ -1,0 +1,27 @@
+--- a/include/jemalloc/jemalloc_macros.h.in
++++ b/include/jemalloc/jemalloc_macros.h.in
+@@ -234,7 +234,7 @@
+ #  define JEMALLOC_COLD
+ #endif
+ 
+-#if (defined(__APPLE__) || defined(__FreeBSD__)) && !defined(JEMALLOC_NO_RENAME)
++#if (defined(__APPLE__) || defined(__FreeBSD__) || defined(__ANDROID__)) && !defined(JEMALLOC_NO_RENAME)
+ #  define JEMALLOC_SYS_NOTHROW
+ #else
+ #  define JEMALLOC_SYS_NOTHROW JEMALLOC_NOTHROW
+--- a/include/jemalloc/jemalloc_protos.h.in
++++ b/include/jemalloc/jemalloc_protos.h.in
+@@ -51,8 +51,13 @@
+ JEMALLOC_EXPORT void JEMALLOC_NOTHROW	@je_@malloc_stats_print(
+     void (*write_cb)(void *, const char *), void *@je_@cbopaque,
+     const char *opts);
++#ifdef __ANDROID__
++JEMALLOC_EXPORT size_t @je_@malloc_usable_size(
++    JEMALLOC_USABLE_SIZE_CONST void *ptr) JEMALLOC_CXX_THROW;
++#else
+ JEMALLOC_EXPORT size_t JEMALLOC_NOTHROW	@je_@malloc_usable_size(
+     JEMALLOC_USABLE_SIZE_CONST void *ptr) JEMALLOC_CXX_THROW;
++#endif
+ #ifdef JEMALLOC_HAVE_MALLOC_SIZE
+ JEMALLOC_EXPORT size_t JEMALLOC_NOTHROW	@je_@malloc_size(
+     const void *ptr);

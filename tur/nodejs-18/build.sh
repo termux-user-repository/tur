@@ -1,11 +1,10 @@
 TERMUX_PKG_HOMEPAGE=https://nodejs.org/
-TERMUX_PKG_DESCRIPTION="Open Source, cross-platform JavaScript runtime environment"
+TERMUX_PKG_DESCRIPTION="Open Source, cross-platform JavaScript runtime environment (Version 18, EOL at Mar 27, 2025)"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION=18.19.1
-TERMUX_PKG_REVISION=2
+TERMUX_PKG_VERSION=18.20.8
 TERMUX_PKG_SRCURL=https://nodejs.org/dist/v${TERMUX_PKG_VERSION}/node-v${TERMUX_PKG_VERSION}.tar.xz
-TERMUX_PKG_SHA256=090f96a2ecde080b6b382c6d642bca5d0be4702a78cb555be7bf02b20bd16ded
+TERMUX_PKG_SHA256=36a7bf1a76d62ce4badd881ee5974a323c70e1d8d19165732684e145632460d9
 # Note that we do not use a shared libuv to avoid an issue with the Android
 # linker, which does not use symbols of linked shared libraries when resolving
 # symbols on dlopen(). See https://github.com/termux/termux-packages/issues/462.
@@ -20,11 +19,9 @@ $_INSTALL_PREFIX/lib/dtrace
 "
 TERMUX_PKG_BUILD_IN_SRC=true
 
-termux_step_pre_configure() {
-	termux_setup_ninja
-}
-
 termux_step_configure() {
+	termux_setup_ninja
+
 	local DEST_CPU
 	if [ $TERMUX_ARCH = "arm" ]; then
 		DEST_CPU="arm"
@@ -71,9 +68,9 @@ termux_step_configure() {
 
 termux_step_make() {
 	if [ "${TERMUX_DEBUG_BUILD}" = "true" ]; then
-		ninja -C out/Debug -j "${TERMUX_PKG_MAKE_PROCESSES}" || bash
+		ninja -C out/Debug -j "${TERMUX_PKG_MAKE_PROCESSES}"
 	else
-		ninja -C out/Release -j "${TERMUX_PKG_MAKE_PROCESSES}" || bash
+		ninja -C out/Release -j "${TERMUX_PKG_MAKE_PROCESSES}"
 	fi
 }
 

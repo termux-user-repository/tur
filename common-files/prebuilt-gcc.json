@@ -1,32 +1,42 @@
 {
-  "14": {
-    "version": "14.2.0",
+  "15": {
+    "version": "15.2.0",
     "revision": "0",
     "checksums": {
-      "aarch64": "3908844b1f07cf06f6312df5519573ce397eeea6f02659360c2bf715b487e46a",
-      "arm": "69edcb9a146fad03a860909d57405284b5e39b8723f1b416e0ce1450e9583067",
-      "i686": "4bdddd5080450d86308f2fad555b28c921175d3a66d04703e8f8730bd6e3f343",
-      "x86_64": "a958d5bd5a4f430eb344b234a09dda782431bd2026dd4067f7754872a6e8dddb"
+      "aarch64": "f086c76b949f7cd1c0736b35d549312cd297cb4b54741a749c5fe1f1201d9db1",
+      "arm": "ac4d02171f5fb9300f97bebd4403398ac64f098f9c01e447abd116b95880e4ff",
+      "i686": "fba7426f4091ec7a228d08b8cc1774e75337183cc962eb6edcccc2f89eb6d5bf",
+      "x86_64": "14562d541388cad1f32e60fca49e01fdc6cbd5496c5e18fbb95e00e6e3a16bdf"
+    }
+  },
+  "14": {
+    "version": "14.3.0",
+    "revision": "0",
+    "checksums": {
+      "aarch64": "a2eaa9224630f20f2eb8b0d6a65062799b88b665af638fb73901149f1d07b104",
+      "arm": "6fc2ab7d28ade81c84aedd0dbb12900664969bd08f032490fceaa7d48218c8af",
+      "i686": "d98e1aa79fe59c263b98f6064371200529577891c76513c9f8a5690e3753afee",
+      "x86_64": "c8bbcb8273649fbec5244d3096bfcf08683a9b9d88e1c3061ffbc27d00aaaebb"
     }
   },
   "13": {
-    "version": "13.3.0",
+    "version": "13.4.0",
     "revision": "0",
     "checksums": {
-      "aarch64": "5b6d7a8da87042c92412930a6450b057b5b20d68391e9268c9e461d4118d7f8d",
-      "arm": "83adfb6302b8a1a655f971cff2f77c048c1db74df5abe02007227845c2a68a10",
-      "i686": "2bddb9c05434411179cb3bacbd07d500aa8c7cce1db9c1831b6528f4069ba01b",
-      "x86_64": "e31d1d1ce93270ca455daaa3e865a4190f6558f9947396330dc1ed0afcedffca"
+      "aarch64": "fcc0ae58d81509191509b7195d302da94cac8a31b573a9d08e12d6cbfee0f840",
+      "arm": "37def796eb2ec64a2618248345d66398da6e47802193a7356ed0a4d2bc312c28",
+      "i686": "94acbeb9cd3bdc1dec6fd25d0d75eca412847730b2a7e7ea786c6113918de527",
+      "x86_64": "a64fc8aa6adb966340cf7516f2ca86d13aed72a4aa4d13450cab4fbc9ed96912"
     }
   },
   "12": {
-    "version": "12.4.0",
+    "version": "12.5.0",
     "revision": "0",
     "checksums": {
-      "aarch64": "23bc9e9ec5c0d7a9ac4257719aa29e9ec287da79c2fa6b9cb9f690ce56209b62",
-      "arm": "d1c11e5ffc4d92d158b4f6e4d31c92e9c07df35179529c4df13c45036108d022",
-      "i686": "c588991ed1f091dae8d2a5d64db492e06938acfea34906b8de1a7d69fc73c96b",
-      "x86_64": "1451ea882837e40d6fce3fa559c9d8d71e7a501034b4ddfd0fde5b110dd8460b"
+      "aarch64": "28bf616ba3c7f707f9ae16b65545d00766d0129b30840d5ffb6484bbafc131de",
+      "arm": "3cbbdafd397b268ccf49ee5b4d9eddd418f6ed704d07bcc44a33e2a094b6bf8d",
+      "i686": "6cf74c6252d790cb0943481a87e91f081403495572524114ca618eb52e60e418",
+      "x86_64": "59741e7adfdaabe3db7792bcc2a4de46699645aaebfb51d1e4f31878afd1c919"
     }
   },
   "11": {

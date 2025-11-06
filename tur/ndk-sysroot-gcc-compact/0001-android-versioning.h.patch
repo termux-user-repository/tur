@@ -5,12 +5,26 @@ attribute is not available in GCC.
 [2]: https://android.googlesource.com/platform/bionic/+/bfb6bae9fb5ef42e4f9ae2847f30f41938c04900
 --- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/android/versioning.h
 +++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/android/versioning.h
-@@ -18,7 +18,7 @@
+@@ -16,6 +16,16 @@
  
- // The `annotate` attribute always pulls the annotated (inline) function into the object files, thus
- // we should only annotate headers when we are running versioner.
--#if defined(__BIONIC_VERSIONER)
-+#if defined(__BIONIC_VERSIONER) || !defined(__clang__)
+ #pragma once
  
- #define __INTRODUCED_IN(api_level) __attribute__((__annotate__("introduced_in=" #api_level)))
- #define __INTRODUCED_IN_NO_GUARD_FOR_NDK(api_level) __attribute__((__annotate__("introduced_in=" #api_level))) __VERSIONER_NO_GUARD
++#if !defined(__clang__)
++
++#define __BIONIC_AVAILABILITY_GUARD(api_level) (__ANDROID_API__ >= (api_level))
++#define __INTRODUCED_IN(api_level) __attribute__((__annotate__("introduced_in=" #api_level)))
++#define __DEPRECATED_IN(api_level, msg) __attribute__((__annotate__("deprecated_in=" #api_level)))
++#define __REMOVED_IN(api_level, msg) __attribute__((__annotate__("obsoleted_in=" #api_level)))
++#define __INTRODUCED_IN_32(api_level) __attribute__((__annotate__("introduced_in_32=" #api_level)))
++#define __INTRODUCED_IN_64(api_level) __attribute__((__annotate__("introduced_in_64=" #api_level)))
++
++#else
+ /**
+  * @def __ANDROID_UNAVAILABLE_SYMBOLS_ARE_WEAK__
+  *
+@@ -80,3 +89,5 @@
+ #define __INTRODUCED_IN_32(api_level)
+ #define __INTRODUCED_IN_64(api_level) __BIONIC_AVAILABILITY(introduced=api_level)
+ #endif
++
++#endif // !defined(__clang__)

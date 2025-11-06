@@ -1,0 +1,75 @@
+--- a/config/picflag.m4
++++ b/config/picflag.m4
+@@ -51,10 +51,10 @@
+ 	# All AIX code is PIC.
+ 	;;
+ 
+-    # Some targets support both -fPIC and -fpic, but prefer the latter.
++    # Some targets support both -fPIC and -fpic, but prefer the former.
+     # FIXME: Why?
+     i[[34567]]86-*-* | x86_64-*-*)
+-	$1=-fpic
++	$1=-fPIC
+ 	;;
+     # FIXME: Override -fPIC default in libgcc only? 
+     sh-*-linux* | sh[[2346lbe]]*-*-linux*)
+--- a/gcc/configure
++++ b/gcc/configure
+@@ -5348,10 +5348,10 @@
+ 	# All AIX code is PIC.
+ 	;;
+ 
+-    # Some targets support both -fPIC and -fpic, but prefer the latter.
++    # Some targets support both -fPIC and -fpic, but prefer the former.
+     # FIXME: Why?
+     i[34567]86-*-* | x86_64-*-*)
+-	PICFLAG_FOR_TARGET=-fpic
++	PICFLAG_FOR_TARGET=-fPIC
+ 	;;
+     # FIXME: Override -fPIC default in libgcc only?
+     sh-*-linux* | sh[2346lbe]*-*-linux*)
+--- a/libada/configure
++++ b/libada/configure
+@@ -3219,10 +3219,10 @@
+ 	# All AIX code is PIC.
+ 	;;
+ 
+-    # Some targets support both -fPIC and -fpic, but prefer the latter.
++    # Some targets support both -fPIC and -fpic, but prefer the former.
+     # FIXME: Why?
+     i[34567]86-*-* | x86_64-*-*)
+-	PICFLAG=-fpic
++	PICFLAG=-fPIC
+ 	;;
+     # FIXME: Override -fPIC default in libgcc only?
+     sh-*-linux* | sh[2346lbe]*-*-linux*)
+--- a/libiberty/configure
++++ b/libiberty/configure
+@@ -5209,10 +5209,10 @@
+ 	# All AIX code is PIC.
+ 	;;
+ 
+-    # Some targets support both -fPIC and -fpic, but prefer the latter.
++    # Some targets support both -fPIC and -fpic, but prefer the former.
+     # FIXME: Why?
+     i[34567]86-*-* | x86_64-*-*)
+-	PICFLAG=-fpic
++	PICFLAG=-fPIC
+ 	;;
+     # FIXME: Override -fPIC default in libgcc only?
+     sh-*-linux* | sh[2346lbe]*-*-linux*)
+--- a/libgcc/configure
++++ b/libgcc/configure
+@@ -2419,10 +2419,10 @@
+ 	# All AIX code is PIC.
+ 	;;
+ 
+-    # Some targets support both -fPIC and -fpic, but prefer the latter.
++    # Some targets support both -fPIC and -fpic, but prefer the former.
+     # FIXME: Why?
+     i[34567]86-*-* | x86_64-*-*)
+-	PICFLAG=-fpic
++	PICFLAG=-fPIC
+ 	;;
+     # FIXME: Override -fPIC default in libgcc only?
+     sh-*-linux* | sh[2346lbe]*-*-linux*)

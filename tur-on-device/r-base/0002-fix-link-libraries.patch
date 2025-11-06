@@ -1,0 +1,44 @@
+--- a/configure.ac
++++ b/configure.ac
+@@ -1517,6 +1517,8 @@
+     main_ldflags="-Wl,--export-dynamic"
+     STATICR1="-Wl,--whole-archive"
+     STATICR2="-Wl,--no-whole-archive"
++    ## This is needed for Android.
++    SHLIB_LIBADD="\$(LIBM)"
+     ;;
+   mingw*)
+     SHLIB_EXT=".dll"
+--- a/configure
++++ b/configure
+@@ -29101,6 +29101,8 @@
+     main_ldflags="-Wl,--export-dynamic"
+     STATICR1="-Wl,--whole-archive"
+     STATICR2="-Wl,--no-whole-archive"
++    ## This is needed for Android.
++    SHLIB_LIBADD="\$(LIBM)"
+     ;;
+   mingw*)
+     SHLIB_EXT=".dll"
+--- a/src/library/utils/src/Makefile.in
++++ b/src/library/utils/src/Makefile.in
+@@ -25,7 +25,8 @@
+ # need Defn.h etc, and config.h
+ PKG_CPPFLAGS =-I../../../include -I$(top_srcdir)/src/include -DHAVE_CONFIG_H \
+   -I$(top_srcdir)/src/main
+ 
++PKG_LIBS = -llzma
+
+ all: Makedeps
+ 	@$(MAKE) shlib
+--- a/src/modules/internet/Makefile.in
++++ b/src/modules/internet/Makefile.in
+@@ -22,7 +22,7 @@
+ 	dllversion.rc
+ 
+ internet_la = internet$(SHLIB_EXT)
+-internet_la_LIBADD = $(CURL_LIBS) $(LIBR1) @INTERNET_LIBS@ @DYLIB_UNDEFINED_ALLOWED_FALSE@ $(LIBINTL)
++internet_la_LIBADD = $(LIBM) $(CURL_LIBS) $(LIBR1) @INTERNET_LIBS@ @DYLIB_UNDEFINED_ALLOWED_FALSE@ $(LIBINTL)
+ 
+ ALL_CPPFLAGS = $(R_XTRA_CPPFLAGS) $(CURL_CPPFLAGS) $(CPPFLAGS) $(DEFS)
+ ALL_CFLAGS = $(ALL_CFLAGS_LO)  @C_VISIBILITY@

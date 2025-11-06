@@ -1,0 +1,48 @@
+#!/usr/bin/env python
+import itertools
+import os
+import subprocess
+import sys
+import typing
+
+COMPLIER_CC = "@COMPILER_CC@"
+COMPILER_CXX = "@COMPILER_CXX@"
+
+def main(argv: typing.List[str]):
+    cwd = os.getcwd()
+    is_cxx_mode = False
+    argv_new = []
+    it = iter(argv[1:])
+    while True:
+        arg = next(it, None)
+        if arg == None:
+            break
+        elif arg == "-c":
+            argv_new.append(arg)
+            next_arg = next(it, None)
+            assert next_arg is not None
+            is_cxx_mode = is_cxx_mode or (next_arg.endswith(".cc") or next_arg.endswith(".cpp"))
+            it = itertools.chain([next_arg], it)
+        elif arg[0] == "@":
+            # Maybe need to expand the params
+            with open(arg[1:], "r") as fp:
+                need_expand = False
+                lines = list(map(str.strip, fp.readlines()))
+                for line in lines:
+                    if line.startswith("-fuse-ld"):
+                        need_expand = True
+                if need_expand:
+                    it = itertools.chain(lines, it)
+                else:
+                    argv_new.append(arg)
+            continue
+        elif arg in ["-Wthread-safety", "-Wself-assign", "-fcolor-diagnostics"]:
+            # Not supported by GCC
+            continue
+        else:
+            argv_new.append(arg)
+    args = [COMPILER_CXX if is_cxx_mode else COMPLIER_CC, "-no-canonical-prefixes"] + argv_new
+    subprocess.check_call(args, env=os.environ, cwd=cwd, text=True)
+
+if __name__ == '__main__':
+    main(sys.argv)

@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://computing.llnl.gov/projects/sundials
 TERMUX_PKG_DESCRIPTION="SUite of Nonlinear and DIfferential/ALgebraic equation Solvers."
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="1:7.3.0"
+TERMUX_PKG_VERSION="1:7.5.0"
 TERMUX_PKG_SRCURL=https://github.com/LLNL/sundials/releases/download/v${TERMUX_PKG_VERSION#*:}/sundials-${TERMUX_PKG_VERSION#*:}.tar.gz
-TERMUX_PKG_SHA256=fd970a9023f8ea37b81c5065c067bf1726f656b39f5907b48169a6f98d306ba7
+TERMUX_PKG_SHA256=089ac659507def738b7a65b574ffe3a900d38569e3323d9709ebed3e445adecc
 TERMUX_PKG_DEPENDS="libopenblas, suitesparse"
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
@@ -30,7 +30,7 @@ TERMUX_PKG_RM_AFTER_INSTALL="examples/"
 source $TERMUX_SCRIPTDIR/common-files/setup_toolchain_gcc.sh
 
 termux_step_pre_configure() {
-	_setup_toolchain_ndk_gcc_11
+	_setup_toolchain_ndk_gcc_15
 	_override_configure_cmake_for_gcc
 }
 

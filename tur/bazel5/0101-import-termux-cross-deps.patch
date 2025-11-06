@@ -1,0 +1,30 @@
+--- a/WORKSPACE
++++ b/WORKSPACE
+@@ -715,3 +715,27 @@
+ load("@bazel_skylib//:workspace.bzl", "bazel_skylib_workspace")
+ 
+ bazel_skylib_workspace()
++
++new_local_repository(
++    name = "termux-prefix",
++    path = "@TERMUX_PREFIX@",
++    build_file_content = """
++package(default_visibility = ["//visibility:public"])
++filegroup(
++    name = "prefix",
++    srcs = glob(["**"])
++)
++"""
++)
++
++new_local_repository(
++    name = "termux-toolchain",
++    path = "@TERMUX_PREFIX@/tmp/custom-toolchain",
++    build_file_content = """
++package(default_visibility = ["//visibility:public"])
++filegroup(
++    name = "toolchain",
++    srcs = glob(["**"])
++)
++"""
++)

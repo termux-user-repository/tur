@@ -2,12 +2,13 @@ diff --git a/crates/llama-cpp-server/build.rs b/crates/llama-cpp-server/build.rs
 index 35a4edb..3837363 100644
 --- a/crates/llama-cpp-server/build.rs
 +++ b/crates/llama-cpp-server/build.rs
-@@ -12,6 +12,15 @@ fn main() {
+@@ -12,6 +12,16 @@ fn main() {
      config.profile("Release");
      config.define("GGML_NATIVE", "OFF");
      config.define("GGML_NATIVE_DEFAULT", "OFF");
 +    config.define("GGML_BLAS", "ON");
 +    config.define("GGML_BLAS_VENDOR", "OpenBLAS");
++    config.define("BLAS_INCLUDE_DIRS", "@TERMUX_PREFIX@/include/openblas");
 +    config.define("GGML_OPENMP", "ON");
 +    config.define("GGML_AVX", "OFF");
 +    config.define("GGML_AVX2", "OFF");

@@ -1,0 +1,59 @@
+#!/bin/sh
+#
+# Copyright (C) 2016 The Android Open Source Project
+# Copyright (C) 2022 github.com/REAndroid
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+libdir="@TERMUX_PREFIX@/libexec/apkeditor"
+jarfile=apkeditor.jar
+
+# Find the highest version of APKEditor-*.jar in the directory.
+highest_jarfile=$(ls "$libdir"/APKEditor-*.jar 2>/dev/null | sort -V | tail -n 1)
+if [ -n "$highest_jarfile" ]; then
+    jarfile=$(basename "$highest_jarfile")
+fi
+
+if [ ! -r "$libdir/$jarfile" ]; then
+    echo "$(basename "$0"): can't find $jarfile"
+    exit 1
+fi
+
+# By default, give apkeditor a max heap size of 1 gig. This can be overridden
+# by using a "-J" option (see below).
+defaultMx="-Xmx1024M"
+
+# The following will extract any initial parameters of the form
+# "-J<stuff>" from the command line and pass them to the Java
+# invocation (instead of to apkeditor). This makes it possible for you to add
+# a command-line parameter such as "-JXmx8g" in your scripts, for
+# example. "java" (with no args) and "java -X" give a summary of
+# available options.
+javaOpts=""
+
+while expr "x$1" : 'x-J' >/dev/null; do
+    opt=`expr "x$1" : 'x-J\(.*\)'`
+    javaOpts="${javaOpts} -${opt}"
+    if expr "x${opt}" : "xXmx[0-9]" >/dev/null; then
+        defaultMx="no"
+    fi
+    shift
+done
+
+if [ "${defaultMx}" != "no" ]; then
+    javaOpts="${javaOpts} ${defaultMx}"
+fi
+
+jarpath="$libdir/$jarfile"
+
+exec java $javaOpts -jar "$jarpath" "$@"

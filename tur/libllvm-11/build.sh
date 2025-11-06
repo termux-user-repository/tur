@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://clang.llvm.org/
 TERMUX_PKG_DESCRIPTION="Modular compiler and toolchain technologies library (Version 11)"
 TERMUX_PKG_LICENSE="Apache-2.0"
 TERMUX_PKG_LICENSE_FILE="llvm/LICENSE.TXT"
-TERMUX_PKG_MAINTAINER="@buttaface, @termux-user-repository"
+TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION=11.1.0
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_REVISION=2
 TERMUX_PKG_SHA256=74d2529159fd118c3eac6f90107b5611bccc6f647fdea104024183e8d5e25831
 TERMUX_PKG_SRCURL=https://github.com/llvm/llvm-project/releases/download/llvmorg-$TERMUX_PKG_VERSION/llvm-project-$TERMUX_PKG_VERSION.src.tar.xz
 TERMUX_PKG_HOSTBUILD=true
@@ -64,6 +64,9 @@ termux_step_pre_configure() {
 	# see CMakeLists.txt and tools/clang/CMakeLists.txt
 	TERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DLLVM_TARGET_ARCH=$LLVM_TARGET_ARCH"
 	TERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DLLVM_HOST_TRIPLE=$LLVM_DEFAULT_TARGET_TRIPLE"
+
+	LDFLAGS+=" -Wl,--undefined-version"
+
 	export TERMUX_SRCDIR_SAVE=$TERMUX_PKG_SRCDIR
 	TERMUX_PKG_SRCDIR=$TERMUX_PKG_SRCDIR/llvm
 }

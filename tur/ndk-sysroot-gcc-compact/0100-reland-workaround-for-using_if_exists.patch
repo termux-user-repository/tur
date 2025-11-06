@@ -7,14 +7,20 @@ true when targetting Android API 24.
 
 --- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__config
 +++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__config
-@@ -552,6 +552,18 @@
+@@ -551,6 +551,24 @@
  #    define _LIBCPP_USING_DEV_RANDOM
  #  endif
  
 +#if __has_attribute(using_if_exists)
 +# define _LIBCPP_HAS_TIMESPEC_GET
 +# define _LIBCPP_HAS_ALIGNED_ALLOC
++# define _LIBCPP_HAS_TOWCTRANS
++# define _LIBCPP_HAS_WCTRANS
 +#elif defined(__BIONIC__)
++#  if __ANDROID_API__ >= 26
++#    define _LIBCPP_HAS_TOWCTRANS
++#    define _LIBCPP_HAS_WCTRANS
++#  endif
 +#  if __ANDROID_API__ >= 28
 +#    define _LIBCPP_HAS_ALIGNED_ALLOC
 +#  endif
@@ -57,3 +63,18 @@ true when targetting Android API 24.
  using ::timespec_get _LIBCPP_USING_IF_EXISTS;
  #endif
  
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/cwctype
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/cwctype
+@@ -88,8 +88,12 @@
+ using ::wctype _LIBCPP_USING_IF_EXISTS;
+ using ::towlower _LIBCPP_USING_IF_EXISTS;
+ using ::towupper _LIBCPP_USING_IF_EXISTS;
++#if defined(_LIBCPP_HAS_TOWCTRANS)
+ using ::towctrans _LIBCPP_USING_IF_EXISTS;
++#endif
++#if defined(_LIBCPP_HAS_WCTRANS)
+ using ::wctrans _LIBCPP_USING_IF_EXISTS;
++#endif
+ #endif // _LIBCPP_INCLUDED_C_LIBRARY_WCTYPE_H
+ 
+ _LIBCPP_END_NAMESPACE_STD

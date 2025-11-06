@@ -1,0 +1,44 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -301,6 +305,10 @@
+   endif ()
+ endif ()
+ 
++# FIXME: Try another way if possible.
++set(CMAKE_SHARED_LINKER_FLAGS "-L@TERMUX_PREFIX@/lib -Wl,-ldl -Wl,-l:libunwind.a -Wl,--rpath=@TERMUX_PREFIX@/lib")
++set(CMAKE_EXE_LINKER_FLAGS "-L@TERMUX_PREFIX@/lib -Wl,-ldl -Wl,-l:libunwind.a -Wl,--rpath=@TERMUX_PREFIX@/lib")
++set(CMAKE_MODULE_LINKER_FLAGS "-L@TERMUX_PREFIX@/lib -Wl,-ldl -Wl,-l:libunwind.a -Wl,--rpath=@TERMUX_PREFIX@/lib")
+ if (APPLE)
+   set(CMAKE_MODULE_LINKER_FLAGS "-Wl,-flat_namespace -Wl,-undefined -Wl,suppress")
+ endif ()
+--- a/runtime/flang/CMakeLists.txt
++++ b/runtime/flang/CMakeLists.txt
+@@ -517,7 +517,7 @@
+ elseif (APPLE)
+   target_link_libraries(flang_shared m)
+ else()
+-  target_link_libraries(flang_shared m rt)
++  target_link_libraries(flang_shared m android-execinfo)
+ endif()
+ 
+ set(SHARED_LIBRARY FALSE)
+--- a/runtime/flangrti/CMakeLists.txt
++++ b/runtime/flangrti/CMakeLists.txt
+@@ -96,9 +96,16 @@
+     FLANG_LIBOMP
+     NAMES omp libomp
+     HINTS ${CMAKE_BINARY_DIR}/lib)
+-  target_link_libraries(flangrti_shared PUBLIC ${FLANG_LIBOMP})
++  target_link_libraries(flangrti_shared PUBLIC ${FLANG_LIBOMP} dl)
+ endif()
+
++# Import Backtrace
++find_library(
++  LIBBACKTRACE
++  NAMES android-execinfo libandroid-execinfo execinfo libexecinfo
++  HINTS ${CMAKE_BINARY_DIR}/lib)
++target_link_libraries(flangrti_shared PUBLIC ${LIBBACKTRACE})
++
+ find_library(
+   LIBPGMATH
+   NAMES pgmath libpgmath

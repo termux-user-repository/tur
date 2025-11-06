@@ -3,7 +3,7 @@ TERMUX_PKG_DESCRIPTION="WireGuard frontend for mitmproxy"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="0.1.23"
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_REVISION=2
 TERMUX_PKG_SRCURL=https://github.com/decathorpe/mitmproxy_wireguard/archive/refs/tags/$TERMUX_PKG_VERSION.tar.gz
 TERMUX_PKG_SHA256=29eac8ffcb235194b9f1aba9e0fe3e024aa8417427005eabeb30c1870c808b35
 TERMUX_PKG_AUTO_UPDATE=true
@@ -30,7 +30,10 @@ termux_step_make_install() {
 	export PYO3_CROSS_LIB_DIR=$TERMUX_PREFIX/lib
 	export PYTHONPATH=$TERMUX_PREFIX/lib/python${_PYTHON_VERSION}/site-packages
 
-	build-python -m maturin build --release --skip-auditwheel --target $CARGO_BUILD_TARGET
+	build-python -m maturin build \
+		--target $CARGO_BUILD_TARGET \
+		--release --skip-auditwheel \
+		--interpreter python${TERMUX_PYTHON_VERSION}
 
 	# Fix wheel name for arm
 	if [ "$TERMUX_ARCH" = "arm" ]; then

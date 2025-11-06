@@ -2,12 +2,14 @@ TERMUX_PKG_HOMEPAGE=https://github.com/stsp/thunk_gen
 TERMUX_PKG_DESCRIPTION="thunk generator for C and assembler"
 TERMUX_PKG_LICENSE="GPL-3.0"
 TERMUX_PKG_MAINTAINER="@stsp"
-TERMUX_PKG_VERSION=1.3
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_VERSION="1.8"
 TERMUX_PKG_SRCURL=https://github.com/stsp/thunk_gen/archive/refs/tags/${TERMUX_PKG_VERSION}.tar.gz
-TERMUX_PKG_SHA256=248795fbbf2988aabdf6fb83a53b6b83d42fd8346de5b88507ef673bc84ba830
+TERMUX_PKG_SHA256=f028a55a919ba718469c6317f4a614ee3d0ecc7b44572c4c1b086000af4b66e6
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_BUILD_DEPENDS="flex, bison"
+# As strange as it may seem, this package uses autoconf and pkg-config
+# at run-time, not for build!
+TERMUX_PKG_DEPENDS="bash, autoconf, pkg-config"
 TERMUX_PKG_HOSTBUILD=true
 TERMUX_PKG_NO_SHEBANG_FIX_FILES="
 opt/${TERMUX_PKG_NAME}/cross/libexec/thunk_gen/*

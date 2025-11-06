@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE="https://playit.gg"
 TERMUX_PKG_DESCRIPTION="playit is a global proxy that allows anyone to host a server without port forwarding."
 TERMUX_PKG_LICENSE="BSD 2-Clause"
 TERMUX_PKG_MAINTAINER="@nisheri-ascar"
-TERMUX_PKG_VERSION="0.15.26"
+TERMUX_PKG_VERSION="0.16.3"
 TERMUX_PKG_SRCURL=https://github.com/playit-cloud/playit-agent/archive/v${TERMUX_PKG_VERSION}.tar.gz
-TERMUX_PKG_SHA256=3aad55efbd8371ae7bc49cc8a9a27ea975e96aa93046c959f9bce84676af9bb4
+TERMUX_PKG_SHA256=c0c5b9c5b1390a3966badd5d667f66aa5dbf88d360f8b51250ae29ea18f98479
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_AUTO_UPDATE=true
 

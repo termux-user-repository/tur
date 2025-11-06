@@ -1,0 +1,15 @@
+--- a/gcc/ada/sysdep.c
++++ b/gcc/ada/sysdep.c
+@@ -1013,6 +1013,12 @@
+ 
+ #ifdef __ANDROID__
+ 
++int
++__gnat_has_cap_sys_nice () {
++  // Stub
++  return 0;
++}
++
+ /* Provide extern symbols for sig* as needed by the tasking run-time, instead
+    of static inline functions.  */
+ 

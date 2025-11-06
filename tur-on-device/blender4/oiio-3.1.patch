@@ -1,0 +1,185 @@
+From cf436f5faa8dce9e9f987792f1d5bbc7657edfe5 Mon Sep 17 00:00:00 2001
+From: Jesse Yurkovich <jesse.y@gmail.com>
+Date: Fri, 3 Oct 2025 16:50:29 -0700
+Subject: [PATCH] Image: Support building against OpenImageIO 3.1.x
+
+We were using an undocumented macro that has been removed in the latest
+version. Certain distros are now attempting builds and this seems easy
+enough to adjust on our side.
+
+Will mark for backport to 4.5 as well.
+---
+ intern/cycles/session/denoising.h                       | 2 +-
+ intern/cycles/session/merge.cpp                         | 2 +-
+ source/blender/imbuf/intern/format_bmp.cc               | 2 +-
+ source/blender/imbuf/intern/format_dds.cc               | 2 +-
+ source/blender/imbuf/intern/format_dpx.cc               | 2 +-
+ source/blender/imbuf/intern/format_hdr.cc               | 2 +-
+ source/blender/imbuf/intern/format_png.cc               | 2 +-
+ source/blender/imbuf/intern/format_psd.cc               | 2 +-
+ source/blender/imbuf/intern/format_targa.cc             | 2 +-
+ source/blender/imbuf/intern/format_tiff.cc              | 2 +-
+ source/blender/imbuf/intern/oiio/openimageio_api.cpp    | 2 +-
+ source/blender/imbuf/intern/oiio/openimageio_support.cc | 2 +-
+ 12 files changed, 12 insertions(+), 12 deletions(-)
+
+diff --git a/intern/cycles/session/denoising.h b/intern/cycles/session/denoising.h
+index ac6497e1339..2a566062f29 100644
+--- a/intern/cycles/session/denoising.h
++++ b/intern/cycles/session/denoising.h
+@@ -19,7 +19,7 @@
+ 
+ #include <OpenImageIO/imageio.h>
+ 
+-OIIO_NAMESPACE_USING
++using namespace OIIO;
+ 
+ CCL_NAMESPACE_BEGIN
+ 
+diff --git a/intern/cycles/session/merge.cpp b/intern/cycles/session/merge.cpp
+index 20f8ff7452a..b41dca4a3ce 100644
+--- a/intern/cycles/session/merge.cpp
++++ b/intern/cycles/session/merge.cpp
+@@ -12,7 +12,7 @@
+ #include <OpenImageIO/filesystem.h>
+ #include <OpenImageIO/imageio.h>
+ 
+-OIIO_NAMESPACE_USING
++using namespace OIIO;
+ 
+ CCL_NAMESPACE_BEGIN
+ 
+diff --git a/source/blender/imbuf/intern/format_bmp.cc b/source/blender/imbuf/intern/format_bmp.cc
+index 95e01638368..2210ad713d1 100644
+--- a/source/blender/imbuf/intern/format_bmp.cc
++++ b/source/blender/imbuf/intern/format_bmp.cc
+@@ -11,7 +11,7 @@
+ #include "IMB_filetype.hh"
+ #include "IMB_imbuf_types.hh"
+ 
+-OIIO_NAMESPACE_USING
++using namespace OIIO;
+ using namespace blender::imbuf;
+ 
+ bool imb_is_a_bmp(const uchar *mem, size_t size)
+diff --git a/source/blender/imbuf/intern/format_dds.cc b/source/blender/imbuf/intern/format_dds.cc
+index 3d1a9e6241d..a899c5ac6da 100644
+--- a/source/blender/imbuf/intern/format_dds.cc
++++ b/source/blender/imbuf/intern/format_dds.cc
+@@ -21,7 +21,7 @@
+ #include "BLI_path_utils.hh"
+ #include "BLI_string.h"
+ 
+-OIIO_NAMESPACE_USING
++using namespace OIIO;
+ using namespace blender::imbuf;
+ 
+ static void LoadDXTCImage(ImBuf *ibuf, Filesystem::IOMemReader &mem_reader);
+diff --git a/source/blender/imbuf/intern/format_dpx.cc b/source/blender/imbuf/intern/format_dpx.cc
+index b809aac2b5b..3701628860c 100644
+--- a/source/blender/imbuf/intern/format_dpx.cc
++++ b/source/blender/imbuf/intern/format_dpx.cc
+@@ -12,7 +12,7 @@
+ #include "IMB_filetype.hh"
+ #include "IMB_imbuf_types.hh"
+ 
+-OIIO_NAMESPACE_USING
++using namespace OIIO;
+ using namespace blender::imbuf;
+ 
+ bool imb_is_a_dpx(const uchar *mem, size_t size)
+diff --git a/source/blender/imbuf/intern/format_hdr.cc b/source/blender/imbuf/intern/format_hdr.cc
+index 283b8c96a74..9764d2a4fc9 100644
+--- a/source/blender/imbuf/intern/format_hdr.cc
++++ b/source/blender/imbuf/intern/format_hdr.cc
+@@ -11,7 +11,7 @@
+ #include "IMB_filetype.hh"
+ #include "IMB_imbuf_types.hh"
+ 
+-OIIO_NAMESPACE_USING
++using namespace OIIO;
+ using namespace blender::imbuf;
+ 
+ bool imb_is_a_hdr(const uchar *mem, size_t size)
+diff --git a/source/blender/imbuf/intern/format_png.cc b/source/blender/imbuf/intern/format_png.cc
+index ce0df6ce110..5b866179928 100644
+--- a/source/blender/imbuf/intern/format_png.cc
++++ b/source/blender/imbuf/intern/format_png.cc
+@@ -12,7 +12,7 @@
+ #include "IMB_filetype.hh"
+ #include "IMB_imbuf_types.hh"
+ 
+-OIIO_NAMESPACE_USING
++using namespace OIIO;
+ using namespace blender::imbuf;
+ 
+ bool imb_is_a_png(const uchar *mem, size_t size)
+diff --git a/source/blender/imbuf/intern/format_psd.cc b/source/blender/imbuf/intern/format_psd.cc
+index 1458ea5e122..d57788610c4 100644
+--- a/source/blender/imbuf/intern/format_psd.cc
++++ b/source/blender/imbuf/intern/format_psd.cc
+@@ -12,7 +12,7 @@
+ 
+ #include "IMB_imbuf_types.hh"
+ 
+-OIIO_NAMESPACE_USING
++using namespace OIIO;
+ using namespace blender::imbuf;
+ 
+ bool imb_is_a_psd(const uchar *mem, size_t size)
+diff --git a/source/blender/imbuf/intern/format_targa.cc b/source/blender/imbuf/intern/format_targa.cc
+index 7ebca13719a..639a1900dcd 100644
+--- a/source/blender/imbuf/intern/format_targa.cc
++++ b/source/blender/imbuf/intern/format_targa.cc
+@@ -11,7 +11,7 @@
+ #include "IMB_filetype.hh"
+ #include "IMB_imbuf_types.hh"
+ 
+-OIIO_NAMESPACE_USING
++using namespace OIIO;
+ using namespace blender::imbuf;
+ 
+ bool imb_is_a_tga(const uchar *mem, size_t size)
+diff --git a/source/blender/imbuf/intern/format_tiff.cc b/source/blender/imbuf/intern/format_tiff.cc
+index b702b28bfa2..83ca8bde48c 100644
+--- a/source/blender/imbuf/intern/format_tiff.cc
++++ b/source/blender/imbuf/intern/format_tiff.cc
+@@ -12,7 +12,7 @@
+ #include "IMB_filetype.hh"
+ #include "IMB_imbuf_types.hh"
+ 
+-OIIO_NAMESPACE_USING
++using namespace OIIO;
+ using namespace blender::imbuf;
+ 
+ bool imb_is_a_tiff(const uchar *mem, size_t size)
+diff --git a/source/blender/imbuf/intern/oiio/openimageio_api.cpp b/source/blender/imbuf/intern/oiio/openimageio_api.cpp
+index d56050ef77b..fba3af3b375 100644
+--- a/source/blender/imbuf/intern/oiio/openimageio_api.cpp
++++ b/source/blender/imbuf/intern/oiio/openimageio_api.cpp
+@@ -12,7 +12,7 @@
+ 
+ #include "BLI_threads.h"
+ 
+-OIIO_NAMESPACE_USING
++using namespace OIIO;
+ 
+ void OIIO_init()
+ {
+diff --git a/source/blender/imbuf/intern/oiio/openimageio_support.cc b/source/blender/imbuf/intern/oiio/openimageio_support.cc
+index b2f534056ce..9bf3c7790a6 100644
+--- a/source/blender/imbuf/intern/oiio/openimageio_support.cc
++++ b/source/blender/imbuf/intern/oiio/openimageio_support.cc
+@@ -25,7 +25,7 @@
+ static CLG_LogRef LOG_READ = {"image.read"};
+ static CLG_LogRef LOG_WRITE = {"image.write"};
+ 
+-OIIO_NAMESPACE_USING
++using namespace OIIO;
+ 
+ using std::string;
+ using std::unique_ptr;
+-- 
+2.49.1
+
+

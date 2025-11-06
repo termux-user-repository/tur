@@ -1,5 +1,5 @@
---- a/src/smartdns.c
-+++ b/src/smartdns.c
+--- a/src/utils/capbility.c
++++ b/src/utils/capbility.c
 @@ -103,6 +103,7 @@
  
  static int drop_root_privilege(void)

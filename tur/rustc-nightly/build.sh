@@ -2,14 +2,14 @@ TERMUX_PKG_HOMEPAGE=https://www.rust-lang.org/
 TERMUX_PKG_DESCRIPTION="Rust compiler and utilities (nightly version)"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="1.88.0-2025.04.12-nightly"
+TERMUX_PKG_VERSION="1.93.0-2025.11.06-nightly"
 _RUST_VERSION=$(echo $TERMUX_PKG_VERSION | cut -d- -f1)
 _DATE="$(echo $TERMUX_PKG_VERSION | cut -d- -f2 | sed 's|\.|-|g')"
 _LLVM_MAJOR_VERSION=$(. $TERMUX_SCRIPTDIR/packages/libllvm/build.sh; echo $LLVM_MAJOR_VERSION)
 _LLVM_MAJOR_VERSION_NEXT=$((_LLVM_MAJOR_VERSION + 1))
 _LZMA_VERSION=$(. $TERMUX_SCRIPTDIR/packages/liblzma/build.sh; echo $TERMUX_PKG_VERSION)
 TERMUX_PKG_SRCURL=https://static.rust-lang.org/dist/$_DATE/rustc-nightly-src.tar.xz
-TERMUX_PKG_SHA256=2fee519ffc7e74cc8abf6c687ed4611c533ab5469d73e20ef22329d02347f224
+TERMUX_PKG_SHA256=46fc0942b0f41e95514acc45894bf5b48acca49a1a0973c803813da8e0b78e4e
 TERMUX_PKG_DEPENDS="clang, libandroid-execinfo, libc++, libllvm (<< ${_LLVM_MAJOR_VERSION_NEXT}), lld, openssl, zlib"
 TERMUX_PKG_BUILD_DEPENDS="wasi-libc"
 TERMUX_PKG_NO_REPLACE_GUESS_SCRIPTS=true
@@ -110,21 +110,31 @@ termux_step_pre_configure() {
 }
 
 termux_step_configure() {
-	# Install llvm-19
-	local _line="deb [arch=amd64] http://apt.llvm.org/noble/ llvm-toolchain-noble-19 main"
-	local _file="/etc/apt/sources.list.d/apt-llvm-org.list"
+	# Install llvm-20
+	local _line="deb [arch=amd64] http://apt.llvm.org/noble/ llvm-toolchain-noble-20 main"
+	local _file="/etc/apt/sources.list.d/apt-llvm-org-rustc-nightly.list"
 	__sudo grep -qF -- "$_line" "$_file" || \
 		echo "$_line" | __sudo tee -a "$_file"
 	__sudo apt update
-	__sudo apt install -y llvm-19-dev llvm-19-tools
+	__sudo apt install -y llvm-20-dev llvm-20-tools
 
 	# Use nightly toolchain to build nightly toolchain
 	if [[ "${TERMUX_ON_DEVICE_BUILD}" == "false" ]]; then
-		rustup install nightly
-		export PATH="${HOME}/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/bin:${PATH}"
+		rustup install nightly-$_DATE-x86_64-unknown-linux-gnu
+		export PATH="${HOME}/.rustup/toolchains/nightly-$_DATE-x86_64-unknown-linux-gnu/bin:${PATH}"
 	fi
 	local RUSTC=$(command -v rustc)
 	local CARGO=$(command -v cargo)
+
+	# rust 1.89.0
+	export WASI_SDK_PATH="${TERMUX_PKG_TMPDIR}/wasi-sdk"
+	rm -fr "${WASI_SDK_PATH}"
+	mkdir -p "${WASI_SDK_PATH}"/{bin,share}
+	ln -fsv "${TERMUX_PREFIX}/share/wasi-sysroot" "${WASI_SDK_PATH}/share/wasi-sysroot"
+	local clang
+	for clang in wasm32-wasip{1,2,3}-clang{,++}; do
+		ln -fsv "$(command -v clang)" "${WASI_SDK_PATH}/bin/${clang}"
+	done
 
 	if [[ "${TERMUX_ON_DEVICE_BUILD}" == "true" ]]; then
 		local dir="${TERMUX_STANDALONE_TOOLCHAIN}/toolchains/llvm/prebuilt/linux-x86_64/bin"
@@ -147,7 +157,7 @@ termux_step_configure() {
 		-e "s|@CARGO_TARGET_NAME@|${CARGO_TARGET_NAME}|g" \
 		-e "s|@RUSTC@|${RUSTC}|g" \
 		-e "s|@CARGO@|${CARGO}|g" \
-		"${TERMUX_PKG_BUILDER_DIR}"/config.toml > config.toml
+		"${TERMUX_PKG_BUILDER_DIR}"/bootstrap.toml > bootstrap.toml
 
 	local env_host=$(printf $CARGO_TARGET_NAME | tr a-z A-Z | sed s/-/_/g)
 	export ${env_host}_OPENSSL_DIR=$TERMUX_PREFIX
@@ -179,6 +189,9 @@ termux_step_configure() {
 	export CARGO_TARGET_${env_host}_RUSTFLAGS+=" -C link-arg=-Wl,-rpath=${TERMUX_PREFIX}/lib -C link-arg=-Wl,--enable-new-dtags"
 
 	unset CC CFLAGS CFLAGS_${env_host} CPP CPPFLAGS CXX CXXFLAGS LD LDFLAGS PKG_CONFIG RANLIB
+
+	# Needed by wasm32-wasip2
+	cargo install wasm-component-ld
 }
 
 termux_step_make() {
@@ -191,17 +204,21 @@ termux_step_make_install() {
 	local job="install"
 	[[ "${TERMUX_ON_DEVICE_BUILD}" == "true" ]] && job="dist"
 
-	"${TERMUX_PKG_SRCDIR}/x.py" ${job} -j ${TERMUX_PKG_MAKE_PROCESSES} --stage 1
+	# rust 1.87.0
+	# https://github.com/termux/termux-packages/issues/25360
+	# build to stage 2 to fix rust-analyzer error
+	"${TERMUX_PKG_SRCDIR}/x.py" "${job}" -j "${TERMUX_PKG_MAKE_PROCESSES}" --stage 2
 
-	# Not putting wasm32-* into config.toml
-	# CI and on device (wasm32*):
+	# wasm32* not added into bootstrap.toml
+	# due to CI and on device build error:
 	# error: could not document `std`
-	"${TERMUX_PKG_SRCDIR}/x.py" install -j ${TERMUX_PKG_MAKE_PROCESSES} --target wasm32-unknown-unknown --stage 1 std
+	"${TERMUX_PKG_SRCDIR}/x.py" install -j "${TERMUX_PKG_MAKE_PROCESSES}" --target wasm32-unknown-unknown --stage 2 std
 	[[ ! -e "${TERMUX_PREFIX}/share/wasi-sysroot" ]] && termux_error_exit "wasi-sysroot not found"
-	"${TERMUX_PKG_SRCDIR}/x.py" install -j ${TERMUX_PKG_MAKE_PROCESSES} --target wasm32-wasip1 --stage 1 std
-	"${TERMUX_PKG_SRCDIR}/x.py" install -j ${TERMUX_PKG_MAKE_PROCESSES} --target wasm32-wasip2 --stage 1 std
+	"${TERMUX_PKG_SRCDIR}/x.py" install -j "${TERMUX_PKG_MAKE_PROCESSES}" --target wasm32-wasip1 --stage 2 std
+	"${TERMUX_PKG_SRCDIR}/x.py" install -j "${TERMUX_PKG_MAKE_PROCESSES}" --target wasm32-wasip2 --stage 2 std
+	"${TERMUX_PKG_SRCDIR}/x.py" install -j "${TERMUX_PKG_MAKE_PROCESSES}" --target wasm32-wasip3 --stage 2 std
 
-	"${TERMUX_PKG_SRCDIR}/x.py" dist -j ${TERMUX_PKG_MAKE_PROCESSES} rustc-dev
+	"${TERMUX_PKG_SRCDIR}/x.py" dist -j "${TERMUX_PKG_MAKE_PROCESSES}" --stage 2 rustc-dev
 
 	local VERSION=nightly
 
@@ -269,7 +286,7 @@ termux_step_make_install() {
 termux_step_post_make_install() {
 	if [ "$TERMUX_ARCH_BITS" = "64" ]; then
 		mkdir -p $TERMUX_PREFIX/opt/rust-nightly/lib/rustlib/$CARGO_TARGET_NAME/codegen-backends/
-		cp build/$CARGO_TARGET_NAME/stage1/lib/rustlib/$CARGO_TARGET_NAME/codegen-backends/librustc_codegen_cranelift-$_RUST_VERSION-nightly.so \
+		cp build/$CARGO_TARGET_NAME/stage2/lib/rustlib/$CARGO_TARGET_NAME/codegen-backends/librustc_codegen_cranelift-$_RUST_VERSION-nightly.so \
 			$TERMUX_PREFIX/opt/rust-nightly/lib/rustlib/$CARGO_TARGET_NAME/codegen-backends/librustc_codegen_cranelift-$_RUST_VERSION-nightly.so
 	fi
 

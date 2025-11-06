@@ -1,7 +1,7 @@
 --- a/Makefile
 +++ b/Makefile
-@@ -39,9 +39,6 @@
- 	$(RM) $(SMARTDNS_SYSTEMD)
+@@ -64,10 +64,7 @@
+ 	$(call PLUGINS_TARGETS, clean)
  
  install: SMARTDNS_BIN 
 -	install -v -m 0640 -D -t $(DESTDIR)$(SYSCONFDIR)/default etc/default/smartdns
@@ -9,4 +9,5 @@
  	install -v -m 0640 -D -t $(DESTDIR)$(SYSCONFDIR)/smartdns etc/smartdns/smartdns.conf
  	install -v -m 0755 -D -t $(DESTDIR)$(SBINDIR) src/smartdns
 -	install -v -m 0644 -D -t $(DESTDIR)$(SYSTEMDSYSTEMUNITDIR) systemd/smartdns.service
+ 	$(call PLUGINS_TARGETS, install)
  

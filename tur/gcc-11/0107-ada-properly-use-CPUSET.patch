@@ -1,0 +1,11 @@
+--- a/gcc/ada/adaint.c
++++ b/gcc/ada/adaint.c
+@@ -3441,7 +3441,7 @@
+ }
+ #endif
+ 
+-#if defined (__linux__)
++#if defined (__linux__) || defined (__ANDROID__)
+ #include <sched.h>
+ 
+ /* glibc versions earlier than 2.7 do not define the routines to handle

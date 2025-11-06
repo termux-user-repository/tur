@@ -1,0 +1,1447 @@
+From ad7b4ee246c9bff21b03296a15daff6ce27e3b1c Mon Sep 17 00:00:00 2001
+From: Chongyun Lee <licy183@termux.dev>
+Date: Sat, 19 Apr 2025 02:40:34 +0800
+Subject: [PATCH] reland jumbo 11
+
+Enable jumbo build for the following component(s)/source_set(s):
+
+- //gpu/command_buffer/client:client_sources
+- //gpu/command_buffer/client:gles2_implementation
+- //gpu/command_buffer/client:gles2_implementation_no_check
+- //gpu/command_buffer/client:gles2_c_lib
+- //gpu/command_buffer/common:common_base_sources
+- //gpu/command_buffer/common:common_sources
+- //gpu/command_buffer/service:service_sources
+- //gpu/config:config_sources
+- //gpu/ipc/service:service
+- //media/audio:audio
+- //media/base:base
+- //media/base/ipc:ipc
+- //media/capture:capture_base
+- //media/capture:capture_device_specific
+- //media/capture:capture_lib
+- //media/cast:common
+- //media/cast:encoding
+- //media/cast:sender
+- //media/filters:filters
+- //media/mojo/clients:clients
+- //media/mojo/common:common
+- //media/mojo/services:services
+- //ppapi/cpp:cpp
+- //ppapi/cpp:objects
+- //ppapi/host:host
+- //ppapi/proxy:proxy
+- //ppapi/shared_impl:common
+- //services/cert_verifier/cert_net_url_loader:cert_net_url_loader
+- //services/network:network_service
+- //services/network/public/cpp:crash_keys
+- //services/network/public/cpp:cpp
+- //services/network/public/cpp:first_party_sets_mojom_support
+- //services/network/public/cpp:cpp_base
+- //storage:browser
+
+---
+ gpu/BUILD.gn                                  |  3 ++-
+ gpu/command_buffer/client/BUILD.gn            |  9 ++++----
+ gpu/command_buffer/common/BUILD.gn            |  5 +++--
+ gpu/command_buffer/service/BUILD.gn           | 12 ++++++++---
+ gpu/command_buffer/service/graphite_utils.cc  |  5 +++++
+ gpu/command_buffer/service/scheduler.cc       |  4 ++++
+ .../angle_vulkan_image_backing_factory.cc     |  4 ++++
+ .../dawn_egl_image_representation.cc          |  4 ++++
+ .../dawn_gl_texture_representation.cc         |  4 ++++
+ .../shared_image/egl_image_backing_factory.cc |  4 ++++
+ .../gl_texture_image_backing_factory.cc       |  4 ++++
+ .../ozone_image_backing_factory.cc            |  4 ++++
+ .../shared_image_representation.cc            |  3 +++
+ .../wrapped_graphite_texture_backing.cc       |  6 ++++++
+ .../wrapped_sk_image_backing_factory.cc       |  4 ++++
+ gpu/config/BUILD.gn                           |  3 ++-
+ gpu/config/webgpu_blocklist_impl.h            |  3 +++
+ gpu/ipc/service/BUILD.gn                      |  3 ++-
+ media/audio/BUILD.gn                          |  3 ++-
+ media/audio/fake_audio_manager.cc             |  6 ++++++
+ media/audio/pulse/audio_manager_pulse.cc      |  6 ++++++
+ media/base/BUILD.gn                           |  5 ++++-
+ media/base/android/BUILD.gn                   |  3 ++-
+ media/base/ipc/BUILD.gn                       |  4 +++-
+ media/base/mac/BUILD.gn                       |  4 +++-
+ media/base/win/BUILD.gn                       |  4 +++-
+ media/capture/BUILD.gn                        |  7 ++++---
+ media/cast/BUILD.gn                           |  7 ++++---
+ media/cast/encoding/av1_encoder.cc            | 20 ++++++++++++++++++
+ media/cast/encoding/vpx_encoder.cc            | 21 +++++++++++++++++++
+ media/cast/sender/audio_sender.cc             |  6 ++++++
+ media/cast/sender/openscreen_frame_sender.cc  |  4 ++++
+ media/cast/sender/video_sender.cc             |  6 ++++++
+ media/filters/BUILD.gn                        |  3 ++-
+ .../h264_to_annex_b_bitstream_converter.cc    |  8 +++++++
+ .../h265_to_annex_b_bitstream_converter.cc    |  8 +++++++
+ media/filters/media_file_checker.cc           |  4 ++++
+ media/media_options.gni                       |  6 +++++-
+ media/mojo/clients/BUILD.gn                   |  4 +++-
+ media/mojo/common/BUILD.gn                    |  4 +++-
+ media/mojo/services/BUILD.gn                  |  3 ++-
+ ppapi/cpp/BUILD.gn                            |  5 +++--
+ ppapi/host/BUILD.gn                           |  3 ++-
+ ppapi/proxy/BUILD.gn                          | 11 ++++++++--
+ ppapi/shared_impl/BUILD.gn                    |  9 +++++++-
+ .../cert_net_url_loader/BUILD.gn              |  3 ++-
+ services/network/BUILD.gn                     |  5 +++--
+ .../http_server_properties_pref_delegate.cc   |  4 ++++
+ services/network/public/cpp/BUILD.gn          | 13 ++++++++----
+ .../cross_origin_embedder_policy_parser.cc    |  8 +++++++
+ .../cpp/document_isolation_policy_parser.cc   |  8 +++++++
+ services/network/url_loader.cc                |  4 ++++
+ .../web_bundle_url_loader_factory.cc          |  4 ++++
+ storage/browser/BUILD.gn                      |  5 +++--
+ storage/browser/blob/blob_url_registry.cc     |  4 ++++
+ storage/browser/quota/quota_settings.cc       |  4 ++++
+ 56 files changed, 276 insertions(+), 44 deletions(-)
+
+diff --git a/gpu/BUILD.gn b/gpu/BUILD.gn
+index b15101df3d..065227d0e5 100644
+--- a/gpu/BUILD.gn
++++ b/gpu/BUILD.gn
+@@ -4,6 +4,7 @@
+ 
+ import("//build/config/chromeos/ui_mode.gni")
+ import("//build/config/cronet/config.gni")
++import("//build/config/jumbo.gni")
+ import("//build/config/ui.gni")
+ import("//gpu/vulkan/features.gni")
+ import("//skia/features.gni")
+@@ -76,7 +77,7 @@ component("webgpu") {
+   public_deps = [ "//gpu/command_buffer/client:webgpu_sources" ]
+ }
+ 
+-static_library("test_support") {
++jumbo_static_library("test_support") {
+   testonly = true
+   sources = [
+     "command_buffer/client/client_test_helper.cc",
+diff --git a/gpu/command_buffer/client/BUILD.gn b/gpu/command_buffer/client/BUILD.gn
+index 7fd901cdce..982c8841c7 100644
+--- a/gpu/command_buffer/client/BUILD.gn
++++ b/gpu/command_buffer/client/BUILD.gn
+@@ -2,6 +2,7 @@
+ # Use of this source code is governed by a BSD-style license that can be
+ # found in the LICENSE file.
+ 
++import("//build/config/jumbo.gni")
+ import("//components/nacl/toolchain.gni")
+ import("//ui/gl/features.gni")
+ 
+@@ -53,7 +54,7 @@ group("webgpu") {
+   }
+ }
+ 
+-source_set("client_sources") {
++jumbo_source_set("client_sources") {
+   # External code should depend on this via //gpu/client above rather than
+   # depending on this directly or the component build will break.
+   visibility = [ "//gpu/*" ]
+@@ -258,7 +259,7 @@ source_set("webgpu_interface") {
+ }
+ 
+ # Library emulates GLES2 using command_buffers.
+-component("gles2_implementation") {
++jumbo_component("gles2_implementation") {
+   sources = gles2_implementation_source_files
+ 
+   defines = [ "GLES2_IMPL_IMPLEMENTATION" ]
+@@ -361,7 +362,7 @@ source_set("webgpu_sources") {
+ }
+ 
+ # Library emulates GLES2 using command_buffers.
+-component("gles2_implementation_no_check") {
++jumbo_component("gles2_implementation_no_check") {
+   sources = gles2_implementation_source_files
+ 
+   defines = [ "GLES2_IMPL_IMPLEMENTATION" ]
+@@ -391,7 +392,7 @@ component("gles2_implementation_no_check") {
+   }
+ }
+ 
+-component("gles2_c_lib") {
++jumbo_component("gles2_c_lib") {
+   sources = gles2_c_lib_source_files
+   defines = [ "GLES2_C_LIB_IMPLEMENTATION" ]
+ 
+diff --git a/gpu/command_buffer/common/BUILD.gn b/gpu/command_buffer/common/BUILD.gn
+index d928bf36c8..b41ac67791 100644
+--- a/gpu/command_buffer/common/BUILD.gn
++++ b/gpu/command_buffer/common/BUILD.gn
+@@ -7,6 +7,7 @@
+ # non-component build. This needs to match the GYP build which was likely an
+ # attempt to make larger components to help with loading.
+ 
++import("//build/config/jumbo.gni")
+ import("//ui/gl/features.gni")
+ 
+ group("common") {
+@@ -47,7 +48,7 @@ group("webgpu") {
+ 
+ # Minimal set of definitions which don't have GPU dependencies outside of this
+ # directory.
+-source_set("common_base_sources") {
++jumbo_source_set("common_base_sources") {
+   visibility = [ "//gpu/*" ]
+   sources = [
+     "command_buffer_id.h",
+@@ -66,7 +67,7 @@ source_set("common_base_sources") {
+   configs += [ "//gpu:gpu_implementation" ]
+ }
+ 
+-source_set("common_sources") {
++jumbo_source_set("common_sources") {
+   visibility = [ "//gpu/*" ]
+ 
+   sources = [
+diff --git a/gpu/command_buffer/service/BUILD.gn b/gpu/command_buffer/service/BUILD.gn
+index 740b754b10..cabac86ca5 100644
+--- a/gpu/command_buffer/service/BUILD.gn
++++ b/gpu/command_buffer/service/BUILD.gn
+@@ -2,6 +2,7 @@
+ # Use of this source code is governed by a BSD-style license that can be
+ # found in the LICENSE file.
+ 
++import("//build/config/jumbo.gni")
+ import("//build/config/ui.gni")
+ import("//gpu/vulkan/features.gni")
+ import("//skia/features.gni")
+@@ -26,9 +27,9 @@ group("gles2") {
+ }
+ 
+ if (is_component_build) {
+-  link_target_type = "source_set"
++  link_target_type = "jumbo_source_set"
+ } else {
+-  link_target_type = "static_library"
++  link_target_type = "jumbo_static_library"
+ }
+ target(link_target_type, "service_sources") {
+   # External code should depend on this via //gpu/command_buffer/service above
+@@ -314,6 +315,11 @@ target(link_target_type, "gles2_sources") {
+     "webgpu_decoder.h",
+   ]
+ 
++  jumbo_excluded_sources = [
++    # GL header conflicts
++    "shared_image/shared_image_format_service_utils.cc",
++  ]
++
+   if (is_android) {
+     sources += [
+       "abstract_texture_android.cc",
+@@ -637,7 +643,7 @@ proto_library("disk_cache_proto") {
+ }
+ 
+ if (is_android) {
+-  static_library("android_texture_owner_test_support") {
++  jumbo_static_library("android_texture_owner_test_support") {
+     testonly = true
+     sources = [
+       "mock_texture_owner.cc",
+diff --git a/gpu/command_buffer/service/graphite_utils.cc b/gpu/command_buffer/service/graphite_utils.cc
+index 502016b20c..c6bf7bbc19 100644
+--- a/gpu/command_buffer/service/graphite_utils.cc
++++ b/gpu/command_buffer/service/graphite_utils.cc
+@@ -12,6 +12,8 @@
+ #include "third_party/skia/include/gpu/graphite/GraphiteTypes.h"
+ #include "third_party/skia/include/gpu/graphite/Surface.h"
+ 
++#define ReadPixelsContext ReadPixelsContext_GrahpiteUtils
++#define OnReadPixelsDone  OnReadPixelsDone_GrahpiteUtils
+ namespace gpu {
+ namespace {
+ 
+@@ -103,3 +105,6 @@ bool GraphiteReadPixelsSync(skgpu::graphite::Context* context,
+ }
+ 
+ }  // namespace gpu
++
++#undef ReadPixelsContext
++#undef OnReadPixelsDone
+diff --git a/gpu/command_buffer/service/scheduler.cc b/gpu/command_buffer/service/scheduler.cc
+index ade35d3a19..ea03b47dcb 100644
+--- a/gpu/command_buffer/service/scheduler.cc
++++ b/gpu/command_buffer/service/scheduler.cc
+@@ -21,6 +21,8 @@
+ #include "gpu/config/gpu_preferences.h"
+ #include "third_party/perfetto/include/perfetto/tracing/traced_value.h"
+ 
++#define GetTaskFlowId GetTaskFlowId_Scheduler
++
+ namespace gpu {
+ namespace {
+ uint64_t GetTaskFlowId(uint32_t sequence_id, uint32_t order_num) {
+@@ -695,3 +697,5 @@ void Scheduler::ExecuteSequence(const SequenceId sequence_id) {
+ }
+ 
+ }  // namespace gpu
++
++#undef GetTaskFlowId
+diff --git a/gpu/command_buffer/service/shared_image/angle_vulkan_image_backing_factory.cc b/gpu/command_buffer/service/shared_image/angle_vulkan_image_backing_factory.cc
+index 59cee1e9c1..61b36b2589 100644
+--- a/gpu/command_buffer/service/shared_image/angle_vulkan_image_backing_factory.cc
++++ b/gpu/command_buffer/service/shared_image/angle_vulkan_image_backing_factory.cc
+@@ -14,6 +14,8 @@
+ #include "gpu/vulkan/vulkan_implementation.h"
+ #include "ui/gl/gl_surface_egl.h"
+ 
++#define kSupportedUsage kSupportedUsage_AngleVulkanImageBackingFactory
++
+ namespace gpu {
+ namespace {
+ 
+@@ -178,3 +180,5 @@ SharedImageBackingType AngleVulkanImageBackingFactory::GetBackingType() {
+ }
+ 
+ }  // namespace gpu
++
++#undef kSupportedUsage
+diff --git a/gpu/command_buffer/service/shared_image/dawn_egl_image_representation.cc b/gpu/command_buffer/service/shared_image/dawn_egl_image_representation.cc
+index 5c74a473eb..01e28e9c27 100644
+--- a/gpu/command_buffer/service/shared_image/dawn_egl_image_representation.cc
++++ b/gpu/command_buffer/service/shared_image/dawn_egl_image_representation.cc
+@@ -10,6 +10,8 @@
+ 
+ #include <dawn/native/OpenGLBackend.h>
+ 
++#define ToSharedImageAccessGLMode ToSharedImageAccessGLMode_DawnEGLImage
++
+ namespace {
+ GLenum ToSharedImageAccessGLMode(wgpu::TextureUsage usage) {
+   if (usage &
+@@ -107,3 +109,5 @@ void DawnEGLImageRepresentation::EndAccess() {
+ }
+ 
+ }  // namespace gpu
++
++#undef ToSharedImageAccessGLMode
+diff --git a/gpu/command_buffer/service/shared_image/dawn_gl_texture_representation.cc b/gpu/command_buffer/service/shared_image/dawn_gl_texture_representation.cc
+index 1bd77ff1e1..af9d74bf32 100644
+--- a/gpu/command_buffer/service/shared_image/dawn_gl_texture_representation.cc
++++ b/gpu/command_buffer/service/shared_image/dawn_gl_texture_representation.cc
+@@ -11,6 +11,8 @@
+ #include "gpu/command_buffer/service/texture_manager.h"
+ #include "gpu/config/gpu_finch_features.h"
+ 
++#define ToSharedImageAccessGLMode ToSharedImageAccessGLMode_DawnGLTexture
++
+ namespace {
+ GLenum ToSharedImageAccessGLMode(wgpu::TextureUsage usage) {
+   if (usage &
+@@ -100,3 +102,5 @@ void DawnGLTextureRepresentation::EndAccess() {
+ }
+ 
+ }  // namespace gpu
++
++#undef ToSharedImageAccessGLMode
+diff --git a/gpu/command_buffer/service/shared_image/egl_image_backing_factory.cc b/gpu/command_buffer/service/shared_image/egl_image_backing_factory.cc
+index 40c4ffbc0d..ceafc60394 100644
+--- a/gpu/command_buffer/service/shared_image/egl_image_backing_factory.cc
++++ b/gpu/command_buffer/service/shared_image/egl_image_backing_factory.cc
+@@ -19,6 +19,8 @@
+ #include "ui/gl/gl_implementation.h"
+ #include "ui/gl/shared_gl_fence_egl.h"
+ 
++#define kSupportedUsage kSupportedUsage_EGLImageBackingFactory
++
+ namespace gpu {
+ namespace {
+ 
+@@ -182,3 +184,5 @@ SharedImageBackingType EGLImageBackingFactory::GetBackingType() {
+ }
+ 
+ }  // namespace gpu
++
++#undef kSupportedUsage
+diff --git a/gpu/command_buffer/service/shared_image/gl_texture_image_backing_factory.cc b/gpu/command_buffer/service/shared_image/gl_texture_image_backing_factory.cc
+index ffe1e587be..674ca4a15b 100644
+--- a/gpu/command_buffer/service/shared_image/gl_texture_image_backing_factory.cc
++++ b/gpu/command_buffer/service/shared_image/gl_texture_image_backing_factory.cc
+@@ -17,6 +17,8 @@
+ #include "ui/gl/gl_implementation.h"
+ #include "ui/gl/progress_reporter.h"
+ 
++#define kSupportedUsage kSupportedUsage_GLTextureImageBackingFactory
++
+ namespace gpu {
+ namespace {
+ 
+@@ -318,3 +320,5 @@ SharedImageBackingType GLTextureImageBackingFactory::GetBackingType() {
+ }
+ 
+ }  // namespace gpu
++
++#undef kSupportedUsage
+diff --git a/gpu/command_buffer/service/shared_image/ozone_image_backing_factory.cc b/gpu/command_buffer/service/shared_image/ozone_image_backing_factory.cc
+index d039572451..db349c2321 100644
+--- a/gpu/command_buffer/service/shared_image/ozone_image_backing_factory.cc
++++ b/gpu/command_buffer/service/shared_image/ozone_image_backing_factory.cc
+@@ -36,6 +36,8 @@
+ #include "gpu/vulkan/vulkan_device_queue.h"
+ #endif  // BUILDFLAG(ENABLE_VULKAN)
+ 
++#define kSupportedUsage kSupportedUsage_OzoneImageBackingFactory
++
+ namespace gpu {
+ namespace {
+ 
+@@ -404,3 +406,5 @@ SharedImageBackingType OzoneImageBackingFactory::GetBackingType() {
+ }
+ 
+ }  // namespace gpu
++
++#undef kSupportedUsage
+diff --git a/gpu/command_buffer/service/shared_image/shared_image_representation.cc b/gpu/command_buffer/service/shared_image/shared_image_representation.cc
+index dc624cc958..2dec586a95 100644
+--- a/gpu/command_buffer/service/shared_image/shared_image_representation.cc
++++ b/gpu/command_buffer/service/shared_image/shared_image_representation.cc
+@@ -25,6 +25,9 @@
+ #include "gpu/vulkan/vulkan_fence_helper.h"
+ #endif
+ 
++// Macro 'None' from X11/X.h will cause confliction
++#undef None
++
+ namespace gpu {
+ 
+ ///////////////////////////////////////////////////////////////////////////////
+diff --git a/gpu/command_buffer/service/shared_image/wrapped_graphite_texture_backing.cc b/gpu/command_buffer/service/shared_image/wrapped_graphite_texture_backing.cc
+index 98acf00f42..23708353a4 100644
+--- a/gpu/command_buffer/service/shared_image/wrapped_graphite_texture_backing.cc
++++ b/gpu/command_buffer/service/shared_image/wrapped_graphite_texture_backing.cc
+@@ -30,6 +30,9 @@
+ #include "gpu/command_buffer/service/shared_image/dawn_fallback_image_representation.h"
+ #endif
+ 
++#define ReadPixelsContext ReadPixelsContext_WrappedGrahpiteTextureBacking
++#define OnReadPixelsDone  OnReadPixelsDone_WrappedGrahpiteTextureBacking
++
+ namespace gpu {
+ namespace {
+ struct ReadPixelsContext {
+@@ -411,3 +414,6 @@ WrappedGraphiteTextureBacking::ProduceDawn(
+ #endif  // BUILDFLAG(SKIA_USE_DAWN)
+ 
+ }  // namespace gpu
++
++#undef ReadPixelsContext
++#undef OnReadPixelsDone
+diff --git a/gpu/command_buffer/service/shared_image/wrapped_sk_image_backing_factory.cc b/gpu/command_buffer/service/shared_image/wrapped_sk_image_backing_factory.cc
+index 050fe396b1..a6e86976eb 100644
+--- a/gpu/command_buffer/service/shared_image/wrapped_sk_image_backing_factory.cc
++++ b/gpu/command_buffer/service/shared_image/wrapped_sk_image_backing_factory.cc
+@@ -25,6 +25,8 @@
+ #include "third_party/skia/include/gpu/ganesh/GrDirectContext.h"
+ #include "third_party/skia/include/gpu/ganesh/GrTypes.h"
+ 
++#define kSupportedUsage kSupportedUsage_WrappedSKImageBackingFactory
++
+ namespace gpu {
+ namespace {
+ // NOTE: WrappedSkImage cannot be used with raster-over-GLES2 as it doesn't
+@@ -266,3 +268,5 @@ SharedImageBackingType WrappedSkImageBackingFactory::GetBackingType() {
+ }
+ 
+ }  // namespace gpu
++
++#undef kSupportedUsage
+diff --git a/gpu/config/BUILD.gn b/gpu/config/BUILD.gn
+index 4c1fa574af..b1b260cb5c 100644
+--- a/gpu/config/BUILD.gn
++++ b/gpu/config/BUILD.gn
+@@ -5,6 +5,7 @@
+ import("//build/config/cast.gni")
+ import("//build/config/chrome_build.gni")
+ import("//build/config/chromeos/ui_mode.gni")
++import("//build/config/jumbo.gni")
+ import("//build/config/ui.gni")
+ import("//gpu/vulkan/features.gni")
+ import("//skia/features.gni")
+@@ -124,7 +125,7 @@ source_set("webgpu_blocklist_impl") {
+   public_deps = [ "//third_party/dawn/include/dawn:cpp_headers" ]
+ }
+ 
+-source_set("config_sources") {
++jumbo_source_set("config_sources") {
+   # External code should depend on this via //gpu/config above rather than
+   # depending on this directly or the component build will break.
+   visibility = [ "//gpu/*" ]
+diff --git a/gpu/config/webgpu_blocklist_impl.h b/gpu/config/webgpu_blocklist_impl.h
+index 7dca9433d6..c021b7c741 100644
+--- a/gpu/config/webgpu_blocklist_impl.h
++++ b/gpu/config/webgpu_blocklist_impl.h
+@@ -5,6 +5,9 @@
+ #ifndef GPU_CONFIG_WEBGPU_BLOCKLIST_IMPL_H_
+ #define GPU_CONFIG_WEBGPU_BLOCKLIST_IMPL_H_
+ 
++// Macro 'None' from X11/X.h will cause confliction
++#undef None
++
+ #include <cstdint>
+ #include <string>
+ 
+diff --git a/gpu/ipc/service/BUILD.gn b/gpu/ipc/service/BUILD.gn
+index 90658a3361..222ccb6b68 100644
+--- a/gpu/ipc/service/BUILD.gn
++++ b/gpu/ipc/service/BUILD.gn
+@@ -2,6 +2,7 @@
+ # Use of this source code is governed by a BSD-style license that can be
+ # found in the LICENSE file.
+ 
++import("//build/config/jumbo.gni")
+ import("//build/config/ui.gni")
+ import("//gpu/vulkan/features.gni")
+ import("//skia/features.gni")
+@@ -16,7 +17,7 @@ declare_args() {
+   subpixel_font_rendering_disabled = false
+ }
+ 
+-component("service") {
++jumbo_component("service") {
+   output_name = "gpu_ipc_service"
+   sources = [
+     "command_buffer_stub.cc",
+diff --git a/media/audio/BUILD.gn b/media/audio/BUILD.gn
+index e5de2b90a4..238c063c1a 100644
+--- a/media/audio/BUILD.gn
++++ b/media/audio/BUILD.gn
+@@ -3,6 +3,7 @@
+ # found in the LICENSE file.
+ 
+ import("//build/config/chromeos/ui_mode.gni")
++import("//build/config/jumbo.gni")
+ import("//build/config/linux/pkg_config.gni")
+ import("//media/media_options.gni")
+ import("//testing/libfuzzer/fuzzer_test.gni")
+@@ -26,7 +27,7 @@ config("platform_config") {
+   }
+ }
+ 
+-source_set("audio") {
++jumbo_source_set("audio") {
+   # Do not expand the visibility here without double-checking with OWNERS, this
+   # is a roll-up target which is part of the //media component. Most other DEPs
+   # should be using //media and not directly DEP this roll-up target.
+diff --git a/media/audio/fake_audio_manager.cc b/media/audio/fake_audio_manager.cc
+index 878cef8e3b..a5de8e6ad0 100644
+--- a/media/audio/fake_audio_manager.cc
++++ b/media/audio/fake_audio_manager.cc
+@@ -9,6 +9,9 @@
+ #include "media/base/audio_parameters.h"
+ #include "media/base/channel_layout.h"
+ 
++#define kDefaultSampleRate      kDefaultSampleRate_Fake
++#define kDefaultInputBufferSize kDefaultInputBufferSize_Fake
++
+ namespace media {
+ 
+ namespace {
+@@ -86,3 +89,6 @@ AudioParameters FakeAudioManager::GetInputStreamParameters(
+ }
+ 
+ }  // namespace media
++
++#undef kDefaultSampleRate
++#undef kDefaultInputBufferSize
+diff --git a/media/audio/pulse/audio_manager_pulse.cc b/media/audio/pulse/audio_manager_pulse.cc
+index a113644ff4..6d212b3917 100644
+--- a/media/audio/pulse/audio_manager_pulse.cc
++++ b/media/audio/pulse/audio_manager_pulse.cc
+@@ -25,6 +25,9 @@
+ #include "media/base/audio_parameters.h"
+ #include "media/base/channel_layout.h"
+ 
++#define kDefaultSampleRate      kDefaultSampleRate_Pulse
++#define kDefaultInputBufferSize kDefaultInputBufferSize_Pulse
++
+ namespace media {
+ 
+ using pulse::AutoPulseLock;
+@@ -374,3 +377,6 @@ void AudioManagerPulse::DefaultSourceInfoCallback(pa_context* context,
+ }
+ 
+ }  // namespace media
++
++#undef kDefaultSampleRate
++#undef kDefaultInputBufferSize
+diff --git a/media/base/BUILD.gn b/media/base/BUILD.gn
+index 11133e1b06..d638ffc7b8 100644
+--- a/media/base/BUILD.gn
++++ b/media/base/BUILD.gn
+@@ -5,6 +5,7 @@
+ import("//build/config/android/config.gni")
+ import("//build/config/arm.gni")
+ import("//build/config/features.gni")
++import("//build/config/jumbo.gni")
+ import("//build/config/linux/pkg_config.gni")
+ import("//build/config/ozone.gni")
+ import("//build/config/ui.gni")
+@@ -15,7 +16,7 @@ if (is_android) {
+   import("//build/config/android/rules.gni")
+ }
+ 
+-source_set("base") {
++jumbo_source_set("base") {
+   # Do not expand the visibility here without double-checking with OWNERS, this
+   # is a roll-up target which is part of the //media component. Most other DEPs
+   # should be using //media and not directly DEP this roll-up target.
+@@ -448,6 +449,8 @@ source_set("base") {
+       "libaom_thread_wrapper.cc",
+       "libaom_thread_wrapper.h",
+     ]
++    jumbo_excluded_sources = [ "libaom_thread_wrapper.cc"]
++
+     deps += [ "//third_party/libaom" ]
+   }
+ 
+diff --git a/media/base/android/BUILD.gn b/media/base/android/BUILD.gn
+index 841b7f713f..3a0d00cf11 100644
+--- a/media/base/android/BUILD.gn
++++ b/media/base/android/BUILD.gn
+@@ -4,6 +4,7 @@
+ 
+ import("//build/config/android/config.gni")
+ import("//build/config/arm.gni")
++import("//build/config/jumbo.gni")
+ import("//build/config/ui.gni")
+ import("//media/media_options.gni")
+ 
+@@ -14,7 +15,7 @@ if (is_android) {
+   # This is bundled into //media, so all dependencies should be on //media.
+   # APK targets that depend on this indirectly, should also
+   # depend on :media_java to get the corresponding Java classes.
+-  source_set("android") {
++  jumbo_source_set("android") {
+     visibility = [
+       "//media",
+       "//media/filters",
+diff --git a/media/base/ipc/BUILD.gn b/media/base/ipc/BUILD.gn
+index 6217873522..98da4b4751 100644
+--- a/media/base/ipc/BUILD.gn
++++ b/media/base/ipc/BUILD.gn
+@@ -2,7 +2,9 @@
+ # Use of this source code is governed by a BSD-style license that can be
+ # found in the LICENSE file.
+ 
+-source_set("ipc") {
++import("//build/config/jumbo.gni")
++
++jumbo_source_set("ipc") {
+   sources = [
+     "media_param_traits.cc",
+     "media_param_traits.h",
+diff --git a/media/base/mac/BUILD.gn b/media/base/mac/BUILD.gn
+index 068aefecec..4c851aabf0 100644
+--- a/media/base/mac/BUILD.gn
++++ b/media/base/mac/BUILD.gn
+@@ -2,9 +2,11 @@
+ # Use of this source code is governed by a BSD-style license that can be
+ # found in the LICENSE file.
+ 
++import("//build/config/jumbo.gni")
++
+ assert(is_apple)
+ 
+-source_set("mac") {
++jumbo_source_set("mac") {
+   # Note: This source_set is depended on only by //media. In the component
+   # build, if other component targets also depend on it, multiple copies of
+   # the ObjC classes declared in the files below will cause warnings at
+diff --git a/media/base/win/BUILD.gn b/media/base/win/BUILD.gn
+index 002aabb2cd..339d8f0a1a 100644
+--- a/media/base/win/BUILD.gn
++++ b/media/base/win/BUILD.gn
+@@ -2,6 +2,8 @@
+ # Use of this source code is governed by a BSD-style license that can be
+ # found in the LICENSE file.
+ 
++import("//build/config/jumbo.gni")
++
+ assert(is_win)
+ 
+ config("delay_load_mf") {
+@@ -13,7 +15,7 @@ config("delay_load_mf") {
+   ]
+ }
+ 
+-source_set("media_foundation_util") {
++jumbo_component("media_foundation_util") {
+   sources = [
+     "dxgi_device_manager.cc",
+     "dxgi_device_manager.h",
+diff --git a/media/capture/BUILD.gn b/media/capture/BUILD.gn
+index 9139fbbfc5..3e2841a5b6 100644
+--- a/media/capture/BUILD.gn
++++ b/media/capture/BUILD.gn
+@@ -4,6 +4,7 @@
+ 
+ import("//build/config/chromeos/ui_mode.gni")
+ import("//build/config/features.gni")
++import("//build/config/jumbo.gni")
+ import("//build/config/ui.gni")
+ import("//media/media_options.gni")
+ import("//services/video_effects/args.gni")
+@@ -34,7 +35,7 @@ component("capture_switches") {
+ }
+ 
+ # Things needed by //media/capture/mojom/video_capture_types.mojom.
+-component("capture_base") {
++jumbo_component("capture_base") {
+   defines = [ "CAPTURE_IMPLEMENTATION" ]
+   sources = [
+     "capture_export.h",
+@@ -57,7 +58,7 @@ component("capture_base") {
+ }
+ 
+ # Target which allows breakout of Android BUILD.gn files.
+-source_set("capture_device_specific") {
++jumbo_source_set("capture_device_specific") {
+   visibility = [
+     ":capture_lib",
+     "//media/capture/video/android",
+@@ -118,7 +119,7 @@ source_set("capture_device_specific") {
+   ]
+ }
+ 
+-component("capture_lib") {
++jumbo_component("capture_lib") {
+   defines = [ "CAPTURE_IMPLEMENTATION" ]
+   sources = [
+     "video/create_video_capture_device_factory.cc",
+diff --git a/media/cast/BUILD.gn b/media/cast/BUILD.gn
+index 6c30c5eaf5..67ca683b4f 100644
+--- a/media/cast/BUILD.gn
++++ b/media/cast/BUILD.gn
+@@ -2,6 +2,7 @@
+ # Use of this source code is governed by a BSD-style license that can be
+ # found in the LICENSE file.
+ 
++import("//build/config/jumbo.gni")
+ import("//testing/libfuzzer/fuzzer_test.gni")
+ import("//testing/test.gni")
+ import("//third_party/libaom/options.gni")
+@@ -12,7 +13,7 @@ proto_library("logging_proto") {
+ }
+ 
+ # Common code shared by all cast components.
+-source_set("common") {
++jumbo_source_set("common") {
+   sources = [
+     "cast_callbacks.h",
+     "cast_config.cc",
+@@ -67,7 +68,7 @@ source_set("common") {
+   ]
+ }
+ 
+-source_set("encoding") {
++jumbo_source_set("encoding") {
+   sources = [
+     "encoding/audio_encoder.cc",
+     "encoding/audio_encoder.h",
+@@ -125,7 +126,7 @@ source_set("encoding") {
+   }
+ }
+ 
+-source_set("sender") {
++jumbo_source_set("sender") {
+   sources = [
+     "sender/audio_sender.cc",
+     "sender/audio_sender.h",
+diff --git a/media/cast/encoding/av1_encoder.cc b/media/cast/encoding/av1_encoder.cc
+index 41650d55b7..54d0e51b5a 100644
+--- a/media/cast/encoding/av1_encoder.cc
++++ b/media/cast/encoding/av1_encoder.cc
+@@ -20,6 +20,16 @@
+ #include "third_party/libaom/source/libaom/aom/aomcx.h"
+ #include "third_party/openscreen/src/cast/streaming/public/encoded_frame.h"
+ 
++#define HasSufficientFeedback                  HasSufficientFeedback_AV1
++#define kRestartFramePeriods                   kRestartFramePeriods_AV1
++#define kEncodingSpeedAccHalfLife              kEncodingSpeedAccHalfLife_AV1
++#define kHiTargetEncoderUtilization            kHiTargetEncoderUtilization_AV1
++#define kMidTargetEncoderUtilization           kMidTargetEncoderUtilization_AV1
++#define kLoTargetEncoderUtilization            kLoTargetEncoderUtilization_AV1
++#define kEquivalentEncodingSpeedStepPerQpStep  kEquivalentEncodingSpeedStepPerQpStep_AV1
++#define kHighestEncodingSpeed                  kHighestEncodingSpeed_AV1
++#define kLowestEncodingSpeed                   kLowestEncodingSpeed_AV1
++
+ namespace media {
+ namespace cast {
+ 
+@@ -411,3 +421,13 @@ void Av1Encoder::GenerateKeyFrame() {
+ 
+ }  // namespace cast
+ }  // namespace media
++
++#undef HasSufficientFeedback
++#undef kRestartFramePeriods
++#undef kEncodingSpeedAccHalfLife
++#undef kHiTargetEncoderUtilization
++#undef kMidTargetEncoderUtilization
++#undef kLoTargetEncoderUtilization
++#undef kEquivalentEncodingSpeedStepPerQpStep
++#undef kHighestEncodingSpeed
++#undef kLowestEncodingSpeed
+diff --git a/media/cast/encoding/vpx_encoder.cc b/media/cast/encoding/vpx_encoder.cc
+index c8a038ca16..c3d16db490 100644
+--- a/media/cast/encoding/vpx_encoder.cc
++++ b/media/cast/encoding/vpx_encoder.cc
+@@ -24,6 +24,16 @@
+ 
+ using Dependency = openscreen::cast::EncodedFrame::Dependency;
+ 
++#define HasSufficientFeedback                  HasSufficientFeedback_VPX
++#define kRestartFramePeriods                   kRestartFramePeriods_VPX
++#define kEncodingSpeedAccHalfLife              kEncodingSpeedAccHalfLife_VPX
++#define kHiTargetEncoderUtilization            kHiTargetEncoderUtilization_VPX
++#define kMidTargetEncoderUtilization           kMidTargetEncoderUtilization_VPX
++#define kLoTargetEncoderUtilization            kLoTargetEncoderUtilization_VPX
++#define kEquivalentEncodingSpeedStepPerQpStep  kEquivalentEncodingSpeedStepPerQpStep_VPX
++#define kHighestEncodingSpeed                  kHighestEncodingSpeed_VPX
++#define kLowestEncodingSpeed                   kLowestEncodingSpeed_VPX
++
+ namespace media {
+ namespace cast {
+ 
+@@ -468,3 +478,14 @@ void VpxEncoder::GenerateKeyFrame() {
+ 
+ }  // namespace cast
+ }  // namespace media
++
++#undef HasSufficientFeedback
++#undef kEncodeSuffix
++#undef kRestartFramePeriods
++#undef kEncodingSpeedAccHalfLife
++#undef kHiTargetEncoderUtilization
++#undef kMidTargetEncoderUtilization
++#undef kLoTargetEncoderUtilization
++#undef kEquivalentEncodingSpeedStepPerQpStep
++#undef kHighestEncodingSpeed
++#undef kLowestEncodingSpeed
+diff --git a/media/cast/sender/audio_sender.cc b/media/cast/sender/audio_sender.cc
+index 240e1a5c4b..ec7a2595f4 100644
+--- a/media/cast/sender/audio_sender.cc
++++ b/media/cast/sender/audio_sender.cc
+@@ -17,6 +17,9 @@
+ #include "media/cast/sender/frame_sender.h"
+ #include "third_party/openscreen/src/cast/streaming/public/sender.h"
+ 
++#define kHistogramDroppedFrames kHistogramDroppedFrames_AS
++#define kHistogramFrameDropped  kHistogramFrameDropped_AS
++
+ namespace media::cast {
+ namespace {
+ 
+@@ -145,3 +148,6 @@ void AudioSender::OnEncodedAudioFrame(
+ }
+ 
+ }  // namespace media::cast
++
++#undef kHistogramDroppedFrames
++#undef kHistogramFrameDropped
+diff --git a/media/cast/sender/openscreen_frame_sender.cc b/media/cast/sender/openscreen_frame_sender.cc
+index 7d26815f71..efe5b69268 100644
+--- a/media/cast/sender/openscreen_frame_sender.cc
++++ b/media/cast/sender/openscreen_frame_sender.cc
+@@ -26,6 +26,8 @@
+ #include "media/cast/constants.h"
+ #include "third_party/openscreen/src/cast/streaming/public/encoded_frame.h"
+ 
++#define kMaxFrameBurst kMaxFrameBurst_OFS
++
+ namespace media::cast {
+ namespace {
+ 
+@@ -352,3 +354,5 @@ void OpenscreenFrameSender::RecordShouldDropNextFrame(bool should_drop) {
+   }
+ }
+ }  // namespace media::cast
++
++#undef kMaxFrameBurst
+diff --git a/media/cast/sender/video_sender.cc b/media/cast/sender/video_sender.cc
+index 1d06e8d28f..66401eb1b6 100644
+--- a/media/cast/sender/video_sender.cc
++++ b/media/cast/sender/video_sender.cc
+@@ -26,6 +26,9 @@
+ #include "third_party/openscreen/src/cast/streaming/public/encoded_frame.h"
+ #include "third_party/openscreen/src/cast/streaming/public/sender.h"
+ 
++#define kHistogramDroppedFrames kHistogramDroppedFrames_VS
++#define kHistogramFrameDropped  kHistogramFrameDropped_VS
++
+ namespace media::cast {
+ 
+ namespace {
+@@ -385,3 +388,6 @@ void VideoSender::OnEncodedVideoFrame(
+ }
+ 
+ }  // namespace media::cast
++
++#undef kHistogramDroppedFrames
++#undef kHistogramFrameDropped
+diff --git a/media/filters/BUILD.gn b/media/filters/BUILD.gn
+index 264a479a9b..60aaa65fce 100644
+--- a/media/filters/BUILD.gn
++++ b/media/filters/BUILD.gn
+@@ -2,10 +2,11 @@
+ # Use of this source code is governed by a BSD-style license that can be
+ # found in the LICENSE file.
+ 
++import("//build/config/jumbo.gni")
+ import("//media/gpu/args.gni")
+ import("//media/media_options.gni")
+ 
+-source_set("filters") {
++jumbo_source_set("filters") {
+   # Do not expand the visibility here without double-checking with OWNERS, this
+   # is a roll-up target which is part of the //media component. Most other DEPs
+   # should be using //media and not directly DEP this roll-up target.
+diff --git a/media/filters/h264_to_annex_b_bitstream_converter.cc b/media/filters/h264_to_annex_b_bitstream_converter.cc
+index 01069114fa..4592949e2f 100644
+--- a/media/filters/h264_to_annex_b_bitstream_converter.cc
++++ b/media/filters/h264_to_annex_b_bitstream_converter.cc
+@@ -15,6 +15,10 @@
+ #include "media/formats/mp4/box_definitions.h"
+ #include "media/parsers/h264_parser.h"
+ 
++#define kStartCodePrefix        kStartCodePrefix_H264
++#define kParamSetStartCodeSize  kParamSetStartCodeSize_H264
++#define IsAccessUnitBoundaryNal IsAccessUnitBoundaryNal_H264
++
+ namespace media {
+ 
+ static const uint8_t kStartCodePrefix[3] = {0, 0, 1};
+@@ -302,3 +306,7 @@ bool H264ToAnnexBBitstreamConverter::WriteParamSet(
+ }
+ 
+ }  // namespace media
++
++#undef kStartCodePrefix
++#undef kParamSetStartCodeSize
++#undef IsAccessUnitBoundaryNal
+diff --git a/media/filters/h265_to_annex_b_bitstream_converter.cc b/media/filters/h265_to_annex_b_bitstream_converter.cc
+index 6bd4c8e642..c0082e8276 100644
+--- a/media/filters/h265_to_annex_b_bitstream_converter.cc
++++ b/media/filters/h265_to_annex_b_bitstream_converter.cc
+@@ -16,6 +16,10 @@
+ #include "media/formats/mp4/hevc.h"
+ #include "media/parsers/h265_nalu_parser.h"
+ 
++#define kStartCodePrefix        kStartCodePrefix_H265
++#define kParamSetStartCodeSize  kParamSetStartCodeSize_H265
++#define IsAccessUnitBoundaryNal IsAccessUnitBoundaryNal_H265
++
+ namespace media {
+ namespace {
+ 
+@@ -291,3 +295,7 @@ bool H265ToAnnexBBitstreamConverter::WriteParamSet(
+ }
+ 
+ }  // namespace media
++
++#undef kStartCodePrefix
++#undef kParamSetStartCodeSize
++#undef IsAccessUnitBoundaryNal
+diff --git a/media/filters/media_file_checker.cc b/media/filters/media_file_checker.cc
+index 952a07b46e..09669fe370 100644
+--- a/media/filters/media_file_checker.cc
++++ b/media/filters/media_file_checker.cc
+@@ -25,6 +25,8 @@
+ #include "media/filters/ffmpeg_glue.h"
+ #include "media/filters/file_data_source.h"
+ 
++#define Decoder Decoder_MediaFileChecker
++
+ namespace media {
+ 
+ namespace {
+@@ -114,3 +116,5 @@ bool MediaFileChecker::Start(base::TimeDelta check_time) {
+ }
+ 
+ }  // namespace media
++
++#undef Decoder
+diff --git a/media/media_options.gni b/media/media_options.gni
+index e235287ebb..cffc86fcb9 100644
+--- a/media/media_options.gni
++++ b/media/media_options.gni
+@@ -7,6 +7,7 @@ import("//build/config/chrome_build.gni")
+ import("//build/config/chromeos/args.gni")
+ import("//build/config/chromeos/ui_mode.gni")
+ import("//build/config/features.gni")
++import("//build/config/jumbo.gni")
+ import("//build/config/ui.gni")
+ import("//media/gpu/args.gni")
+ import("//testing/libfuzzer/fuzzer_test.gni")
+@@ -103,7 +104,7 @@ declare_args() {
+   # Enable logging override, e.g. enable DVLOGs through level 2 at build time.
+   # On Cast devices, these are logged as INFO.
+   # When enabled on Fuchsia, these are logged as VLOGs.
+-  enable_logging_override = is_cast_media_device
++  enable_logging_override = !use_jumbo_build && is_cast_media_device
+ 
+   enable_dav1d_decoder = use_blink
+ 
+@@ -189,6 +190,9 @@ assert(!enable_hevc_parser_and_hw_decoder || enable_platform_hevc,
+ assert(!enable_platform_dolby_vision || enable_platform_hevc,
+        "enable_platform_hevc required for enable_platform_dolby_vision")
+ 
++# Logging override must not be enabled in jumbo builds.
++assert(!use_jumbo_build || !enable_logging_override)
++
+ # Use another declare_args() to pick up possible overrides of |use_cras|.
+ declare_args() {
+   # Enables runtime selection of PulseAudio library.
+diff --git a/media/mojo/clients/BUILD.gn b/media/mojo/clients/BUILD.gn
+index 3c303da38b..dc41d2cd7a 100644
+--- a/media/mojo/clients/BUILD.gn
++++ b/media/mojo/clients/BUILD.gn
+@@ -4,8 +4,10 @@
+ 
+ import("//media/media_options.gni")
+ 
++import("//build/config/jumbo.gni")
++
+ # Implementations of media C++ interfaces using corresponding mojo services.
+-source_set("clients") {
++jumbo_source_set("clients") {
+   visibility = [
+     ":test_support",
+     "//chromecast/*",
+diff --git a/media/mojo/common/BUILD.gn b/media/mojo/common/BUILD.gn
+index c42b874e05..29a54b7277 100644
+--- a/media/mojo/common/BUILD.gn
++++ b/media/mojo/common/BUILD.gn
+@@ -2,7 +2,9 @@
+ # Use of this source code is governed by a BSD-style license that can be
+ # found in the LICENSE file.
+ 
+-source_set("common") {
++import("//build/config/jumbo.gni")
++
++jumbo_source_set("common") {
+   sources = [
+     "audio_data_s16_converter.cc",
+     "audio_data_s16_converter.h",
+diff --git a/media/mojo/services/BUILD.gn b/media/mojo/services/BUILD.gn
+index 3e2dac7991..bd028aa5ab 100644
+--- a/media/mojo/services/BUILD.gn
++++ b/media/mojo/services/BUILD.gn
+@@ -4,6 +4,7 @@
+ 
+ import("//build/config/cast.gni")
+ import("//build/config/chromeos/ui_mode.gni")
++import("//build/config/jumbo.gni")
+ import("//media/gpu/args.gni")
+ import("//media/media_options.gni")
+ import("//mojo/public/tools/fuzzers/mojolpm.gni")
+@@ -12,7 +13,7 @@ import("//testing/test.gni")
+ enable_playback_events_recorder =
+     enable_cast_receiver && (is_fuchsia || is_android)
+ 
+-component("services") {
++jumbo_component("services") {
+   output_name = "media_mojo_services"
+   sources = [
+     "deferred_destroy_unique_receiver_set.h",
+diff --git a/ppapi/cpp/BUILD.gn b/ppapi/cpp/BUILD.gn
+index c916c3a5c3..0e03f92ded 100644
+--- a/ppapi/cpp/BUILD.gn
++++ b/ppapi/cpp/BUILD.gn
+@@ -2,6 +2,7 @@
+ # Use of this source code is governed by a BSD-style license that can be
+ # found in the LICENSE file.
+ 
++import("//build/config/jumbo.gni")
+ import("//ppapi/buildflags/buildflags.gni")
+ 
+ if (is_nacl) {
+@@ -13,7 +14,7 @@ assert(enable_ppapi)
+ if (is_nacl && is_nacl_glibc) {
+   cpp_target_type = "shared_library"
+ } else {
+-  cpp_target_type = "static_library"
++  cpp_target_type = "jumbo_static_library"
+ }
+ 
+ # Link to this target to get the PPAPI C++ wrapper objects and plugin startup
+@@ -54,7 +55,7 @@ target(cpp_target_type, "cpp") {
+ # Link to this target to get only the PPAPI C++ wrapper objects but not the
+ # plugin startup code. Some plugins need special startup code that they supply
+ # themselves.
+-source_set("objects") {
++jumbo_source_set("objects") {
+   sources = [
+     "array_output.cc",
+     "array_output.h",
+diff --git a/ppapi/host/BUILD.gn b/ppapi/host/BUILD.gn
+index 46c0f01597..acf4d9f466 100644
+--- a/ppapi/host/BUILD.gn
++++ b/ppapi/host/BUILD.gn
+@@ -2,11 +2,12 @@
+ # Use of this source code is governed by a BSD-style license that can be
+ # found in the LICENSE file.
+ 
++import("//build/config/jumbo.gni")
+ import("//ppapi/buildflags/buildflags.gni")
+ 
+ assert(enable_ppapi)
+ 
+-component("host") {
++jumbo_component("host") {
+   output_name = "ppapi_host"
+ 
+   sources = [
+diff --git a/ppapi/proxy/BUILD.gn b/ppapi/proxy/BUILD.gn
+index fc97758faa..1a40565110 100644
+--- a/ppapi/proxy/BUILD.gn
++++ b/ppapi/proxy/BUILD.gn
+@@ -2,6 +2,7 @@
+ # Use of this source code is governed by a BSD-style license that can be
+ # found in the LICENSE file.
+ 
++import("//build/config/jumbo.gni")
+ import("//build/config/nacl/config.gni")
+ import("//components/nacl/toolchain.gni")
+ import("//ppapi/buildflags/buildflags.gni")
+@@ -12,9 +13,15 @@ config("proxy_implementation") {
+   defines = [ "PPAPI_PROXY_IMPLEMENTATION" ]
+ }
+ 
+-component("proxy") {
++jumbo_component("proxy") {
+   output_name = "ppapi_proxy"
+ 
++  if (is_nacl) {
++    # The nacl toolchain has template related bugs that are triggered
++    # in jumbo builds. https://crbug.com/912152
++    never_build_jumbo = true
++  }
++
+   sources = [
+     # Take some standalone files from the C++ wrapper allowing us to more
+     # easily make async callbacks in the proxy. We can't depend on the
+@@ -326,7 +333,7 @@ source_set("ipc_sources") {
+   }
+ }
+ 
+-static_library("test_support") {
++jumbo_static_library("test_support") {
+   testonly = true
+ 
+   sources = [
+diff --git a/ppapi/shared_impl/BUILD.gn b/ppapi/shared_impl/BUILD.gn
+index d6efdcc516..931da455d4 100644
+--- a/ppapi/shared_impl/BUILD.gn
++++ b/ppapi/shared_impl/BUILD.gn
+@@ -2,6 +2,7 @@
+ # Use of this source code is governed by a BSD-style license that can be
+ # found in the LICENSE file.
+ 
++import("//build/config/jumbo.gni")
+ import("//build/config/nacl/config.gni")
+ import("//components/nacl/toolchain.gni")
+ import("//ppapi/buildflags/buildflags.gni")
+@@ -42,12 +43,18 @@ source_set("headers") {
+ }
+ 
+ # This contains the things that //ppapi/thunk needs.
+-source_set("common") {
++jumbo_source_set("common") {
+   visibility = [
+     ":*",
+     "//ppapi/thunk:*",
+   ]
+ 
++  if (is_nacl) {
++    # The nacl toolchain has template related bugs that are triggered
++    # in jumbo builds. https://crbug.com/912152
++    never_build_jumbo = true
++  }
++
+   sources = [
+     "array_var.cc",
+     "array_var.h",
+diff --git a/services/cert_verifier/cert_net_url_loader/BUILD.gn b/services/cert_verifier/cert_net_url_loader/BUILD.gn
+index ffc6bdc4ab..28ab85355d 100644
+--- a/services/cert_verifier/cert_net_url_loader/BUILD.gn
++++ b/services/cert_verifier/cert_net_url_loader/BUILD.gn
+@@ -2,10 +2,11 @@
+ # Use of this source code is governed by a BSD-style license that can be
+ # found in the LICENSE file.
+ 
++import("//build/config/jumbo.gni")
+ import("//crypto/features.gni")
+ import("//testing/test.gni")
+ 
+-component("cert_net_url_loader") {
++jumbo_component("cert_net_url_loader") {
+   sources = [
+     "cert_net_fetcher_url_loader.cc",
+     "cert_net_fetcher_url_loader.h",
+diff --git a/services/network/BUILD.gn b/services/network/BUILD.gn
+index b426a7a7ce..993f03d058 100644
+--- a/services/network/BUILD.gn
++++ b/services/network/BUILD.gn
+@@ -4,12 +4,13 @@
+ 
+ import("//build/config/chromeos/ui_mode.gni")
+ import("//build/config/features.gni")
++import("//build/config/jumbo.gni")
+ import("//mojo/public/tools/bindings/mojom.gni")
+ import("//net/features.gni")
+ import("//services/network/public/cpp/features.gni")
+ import("//testing/libfuzzer/fuzzer_test.gni")
+ 
+-component("network_service") {
++jumbo_component("network_service") {
+   sources = [
+     "ad_heuristic_cookie_overrides.cc",
+     "ad_heuristic_cookie_overrides.h",
+@@ -600,7 +601,7 @@ source_set("tests") {
+   }
+ }
+ 
+-source_set("test_support") {
++jumbo_source_set("test_support") {
+   testonly = true
+ 
+   sources = [
+diff --git a/services/network/http_server_properties_pref_delegate.cc b/services/network/http_server_properties_pref_delegate.cc
+index 83541ae136..d70fbf6c78 100644
+--- a/services/network/http_server_properties_pref_delegate.cc
++++ b/services/network/http_server_properties_pref_delegate.cc
+@@ -10,6 +10,8 @@
+ #include "components/prefs/pref_registry_simple.h"
+ #include "components/prefs/pref_service.h"
+ 
++#define kPrefPath kPrefPath_HttpServerPropertiesPrefDelegate
++
+ const char kPrefPath[] = "net.http_server_properties";
+ 
+ namespace network {
+@@ -58,3 +60,5 @@ void HttpServerPropertiesPrefDelegate::WaitForPrefLoad(
+ }
+ 
+ }  // namespace network
++
++#undef kPrefPath
+diff --git a/services/network/public/cpp/BUILD.gn b/services/network/public/cpp/BUILD.gn
+index a44cc305f6..3c7897a499 100644
+--- a/services/network/public/cpp/BUILD.gn
++++ b/services/network/public/cpp/BUILD.gn
+@@ -3,6 +3,7 @@
+ # found in the LICENSE file.
+ 
+ import("//build/buildflag_header.gni")
++import("//build/config/jumbo.gni")
+ import("//mojo/public/tools/bindings/mojom.gni")
+ import("//net/features.gni")
+ import("//services/network/public/cpp/features.gni")
+@@ -18,7 +19,7 @@ buildflag_header("buildflags") {
+   ]
+ }
+ 
+-component("crash_keys") {
++jumbo_component("crash_keys") {
+   sources = [
+     "crash_keys.cc",
+     "crash_keys.h",
+@@ -28,7 +29,7 @@ component("crash_keys") {
+   defines = [ "IS_NETWORK_CPP_CRASH_KEYS_IMPL" ]
+ }
+ 
+-component("cpp") {
++jumbo_component("cpp") {
+   output_name = "network_cpp"
+ 
+   sources = [
+@@ -370,7 +371,7 @@ component("schemeful_site_mojom_support") {
+ 
+ # This component is separate from cpp_base as it is a dependency of
+ # //services/network/public/mojom:cookies_mojom.
+-component("first_party_sets_mojom_support") {
++jumbo_component("first_party_sets_mojom_support") {
+   sources = [
+     "first_party_sets_mojom_traits.cc",
+     "first_party_sets_mojom_traits.h",
+@@ -400,7 +401,7 @@ component("storage_access_api_mojom_support") {
+   defines = [ "IS_STORAGE_ACCESS_API_MOJOM_TRAITS_IMPL" ]
+ }
+ 
+-component("cpp_base") {
++jumbo_component("cpp_base") {
+   output_name = "network_cpp_base"
+ 
+   sources = [
+@@ -454,6 +455,7 @@ component("cpp_base") {
+     "web_transport_error_mojom_traits.cc",
+     "web_transport_error_mojom_traits.h",
+   ]
++  jumbo_excluded_sources = []
+ 
+   configs += [ "//build/config/compiler:wexit_time_destructors" ]
+ 
+@@ -495,6 +497,9 @@ component("cpp_base") {
+       "p2p_param_traits.h",
+       "p2p_socket_type.h",
+     ]
++    jumbo_excluded_sources += [
++      "p2p_param_traits.cc",
++    ]
+ 
+     deps += [ "//services/network/public/mojom:mojom_shared" ]
+     public_deps += [ "//third_party/webrtc_overrides:webrtc_component" ]
+diff --git a/services/network/public/cpp/cross_origin_embedder_policy_parser.cc b/services/network/public/cpp/cross_origin_embedder_policy_parser.cc
+index bf9d5f41d4..8aaaf8036d 100644
+--- a/services/network/public/cpp/cross_origin_embedder_policy_parser.cc
++++ b/services/network/public/cpp/cross_origin_embedder_policy_parser.cc
+@@ -13,6 +13,10 @@
+ #include "net/http/structured_headers.h"
+ #include "services/network/public/cpp/cross_origin_embedder_policy.h"
+ 
++#define kHeaderName           kHeaderName_CrossOriginEmbedder
++#define kReportOnlyHeaderName kReportOnlyHeaderName_CrossOriginEmbedder
++#define Parse                 Parse_CrossOriginEmbedder
++
+ namespace network {
+ 
+ namespace {
+@@ -76,3 +80,7 @@ CrossOriginEmbedderPolicy ParseCrossOriginEmbedderPolicy(
+ }
+ 
+ }  // namespace network
++
++#undef kHeaderName
++#undef kReportOnlyHeaderName
++#undef Parse
+diff --git a/services/network/public/cpp/document_isolation_policy_parser.cc b/services/network/public/cpp/document_isolation_policy_parser.cc
+index b32b864b80..3407788fbe 100644
+--- a/services/network/public/cpp/document_isolation_policy_parser.cc
++++ b/services/network/public/cpp/document_isolation_policy_parser.cc
+@@ -13,6 +13,10 @@
+ #include "net/http/structured_headers.h"
+ #include "services/network/public/cpp/document_isolation_policy.h"
+ 
++#define kHeaderName           kHeaderName_DocumentIsolation
++#define kReportOnlyHeaderName kReportOnlyHeaderName_DocumentIsolation
++#define Parse                 Parse_DocumentIsolation
++
+ namespace network {
+ 
+ namespace {
+@@ -76,3 +80,7 @@ DocumentIsolationPolicy ParseDocumentIsolationPolicy(
+ }
+ 
+ }  // namespace network
++
++#undef kHeaderName
++#undef kReportOnlyHeaderName
++#undef Parse
+diff --git a/services/network/url_loader.cc b/services/network/url_loader.cc
+index beb3fe75a6..8db22bf946 100644
+--- a/services/network/url_loader.cc
++++ b/services/network/url_loader.cc
+@@ -114,6 +114,8 @@
+ #include "third_party/abseil-cpp/absl/container/inlined_vector.h"
+ #include "url/origin.h"
+ 
++#define kBlockedBodyAllocationSize kBlockedBodyAllocationSize_URLLoader
++
+ namespace network {
+ 
+ namespace {
+@@ -3284,3 +3286,5 @@ void URLLoader::RecordRequestMetrics() {
+ }
+ 
+ }  // namespace network
++
++#undef kBlockedBodyAllocationSize
+diff --git a/services/network/web_bundle/web_bundle_url_loader_factory.cc b/services/network/web_bundle/web_bundle_url_loader_factory.cc
+index 3b43bea203..4028a395e3 100644
+--- a/services/network/web_bundle/web_bundle_url_loader_factory.cc
++++ b/services/network/web_bundle/web_bundle_url_loader_factory.cc
+@@ -32,6 +32,8 @@
+ #include "services/network/web_bundle/web_bundle_chunked_buffer.h"
+ #include "services/network/web_bundle/web_bundle_memory_quota_consumer.h"
+ 
++#define kBlockedBodyAllocationSize kBlockedBodyAllocationSize_WebBundleURLLoaderFactory
++
+ namespace network {
+ 
+ namespace {
+@@ -983,3 +985,5 @@ void WebBundleURLLoaderFactory::OnWebBundleFetchFailed() {
+ }
+ 
+ }  // namespace network
++
++#undef kBlockedBodyAllocationSize
+diff --git a/storage/browser/BUILD.gn b/storage/browser/BUILD.gn
+index fb0c66e45a..b7b8330434 100644
+--- a/storage/browser/BUILD.gn
++++ b/storage/browser/BUILD.gn
+@@ -1,10 +1,11 @@
+ # Copyright 2014 The Chromium Authors
+ # Use of this source code is governed by a BSD-style license that can be
+ # found in the LICENSE file.
++import("//build/config/jumbo.gni")
+ import("//mojo/public/tools/bindings/mojom.gni")
+ import("//testing/test.gni")
+ 
+-component("browser") {
++jumbo_component("browser") {
+   output_name = "storage_browser"
+   sources = [
+     "blob/blob_builder_from_stream.cc",
+@@ -363,7 +364,7 @@ source_set("unittests") {
+   ]
+ }
+ 
+-static_library("test_support") {
++jumbo_static_library("test_support") {
+   testonly = true
+ 
+   sources = [
+diff --git a/storage/browser/blob/blob_url_registry.cc b/storage/browser/blob/blob_url_registry.cc
+index 7135cd4b32..e111684fc3 100644
+--- a/storage/browser/blob/blob_url_registry.cc
++++ b/storage/browser/blob/blob_url_registry.cc
+@@ -12,6 +12,8 @@
+ #include "storage/browser/blob/blob_url_utils.h"
+ #include "url/gurl.h"
+ 
++#define g_url_store_creation_hook g_url_store_creation_hook_blob_url_registry
++
+ namespace storage {
+ 
+ namespace {
+@@ -218,3 +220,5 @@ void BlobUrlRegistry::SetURLStoreCreationHookForTesting(
+ }
+ 
+ }  // namespace storage
++
++#undef g_url_store_creation_hook
+diff --git a/storage/browser/quota/quota_settings.cc b/storage/browser/quota/quota_settings.cc
+index e53053151f..b4b67288d9 100644
+--- a/storage/browser/quota/quota_settings.cc
++++ b/storage/browser/quota/quota_settings.cc
+@@ -20,6 +20,8 @@
+ #include "storage/browser/quota/quota_features.h"
+ #include "storage/browser/quota/quota_macros.h"
+ 
++#define RandomizeByPercent RandomizeByPercent_QuotaSettings
++
+ namespace storage {
+ 
+ namespace {
+@@ -179,3 +181,5 @@ double GetIncognitoQuotaRatioUpperBound_ForTesting() {
+ }
+ 
+ }  // namespace storage
++
++#undef RandomizeByPercent

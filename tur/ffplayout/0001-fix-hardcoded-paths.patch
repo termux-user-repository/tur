@@ -1,20 +1,123 @@
---- a/engine/src/utils/mod.rs
-+++ b/engine/src/utils/mod.rs
-@@ -183,7 +183,7 @@
-         }
-     }
+--- a/engine/src/db/mod.rs
++++ b/engine/src/db/mod.rs
+@@ -17,8 +17,8 @@ use crate::{ARGS, utils::errors::ProcessError};
+ use models::GlobalSettings;
  
--    let sys_path = Path::new("/usr/share/ffplayout/db");
-+    let sys_path = Path::new("@TERMUX_PREFIX@/share/ffplayout/db");
-     let mut db_path = "./ffplayout.db";
+ pub static DB_PATH: LazyLock<Result<Cow<'static, Path>, io::Error>> = LazyLock::new(|| {
+-    const DEFAULT_DIR: &str = "/usr/share/ffplayout/db/";
+-    const DEFAULT_PATH: &str = "/usr/share/ffplayout/db/ffplayout.db";
++    const DEFAULT_DIR: &str = "@TERMUX_PREFIX@/share/ffplayout/db/";
++    const DEFAULT_PATH: &str = "@TERMUX_PREFIX@/share/ffplayout/db/ffplayout.db";
+     const ASSET_DIR: &str = "./assets";
+     const ASSET_PATH: &str = "./assets/ffplayout.db";
+     const DB_NAME: &str = "ffplayout.db";
+--- a/engine/src/file/local.rs
++++ b/engine/src/file/local.rs
+@@ -390,9 +390,9 @@ impl LocalStorage {
+         let root = self.root.read().await.clone();
+         if root.is_dir() {
+             let target = root.join("00-assets");
+-            let mut dummy_source = Path::new("/usr/share/ffplayout/dummy.vtt");
+-            let mut font_source = Path::new("/usr/share/ffplayout/DejaVuSans.ttf");
+-            let mut logo_source = Path::new("/usr/share/ffplayout/logo.png");
++            let mut dummy_source = Path::new("@TERMUX_PREFIX@/share/ffplayout/dummy.vtt");
++            let mut font_source = Path::new("@TERMUX_PREFIX@/share/ffplayout/DejaVuSans.ttf");
++            let mut logo_source = Path::new("@TERMUX_PREFIX@/share/ffplayout/logo.png");
  
-     if sys_path.is_dir() && !sys_path.writable() {
-@@ -191,7 +191,7 @@
-     }
+             if !dummy_source.is_file() {
+                 dummy_source = Path::new("./assets/dummy.vtt");
+--- a/migrations/00001_create_tables.sql
++++ b/migrations/00001_create_tables.sql
+@@ -5,10 +5,10 @@ CREATE TABLE
+     global (
+         id INTEGER PRIMARY KEY,
+         secret TEXT NOT NULL,
+-        logs TEXT NOT NULL DEFAULT "/var/log/ffplayout",
+-        playlists TEXT NOT NULL DEFAULT "/var/lib/ffplayout/playlists",
+-        public TEXT NOT NULL DEFAULT "/usr/share/ffplayout/public",
+-        storage TEXT NOT NULL DEFAULT "/var/lib/ffplayout/tv-media",
++        logs TEXT NOT NULL DEFAULT "@TERMUX_PREFIX@/var/log/ffplayout",
++        playlists TEXT NOT NULL DEFAULT "@TERMUX_PREFIX@/var/lib/ffplayout/playlists",
++        public TEXT NOT NULL DEFAULT "@TERMUX_PREFIX@/share/ffplayout/public",
++        storage TEXT NOT NULL DEFAULT "@TERMUX_PREFIX@/var/lib/ffplayout/tv-media",
+         shared INTEGER NOT NULL DEFAULT 0,
+         mail_smtp TEXT NOT NULL DEFAULT "mail.example.org",
+         mail_user TEXT NOT NULL DEFAULT "ffplayout@example.org",
+@@ -31,9 +31,9 @@ CREATE TABLE
+         preview_url TEXT NOT NULL,
+         extra_extensions TEXT NOT NULL DEFAULT "jpg,jpeg,png",
+         active INTEGER NOT NULL DEFAULT 0,
+-        public TEXT NOT NULL DEFAULT "/usr/share/ffplayout/public",
+-        playlists TEXT NOT NULL DEFAULT "/var/lib/ffplayout/playlists",
+-        storage TEXT NOT NULL DEFAULT "/var/lib/ffplayout/tv-media",
++        public TEXT NOT NULL DEFAULT "@TERMUX_PREFIX@/share/ffplayout/public",
++        playlists TEXT NOT NULL DEFAULT "@TERMUX_PREFIX@/var/lib/ffplayout/playlists",
++        storage TEXT NOT NULL DEFAULT "@TERMUX_PREFIX@/var/lib/ffplayout/tv-media",
+         last_date TEXT,
+         time_shift REAL NOT NULL DEFAULT 0,
+         timezone TEXT
+--- a/debian/postinst
++++ b/debian/postinst
+@@ -1,28 +1,20 @@
+-#!/bin/sh
++#!@TERMUX_PREFIX@/bin/sh
+ #DEBHELPER#
  
-     if sys_path.is_dir() && sys_path.writable() {
--        db_path = "/usr/share/ffplayout/db/ffplayout.db";
-+        db_path = "@TERMUX_PREFIX@/share/ffplayout/db/ffplayout.db";
-     } else if Path::new("./assets").is_dir() {
-         db_path = "./assets/ffplayout.db";
-     }
+-sysUser="ffpu"
++sysUser="$(whoami)"
+ 
+-if [ -f /run/.containerenv ] || [ -f /run/.dockerenv ] || [ -f /.dockerenv ] || [ -f /.dockerinit ]; then
+-    sysUser="root"
+-fi
+-
+-if [ ! $(id -u $sysUser 2>/dev/null || echo -1) -ge 0 ]; then
+-    adduser --system --create-home $sysUser > /dev/null || adduser --system --home "/home/$sysUser" $sysUser
+-fi
+-
+-if [ ! -d "/usr/share/ffplayout/db" ]; then
+-    mkdir "/usr/share/ffplayout/db"
+-    mkdir -p "/usr/share/ffplayout/public/live"
+-    mkdir -p "/var/lib/ffplayout/playlists"
+-    mkdir -p "/var/lib/ffplayout/tv-media"
++if [ ! -d "@TERMUX_PREFIX@/share/ffplayout/db" ]; then
++    mkdir "@TERMUX_PREFIX@/share/ffplayout/db"
++    mkdir -p "@TERMUX_PREFIX@/share/ffplayout/public/live"
++    mkdir -p "@TERMUX_PREFIX@/var/lib/ffplayout/playlists"
++    mkdir -p "@TERMUX_PREFIX@/var/lib/ffplayout/tv-media"
+ 
+-    chown -R ${sysUser}: "/usr/share/ffplayout"
+-    chown -R ${sysUser}: "/var/lib/ffplayout"
++    chown -R ${sysUser}: "@TERMUX_PREFIX@/share/ffplayout"
++    chown -R ${sysUser}: "@TERMUX_PREFIX@/var/lib/ffplayout"
+ fi
+ 
+-if [ ! -d "/var/log/ffplayout" ]; then
+-    mkdir "/var/log/ffplayout"
++if [ ! -d "@TERMUX_PREFIX@/var/log/ffplayout" ]; then
++    mkdir "@TERMUX_PREFIX@/var/log/ffplayout"
+ 
+-    chown ${sysUser}: "/var/log/ffplayout"
++    chown ${sysUser}: "@TERMUX_PREFIX@/var/log/ffplayout"
+ fi
+--- a/debian/postrm
++++ b/debian/postrm
+@@ -1,16 +1,13 @@
+-#!/bin/sh
++#!@TERMUX_PREFIX@/bin/sh
+ #DEBHELPER#
+ 
+-sysUser="ffpu"
+-
+ case "$1" in
+     abort-install|purge)
+-        deluser $sysUser
+-        rm -rf /usr/share/ffplayout /var/log/ffplayout /var/lib/ffplayout /home/$sysUser
++        rm -rf @TERMUX_PREFIX@/share/ffplayout @TERMUX_PREFIX@/var/log/ffplayout @TERMUX_PREFIX@/var/lib/ffplayout
+     ;;
+ 
+     remove)
+-        rm -rf /var/log/ffplayout
++        rm -rf @TERMUX_PREFIX@/var/log/ffplayout
+     ;;
+ 
+     upgrade|failed-upgrade|abort-upgrade|disappear)

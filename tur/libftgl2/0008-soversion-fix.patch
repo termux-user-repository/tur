@@ -1,0 +1,11 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -6,7 +6,7 @@
+ SET(VERSION_SERIES 2)
+ SET(VERSION_MAJOR 4)
+ SET(VERSION_MINOR 0)
+-SET(FTGL_SOVERSION 1)
++SET(FTGL_SOVERSION 2)
+ 
+ FIND_PACKAGE(Freetype REQUIRED) # if it fails, check this: https://bugs.launchpad.net/ubuntu/+source/cmake/+bug/826988
+ FIND_PACKAGE(OpenGL   REQUIRED)

@@ -1,0 +1,18 @@
+Fix the following error since GCC 15:
+
+__memory/pointer_traits.h: In instantiation of 'constexpr std::__ndk1::__decay_t<decltype (std::__ndk1::__to_address_helper<_Pointer>::__call(declval<const _Pointer&>()))> std::__ndk1::__to_address(const _Pointer&) [with _Pointer = reverse_iterator<char*>; <template-parameter-1-2> = void]':
+__memory/pointer_traits.h:207:5: error: use of built-in trait '__decay(decltype((std::__ndk1::__to_address_helper<_Pointer, void>::__call)((declval<const _Pointer&>)())))' in function signature; use library traits instead
+  207 |     __to_address(const _Pointer& __p) _NOEXCEPT {
+      |     ^~~~~~~~~~~~
+
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/decay.h
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__type_traits/decay.h
+@@ -25,7 +25,7 @@
+ 
+ _LIBCPP_BEGIN_NAMESPACE_STD
+ 
+-#if __has_builtin(__decay)
++#if __has_builtin(__decay) && !defined(_LIBCPP_COMPILER_GCC)
+ template <class _Tp>
+ using __decay_t _LIBCPP_NODEBUG = __decay(_Tp);
+ 
