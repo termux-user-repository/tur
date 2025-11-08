@@ -1,0 +1,15 @@
+Prevents ld.lld: error: undefined symbol: Android_Custom_Vulkan_Driver_In_Use
+Freedreno is the most commonly used Vulkan driver in 64-bit ARM Termux devices,
+so assume it is in use
+
+--- a/lib/graphics_engine/src/ge_vulkan_features.cpp
++++ b/lib/graphics_engine/src/ge_vulkan_features.cpp
+@@ -221,7 +221,7 @@ void GEVulkanFeatures::init(GEVulkanDriver* vk)
+ 
+ #if defined(__ANDROID__) && defined(__aarch64__)
+     // Freedreno is slow with bindless code
+-    if (Android_Custom_Vulkan_Driver_In_Use() != NULL)
++    if (true)
+         g_supports_multi_draw_indirect = false;
+ #endif
+ }   // init

@@ -1,0 +1,11 @@
+--- a/src/config/user_config.hpp
++++ b/src/config/user_config.hpp
+@@ -540,7 +540,7 @@ namespace UserConfigParams
+             "Enable multitouch support: 0 = disabled, 1 = if available, 2 = enabled") );
+ 
+     PARAM_PREFIX BoolUserConfigParam         m_multitouch_draw_gui
+-            PARAM_DEFAULT( BoolUserConfigParam(false, "multitouch_draw_gui",
++            PARAM_DEFAULT( BoolUserConfigParam(true, "multitouch_draw_gui",
+             &m_multitouch_group,
+             "Enable multitouch race GUI"));
+ 
