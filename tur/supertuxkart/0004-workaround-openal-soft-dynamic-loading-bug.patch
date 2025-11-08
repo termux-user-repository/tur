@@ -1,0 +1,14 @@
+successful application-side workaround of
+https://github.com/kcat/openal-soft/issues/1111
+https://github.com/termux/termux-packages/issues/23148
+
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -437,6 +437,7 @@ if(NOT SERVER_ONLY)
+             find_path(OPENAL_INCLUDE_DIR NAMES AL/al.h REQUIRED)
+         endif()
+         include_directories(${OPENAL_INCLUDE_DIR})
++        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--no-as-needed,-lOpenSLES,--as-needed")
+     endif()
+ 
+     # OggVorbis
