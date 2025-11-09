@@ -282,10 +282,8 @@ jobs:
       run: |
         GITHUB_SHA=${{ github.sha }}
         for archive in debs-*/debs-{aarch64,arm,i686,x86_64}-${{ github.sha }}.tar; do
-          tur_on_device_archive="${archive//.tar/-tur-on-device.tar}"
-          mv "$archive" "$tur_on_device_archive"
-          gh release upload -R https://github.com/termux-user-repository/tur "0.1" "$tur_on_device_archive"
-          echo "$tur_on_device_archive uploaded"
+          gh release upload -R https://github.com/termux-user-repository/tur "0.1" $archive
+          echo "$archive  uploaded"
         done
     - name: Trigger workflow in dists repository
       env:
