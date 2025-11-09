@@ -1,0 +1,15 @@
+'git reset HEAD~' is TEMPORARY - work around bug in lint-packages.sh
+will discuss with Tomjo2000 and fix upstream later
+
+--- a/scripts/lint-packages.sh
++++ b/scripts/lint-packages.sh
+@@ -124,7 +124,8 @@ check_indentation() {
+ # We'll need the 'origin/master' as a base commit when running the version check.
+ # So try fetching it now if it doesn't exist.
++git reset HEAD~
+ if ! base_commit="HEAD~$(git rev-list --count FETCH_HEAD..)"; then
+-	git fetch https://github.com/termux/termux-packages.git
++	git fetch https://github.com/termux-user-repository/tur.git
+ 	base_commit="HEAD~$(git rev-list --count FETCH_HEAD..)"
+ fi
+ 
