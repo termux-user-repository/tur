@@ -27,6 +27,17 @@
  	echo "${PR_COMMIT_BODY}"
  	echo "::endgroup::"
  
+@@ -161,6 +161,10 @@ readarray -t COMMITS < <(git rev-list --no-merges "$OLD_COMMIT..$HEAD_COMMIT" ||
+ 		git diff-tree --name-only -r "$PR_MERGE_BASE..$OLD_COMMIT"
+ 	) || :
+ 
++	if [[ $(git diff-tree --name-only -r "$OLD_COMMIT..$HEAD_COMMIT") =~ .*tur-on-device.* ]]; then
++		infoexit "This PR modifies tur-on-device packages, not performing CI fast path"
++	fi
++
+ 	# obtain list of all packages changed by this PR
+ 	readarray -t PR_CHANGED_PACKAGES < <(
+ 		git diff-tree --name-only -r "$OLD_COMMIT..$HEAD_COMMIT" \
 @@ -206,7 +206,7 @@
  		# The same commit can be used in more than one PR or even push
  		WORKFLOW_PR_QUERY="
