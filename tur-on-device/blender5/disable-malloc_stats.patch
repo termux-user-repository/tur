@@ -1,0 +1,13 @@
+diff --git a/intern/guardedalloc/intern/mallocn_intern.hh b/intern/guardedalloc/intern/mallocn_intern.hh
+index 3533cc1..1650e13 100644
+--- a/intern/guardedalloc/intern/mallocn_intern.hh
++++ b/intern/guardedalloc/intern/mallocn_intern.hh
+@@ -21,7 +21,7 @@
+ 
+ #if defined(HAVE_MALLOC_STATS_H)
+ #  include <malloc.h>
+-#  define HAVE_MALLOC_STATS
++#  define _HAVE_MALLOC_STATS
+ #elif defined(__FreeBSD__)
+ #  include <malloc_np.h>
+ #elif defined(__NetBSD__) || defined(__OpenBSD__)
