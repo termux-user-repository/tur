@@ -1,0 +1,11 @@
+--- a/build_files/cmake/platform/platform_unix.cmake
++++ b/build_files/cmake/platform/platform_unix.cmake
+@@ -1077,7 +1077,7 @@ set(PLATFORM_LINKFLAGS
+ # browsers can't properly detect blender as an executable then. Still enabled
+ # for non-portable installs as typically used by Linux distributions.
+ if(WITH_INSTALL_PORTABLE)
+-  string(APPEND CMAKE_EXE_LINKER_FLAGS " -no-pie")
++  string(APPEND CMAKE_EXE_LINKER_FLAGS " -pie")
+ endif()
+ 
+ if(WITH_COMPILER_CCACHE)

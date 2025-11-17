@@ -1,0 +1,151 @@
+diff --git a/extern/ceres/include/ceres/solver.h b/extern/ceres/include/ceres/solver.h
+index 68438a10..3d549864 100644
+--- a/extern/ceres/include/ceres/solver.h
++++ b/extern/ceres/include/ceres/solver.h
+@@ -730,7 +730,7 @@ class CERES_EXPORT Solver {
+     // non-empty if trust_region_minimizer_iterations_to_dump is
+     // non-empty and trust_region_problem_dump_format_type is not
+     // CONSOLE.
+-    std::string trust_region_problem_dump_directory = "/tmp";
++    std::string trust_region_problem_dump_directory = "@TERMUX_PREFIX@/tmp";
+     DumpFormatType trust_region_problem_dump_format_type = TEXTFILE;
+ 
+     // Finite differences options ----------------------------------------------
+diff --git a/extern/glog/src/logging.cc b/extern/glog/src/logging.cc
+index 0c86cf62..57df4573 100644
+--- a/extern/glog/src/logging.cc
++++ b/extern/glog/src/logging.cc
+@@ -1862,7 +1862,7 @@ static void GetTempDirectories(vector<string>* list) {
+     getenv("TMPDIR"), getenv("TMP"),
+ 
+     // If all else fails
+-    "/tmp",
++    "@TERMUX_PREFIX@/tmp",
+   };
+ 
+   for (size_t i = 0; i < ARRAYSIZE(candidates); i++) {
+diff --git a/scripts/addons_core/bl_pkg/cli/blender_ext.py b/scripts/addons_core/bl_pkg/cli/blender_ext.py
+index 3040f582..e3a59abc 100755
+--- a/scripts/addons_core/bl_pkg/cli/blender_ext.py
++++ b/scripts/addons_core/bl_pkg/cli/blender_ext.py
+@@ -207,7 +207,7 @@ def print(*args: Any, **kw: dict[str, Any]) -> None:
+ 
+ # # Useful for testing.
+ # def print(*args: Any, **kw: dict[str, Any]):
+-#     __builtins__["print"](*args, **kw, file=open('/tmp/output.txt', 'a'))
++#     __builtins__["print"](*args, **kw, file=open('@TERMUX_PREFIX@/tmp/output.txt', 'a'))
+ 
+ 
+ def any_as_none(_arg: Any) -> None:
+@@ -220,7 +220,7 @@ def debug_stack_trace_to_file() -> None:
+     """
+     import inspect
+     stack = inspect.stack(context=1)
+-    with open("/tmp/out.txt", "w", encoding="utf-8") as fh:
++    with open("@TERMUX_PREFIX@/tmp/out.txt", "w", encoding="utf-8") as fh:
+         for frame_info in stack[1:]:
+             fh.write("{:s}:{:d}: {:s}\n".format(
+                 frame_info.filename,
+diff --git a/scripts/addons_core/ui_translate/settings.py b/scripts/addons_core/ui_translate/settings.py
+index 23d3b23a..52efce12 100644
+--- a/scripts/addons_core/ui_translate/settings.py
++++ b/scripts/addons_core/ui_translate/settings.py
+@@ -142,7 +142,7 @@ class UI_AP_i18n_settings(AddonPreferences):
+         name="Spell Cache",
+         description="A cache storing validated msgids, to avoid re-spellchecking them",
+         subtype='FILE_PATH',
+-        default=os.path.join("/tmp", ".spell_cache"),
++        default=os.path.join("@TERMUX_PREFIX@/tmp", ".spell_cache"),
+         get=lambda self: self._settings.SPELL_CACHE,
+         set=lambda self, val: setattr(self._settings, "SPELL_CACHE", val),
+     )
+diff --git a/scripts/modules/_bl_i18n_utils/settings.py b/scripts/modules/_bl_i18n_utils/settings.py
+index 92ff288c..32cc9eff 100644
+--- a/scripts/modules/_bl_i18n_utils/settings.py
++++ b/scripts/modules/_bl_i18n_utils/settings.py
+@@ -656,7 +656,7 @@ CUSTOM_PY_UI_FILES = [
+ SRC_POTFILES = ""
+ 
+ # A cache storing validated msgids, to avoid re-spellchecking them.
+-SPELL_CACHE = os.path.join("/tmp", ".spell_cache")
++SPELL_CACHE = os.path.join("@TERMUX_PREFIX@/tmp", ".spell_cache")
+ 
+ # Threshold defining whether a new msgid is similar enough with an old one to reuse its translation...
+ SIMILAR_MSGID_THRESHOLD = 0.75
+diff --git a/source/blender/blenlib/intern/delaunay_2d.cc b/source/blender/blenlib/intern/delaunay_2d.cc
+index 1dac8c4a..6c102a68 100644
+--- a/source/blender/blenlib/intern/delaunay_2d.cc
++++ b/source/blender/blenlib/intern/delaunay_2d.cc
+@@ -475,7 +475,7 @@ template<typename T> void cdt_draw(const std::string &label, const CDTArrangemen
+ #  ifdef _WIN32
+   const char *drawfile = "./cdt_debug_draw.html";
+ #  else
+-  const char *drawfile = "/tmp/cdt_debug_draw.html";
++  const char *drawfile = "@TERMUX_PREFIX@/tmp/cdt_debug_draw.html";
+ #  endif
+   constexpr int max_draw_width = 1800;
+   constexpr int max_draw_height = 1600;
+diff --git a/source/blender/blenlib/intern/mesh_boolean.cc b/source/blender/blenlib/intern/mesh_boolean.cc
+index 1cb890a9..360dc221 100644
+--- a/source/blender/blenlib/intern/mesh_boolean.cc
++++ b/source/blender/blenlib/intern/mesh_boolean.cc
+@@ -636,7 +636,7 @@ static void write_obj_cell_patch(const IMesh &m,
+     return;
+   }
+ #  else
+-  const char *objdir = "/tmp/";
++  const char *objdir = "@TERMUX_PREFIX@/tmp/";
+ #  endif
+ 
+   std::string fname = std::string(objdir) + name + std::string("_cellpatch.obj");
+diff --git a/source/blender/blenlib/intern/mesh_intersect.cc b/source/blender/blenlib/intern/mesh_intersect.cc
+index 193c7e64..3c74219e 100644
+--- a/source/blender/blenlib/intern/mesh_intersect.cc
++++ b/source/blender/blenlib/intern/mesh_intersect.cc
+@@ -3030,7 +3030,7 @@ void write_obj_mesh(IMesh &m, const std::string &objname)
+     return;
+   }
+ #  else
+-  const char *objdir = "/tmp/";
++  const char *objdir = "@TERMUX_PREFIX@/tmp/";
+ #  endif
+ 
+   if (m.face_size() == 0) {
+diff --git a/source/blender/blenlib/intern/tempfile.cc b/source/blender/blenlib/intern/tempfile.cc
+index e2ba8e33..0c4ecfd2 100644
+--- a/source/blender/blenlib/intern/tempfile.cc
++++ b/source/blender/blenlib/intern/tempfile.cc
+@@ -80,6 +80,6 @@ void BLI_temp_directory_path_get(char *tempdir, const size_t tempdir_maxncpy)
+   }
+ 
+   if (tempdir[0] == '\0') {
+-    BLI_strncpy(tempdir, "/tmp/", tempdir_maxncpy);
++    BLI_strncpy(tempdir, "@TERMUX_PREFIX@/tmp/", tempdir_maxncpy);
+   }
+ }
+diff --git a/source/blender/geometry/intern/mesh_boolean.cc b/source/blender/geometry/intern/mesh_boolean.cc
+index 37dc71c7..25278415 100644
+--- a/source/blender/geometry/intern/mesh_boolean.cc
++++ b/source/blender/geometry/intern/mesh_boolean.cc
+@@ -36,7 +36,7 @@
+ #  include "BLI_timeit.hh"
+ #  include <filesystem>
+ #  include <fstream>
+-#  define BENCHMARK_FILE "/tmp/blender_benchmark.csv"
++#  define BENCHMARK_FILE "@TERMUX_PREFIX@/tmp/blender_benchmark.csv"
+ #endif
+ 
+ namespace blender::geometry::boolean {
+diff --git a/tools/utils/cycles_timeit.py b/tools/utils/cycles_timeit.py
+index af0c3e39..ed459140 100755
+--- a/tools/utils/cycles_timeit.py
++++ b/tools/utils/cycles_timeit.py
+@@ -136,7 +136,7 @@ def benchmarkFile(blender, blendfile, stats):
+     re_pipeline_time = re.compile(r"Time: ([0-9:\.]+) \(Saving: ([0-9:\.]+)\)")
+     # Prepare output folder.
+     # TODO(sergey): Use some proper output folder.
+-    output_folder = "/tmp/"
++    output_folder = "@TERMUX_PREFIX@/tmp/"
+     # Configure command for the current file.
+     command = (blender,
+                "--background",
