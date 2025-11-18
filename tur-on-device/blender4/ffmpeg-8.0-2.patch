@@ -1,0 +1,38 @@
+From f5f30131131025a24be93eced7d04f9d96cf5cbf Mon Sep 17 00:00:00 2001
+From: Sebastian Parborg <sebastian@blender.org>
+Date: Wed, 27 Aug 2025 15:26:56 +0200
+Subject: [PATCH] FFmpeg: Remove deprecated variable (fixes ffmpeg 8
+ compilation)
+
+We needed to remove `AV_INPUT_BUFFER_MIN_SIZE` as ffmpeg8 has removed it: [Changelog](https://git.ffmpeg.org/gitweb/ffmpeg.git/blob/48115181438b4d7258f38c7083b5def083ee345a:/doc/APIchanges#l468
+)
+
+Pull Request: https://projects.blender.org/blender/blender/pulls/145183
+---
+ .../blender/imbuf/movie/intern/movie_write_audio.cc  | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/source/blender/imbuf/movie/intern/movie_write_audio.cc b/source/blender/imbuf/movie/intern/movie_write_audio.cc
+index 16d01359a60..5fe3634e08d 100644
+--- a/source/blender/imbuf/movie/intern/movie_write_audio.cc
++++ b/source/blender/imbuf/movie/intern/movie_write_audio.cc
+@@ -334,12 +334,12 @@ AVStream *alloc_audio_stream(MovieWriter *context,
+   c->time_base.num = 1;
+   c->time_base.den = c->sample_rate;
+ 
+-  if (c->frame_size == 0) {
+-    /* Used to be if ((c->codec_id >= CODEC_ID_PCM_S16LE) && (c->codec_id <= CODEC_ID_PCM_DVD))
+-     * not sure if that is needed anymore, so let's try out if there are any
+-     * complaints regarding some FFMPEG versions users might have. */
+-    context->audio_input_samples = AV_INPUT_BUFFER_MIN_SIZE * 8 / c->bits_per_coded_sample /
+-                                   audio_channels;
++  if (c->codec->capabilities & AV_CODEC_CAP_VARIABLE_FRAME_SIZE) {
++    /* If the audio format has a variable frame size, default to 1024.
++     * This is because we won't try to encode any variable frame size.
++     * 1024 seems to be a good compromize between size and speed.
++     */
++    context->audio_input_samples = 1024;
+   }
+   else {
+     context->audio_input_samples = c->frame_size;
+
