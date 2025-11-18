@@ -19,15 +19,6 @@ Only search packages from TUR repository when auto-updating.
  				if [ -d "${repo_dir}/${pkg}" ]; then
  					pkg="${repo_dir}/${pkg}"
  					break
-@@ -352,7 +352,7 @@
- 	local body
- 
- 	if [[ "${assignee:-termuxbot2}" == "termuxbot2" ]]; then
--		assignee="MrAdityaAlok" # Assign myself if termuxbot2 is the actor.
-+		assignee="licy183" # Assign myself if termuxbot2 is the actor.
- 	fi
- 
- 	body="$(
 Sleep 1s after update in order to not reach GitHub rate limit.
 --- a/scripts/bin/update-packages
 +++ b/scripts/bin/update-packages
