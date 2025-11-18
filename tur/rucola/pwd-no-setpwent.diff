@@ -1,0 +1,38 @@
+--- a/src/unix.rs
++++ b/src/unix.rs
+@@ -1,4 +1,4 @@
+-use libc::{c_char, endpwent, getpwent, getpwnam, getpwuid, getuid, passwd, setpwent};
++use libc::{c_char, getpwnam, getpwuid, getuid, passwd};
+ use std::ffi::{CStr, CString};
+ 
+ use crate::errors::{PwdError, Result};
+@@ -41,27 +41,8 @@ impl Iterator for PasswdIter {
+     type Item = Passwd;
+ 
+     fn next(&mut self) -> Option<Self::Item> {
+-        if !self.inited {
+-            unsafe {
+-                setpwent();
+-            };
+-            self.inited = true;
+-        }
+-
+-        let next = unsafe { getpwent() };
+-
+-        if next.is_null() {
+-            unsafe {
+-                endpwent();
+-            };
+-            return None;
+-        }
+-
+-        if let Ok(passwd) = Passwd::from_unsafe(next) {
+-            Some(passwd)
+-        } else {
+-            None
+-        }
++        self.inited = true;
++        None
+     }
+ }
+ 

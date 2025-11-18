@@ -1,0 +1,12 @@
+--- a/src/unix.rs
++++ b/src/unix.rs
+@@ -67,6 +67,9 @@ impl Passwd {
+             Some(cstr_to_string(pwd.pw_passwd)?)
+         };
+ 
++        #[cfg(all(target_os = "android", target_pointer_width = "32"))]
++        let gecos = None;
++        #[cfg(not(all(target_os = "android", target_pointer_width = "32")))]
+         let gecos = if pwd.pw_gecos.is_null() {
+             None
+         } else {
