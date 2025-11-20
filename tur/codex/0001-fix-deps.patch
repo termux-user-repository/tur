@@ -1,29 +1,11 @@
---- a/codex-rs/core/Cargo.toml
-+++ b/codex-rs/core/Cargo.toml
-@@ -32,7 +32,6 @@
- codex-utils-readiness = { workspace = true }
- codex-utils-string = { workspace = true }
- codex-utils-tokenizer = { workspace = true }
--codex-windows-sandbox = { package = "codex-windows-sandbox", path = "../windows-sandbox-rs" }
- dirs = { workspace = true }
- dunce = { workspace = true }
- env-flags = { workspace = true }
-@@ -85,6 +84,8 @@
- which = { workspace = true }
- wildmatch = { workspace = true }
- 
-+[target.'cfg(target_os = "windows")'.dependencies]
-+codex-windows-sandbox = { package = "codex-windows-sandbox", path = "../windows-sandbox-rs" }
- 
- [target.'cfg(target_os = "linux")'.dependencies]
- landlock = { workspace = true }
---- a/codex-rs/tui/Cargo.toml
-+++ b/codex-rs/tui/Cargo.toml
-@@ -88,6 +88,7 @@
- unicode-width = { workspace = true }
- url = { workspace = true }
- 
-+[target.'cfg(target_os = "windows")'.dependencies]
- codex-windows-sandbox = { workspace = true }
- 
- [target.'cfg(unix)'.dependencies]
+--- a/codex-rs/windows-sandbox-rs/Cargo.toml
++++ b/codex-rs/windows-sandbox-rs/Cargo.toml
+@@ -21,7 +21,7 @@
+ features = ["std", "small_rng"]
+ [dependencies.dirs-next]
+ version = "2.0"
+-[dependencies.windows-sys]
++[target.'cfg(target_os = "windows")'.dependencies.windows-sys]
+ version = "0.52"
+ features = [
+     "Win32_Foundation",
