@@ -30,6 +30,7 @@ $SUDO docker start $CONTAINER_NAME >/dev/null 2>&1 || {
 		--name $CONTAINER_NAME \
 		--volume $REPOROOT:$CONTAINER_HOME_DIR/termux-packages \
 		--security-opt seccomp=unconfined \
+		--pid=host \
 		--tty \
 		-w $CONTAINER_HOME_DIR/termux-packages \
 		$TERMUX_BUILDER_IMAGE_NAME

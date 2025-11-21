@@ -149,6 +149,9 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GH_TOKEN }}
 
+      - name: Set process id limit for 32-bit builds depending on aosp-libs
+        run: echo 65535 | sudo tee /proc/sys/kernel/pid_max
+
       - name: Merge repos
         run: ./setup-environment.sh
 
