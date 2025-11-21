@@ -60,6 +60,8 @@ jobs:
       with:
         fetch-depth: 1000
         path: ${{ github.workspace }}
+    - name: Set process id limit for builds inside 32-bit termux-docker
+      run: echo 65535 | sudo tee /proc/sys/kernel/pid_max
     - name: Merge repos
       run: ./setup-environment.sh
     - name: Gather build summary

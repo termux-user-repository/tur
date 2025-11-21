@@ -60,6 +60,9 @@ jobs:
         fetch-depth: 1000
         submodules: true
 
+    - name: Set process id limit for 32-bit builds depending on aosp-libs
+      run: echo 65535 | sudo tee /proc/sys/kernel/pid_max
+
     - name: Merge repos
       run: ./setup-environment.sh
 
