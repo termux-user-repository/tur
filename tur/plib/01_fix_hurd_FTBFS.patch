@@ -1,0 +1,58 @@
+Description: _fix_hurd_FTBFS.diff
+--- a/src/js/jsNone.cxx
++++ b/src/js/jsNone.cxx
+@@ -22,7 +22,7 @@
+ 
+ #include "js.h"
+ 
+-#if defined(UL_IRIX) || defined(UL_SOLARIS) || defined (UL_HPUX)
++#if defined(UL_IRIX) || defined(UL_SOLARIS) || defined (UL_HPUX) || defined(UL_GNU)
+ 
+ struct os_specific_s ;
+ 
+--- a/src/util/ul.h
++++ b/src/util/ul.h
+@@ -92,6 +92,10 @@
+ 
+ #define UL_HPUX      1
+ 
++#elif defined(__GNU__)
++
++#define UL_GNU       1
++
+ #elif (defined(__unix__) || defined(unix)) && !defined(USG)
+ 
+ #define UL_BSD       1
+@@ -144,6 +148,12 @@
+ #define  UL_GLX     1
+ #endif
+ 
++#ifdef UL_GNU
++#include <unistd.h>
++#include <dlfcn.h>
++#define  UL_GLX     1
++#endif
++
+ #include <assert.h>
+ #include <limits.h>
+ #include <math.h>
+--- a/src/sl/slPortability.h
++++ b/src/sl/slPortability.h
+@@ -51,7 +51,7 @@
+ #include <limits.h>
+ #include <math.h>
+ 
+-#if (defined(UL_LINUX) || defined(UL_BSD)) && !defined(__NetBSD__)
++#if (defined(UL_LINUX) || defined(UL_BSD) || defined(UL_GNU)) && !defined(__NetBSD__)
+ #define SL_USING_OSS_AUDIO 1
+ #endif
+ 
+@@ -59,7 +59,7 @@
+ #  if defined(UL_LINUX)
+ #    include <linux/soundcard.h>
+ #    include <sys/ioctl.h>
+-#  elif defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
++#  elif defined(__FreeBSD__) || defined(__FreeBSD_kernel__) || defined(UL_GNU)
+ #    include <sys/soundcard.h>
+ #  else
+     /*
