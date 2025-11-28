@@ -1,0 +1,86 @@
+From 85705eda717d1d79e976edbce671e4a77dc2ac56 Mon Sep 17 00:00:00 2001
+From: Niels Dossche <7771979+nielsdos@users.noreply.github.com>
+Date: Wed, 3 Jul 2024 15:48:44 +0200
+Subject: [PATCH] Fix compilation on libxml2 2.13
+
+---
+ ext/dom/document.c            | 6 ++++--
+ ext/libxml/libxml.c           | 4 +++-
+ ext/libxml/php_libxml.h       | 2 ++
+ ext/soap/php_xml.c            | 8 +++++++-
+ ext/xml/compat.c              | 3 +--
+ ext/xml/xml.c                 | 3 +++
+ ext/xmlwriter/php_xmlwriter.c | 3 ++-
+ 7 files changed, 22 insertions(+), 7 deletions(-)
+
+diff --git a/ext/dom/document.c b/ext/dom/document.c
+index 11ef4aa8..0397dd21 100644
+--- a/ext/dom/document.c
++++ b/ext/dom/document.c
+@@ -1437,10 +1437,12 @@ static xmlDocPtr dom_document_parser(zval *id, int mode, char *source, size_t so
+ 	if (keep_blanks == 0 && ! (options & XML_PARSE_NOBLANKS)) {
+ 		options |= XML_PARSE_NOBLANKS;
+ 	}
++	if (recover) {
++		options |= XML_PARSE_RECOVER;
++	}
+ 
+ 	xmlCtxtUseOptions(ctxt, options);
+ 
+-	ctxt->recovery = recover;
+ 	if (recover) {
+ 		old_error_reporting = EG(error_reporting);
+ 		EG(error_reporting) = old_error_reporting | E_WARNING;
+@@ -1450,7 +1452,7 @@ static xmlDocPtr dom_document_parser(zval *id, int mode, char *source, size_t so
+ 
+ 	if (ctxt->wellFormed || recover) {
+ 		ret = ctxt->myDoc;
+-		if (ctxt->recovery) {
++		if (recover) {
+ 			EG(error_reporting) = old_error_reporting;
+ 		}
+ 		/* If loading from memory, set the base reference uri for the document */
+diff --git a/ext/libxml/libxml.c b/ext/libxml/libxml.c
+index c871cb89..d0fe8d91 100644
+--- a/ext/libxml/libxml.c
++++ b/ext/libxml/libxml.c
+@@ -428,8 +428,10 @@ php_libxml_input_buffer_create_filename(const char *URI, xmlCharEncoding enc)
+ static xmlOutputBufferPtr
+ php_libxml_output_buffer_create_filename(const char *URI,
+                               xmlCharEncodingHandlerPtr encoder,
+-                              int compression ATTRIBUTE_UNUSED)
++                              int compression)
+ {
++	ZEND_IGNORE_VALUE(compression);
++
+ 	xmlOutputBufferPtr ret;
+ 	xmlURIPtr puri;
+ 	void *context = NULL;
+diff --git a/ext/xml/compat.c b/ext/xml/compat.c
+index ef834857..933cc5a9 100644
+--- a/ext/xml/compat.c
++++ b/ext/xml/compat.c
+@@ -750,8 +750,7 @@ XML_GetCurrentByteCount(XML_Parser parser)
+ {
+ 	/* WARNING: this is identical to ByteIndex; it should probably
+ 	 * be different */
+-	return parser->parser->input->consumed +
+-			(parser->parser->input->cur - parser->parser->input->base);
++	return XML_GetCurrentByteIndex(parser);
+ }
+ 
+ PHP_XML_API const XML_Char *XML_ExpatVersion(void)
+diff --git a/ext/xmlwriter/php_xmlwriter.c b/ext/xmlwriter/php_xmlwriter.c
+index 39561c76..ded30c8b 100644
+--- a/ext/xmlwriter/php_xmlwriter.c
++++ b/ext/xmlwriter/php_xmlwriter.c
+@@ -1805,7 +1805,8 @@ static void php_xmlwriter_flush(INTERNAL_FUNCTION_PARAMETERS, int force_string)
+ 		}
+ 		output_bytes = xmlTextWriterFlush(ptr);
+ 		if (buffer) {
+-			RETVAL_STRING((char *) buffer->content);
++			const xmlChar *content = xmlBufferContent(buffer);
++			RETVAL_STRING((const char *) content);
+ 			if (empty) {
+ 				xmlBufferEmpty(buffer);
+ 			}
