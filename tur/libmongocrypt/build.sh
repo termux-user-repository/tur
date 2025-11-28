@@ -4,6 +4,7 @@ TERMUX_PKG_LICENSE="Apache-2.0, custom"
 TERMUX_PKG_LICENSE_FILE="LICENSE, kms-message/THIRD_PARTY_NOTICES"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION=1:1.13.2
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://github.com/mongodb/libmongocrypt/archive/refs/tags/${TERMUX_PKG_VERSION#*:}.tar.gz
 TERMUX_PKG_SHA256=af15439e3f3e25ded3d4d0d4dac0b84984ed394a8d68c69343445ed8f9f46df5
 TERMUX_PKG_DEPENDS="libbson, libicu, libsasl, libsnappy, openssl"
