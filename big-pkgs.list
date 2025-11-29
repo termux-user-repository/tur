@@ -10,3 +10,6 @@ code-oss
 electron-headers-.*
 rustc-nightly
 python-polars
+wine-devel
+wine-stable
+wine-staging
