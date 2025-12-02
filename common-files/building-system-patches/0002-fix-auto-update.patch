@@ -1,18 +1,30 @@
 Only search packages from TUR repository when auto-updating.
 --- a/scripts/bin/update-packages
 +++ b/scripts/bin/update-packages
-@@ -307,7 +307,7 @@
+@@ -336,6 +336,11 @@ _should_update() {
+ 		termux_error_exit "directory '${pkg_dir}' is not a package."
+ 	fi
+ 
++	if [[ "$(realpath "$(dirname "${pkg_dir}")")" != *"tur"* ]]; then
++		echo "INFO: Skipping '$(basename "${pkg_dir}")', it is not a TUR package."
++		return 1
++	fi
++
+ 	# `[[ "$(<"$file")" =~ regex ]]` is bash builtin solution for `grep -q` without spawning extra process
+ 	# it is needed to pre-fetch and filter packages as fast as possible (it is 6.5 times faster than `grep`)
+ 	case "${PACKAGES_OPT_OUT:-}" in
+@@ -378,7 +383,7 @@ echo "INFO: Running update for: $*"
  
  if [[ "$1" == "@all" ]]; then
  	_fetch_and_cache_tags
 -	for repo_dir in $(jq --raw-output 'del(.pkg_format) | keys | .[]' "${TERMUX_SCRIPTDIR}/repo.json"); do
 +	for repo_dir in "tur" "tur-on-device" "tur-multilib" "tur-hacking"; do
  		for pkg_dir in "${repo_dir}"/*; do
- 			_unix_millis=$(date +%s%N | cut -b1-13)
+ 			_unix_millis="$(date +%10s%3N)"
  			! _should_update "${pkg_dir}" && continue # Skip if not needed.
-@@ -327,7 +327,7 @@
- else
+@@ -398,7 +403,7 @@ else
  	for pkg in "$@"; do
+ 		_unix_millis="$(date +%10s%3N)"
  		if [ ! -d "${pkg}" ]; then # If only package name is given, try to find it's directory.
 -			for repo_dir in $(jq --raw-output 'del(.pkg_format) | keys | .[]' "${TERMUX_SCRIPTDIR}/repo.json"); do
 +			for repo_dir in "tur" "tur-on-device" "tur-multilib" "tur-hacking"; do
