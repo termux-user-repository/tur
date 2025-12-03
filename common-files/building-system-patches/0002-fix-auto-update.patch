@@ -5,7 +5,7 @@ Only search packages from TUR repository when auto-updating.
  		termux_error_exit "directory '${pkg_dir}' is not a package."
  	fi
  
-+	if [[ "$(realpath "$(dirname "${pkg_dir}")")" != *"tur"* ]]; then
++	if [[ "$(basename "$(realpath "$(dirname "${pkg_dir}")")")" != *"tur"* ]]; then
 +		echo "INFO: Skipping '$(basename "${pkg_dir}")', it is not a TUR package."
 +		return 1
 +	fi
