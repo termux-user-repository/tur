@@ -1,11 +1,11 @@
 --- a/codex-rs/windows-sandbox-rs/Cargo.toml
 +++ b/codex-rs/windows-sandbox-rs/Cargo.toml
-@@ -21,7 +21,7 @@
- features = ["std", "small_rng"]
+@@ -22,7 +22,7 @@
+ version = "0.8"
  [dependencies.dirs-next]
  version = "2.0"
 -[dependencies.windows-sys]
 +[target.'cfg(target_os = "windows")'.dependencies.windows-sys]
- version = "0.52"
  features = [
      "Win32_Foundation",
+     "Win32_System_Diagnostics_Debug",
