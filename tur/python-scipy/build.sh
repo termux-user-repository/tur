@@ -3,8 +3,9 @@ TERMUX_PKG_DESCRIPTION="Fundamental algorithms for scientific computing in Pytho
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="1:1.16.3"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=git+https://github.com/scipy/scipy
-TERMUX_PKG_DEPENDS="libc++, libopenblas, python, python-numpy"
+TERMUX_PKG_DEPENDS="libc++ (>= 29), libopenblas, python, python-numpy"
 TERMUX_PKG_BUILD_DEPENDS="python-numpy-static"
 TERMUX_PKG_PYTHON_COMMON_DEPS="wheel, 'Cython>=3.0.4', meson-python, build"
 _NUMPY_VERSION=$(. $TERMUX_SCRIPTDIR/packages/python-numpy/build.sh; echo $TERMUX_PKG_VERSION)
@@ -43,28 +44,17 @@ termux_step_pre_configure() {
 	# FIXME: Don't know why NDK's libc++ should link against clang's libunwind,
 	# FIXME: otherwise pybind11's `register_local_exception_translator` won't
 	# FIXME: work properly, causing crash on `scipy.io._mmio`.
-	# FIXME: Besides, `__cxa_call_terminate` is introduced since gcc-14, but it
-	# FIXME: doesn't exist on libcxx's libunwind since clang 19.1.0.
-	if [ "$TERMUX_NDK_VERSION" != "28c" ]; then
-		termux_error_exit "Please remove the workaround for __cxa_call_terminate."
-	fi
 	local _unwind_dir="$TERMUX_PKG_TMPDIR/_libunwind_libdir"
 	local _NDK_ARCH=$TERMUX_ARCH
 	test $_NDK_ARCH == 'i686' && _NDK_ARCH='i386'
 	mkdir -p $_unwind_dir
 	cp $NDK/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/*/lib/linux/$_NDK_ARCH/libunwind.a \
 		$_unwind_dir/libunwind.a
-	$CXX $CPPFLAGS $CXXFLAGS -fPIC \
-		-c $TERMUX_PKG_BUILDER_DIR/libunwind-extra.cpp \
-		-o $_unwind_dir/libunwind-extra.o
-	pushd $_unwind_dir
-	$AR rcu libunwind-extra.a libunwind-extra.o
-	popd # $_unwind_dir
 
 	_setup_toolchain_ndk_gcc_15
 
 	LDFLAGS+=" -Wl,--no-as-needed,-lpython${TERMUX_PYTHON_VERSION},--as-needed"
-	LDFLAGS="-L$TERMUX_PKG_TMPDIR/_libunwind_libdir -l:libunwind.a -l:libunwind-extra.a ${LDFLAGS}"
+	LDFLAGS="-L$TERMUX_PKG_TMPDIR/_libunwind_libdir -l:libunwind.a ${LDFLAGS}"
 }
 
 termux_step_configure() {
