@@ -7,7 +7,7 @@ TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://files.pythonhosted.org/packages/62/4f/7e95c5000c411164d5ca6f55ac54cda5d200a3b6719dafd215ee0bd61578/scipy-$TERMUX_PKG_VERSION.tar.gz
 TERMUX_PKG_SHA256=ecbe6413ca90b8e19f8475bfa303ac001e81b04ec600d17fa7f816271f7cca57
 TERMUX_PKG_DEPENDS="libc++, libopenblas, python2, python2-numpy"
-TERMUX_PKG_BUILD_DEPENDS="binutils, which, gcc-11, python2-numpy-static"
+TERMUX_PKG_BUILD_DEPENDS="binutils, which, gcc-15, python2-numpy-static"
 TERMUX_PKG_BUILD_IN_SRC=true
 
 termux_step_pre_configure() {
@@ -24,7 +24,7 @@ termux_step_pre_configure() {
 	mkdir -p $TERMUX_PKG_TMPDIR/_fake_bin
 	sed -e "s|@TERMUX_PREFIX@|${TERMUX_PREFIX}|g" \
 		-e "s|@TERMUX_ARCH@|${TERMUX_ARCH}|g" \
-		-e "s|@COMPILER@|$(command -v ${CROSS_PREFIX}-gfortran-11)|g" \
+		-e "s|@COMPILER@|$(command -v ${CROSS_PREFIX}-gfortran-15)|g" \
 		"$TERMUX_PKG_BUILDER_DIR"/wrapper.in \
 		> $TERMUX_PKG_TMPDIR/_fake_bin/gfortran
 	chmod +x $TERMUX_PKG_TMPDIR/_fake_bin/gfortran

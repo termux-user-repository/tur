@@ -7,7 +7,7 @@ TERMUX_PKG_REVISION=2
 TERMUX_PKG_SRCURL=https://cran.r-project.org/src/base/R-${TERMUX_PKG_VERSION::1}/R-$TERMUX_PKG_VERSION.tar.gz
 TERMUX_PKG_SHA256=ace4125f9b976d2c53bcc5fca30c75e30d4edc401584859cbadb080e72b5f030
 TERMUX_PKG_DEPENDS="libandroid-glob, libiconv, libbz2, libcurl, liblzma, pcre2, readline, zlib"
-TERMUX_PKG_BUILD_DEPENDS="binutils, gcc-11, openjdk-21, which"
+TERMUX_PKG_BUILD_DEPENDS="binutils, gcc-15, openjdk-21, which"
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 ac_cv_have_decl_wctrans=yes
 --with-x=no
@@ -35,9 +35,9 @@ termux_step_pre_configure() {
 	export AS=$CROSS_PREFIX-as
 	export LD=$CROSS_PREFIX-ld
 	export NM=$CROSS_PREFIX-nm
-	export CC=$CROSS_PREFIX-gcc-11
-	export FC=$CROSS_PREFIX-gfortran-11
-	export CXX=$CROSS_PREFIX-g++-11
+	export CC=$CROSS_PREFIX-gcc-15
+	export FC=$CROSS_PREFIX-gfortran-15
+	export CXX=$CROSS_PREFIX-g++-15
 	unset CPP CXXCPP STRINGS
 	export STRIP=$CROSS_PREFIX-strip
 	export RANLIB=$CROSS_PREFIX-ranlib
