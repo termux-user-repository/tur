@@ -7,9 +7,9 @@ __memory/shared_ptr.h:227:6: error: inlining failed in call to 'always_inline' '
   157 |       __on_zero_shared();
       |       ~~~~~~~~~~~~~~~~^~
 
---- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__memory/shared_ptr.h
-+++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__memory/shared_ptr.h
-@@ -147,7 +147,8 @@
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__memory/shared_count.h
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__memory/shared_count.h
+@@ -81,7 +81,8 @@
  public:
    _LIBCPP_HIDE_FROM_ABI explicit __shared_count(long __refs = 0) _NOEXCEPT : __shared_owners_(__refs) {}
  
@@ -19,13 +19,15 @@ __memory/shared_ptr.h:227:6: error: inlining failed in call to 'always_inline' '
    void __add_shared() noexcept;
    bool __release_shared() noexcept;
  #else
-@@ -175,7 +176,8 @@
-   ~__shared_weak_count() override;
- 
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__cxx03/__memory/shared_ptr.h
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__cxx03/__memory/shared_ptr.h
+@@ -146,7 +146,8 @@
  public:
+   _LIBCPP_HIDE_FROM_ABI explicit __shared_count(long __refs = 0) _NOEXCEPT : __shared_owners_(__refs) {}
+ 
 -#if defined(_LIBCPP_SHARED_PTR_DEFINE_LEGACY_INLINE_FUNCTIONS)
 +#if defined(_LIBCPP_SHARED_PTR_DEFINE_LEGACY_INLINE_FUNCTIONS) || \
 +  defined(_LIBCPP_COMPILER_GCC) && defined(_LIBCPP_DEPRECATED_ABI_LEGACY_LIBRARY_DEFINITIONS_FOR_INLINE_FUNCTIONS)
    void __add_shared() noexcept;
-   void __add_weak() noexcept;
-   void __release_shared() noexcept;
+   bool __release_shared() noexcept;
+ #else

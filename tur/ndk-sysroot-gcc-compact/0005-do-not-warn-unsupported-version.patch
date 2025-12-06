@@ -1,13 +1,13 @@
---- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__config
-+++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__config
+--- a/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__configuration/compiler.h
++++ b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/c++/v1/__configuration/compiler.h
 @@ -41,8 +41,8 @@
  #      warning "Libc++ only supports AppleClang 15 and later"
  #    endif
  #  elif defined(_LIBCPP_GCC_VER)
--#    if _LIBCPP_GCC_VER < 1300
--#      warning "Libc++ only supports GCC 13 and later"
-+#    if _LIBCPP_GCC_VER < 1100
-+#      warning "Libc++ only supports GCC 11 and later"
+-#    if _LIBCPP_GCC_VER < 1400
+-#      warning "Libc++ only supports GCC 14 and later"
++#    if _LIBCPP_GCC_VER < 1200
++#      warning "Libc++ only supports GCC 12 and later"
  #    endif
  #  endif
  
