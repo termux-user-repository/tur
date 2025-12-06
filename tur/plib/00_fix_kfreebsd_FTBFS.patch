@@ -1,0 +1,49 @@
+Description: _fix_kfreebsd_FTBFS.diff
+Index: plib/src/js/jsBSD.cxx
+===================================================================
+--- plib.orig/src/js/jsBSD.cxx	2009-06-09 18:18:17.000000000 +0100
++++ plib/src/js/jsBSD.cxx	2009-12-14 22:12:02.000000000 +0000
+@@ -47,7 +47,7 @@
+ #include <string.h>
+ #include <errno.h>
+ #include <sys/ioctl.h>
+-#if defined(__FreeBSD__)
++#if defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
+ # include <sys/joystick.h>
+ #else
+ # include <machine/joystick.h>		// For analog joysticks
+Index: plib/src/sl/slDSP.cxx
+===================================================================
+--- plib.orig/src/sl/slDSP.cxx	2009-06-09 18:18:17.000000000 +0100
++++ plib/src/sl/slDSP.cxx	2009-12-14 22:12:02.000000000 +0000
+@@ -413,7 +413,7 @@
+ /* NetBSD/OpenBSD 2.3 this should be very close to SUN Audio    */
+ /* ------------------------------------------------------------ */
+ 
+-#elif (defined(UL_BSD) && !defined(__FreeBSD__)) || defined(UL_SOLARIS)
++#elif (defined(UL_BSD) && !defined(__FreeBSD__) && !defined(__FreeBSD_kernel__)) || defined(UL_SOLARIS)
+ void slDSP::open ( const char *device, int _rate, int _stereo, int _bps )
+ {
+ 
+Index: plib/src/sl/slPortability.h
+===================================================================
+--- plib.orig/src/sl/slPortability.h	2009-06-09 18:18:17.000000000 +0100
++++ plib/src/sl/slPortability.h	2009-12-14 22:12:02.000000000 +0000
+@@ -59,7 +59,7 @@
+ #  if defined(UL_LINUX)
+ #    include <linux/soundcard.h>
+ #    include <sys/ioctl.h>
+-#  elif defined(__FreeBSD__)
++#  elif defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
+ #    include <sys/soundcard.h>
+ #  else
+     /*
+@@ -75,7 +75,7 @@
+ #endif
+ 
+ #ifdef UL_BSD
+-#ifndef __FreeBSD__
++#if !defined(__FreeBSD__) && !defined(__FreeBSD_kernel__)
+ #  include <sys/audioio.h>
+ #endif
+ #endif
