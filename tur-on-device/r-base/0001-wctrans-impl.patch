@@ -61,3 +61,35 @@ diff -uNr a/src/main/wctrans-impl.c b/src/main/wctrans-impl.c
 +  errno = EINVAL;
 +  return 0;
 +}
+--- a/src/main/character.c
++++ b/src/main/character.c
+@@ -89,6 +89,8 @@ abbreviate chartr make.names strtrim tolower toupper give error.
+ #include <R_ext/Itermacros.h>
+ #include <rlocale.h>   // overrides iswxxxx on some platforms.
+ 
++#include "wctrans.h"
++
+ /* We use a shared buffer here to avoid reallocing small buffers, and
+    keep a standard-size (MAXELTSIZE = 8192) buffer allocated shared
+    between the various functions.
+diff --git a/src/main/wctrans.h b/src/main/wctrans.h
+new file mode 100644
+index 0000000..0c8daea
+--- /dev/null
++++ b/src/main/wctrans.h
+@@ -0,0 +1,4 @@
++#include <wctype.h>
++
++wint_t towctrans(wint_t __wc, wctrans_t _Nonnull __transform);
++wctrans_t _Nullable wctrans(const char* _Nonnull __name);
+--- a/src/main/grep.c
++++ b/src/main/grep.c
+@@ -68,6 +68,8 @@ As from R 4.1.0 we translate latin1 strings in a non-latin1-locale to UTF-8.
+ #include <wchar.h>
+ #include <wctype.h>    /* for wctrans_t */
+ 
++#include "wctrans.h"
++
+ /* As from TRE 0.8.0, tre.h replaces regex.h */
+ #include <tre/tre.h>
+ 
