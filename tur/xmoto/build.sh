@@ -5,7 +5,7 @@ TERMUX_PKG_MAINTAINER="@termux"
 TERMUX_PKG_VERSION="0.6.3"
 TERMUX_PKG_SRCURL=https://github.com/xmoto/xmoto/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz
 TERMUX_PKG_SHA256=64cb29934660456ec82cebdaa0d3d273a862e10760e8ee80443928d317242484
-TERMUX_PKG_DEPENDS="libx11, libjpeg-turbo, libpng, lua54, sdl2, sdl2-mixer, sdl2-net, libcurl, bzip2, libxdg-basedir, sdl2-ttf, glu, game-music-emu, libwavpack"
+TERMUX_PKG_DEPENDS="libx11, libjpeg-turbo, libpng, lua54, sdl2 | sdl2-compat, sdl2-mixer, sdl2-net, libcurl, bzip2, libxdg-basedir, sdl2-ttf, glu, game-music-emu, libwavpack"
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_HOSTBUILD=true
 
