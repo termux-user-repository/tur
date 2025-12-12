@@ -1,5 +1,6 @@
 .*-jumbo
 .*-jumbo-host-tools
+bazel
 biome2
 blender
 blender4
