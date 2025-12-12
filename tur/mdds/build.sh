@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://gitlab.com/mdds/mdds
 TERMUX_PKG_DESCRIPTION="A collection of multi-dimensional data structures and indexing algorithms"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="3.1.0"
+TERMUX_PKG_VERSION="3.2.0"
 TERMUX_PKG_SRCURL=https://gitlab.com/api/v4/projects/mdds%2Fmdds/packages/generic/source/${TERMUX_PKG_VERSION}/mdds-${TERMUX_PKG_VERSION}.tar.xz
-TERMUX_PKG_SHA256=ca295f4c86968a7eb1f5d503ff7ae180e6605210cfb26d01658be42048c0924c
+TERMUX_PKG_SHA256=16defab556c53f94b463460ea2a1faab96e58bad2a95d7981300d2956534abbb
 TERMUX_PKG_AUTO_UPDATE=true
 
 termux_pkg_auto_update() {
