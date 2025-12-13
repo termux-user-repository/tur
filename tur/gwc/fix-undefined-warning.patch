@@ -1,0 +1,10 @@
+--- a/tap_reverb.c
++++ b/tap_reverb.c
+@@ -25,6 +25,7 @@
+ #include <math.h>
+ #include <unistd.h>
+ 
++#include "gwc.h"
+ #include "tap_reverb_common.h"
+ #include "tap_reverb_file_io.h"
+ #include "tap_reverb.h"

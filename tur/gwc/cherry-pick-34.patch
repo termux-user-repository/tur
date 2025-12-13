@@ -1,0 +1,64 @@
+From f51ede2834900e5acf0e832e6e83c454af08168e Mon Sep 17 00:00:00 2001
+From: Evan Johnston <evan@d2evs.net>
+Date: Sun, 5 Jan 2025 17:47:49 -0500
+Subject: [PATCH 1/2] specify return type for main
+
+---
+ meschach/dmacheps.c | 2 +-
+ meschach/fmacheps.c | 2 +-
+ meschach/maxint.c   | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
+
+--- a/meschach/dmacheps.c
++++ b/meschach/dmacheps.c
+@@ -34,7 +34,7 @@ double	x;
+     return y;	/* prevents optimisation */
+ }
+ 
+-main()
++int main()
+ {
+     static double	deps, deps1, dtmp;
+ 
+--- a/meschach/fmacheps.c
++++ b/meschach/fmacheps.c
+@@ -34,7 +34,7 @@ double	x;
+     return y;	/* prevents optimisation */
+ }
+ 
+-main()
++int main()
+ {
+     static float	feps, feps1, ftmp;
+ 
+--- a/meschach/maxint.c
++++ b/meschach/maxint.c
+@@ -24,7 +24,7 @@
+ ***************************************************************************/
+ 
+ 
+-main()
++int main()
+ {
+     int		i, old_i;
+ 
+
+From 6f51fbdb1405dcf7a910b038a9a56030fbf3d7a8 Mon Sep 17 00:00:00 2001
+From: Evan Johnston <evan@d2evs.net>
+Date: Sun, 5 Jan 2025 18:03:12 -0500
+Subject: [PATCH 2/2] include <stdio.h> for printf
+
+---
+ meschach/maxint.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+--- a/meschach/maxint.c
++++ b/meschach/maxint.c
+@@ -23,6 +23,7 @@
+ **
+ ***************************************************************************/
+ 
++#include <stdio.h>
+ 
+ int main()
+ {
