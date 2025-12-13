@@ -1,5 +1,3 @@
-diff --git a/fmtheaders.h b/fmtheaders.h
-index e45f038..944c276 100644
 --- a/fmtheaders.h
 +++ b/fmtheaders.h
 @@ -33,13 +33,10 @@

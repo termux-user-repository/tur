@@ -1,0 +1,18 @@
+--- a/meschach/configure
++++ b/meschach/configure
+@@ -329,6 +329,7 @@ if egrep "memchr" conftest.out >/dev/null 2>&1; then
+   # SGI's /bin/cc from Irix-4.0.5 gets non-ANSI ctype macros unless using -ansi.
+ cat > conftest.c <<EOF
+ #include <ctype.h>
++#include <stdlib.h>
+ #define ISLOWER(c) ('a' <= (c) && (c) <= 'z')
+ #define TOUPPER(c) (ISLOWER(c) ? 'A' + ((c) - 'a') : (c))
+ #define XOR(e,f) (((e) && !(f)) || (!(e) && (f)))
+@@ -485,6 +485,7 @@ ccp = (char const *const *) p;
+ }'
+ echo checking for working const
+ cat > conftest.c <<EOF
++#include <stdlib.h>
+ 
+ int main() { exit(0); }
+ int t() { $prog }
