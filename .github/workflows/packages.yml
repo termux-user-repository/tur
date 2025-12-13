@@ -109,7 +109,7 @@ jobs:
           exit 1
         fi
 
-        GITHUB_OUTPUT="$GITHUB_OUTPUT" OLD_COMMIT="$OLD_COMMIT" HEAD_COMMIT="$HEAD_COMMIT" GITHUB_TOKEN="${{ secrets.GH_TOKEN }}" scripts/utils/termux_reuse_pr_build_artifacts.sh "${{ github.event_name }}" "${{ matrix.target_arch }}" || true
+        GITHUB_OUTPUT="$GITHUB_OUTPUT" OLD_COMMIT="$OLD_COMMIT" HEAD_COMMIT="$HEAD_COMMIT" GITHUB_TOKEN="${{ secrets.GH_TOKEN }}" scripts/utils/termux_reuse_pr_build_artifacts.sh "${{ github.event_name }}" "${{ matrix.target_arch }}" ".github/workflows/packages.yml" || true
 
         if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
           # Process tag '%ci:no-build' that may be added as line to commit message.
