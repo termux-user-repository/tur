@@ -1,0 +1,56 @@
+--- a/meschach/configure
++++ b/meschach/configure
+@@ -338,7 +338,7 @@ exit (0); }
+ 
+ EOF
+ eval $compile
+-if test -s conftest && (./conftest; exit) 2>/dev/null; then
++if test -s conftest && (termux-proot-run ./conftest; exit) 2>/dev/null; then
+   {
+ test -n "$verbose" && \
+ echo '	defining' STDC_HEADERS
+@@ -690,10 +690,10 @@ $CC -o macheps dmacheps.c
+ {
+ test -n "$verbose" && \
+ echo '	defining' D_MACHEPS to be '`./macheps`'
+-DEFS="$DEFS -DD_MACHEPS=`./macheps`"
+-SEDDEFS="${SEDDEFS}\${SEDdA}D_MACHEPS\${SEDdB}D_MACHEPS\${SEDdC}`./macheps`\${SEDdD}
+-\${SEDuA}D_MACHEPS\${SEDuB}D_MACHEPS\${SEDuC}`./macheps`\${SEDuD}
+-\${SEDeA}D_MACHEPS\${SEDeB}D_MACHEPS\${SEDeC}`./macheps`\${SEDeD}
++DEFS="$DEFS -DD_MACHEPS=`termux-proot-run ./macheps`"
++SEDDEFS="${SEDDEFS}\${SEDdA}D_MACHEPS\${SEDdB}D_MACHEPS\${SEDdC}`termux-proot-run ./macheps`\${SEDdD}
++\${SEDuA}D_MACHEPS\${SEDuB}D_MACHEPS\${SEDuC}`termux-proot-run ./macheps`\${SEDuD}
++\${SEDeA}D_MACHEPS\${SEDeB}D_MACHEPS\${SEDeC}`termux-proot-run ./macheps`\${SEDeD}
+ "
+ }
+ 
+@@ -702,10 +702,10 @@ $CC -o macheps fmacheps.c
+ {
+ test -n "$verbose" && \
+ echo '	defining' F_MACHEPS to be '`./macheps`'
+-DEFS="$DEFS -DF_MACHEPS=`./macheps`"
+-SEDDEFS="${SEDDEFS}\${SEDdA}F_MACHEPS\${SEDdB}F_MACHEPS\${SEDdC}`./macheps`\${SEDdD}
+-\${SEDuA}F_MACHEPS\${SEDuB}F_MACHEPS\${SEDuC}`./macheps`\${SEDuD}
+-\${SEDeA}F_MACHEPS\${SEDeB}F_MACHEPS\${SEDeC}`./macheps`\${SEDeD}
++DEFS="$DEFS -DF_MACHEPS=`termux-proot-run ./macheps`"
++SEDDEFS="${SEDDEFS}\${SEDdA}F_MACHEPS\${SEDdB}F_MACHEPS\${SEDdC}`termux-proot-run ./macheps`\${SEDdD}
++\${SEDuA}F_MACHEPS\${SEDuB}F_MACHEPS\${SEDuC}`termux-proot-run ./macheps`\${SEDuD}
++\${SEDeA}F_MACHEPS\${SEDeB}F_MACHEPS\${SEDeC}`termux-proot-run ./macheps`\${SEDeD}
+ "
+ }
+ 
+@@ -715,10 +715,10 @@ $CC -o maxint maxint.c
+ {
+ test -n "$verbose" && \
+ echo '	defining' M_MAX_INT to be '`./maxint`'
+-DEFS="$DEFS -DM_MAX_INT=`./maxint`"
+-SEDDEFS="${SEDDEFS}\${SEDdA}M_MAX_INT\${SEDdB}M_MAX_INT\${SEDdC}`./maxint`\${SEDdD}
+-\${SEDuA}M_MAX_INT\${SEDuB}M_MAX_INT\${SEDuC}`./maxint`\${SEDuD}
+-\${SEDeA}M_MAX_INT\${SEDeB}M_MAX_INT\${SEDeC}`./maxint`\${SEDeD}
++DEFS="$DEFS -DM_MAX_INT=`termux-proot-run ./maxint`"
++SEDDEFS="${SEDDEFS}\${SEDdA}M_MAX_INT\${SEDdB}M_MAX_INT\${SEDdC}`termux-proot-run ./maxint`\${SEDdD}
++\${SEDuA}M_MAX_INT\${SEDuB}M_MAX_INT\${SEDuC}`termux-proot-run ./maxint`\${SEDuD}
++\${SEDeA}M_MAX_INT\${SEDeB}M_MAX_INT\${SEDeC}`termux-proot-run ./maxint`\${SEDeD}
+ "
+ }
+ 

@@ -1,0 +1,11 @@
+--- a/gwc.c
++++ b/gwc.c
+@@ -2368,7 +2368,7 @@ void save_selection_as_encoded(int fmt, char *filename, char *filename_new, stru
+ 
+ void store_selected_filename_as_encoded(gpointer user_data)
+ {
+-    int enc_format = NULL ;
++    int enc_format = 0;
+     int l;
+     char trackname[1024] = "" ;
+ 
