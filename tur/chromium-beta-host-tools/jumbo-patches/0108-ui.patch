@@ -78,7 +78,6 @@ Enable jumbo build for the following component(s)/source_set(s):
 - //ui/shell_dialogs:shell_dialogs
 - //ui/snapshot:snapshot
 - //ui/snapshot:snapshot_export
-- //ui/surface:surface
 - //ui/touch_selection:touch_selection
 - //ui/views/controls/webview:webview
 - //ui/views:views
@@ -1757,22 +1756,6 @@ index e9dbc8b20e..fbfa37b342 100644
    sources = [ "snapshot_export.h" ]
    visibility = [ ":*" ]
  }
-diff --git a/ui/surface/BUILD.gn b/ui/surface/BUILD.gn
-index dace1de6c0..e7f68805e9 100644
---- a/ui/surface/BUILD.gn
-+++ b/ui/surface/BUILD.gn
-@@ -2,9 +2,10 @@
- # Use of this source code is governed by a BSD-style license that can be
- # found in the LICENSE file.
- 
-+import("//build/config/jumbo.gni")
- import("//build/config/ui.gni")
- 
--component("surface") {
-+jumbo_component("surface") {
-   sources = [
-     "surface_export.h",
-     "transport_dib.cc",
 diff --git a/ui/touch_selection/BUILD.gn b/ui/touch_selection/BUILD.gn
 index 5043429e94..83a1accb6f 100644
 --- a/ui/touch_selection/BUILD.gn
@@ -1949,13 +1932,15 @@ diff --git a/ui/views/widget/desktop_aura/desktop_native_widget_aura.cc b/ui/vie
 index 47adf1b694..518d77e164 100644
 --- a/ui/views/widget/desktop_aura/desktop_native_widget_aura.cc
 +++ b/ui/views/widget/desktop_aura/desktop_native_widget_aura.cc
-@@ -634,7 +634,7 @@ void DesktopNativeWidgetAura::InitNativeWidget(Widget::InitParams params) {
+@@ -634,8 +634,8 @@ void DesktopNativeWidgetAura::InitNativeWidget(Widget::InitParams params) {
            std::unique_ptr<wm::NativeCursorManager>(native_cursor_manager_));
        cursor_manager_->SetDisplay(
            display::Screen::Get()->GetDisplayNearestWindow(host_->window()));
--      if (features::IsSystemCursorSizeSupported()) {
-+      if (::features::IsSystemCursorSizeSupported()) {
-         native_cursor_manager_->InitCursorSizeObserver(cursor_manager_);
+-      if (features::IsSystemCursorSizeSupported() ||
+-          features::ShouldUseCursorEventHook()) {
++      if (::features::IsSystemCursorSizeSupported() ||
++          ::features::ShouldUseCursorEventHook()) {
+         native_cursor_manager_->InitSystemCursorObservers(cursor_manager_);
        }
      }
 diff --git a/ui/views/widget/desktop_aura/desktop_window_tree_host_platform.cc b/ui/views/widget/desktop_aura/desktop_window_tree_host_platform.cc

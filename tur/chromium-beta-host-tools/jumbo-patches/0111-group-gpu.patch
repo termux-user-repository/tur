@@ -1384,3 +1384,24 @@ index eefa79d1bc..dff6b44e7c 100644
  #include "gpu/config/webgpu_blocklist_impl.h"
  
  #include <array>
+diff --git a/gpu/command_buffer/service/gpu_persistent_cache.cc b/gpu/command_buffer/service/gpu_persistent_cache.cc
+index afa5209484..5bb5c6861d 100644
+--- a/gpu/command_buffer/service/gpu_persistent_cache.cc
++++ b/gpu/command_buffer/service/gpu_persistent_cache.cc
+@@ -29,6 +29,9 @@
+ #include "gpu/command_buffer/service/memory_cache.h"
+ #include "ui/gl/gl_bindings.h"
+ 
++#define GLBlobCacheGetCallback GLBlobCacheGetCallback_GpuPersistentCache
++#define GLBlobCacheSetCallback GLBlobCacheSetCallback_GpuPersistentCache
++
+ namespace gpu {
+ 
+ namespace {
+@@ -698,3 +701,6 @@ void UnbindCacheFromCurrentOpenGLContext() {
+ }
+ 
+ }  // namespace gpu
++
++#undef GLBlobCacheGetCallback
++#undef GLBlobCacheSetCallback

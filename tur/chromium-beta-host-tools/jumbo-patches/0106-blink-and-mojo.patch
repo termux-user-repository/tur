@@ -3711,9 +3711,12 @@ index 589dd18b99..d65ab808e7 100644
  
 -static_library("test_support") {
 +jumbo_static_library("test_support") {
-   visibility += [
-     "//third_party/blink/*",
-     "//tools/privacy_budget/font_indexer:*",
+   visibility += [ "//third_party/blink/*" ]
+   testonly = true
+ 
+   configs += blink_symbols_config
+ }
+ 
 @@ -2180,7 +2198,7 @@ if (enable_nocompile_tests) {
    }
  }
@@ -4797,3 +4800,26 @@ index 3ebe4bb745..fba0084cb1 100644
  }  // namespace blink
 +
 +#undef kMaxDigestSize
+diff --git a/third_party/blink/renderer/core/xml/parser/xml_document_parser_rs.cc b/third_party/blink/renderer/core/xml/parser/xml_document_parser_rs.cc
+index 8238b11bef..5abb967f85 100644
+--- a/third_party/blink/renderer/core/xml/parser/xml_document_parser_rs.cc
++++ b/third_party/blink/renderer/core/xml/parser/xml_document_parser_rs.cc
+@@ -54,6 +54,10 @@
+ #include "third_party/blink/renderer/core/xmlns_names.h"
+ #include "third_party/blink/renderer/platform/wtf/text/strcat.h"
+ 
++#define HasNoStyleInformation HasNoStyleInformation_RS
++#define SetAttributes         SetAttributes_RS
++#define kMaxXMLTreeDepth      kMaxXMLTreeDepth_RS
++
+ namespace blink {
+ 
+ namespace {
+@@ -835,3 +839,7 @@ HashMap<String, String> ParseAttributesRust(const String& attrs_string,
+ }
+ 
+ }  // namespace blink
++
++#undef HasNoStyleInformation
++#undef SetAttributes
++#undef kMaxXMLTreeDepth

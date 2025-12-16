@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://www.chromium.org/Home
 TERMUX_PKG_DESCRIPTION="Chromium web browser (Host tools)"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="@licy183"
-TERMUX_PKG_VERSION=143.0.7499.4
-TERMUX_PKG_SRCURL=https://commondatastorage.googleapis.com/chromium-browser-official/chromium-$TERMUX_PKG_VERSION.tar.xz
-TERMUX_PKG_SHA256=7be0c051bbd1f9b9a965bf617dbf2d65414a62c681dad5d248e69495d136325e
+TERMUX_PKG_VERSION=144.0.7559.20
+TERMUX_PKG_SRCURL=https://commondatastorage.googleapis.com/chromium-browser-official/chromium-$TERMUX_PKG_VERSION-lite.tar.xz
+TERMUX_PKG_SHA256=d6940d801cb5954f836bce72781034e4df91ad43ecd2b39a43ad22b0b13fb7c0
 TERMUX_PKG_DEPENDS="atk, cups, dbus, fontconfig, gtk3, krb5, libc++, libevdev, libxkbcommon, libminizip, libnss, libx11, mesa, openssl, pango, pulseaudio, zlib"
 TERMUX_PKG_BUILD_DEPENDS="libffi-static"
 # TODO: Split chromium-common and chromium-headless
@@ -50,7 +50,7 @@ termux_pkg_auto_update() {
 	fi
 
 	local tmpdir="$(mktemp -d)"
-	curl -sLo "${tmpdir}/tmpfile" "https://commondatastorage.googleapis.com/chromium-browser-official/chromium-$latest_version.tar.xz"
+	curl -sLo "${tmpdir}/tmpfile" "https://commondatastorage.googleapis.com/chromium-browser-official/chromium-$latest_version-lite.tar.xz"
 	local sha="$(sha256sum "${tmpdir}/tmpfile" | cut -d ' ' -f 1)"
 	rm -fr "${tmpdir}"
 	printf '%s\n' 'INFO: Generated checksums:' "${sha}"
@@ -78,7 +78,7 @@ termux_step_post_get_source() {
 		$SYSTEM_LIBRARIES
 
 	# Remove the source file to keep more space
-	rm -f "$TERMUX_PKG_CACHEDIR/chromium-$TERMUX_PKG_VERSION.tar.xz"
+	rm -f "$TERMUX_PKG_CACHEDIR/chromium-$TERMUX_PKG_VERSION-lite.tar.xz"
 }
 
 termux_step_configure() {

@@ -1048,13 +1048,13 @@ diff --git a/chrome/browser/extensions/extension_view_host_factory.h b/chrome/br
 index 924213eaf8..f7490bf1af 100644
 --- a/chrome/browser/extensions/extension_view_host_factory.h
 +++ b/chrome/browser/extensions/extension_view_host_factory.h
-@@ -53,7 +53,7 @@ class ExtensionViewHostFactory {
+@@ -46,7 +46,7 @@
        const Extension& extension,
        const GURL& url,
        BrowserWindowInterface* browser,
 -      tabs::TabInterface* tab_interface);
 +      ::tabs::TabInterface* tab_interface);
- #endif  // BUILDFLAG(IS_ANDROID)
+ #endif  // BUILDFLAG(ENABLE_EXTENSIONS)
  };
  
 diff --git a/chrome/browser/feedback/BUILD.gn b/chrome/browser/feedback/BUILD.gn
@@ -2071,25 +2071,6 @@ index e09c4e2b32..9c7cbbb7a8 100644
    public_deps = [ "//chrome/browser:browser_public_dependencies" ]
  
    sources = [
-diff --git a/chrome/browser/tpcd/support/tpcd_support_service.cc b/chrome/browser/tpcd/support/tpcd_support_service.cc
-index 10a78726d1..c719a63c7b 100644
---- a/chrome/browser/tpcd/support/tpcd_support_service.cc
-+++ b/chrome/browser/tpcd/support/tpcd_support_service.cc
-@@ -19,6 +19,8 @@
- #include "url/gurl.h"
- #include "url/origin.h"
- 
-+#define kTrialName kTrialName_Tcpd
-+
- namespace tpcd::trial {
- namespace {
- 
-@@ -153,3 +155,5 @@ std::string TpcdTrialService::trial_name() {
- }
- 
- }  // namespace tpcd::trial
-+
-+#undef kTrialName
 diff --git a/chrome/browser/ui/BUILD.gn b/chrome/browser/ui/BUILD.gn
 index b96bea1dd7..fa8cb0b546 100644
 --- a/chrome/browser/ui/BUILD.gn
@@ -3881,3 +3862,26 @@ index 7fb75c303c..ca69991113 100644
  END_METADATA
 +
 +#undef kIconSize
+diff --git a/chrome/browser/devtools/BUILD.gn b/chrome/browser/devtools/BUILD.gn
+index 94b7d51199..82e6e35682 100644
+--- a/chrome/browser/devtools/BUILD.gn
++++ b/chrome/browser/devtools/BUILD.gn
+@@ -97,6 +97,7 @@ inspector_protocol_generate("protocol_generated_sources") {
+ jumbo_static_library("devtools") {
+   # Note: new sources and deps should be generally added in (!is_android) below.
+   sources = []
++  jumbo_excluded_sources = []
+ 
+   configs += [
+     "//build/config/compiler:wexit_time_destructors",
+@@ -193,6 +194,10 @@ jumbo_static_library("devtools") {
+       "visual_logging.cc",
+       "visual_logging.h",
+     ]
++    jumbo_excluded_sources += [
++      # kCancelButtonId also exists in devtools_ui_bindings.cc
++      "devtools_connection_dialog.cc"
++    ]
+     deps += [
+       "//chrome/browser:browser_process",
+       "//chrome/browser/profiles:profile",
