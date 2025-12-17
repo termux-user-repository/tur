@@ -394,7 +394,7 @@ diff --git a/net/proxy_resolution/configured_proxy_resolution_service.cc b/net/p
 index 82c6860602..cfe77c50ef 100644
 --- a/net/proxy_resolution/configured_proxy_resolution_service.cc
 +++ b/net/proxy_resolution/configured_proxy_resolution_service.cc
-@@ -161,6 +161,10 @@ class DefaultPollPolicy
+@@ -163,6 +163,10 @@
    }
  };
  
@@ -405,7 +405,7 @@ index 82c6860602..cfe77c50ef 100644
  // Config getter that always returns direct settings.
  class ProxyConfigServiceDirect : public ProxyConfigService {
   public:
-@@ -174,6 +178,10 @@ class ProxyConfigServiceDirect : public ProxyConfigService {
+@@ -176,6 +180,10 @@
    }
  };
  
@@ -416,15 +416,15 @@ index 82c6860602..cfe77c50ef 100644
  // Proxy resolver that fails every time.
  class ProxyResolverNull : public ProxyResolver {
   public:
-@@ -895,7 +903,7 @@ std::unique_ptr<ConfiguredProxyResolutionService>
+@@ -898,7 +906,7 @@
  ConfiguredProxyResolutionService::CreateDirect() {
    // Use direct connections.
    return std::make_unique<ConfiguredProxyResolutionService>(
 -      std::make_unique<ProxyConfigServiceDirect>(),
 +      std::make_unique<configured_proxy_resolution_service::ProxyConfigServiceDirect>(),
-       std::make_unique<ProxyResolverFactoryForNullResolver>(), nullptr,
+       std::make_unique<ProxyResolverFactoryForNullResolver>(),
+       /*host_resolver_for_override_rules=*/nullptr, /*net_log=*/nullptr,
        /*quick_check_enabled=*/true);
- }
 diff --git a/net/proxy_resolution/proxy_config_service.cc b/net/proxy_resolution/proxy_config_service.cc
 index e32f7dd46b..25c271441b 100644
 --- a/net/proxy_resolution/proxy_config_service.cc

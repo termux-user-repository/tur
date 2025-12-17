@@ -722,19 +722,14 @@ diff --git a/v8/src/objects/js-atomics-synchronization.h b/v8/src/objects/js-ato
 index 73a03828db..8b458f2fba 100644
 --- a/v8/src/objects/js-atomics-synchronization.h
 +++ b/v8/src/objects/js-atomics-synchronization.h
-@@ -29,11 +29,11 @@ template <typename T>
- class AsyncWaiterQueueNode;
+@@ -27,8 +27,8 @@
+ class WaiterQueueNode;
  }  // namespace detail
  
 -using detail::WaiterQueueLockGuard;
 -using detail::WaiterQueueNode;
--using LockAsyncWaiterQueueNode = detail::AsyncWaiterQueueNode<JSAtomicsMutex>;
 +using internal::detail::WaiterQueueLockGuard;
 +using internal::detail::WaiterQueueNode;
-+using LockAsyncWaiterQueueNode = internal::detail::AsyncWaiterQueueNode<JSAtomicsMutex>;
- using WaitAsyncWaiterQueueNode =
--    detail::AsyncWaiterQueueNode<JSAtomicsCondition>;
-+    internal::detail::AsyncWaiterQueueNode<JSAtomicsCondition>;
  
  // JSSynchronizationPrimitive is the base class for JSAtomicsMutex and
  // JSAtomicsCondition. It contains a 32-bit state field and a pointer to a
@@ -1004,3 +999,13 @@ index d91aea71f1..fe232e23b4 100644
      if (v8_current_cpu == "arm") {
        sources += [
          "src/maglev/arm/maglev-assembler-arm.cc",
+diff --git a/v8/src/compiler/turboshaft/wasm-shuffle-reducer.cc b/v8/src/compiler/turboshaft/wasm-shuffle-reducer.cc
+index 68e56a28b8..d025caf4cb 100644
+--- a/v8/src/compiler/turboshaft/wasm-shuffle-reducer.cc
++++ b/v8/src/compiler/turboshaft/wasm-shuffle-reducer.cc
+@@ -518,3 +518,5 @@ void WasmShuffleAnalyzer::ProcessShuffle(const Simd128ShuffleOp& shuffle) {
+ }
+ 
+ }  // namespace v8::internal::compiler::turboshaft
++
++#undef TRACE

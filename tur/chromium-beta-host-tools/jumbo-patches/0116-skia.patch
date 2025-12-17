@@ -24,8 +24,10 @@ Enable jumbo build for the following template(s):
  third_party/skia/src/core/SkMemset_opts.cpp   |  5 +++
  .../skia/src/core/SkMemset_opts_avx.cpp       |  2 +
  third_party/skia/src/core/SkOpts.cpp          |  5 +++
+ third_party/skia/src/core/SkPath_editing.cpp  | 10 +++++
  third_party/skia/src/core/SkRecordCanvas.cpp  |  2 +
  third_party/skia/src/core/SkScalerContext.cpp |  4 ++
+ third_party/skia/src/core/SkScan_Antihair.cpp |  4 ++
  third_party/skia/src/core/SkSwizzler_opts.cpp |  5 +++
  .../skia/src/core/SkSwizzler_opts_hsw.cpp     |  2 +
  .../skia/src/core/SkSwizzler_opts_ssse3.cpp   |  2 +
@@ -74,7 +76,7 @@ Enable jumbo build for the following template(s):
  .../sksl/codegen/SkSLMetalCodeGenerator.cpp   | 10 +++++
  .../skia/src/utils/SkCustomTypeface.cpp       |  4 ++
  third_party/skia/src/utils/SkParsePath.cpp    | 14 ++++++
- 62 files changed, 308 insertions(+), 9 deletions(-)
+ 64 files changed, 322 insertions(+), 9 deletions(-)
 
 diff --git a/skia/BUILD.gn b/skia/BUILD.gn
 index d0260eb23d..2ad7fc2c0b 100644
@@ -151,7 +153,7 @@ index d0260eb23d..2ad7fc2c0b 100644
      forward_variables_from(invoker, "*")
  
      check_includes = false
-@@ -728,6 +752,18 @@ skia_source_set("skia_core_and_effects") {
+@@ -766,6 +790,18 @@ skia_source_set("skia_core_and_effects") {
    sources += skia_effects_sources
    sources += skia_effects_imagefilter_sources
    sources += skia_pathops_sources
@@ -167,9 +169,9 @@ index d0260eb23d..2ad7fc2c0b 100644
 +    "//third_party/skia/src/core/SkSwizzler_opts_hsw.cpp",
 +    "//third_party/skia/src/core/SkSwizzler_opts_ssse3.cpp",
 +  ]
+   deps = []
    if (skia_support_gpu) {
-     deps = [ "//gpu/config:workaround_list" ]
-   }
+     deps += [ "//gpu/config:workaround_list" ]
 @@ -941,6 +977,11 @@ if (skia_support_gpu) {
    skia_source_set("skia_graphite_private") {
      sources = skia_graphite_sources + skia_graphite_precompile_sources +
@@ -377,6 +379,31 @@ index 6b48eb6357..74888510bb 100644
 +
 +#undef SK_OPTS_TARGET
 +#undef init
+diff --git a/third_party/skia/src/core/SkPath_editing.cpp b/third_party/skia/src/core/SkPath_editing.cpp
+index b4f67d7cde..5bb540858b 100644
+--- a/third_party/skia/src/core/SkPath_editing.cpp
++++ b/third_party/skia/src/core/SkPath_editing.cpp
+@@ -38,6 +38,11 @@
+ #include <limits.h>
+ #include <utility>
+ 
++#define arc_is_lone_point      arc_is_lone_point_SkPath_editing
++#define angles_to_unit_vectors angles_to_unit_vectors_SkPath_editing
++#define build_arc_conics       build_arc_conics_SkPath_editing
++#define subdivide_cubic_to     subdivide_cubic_to_SkPath_editing
++
+ class [[nodiscard]] SkAutoAddSimpleShape {
+ public:
+     SkAutoAddSimpleShape(SkPath* path, SkPathDirection dir)
+@@ -988,3 +993,8 @@ SkPath& SkPath::dirtyAfterEdit() {
+ }
+ 
+ #endif
++
++#undef arc_is_lone_point
++#undef angles_to_unit_vectors
++#undef build_arc_conics
++#undef subdivide_cubic_to
 diff --git a/third_party/skia/src/core/SkRecordCanvas.cpp b/third_party/skia/src/core/SkRecordCanvas.cpp
 index a74175be55..c78789cd5e 100644
 --- a/third_party/skia/src/core/SkRecordCanvas.cpp
@@ -406,6 +433,25 @@ index e9089a234d..a0879304da 100644
  
 +
 +#undef kSkShowTextBlitCoverage
+diff --git a/third_party/skia/src/core/SkScan_Antihair.cpp b/third_party/skia/src/core/SkScan_Antihair.cpp
+index 34553872d3..9a7951483f 100644
+--- a/third_party/skia/src/core/SkScan_Antihair.cpp
++++ b/third_party/skia/src/core/SkScan_Antihair.cpp
+@@ -26,6 +26,8 @@
+ #include <algorithm>
+ #include <cstdint>
+ 
++#define fixed_to_alpha fixed_to_alpha_SkScan_Antihair
++
+ #define HLINE_STACK_BUFFER      100
+ 
+ static inline U8CPU scale_alpha_by_coverage(U8CPU value, SkFDot6 coverage) {
+@@ -1023,3 +1025,5 @@ void SkScan::AntiFrameRect(const SkRect& r, const SkPoint& strokeSize,
+         AntiFrameRect(r, strokeSize, &wrap.getRgn(), wrap.getBlitter());
+     }
+ }
++
++#undef fixed_to_alpha
 diff --git a/third_party/skia/src/core/SkSwizzler_opts.cpp b/third_party/skia/src/core/SkSwizzler_opts.cpp
 index 0665a19fbb..7a0e7bee9b 100644
 --- a/third_party/skia/src/core/SkSwizzler_opts.cpp
@@ -1182,46 +1228,3 @@ index dc38257ceb..e7187190de 100644
 +#undef is_sep
 +#undef skip_ws
 +#undef skip_sep
-diff --git a/third_party/skia/src/core/SkPath_editing.cpp b/third_party/skia/src/core/SkPath_editing.cpp
-index 9601b72078..dfbdcc06db 100644
---- a/third_party/skia/src/core/SkPath_editing.cpp
-+++ b/third_party/skia/src/core/SkPath_editing.cpp
-@@ -38,6 +38,11 @@
- #include <limits.h>
- #include <utility>
- 
-+#define arc_is_lone_point      arc_is_lone_point_SkPath_editing
-+#define angles_to_unit_vectors angles_to_unit_vectors_SkPath_editing
-+#define build_arc_conics       build_arc_conics_SkPath_editing
-+#define subdivide_cubic_to     subdivide_cubic_to_SkPath_editing
-+
- class SkAutoAddSimpleShape {
- public:
-     SkAutoAddSimpleShape(SkPath* path, SkPathDirection dir)
-@@ -1078,3 +1083,7 @@ void SkPath::transform(const SkMatrix& matrix, SkPath* dst) const {
-     }
- }
- 
-+#undef arc_is_lone_point
-+#undef angles_to_unit_vectors
-+#undef build_arc_conics
-+#undef subdivide_cubic_to
-diff --git a/third_party/skia/src/core/SkScan_Antihair.cpp b/third_party/skia/src/core/SkScan_Antihair.cpp
-index eb22c85e7c..8728f523d1 100644
---- a/third_party/skia/src/core/SkScan_Antihair.cpp
-+++ b/third_party/skia/src/core/SkScan_Antihair.cpp
-@@ -26,6 +26,8 @@
- #include <algorithm>
- #include <cstdint>
- 
-+#define fixed_to_alpha fixed_to_alpha_SkScan_Antihair
-+
- #define HLINE_STACK_BUFFER      100
- 
- static inline U8CPU scale_alpha_by_coverage(U8CPU value, SkFDot6 coverage) {
-@@ -1024,3 +1026,5 @@ void SkScan::AntiFrameRect(const SkRect& r, const SkPoint& strokeSize,
-         AntiFrameRect(r, strokeSize, &wrap.getRgn(), wrap.getBlitter());
-     }
- }
-+
-+#undef fixed_to_alpha
