@@ -1,0 +1,22 @@
+--- a/content/browser/gpu/gpu_disk_cache_factory.cc
++++ b/content/browser/gpu/gpu_disk_cache_factory.cc
+@@ -21,7 +21,7 @@
+   DCHECK(!factory_instance);
+   // Setup static reserved handles and their mapping to specific paths.
+   gpu::GpuDiskCacheFactory::HandleToPathMap handle_to_path_map;
+-  if (features::IsShaderDiskCacheEnabled(
++  if (::features::IsShaderDiskCacheEnabled(
+           base::CommandLine::ForCurrentProcess())) {
+     base::FilePath compositor_cache_dir =
+         GetContentClient()->browser()->GetShaderDiskCacheDirectory();
+--- a/content/browser/gpu/gpu_process_host.cc
++++ b/content/browser/gpu/gpu_process_host.cc
+@@ -947,7 +947,7 @@
+       viz_main_pending_remote.InitWithNewPipeAndPassReceiver());
+   viz::GpuHostImpl::InitParams params;
+   params.restart_id = host_id_;
+-  params.disable_gpu_shader_disk_cache = !features::IsShaderDiskCacheEnabled(
++  params.disable_gpu_shader_disk_cache = !::features::IsShaderDiskCacheEnabled(
+       base::CommandLine::ForCurrentProcess());
+   params.product = GetContentClient()->browser()->GetProduct();
+   params.deadline_to_synchronize_surfaces =
