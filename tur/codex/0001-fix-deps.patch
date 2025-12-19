@@ -1,9 +1,9 @@
 --- a/codex-rs/windows-sandbox-rs/Cargo.toml
 +++ b/codex-rs/windows-sandbox-rs/Cargo.toml
-@@ -22,7 +22,7 @@
- version = "0.8"
+@@ -47,7 +47,7 @@
  [dependencies.dirs-next]
  version = "2.0"
+ 
 -[dependencies.windows-sys]
 +[target.'cfg(target_os = "windows")'.dependencies.windows-sys]
  features = [
