@@ -2,14 +2,13 @@ TERMUX_PKG_HOMEPAGE=https://nodejs.org/
 TERMUX_PKG_DESCRIPTION="Open Source, cross-platform JavaScript runtime environment (Version 22)"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION=22.15.1
-TERMUX_PKG_REVISION=2
+TERMUX_PKG_VERSION=22.21.1
 TERMUX_PKG_SRCURL=https://nodejs.org/dist/v${TERMUX_PKG_VERSION}/node-v${TERMUX_PKG_VERSION}.tar.xz
-TERMUX_PKG_SHA256=c19f0177d21c621746625e5f37590bd0d79a72043b77b53784cba5f145e7263e
+TERMUX_PKG_SHA256=487d73fd4db00dc2420d659a8221b181a7937fbc5bc73f31c30b1680ad6ded6a
 # Note that we do not use a shared libuv to avoid an issue with the Android
 # linker, which does not use symbols of linked shared libraries when resolving
 # symbols on dlopen(). See https://github.com/termux/termux-packages/issues/462.
-TERMUX_PKG_DEPENDS="libc++, openssl, c-ares, libicu, zlib"
+TERMUX_PKG_DEPENDS="libc++, openssl, c-ares, zlib"
 TERMUX_PKG_SUGGESTS="clang, make, pkg-config, python"
 _INSTALL_PREFIX=opt/nodejs-22
 TERMUX_PKG_RM_AFTER_INSTALL="

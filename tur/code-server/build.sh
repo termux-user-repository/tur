@@ -2,10 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://github.com/coder/code-server
 TERMUX_PKG_DESCRIPTION="Run VS Code on any machine anywhere and access it in the browser"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="4.106.3"
+TERMUX_PKG_VERSION="4.107.0"
 TERMUX_PKG_SRCURL=git+https://github.com/coder/code-server
 TERMUX_PKG_DEPENDS="libandroid-spawn, libsecret, krb5, nodejs-22, ripgrep"
-TERMUX_PKG_ANTI_DEPENDS="nodejs-22"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_HOSTBUILD=true
 TERMUX_PKG_NO_STATICSPLIT=true
@@ -35,7 +34,7 @@ termux_step_post_get_source() {
 }
 
 _setup_nodejs_22() {
-	local NODEJS_VERSION=22.17.0
+	local NODEJS_VERSION=22.21.1
 	local NODEJS_FOLDER=${TERMUX_PKG_CACHEDIR}/build-tools/nodejs-${NODEJS_VERSION}
 
 	if [ ! -x "$NODEJS_FOLDER/bin/node" ]; then
@@ -43,7 +42,7 @@ _setup_nodejs_22() {
 		local NODEJS_TAR_FILE=$TERMUX_PKG_TMPDIR/nodejs-$NODEJS_VERSION.tar.xz
 		termux_download https://nodejs.org/dist/v${NODEJS_VERSION}/node-v${NODEJS_VERSION}-linux-x64.tar.xz \
 			"$NODEJS_TAR_FILE" \
-			325c0f1261e0c61bcae369a1274028e9cfb7ab7949c05512c5b1e630f7e80e12
+			680d3f30b24a7ff24b98db5e96f294c0070f8f9078df658da1bce1b9c9873c88
 		tar -xf "$NODEJS_TAR_FILE" -C "$NODEJS_FOLDER" --strip-components=1
 	fi
 	export PATH="$NODEJS_FOLDER/bin:$PATH"
