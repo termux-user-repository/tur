@@ -4,9 +4,9 @@ TERMUX_PKG_DESCRIPTION="A scalable, distributed, collaborative, document-graph d
 TERMUX_PKG_LICENSE="non-free"
 TERMUX_PKG_LICENSE_FILE="LICENSE"
 TERMUX_PKG_MAINTAINER="@SunPodder"
-TERMUX_PKG_VERSION="2.3.10"
+TERMUX_PKG_VERSION="2.4.0"
 TERMUX_PKG_SRCURL="https://github.com/surrealdb/surrealdb/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz"
-TERMUX_PKG_SHA256=72294908d805ba73a8abc2fc68e07c1dababa17d6d00a6a4da0f93ab208eac2e
+TERMUX_PKG_SHA256=88d2bf5dff7e9f58cde30c868eeb8de14f4ff5244a58d2aac5a13dbdf971614a
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_DEPENDS="openssl, zlib"
@@ -22,16 +22,16 @@ termux_step_configure() {
 	cargo vendor
 	find ./vendor \
 		-mindepth 1 -maxdepth 1 -type d \
-		! -wholename ./vendor/librocksdb-sys \
+		! -wholename ./vendor/surrealdb-librocksdb-sys \
 		-exec rm -rf '{}' \;
 
 	sed -e "s|@TERMUX_PREFIX@|$TERMUX_PREFIX|" \
-		$TERMUX_PKG_BUILDER_DIR/librocksdb-sys.diff \
-		| patch --silent -p1 -d ./vendor/librocksdb-sys/
+		$TERMUX_PKG_BUILDER_DIR/surrealdb-librocksdb-sys.diff \
+		| patch --silent -p1 -d ./vendor/surrealdb-librocksdb-sys/
 
 	echo "" >> Cargo.toml
 	echo "[patch.crates-io]" >> Cargo.toml
-	echo "librocksdb-sys = { path = \"./vendor/librocksdb-sys\" }" >> Cargo.toml
+	echo "surrealdb-librocksdb-sys = { path = \"./vendor/surrealdb-librocksdb-sys\" }" >> Cargo.toml
 }
 
 termux_step_make() {
