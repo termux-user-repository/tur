@@ -91,7 +91,7 @@ fi
 termux_pkg_auto_update() {
 	local _staging_url="https://github.com/wine-staging/wine-staging"
 	local latest_tag
-	latest_tag="$(termux_github_api_get_tag "${_staging_url}" "${TERMUX_PKG_UPDATE_TAG_TYPE}")"
+	latest_tag="$(TERMUX_PKG_SRCURL="$_staging_url" termux_github_api_get_tag)"
 	(( ${#latest_tag} )) || {
 		printf '%s\n' \
 		'WARN: Auto update failure!' \
