@@ -96,7 +96,7 @@ fi
 
 termux_pkg_auto_update() {
 	local latest_tag
-	latest_tag="$(termux_github_api_get_tag "${TERMUX_PKG_SRCURL[1]}" "${TERMUX_PKG_UPDATE_TAG_TYPE}")"
+	latest_tag="$(TERMUX_PKG_SRCURL="${TERMUX_PKG_SRCURL[1]}" termux_github_api_get_tag)"
 	(( ${#latest_tag} )) || {
 		printf '%s\n' \
 		'WARN: Auto update failure!' \
