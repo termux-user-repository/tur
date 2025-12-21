@@ -3,8 +3,12 @@ see: https://github.com/termux/termux-packages/pull/26980#discussion_r2456542227
 
 --- a/scripts/lint-packages.sh
 +++ b/scripts/lint-packages.sh
-@@ -147,6 +147,7 @@ check_indentation() {
- no_build="$(git log --fixed-strings --grep '%ci:no-build' --pretty=format:%H "$base_commit")"
+@@ -146,9 +146,10 @@
+ 
+ # Also figure out if we have a `%ci:no-build` trailer in the commit range,
+ # we may skip some checks later if yes.
+-no_build="$(git log "$base_commit.." --fixed-strings --grep '%ci:no-build' --pretty=format:%H)"
++no_build="$(git log --fixed-strings --grep '%ci:no-build' --pretty=format:%H "$base_commit")"
  
  check_version() {
 +	return
