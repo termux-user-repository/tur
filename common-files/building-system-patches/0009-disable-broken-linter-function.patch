@@ -3,19 +3,8 @@ see: https://github.com/termux/termux-packages/pull/26980#discussion_r2456542227
 
 --- a/scripts/lint-packages.sh
 +++ b/scripts/lint-packages.sh
-@@ -139,9 +139,7 @@
- 	else
- 		origin_url="unknown"
- 	fi
--	if ! base_commit="$(git rev-list "origin/master.." --exclude-first-parent-only --reverse | head -n1)"; then
--		base_commit="HEAD~1"
--	fi
-+	base_commit="HEAD~$(git rev-list --count FETCH_HEAD.. -- || printf 1)"
- } 2> /dev/null
- 
- # Also figure out if we have a `%ci:no-build` trailer in the commit range,
 @@ -149,6 +147,7 @@
- no_build="$(git log "$base_commit.." --fixed-strings --grep '%ci:no-build' --pretty=format:%H)"
+ no_build="$(git log --fixed-strings --grep '%ci:no-build' --pretty=format:%H "$base_commit..")"
  
  check_version() {
 +	return
