@@ -12,6 +12,7 @@
 /build-package.sh
 /build-package.sh.orig
 /clean.sh
+/.github/actions/zram/
 
 # Vim
 [._]*.s[a-w][a-z]
