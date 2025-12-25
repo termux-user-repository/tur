@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://github.com/abhimanyu003/sttr
 TERMUX_PKG_DESCRIPTION="Cli app to perform various operations on string"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="0.2.29"
+TERMUX_PKG_VERSION="0.2.30"
 TERMUX_PKG_SRCURL=https://github.com/abhimanyu003/sttr/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz
-TERMUX_PKG_SHA256=ee9031656861671fd6103fb8d74cede331d92c39afd13b95d0b323debf26bf84
+TERMUX_PKG_SHA256=64c4ddd6f84c99f197053e96c489dea48c0bd83a33dfdd69ab209653bc38b9c8
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_AUTO_UPDATE=true
 
