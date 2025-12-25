@@ -1,5 +1,3 @@
-.*-jumbo
-.*-jumbo-host-tools
 bazel
 biome2
 blender
@@ -8,7 +6,8 @@ chromium-beta
 chromium-beta-host-tools
 code-server
 code-oss
-electron-headers-.*
+electron-jumbo
+electron-jumbo-host-tools
 rustc-nightly
 python-polars
 wine-devel

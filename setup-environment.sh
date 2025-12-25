@@ -21,9 +21,13 @@ fi
 
 # Remove old stuffs
 rm -rf {ndk-patches,packages,x11-packages,root-packages,scripts,build-all.sh,build-package.sh,clean.sh}
+rm -rf .github/actions/zram
 
 # Move build environment scripts to this folder
 mv ./termux-packages/{ndk-patches,packages,x11-packages,root-packages,scripts,build-all.sh,build-package.sh,clean.sh} ./
+
+# Merge .github
+mv ./termux-packages/.github/actions/zram ./.github/actions/
 
 # Apply script patches.
 shopt -s nullglob

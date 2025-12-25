@@ -37,17 +37,21 @@ on:
         description: "A space-separated names of packages selected for rebuilding"
         required: true
 
-# this is here because TUR packages.yml does not ever use setup-ubuntu.sh.
-# if that changes, make this conditional instead of global.
-env:
-  CLEAN_DOCKER_IMAGES: false
+permissions: {} # none
+
+concurrency:
+  # if this is a PR event, group = "pr-<number>", otherwise group = run_id so it never collides with other runs
+  group: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+  # only cancel in-progress when it’s a PR
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+ 
 
 jobs:
   build:
+    permissions:
+      contents: read # actions/upload-artifact doesn't need contents: write
     runs-on: ubuntu-24.04
     env:
-      ANDROID_HOME: "/opt/termux/android-sdk"
-      NDK: "/opt/termux/android-ndk"
       GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
     strategy:
       matrix:
@@ -55,10 +59,9 @@ jobs:
       fail-fast: false
     steps:
     - name: Clone repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         fetch-depth: 1000
-        submodules: true
 
     - name: Set process id limit for 32-bit builds depending on aosp-libs
       run: echo 65535 | sudo tee /proc/sys/kernel/pid_max
@@ -112,22 +115,17 @@ jobs:
         GITHUB_OUTPUT="$GITHUB_OUTPUT" OLD_COMMIT="$OLD_COMMIT" HEAD_COMMIT="$HEAD_COMMIT" GITHUB_TOKEN="${{ secrets.GH_TOKEN }}" scripts/utils/termux_reuse_pr_build_artifacts.sh "${{ github.event_name }}" "${{ matrix.target_arch }}" ".github/workflows/packages.yml" || true
 
         if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+          # GitHub sometimes add merge commits at the end
+          # To prevent user confusion, filter them with --no-merges
           # Process tag '%ci:no-build' that may be added as line to commit message.
           # Forces CI to cancel current build with status 'passed'
-          if grep -qiP '^\s*%ci:no-build\s*$' <(git log --format="%B" -n 1 "HEAD"); then
+          if grep -qiP '^\s*%ci:no-build\s*$' <(git log --format="%B" -n 1 --no-merges "HEAD"); then
+            echo "docker-build=true" >> $GITHUB_OUTPUT
             tar cf artifacts/debs-${{ matrix.target_arch }}.tar debs
             echo "[!] Force exiting as tag '%ci:no-build' was applied to HEAD commit message."
             exit 0
           fi
-          # XXX: TUR uses the termux-builder directly and may add custom builder image later.
-          # Build local Docker image if setup scripts were changed.
-          # Useful for pull requests submitting changes for both build environment and packages.
-          # if grep -qP '^scripts/(Dockerfile|setup-android-sdk\.sh|setup-ubuntu\.sh)$' <<< "$CHANGED_FILES"; then
-          #   echo "Detected changes for environment setup scripts. Building custom Docker image now."
-          #   cd ./scripts
-          #   docker build -t termux/package-builder:latest .
-          #   cd ..
-          # fi
+
           for repo_path in $(jq --raw-output 'keys | .[]' repo.json); do
             repo=$(jq --raw-output '.["'${repo_path}'"].name' repo.json)
             # tur-on-device packages cannot be built in packages.yml, only package_on_device.yml
@@ -191,53 +189,127 @@ jobs:
         for repo in $(jq --raw-output '.[].name' repo.json); do
           # Fix so that lists do not contain duplicates
           if [ -f ./built_${repo}_packages.txt ]; then
-            uniq ./built_${repo}_packages.txt > ./built_${repo}_packages.txt.tmp
+            sort ./built_${repo}_packages.txt | uniq > ./built_${repo}_packages.txt.tmp
             mv ./built_${repo}_packages.txt.tmp ./built_${repo}_packages.txt
           fi
           if [ -f ./built_${repo}_subpackages.txt ]; then
-            uniq ./built_${repo}_subpackages.txt > ./built_${repo}_subpackages.txt.tmp
+            sort ./built_${repo}_subpackages.txt | uniq > ./built_${repo}_subpackages.txt.tmp
             mv ./built_${repo}_subpackages.txt.tmp ./built_${repo}_subpackages.txt
           fi
           if [ -f ./deleted_${repo}_packages.txt ]; then
-            uniq ./deleted_${repo}_packages.txt > ./deleted_${repo}_packages.txt.tmp
+            sort ./deleted_${repo}_packages.txt | uniq > ./deleted_${repo}_packages.txt.tmp
             mv ./deleted_${repo}_packages.txt.tmp ./deleted_${repo}_packages.txt
           fi
         done
+
+        declare -a packages=()
+        for repo_path in $(jq --raw-output 'keys | .[]' repo.json); do
+          repo=$(jq --raw-output '.["'${repo_path}'"].name' repo.json)
+          if [ -f "./built_${repo}_packages.txt" ]; then
+            packages+=($(cat "./built_${repo}_packages.txt"))
+          fi
+        done
+
+        echo "packages: ${packages[*]}"
+
+        docker='true'
+        if [[ "${#packages[@]}" -gt 0 ]]; then
+          for pkg in "${packages[@]}"; do
+            if grep -qFx "$pkg" ./big-pkgs.list; then
+              docker='false'
+              break
+            fi
+            if grep -qFx "$pkg" ./scripts/big-pkgs.list; then
+              docker='false'
+              break
+            fi
+          done
+        fi
+
+        echo "docker-build=$docker" >> $GITHUB_OUTPUT
+        # XXX: TUR uses the termux-builder directly and may add custom builder image later.
+        # if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+        #   Build local Docker image if setup scripts were changed.
+        #   Useful for pull requests submitting changes for both build environment and packages.
+        #   if grep -qP '^scripts/(Dockerfile|properties\.sh|setup-android-sdk\.sh|setup-ubuntu\.sh)$' <<< "$CHANGED_FILES"; then
+        #     echo "Detected changes for environment setup scripts. Building custom Docker image now."
+        #     if [ $docker == 'false' ]; then
+        #       echo "Skipping due to building large packages."
+        #       exit 0
+        #     fi
+        #     cd ./scripts
+        #     docker build -t ghcr.io/termux/package-builder:latest .
+        #     cd ..
+        #   fi
+        # fi
+
     - name: Lint packages
       run: |
-        declare -a package_recipes
+        declare -a package_recipes=()
         for repo_path in $(jq --raw-output 'keys | .[]' repo.json); do
           repo=$(jq --raw-output '.["'${repo_path}'"].name' repo.json)
-          if [ -f ./built_${repo}_packages.txt ]; then
-            package_recipes="$package_recipes $(cat ./built_${repo}_packages.txt | repo_path=${repo_path} awk '{print ENVIRON["repo_path"]"/"$1"/build.sh"}')"
+          if [ -f "./built_${repo}_packages.txt" ]; then
+            package_recipes+=($(cat "./built_${repo}_packages.txt" | repo_path="${repo_path}" awk '{print ENVIRON["repo_path"]"/"$1"/build.sh"}'))
           fi
         done
-        if [ ! -z "$package_recipes" ]; then
-          ./scripts/lint-packages.sh $package_recipes
+        if [[ "${#package_recipes[@]}" -gt 0 ]]; then
+          ./scripts/lint-packages.sh "${package_recipes[@]}"
         fi
-    - name: Free additional disk space (if necessary)
+
+    - name: Enable zram
       if: ${{ steps.build-info.outputs.skip-building != 'true' }}
+      uses: ./.github/actions/zram
+      with:
+        algorithm: zstd
+        size: 16G
+        priority: 100
+        device_name: /dev/zram0
+
+    - name: Free additional disk space (if necessary)
+      if: ${{ steps.build-info.outputs.docker-build == 'false' && steps.build-info.outputs.skip-building != 'true' }}
       run: |
-        if grep -Eq "^($(paste -s -d '|' ./big-pkgs.list))$" ./built_tur_packages.txt; then
-          ./scripts/free-space.sh
-        fi
+        ./scripts/setup-ubuntu.sh
+        # need to unset these for setup-android-sdk.sh.
+        unset NDK ANDROID_HOME
+        ./scripts/setup-android-sdk.sh
+        rm -f ${HOME}/lib/ndk-*.zip ${HOME}/lib/sdk-*.zip
+        sudo apt install ninja-build
+        ./scripts/free-space.sh
+
     - name: Build packages
       if: ${{ steps.build-info.outputs.skip-building != 'true' }}
+      env:
+        DOCKER_BUILD: ${{ steps.build-info.outputs.docker-build }}
+        TERMUX_DOCKER__CONTAINER_EXEC_COMMAND__PRE_CHECK_IF_WILL_BUILD_PACKAGES: "true"
       run: |
-        declare -a packages
+        declare -a packages=()
         for repo_path in $(jq --raw-output 'keys | .[]' repo.json); do
           repo=$(jq --raw-output '.["'${repo_path}'"].name' repo.json)
-          if [ -f ./built_${repo}_packages.txt ]; then
-            packages="$packages $(cat ./built_${repo}_packages.txt)"
+          if [ -f "./built_${repo}_packages.txt" ]; then
+            packages+=($(cat "./built_${repo}_packages.txt"))
           fi
         done
-        if [ ! -z "$packages" ]; then
-          ./scripts/run-docker.sh ./build-package.sh -I -a ${{ matrix.target_arch }} $packages
+
+        echo "packages: ${packages[*]}"
+
+        if [[ "${#packages[@]}" -gt 0 ]]; then
+          if [ "$DOCKER_BUILD" == 'false' ]; then
+            # these need to be unset a second time again for ./build-package.sh
+            # when it is run outside of Docker, because GitHub Actions does not
+            # support permanently unsetting variables at time of writing.
+            # https://github.com/actions/runner/issues/1126
+            unset NDK ANDROID_HOME
+            ./build-package.sh -I -C -a "${{ matrix.target_arch }}" "${packages[@]}"
+          else
+            ./scripts/run-docker.sh ./build-package.sh -I -C -a "${{ matrix.target_arch }}" "${packages[@]}"
+          fi
         fi
+
     - name: Generate build artifacts
       if: always()
       run: |
         test -d tur/output && mv tur/output/* ./output/
+
         for repo in $(jq --raw-output '.[].name' repo.json); do
           # Put package lists into directory with *.deb files so they will be transferred to
           # upload job.
@@ -245,23 +317,35 @@ jobs:
           test -f ./built_${repo}_subpackages.txt && cat ./built_${repo}_subpackages.txt >> ./debs/built_${repo}_packages.txt \
             && rm ./built_${repo}_subpackages.txt
           test -f ./deleted_${repo}_packages.txt && mv ./deleted_${repo}_packages.txt ./debs/
+
           # Move only debs from built_packages into debs/ folder before
           # creating an archive.
-          while read -r pkg; do
-            # Match both $pkg.deb and $pkg-static.deb.
-            find output \( -name "$pkg_*.deb" -o -name "$pkg-static_*.deb" \) -type f -print0 | xargs -0r mv -t debs/
-          done < <(cat ./debs/built_${repo}_packages.txt)
+          if [ -f "./debs/built_${repo}_packages.txt" ] && [ -d "output" ]; then
+            while read -r pkg; do
+              # Match both $pkg.deb and $pkg-static.deb.
+              find output \( -name "$pkg_*.deb" -o -name "$pkg-static_*.deb" \) -type f -print0 | xargs -0r mv -t debs/
+            done < <(cat "./debs/built_${repo}_packages.txt")
+          fi
         done
         # Files containing certain symbols (e.g. ":") will cause failure in actions/upload-artifact.
         # Archiving *.deb files in a tarball to avoid issues with uploading.
         tar cf artifacts/debs-${{ matrix.target_arch }}-${{ github.sha }}.tar debs
+
     - name: Checksums for built *.deb files
       if: always()
       run: |
-        find debs -type f -name "*.deb" -exec sha256sum "{}" \; | sort -k2
+        find debs -type f -name "*.deb" -exec sha256sum "{}" \; | sort -k2 | tee checksum-${{ matrix.target_arch }}-${{ github.sha }}.txt
+
+    - name: Store checksums for built *.deb files
+      if: always()
+      uses: actions/upload-artifact@v6
+      with:
+        name: checksum-${{ matrix.target_arch }}-${{ github.sha }}
+        path: checksum-${{ matrix.target_arch }}-${{ github.sha }}.txt
+
     - name: Store *.deb files
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: debs-${{ matrix.target_arch }}-${{ github.sha }}
         path: ./artifacts
@@ -270,14 +354,16 @@ jobs:
         compression-level: 0
 
   upload:
-    if: github.event_name != 'pull_request' && github.ref != 'refs/heads/dev' && !startsWith(github.ref, 'refs/heads/dev/')
+    permissions:
+      contents: read
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     steps:
     - name: Clone repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
     - name: Get *.deb files
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v7
       with:
         path: ./
     - name: Upload to a temporary release
@@ -297,4 +383,3 @@ jobs:
         REPO: "dists"
       run: |
         curl -d "{\"event_type\": \"${EVENT}\"}" -H "Content-Type: application/json" -H "Authorization: token ${GITHUB_TOKEN}" -H "Accept: application/vnd.github.everest-preview+json" "https://api.github.com/repos/${ORG}/${REPO}/dispatches"
-
