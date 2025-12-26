@@ -53,3 +53,16 @@ Do not run check-updated step, which will make it easy to reach GitHub rate limi
  	if [[ -n "${_LATEST_TAGS[${1##*/}]:-}" ]]; then
  		(
  			set +eu
+--- a/scripts/bin/build-package-dry-run-simulation.sh
++++ b/scripts/bin/build-package-dry-run-simulation.sh
+@@ -12,6 +12,10 @@ TERMUX_PACKAGES_DIRECTORIES="
+ packages
+ root-packages
+ x11-packages
++tur
++tur-on-device
++tur-multilib
++tur-hacking
+ "
+ 
+ # Please keep synchronized with the logic of lines 468-547 of 'build-package.sh'.
