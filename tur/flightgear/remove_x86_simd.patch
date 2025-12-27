@@ -1,0 +1,24 @@
+Tylko w mod: build
+diff -ur orig/CMakeLists.txt mod/CMakeLists.txt
+--- orig/CMakeLists.txt	2025-02-19 09:53:41.000000000 +0100
++++ mod/CMakeLists.txt	2025-03-06 11:14:23.441895531 +0100
+@@ -455,7 +455,8 @@
+     set(WARNING_FLAGS_C   "-Wall")
+ 
+     if (X86 OR X86_64)
+-        set(SIMD_COMPILER_FLAGS "-msse2 -mfpmath=sse -ftree-vectorize -ftree-slp-vectorize")
++        #set(SIMD_COMPILER_FLAGS "-msse2 -mfpmath=sse -ftree-vectorize -ftree-slp-vectorize")
++	set(SIMD_COMPILER_FLAGS "")
+     endif()
+ 
+     set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g -DNDEBUG")
+@@ -478,7 +479,8 @@
+     set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g -DNDEBUG")
+     set(CMAKE_C_FLAGS_RELWITHDEBINFO  "-O3 -g -DNDEBUG")
+ 
+-    set(SIMD_COMPILER_FLAGS "-msse2 -mfpmath=sse -ftree-vectorize -ftree-slp-vectorize")
++#    set(SIMD_COMPILER_FLAGS "-msse2 -mfpmath=sse -ftree-vectorize -ftree-slp-vectorize")
++set(SIMD_COMPILER_FLAGS "")
+     set(WARNING_FLAGS_C "-Wall")
+ endif()
+ 
