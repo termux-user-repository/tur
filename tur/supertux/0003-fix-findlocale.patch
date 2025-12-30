@@ -1,0 +1,19 @@
+diff -ur a/external/findlocale/findlocale.c b/external/findlocale/findlocale.c
+--- a/external/findlocale/findlocale.c	2025-12-29 11:50:50.000000000 +0100
++++ b/external/findlocale/findlocale.c	2025-12-30 11:10:59.780413946 +0100
+@@ -439,6 +439,7 @@
+       }
+     }
+   }
++/*
+ #elif defined(__ANDROID__)
+   // normal method will always give default guess
+   // use JNI instead
+@@ -476,6 +477,7 @@
+     success = FL_FAILED;
+   }
+ 
++*/
+ #else
+   /* assume unixoid */
+   {

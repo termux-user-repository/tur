@@ -1,0 +1,30 @@
+--- a/mk/cmake/GetGitRevisionDescription.cmake
++++ b/mk/cmake/GetGitRevisionDescription.cmake
+@@ -37,8 +37,8 @@
+   cmake_parse_arguments(GIT_RUN "" "RESULT;OUTPUT" "COMMAND" ${ARGN})
+ 
+   if(NOT GIT_FOUND)
+-    parent_set(${GIT_RUN_OUTPUT} ${GIT_RUN_OUTPUT}-NOTFOUND)
+-    parent_set(${GIT_RUN_RESULT} 1)
++    parent_set(${GIT_RUN_OUTPUT} "${GIT_RUN_OUTPUT}-NOTFOUND")
++    parent_set(${GIT_RUN_RESULT} "1")
+     # Can't use a return command here because... Macro.
+   else()
+     execute_process(COMMAND ${GIT_EXECUTABLE} ${GIT_RUN_COMMAND}
+@@ -54,15 +54,14 @@
+       set(_output ${GIT_RUN_OUTPUT}-NOTFOUND)
+     endif()
+ 
+-    parent_set(${GIT_RUN_OUTPUT} ${_output})
+-    parent_set(${GIT_RUN_RESULT} ${_result})
++    parent_set(${GIT_RUN_OUTPUT} "${_output}")
++    parent_set(${GIT_RUN_RESULT} "${_result}")
+   endif()
+ endmacro()
+ 
+ function(git_project_version is_release)
+   if(NOT GIT_FOUND OR NOT EXISTS "${PROJECT_SOURCE_DIR}/.git")
+-    parent_set(${out} ${out}-NOTFOUND)
+     return()
+   endif()
+ 
