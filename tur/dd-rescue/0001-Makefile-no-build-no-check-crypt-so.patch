@@ -1,0 +1,50 @@
+--- a/Makefile	2025-12-31 10:59:56.929277292 +0800
++++ b/Makefile	2025-12-31 10:59:06.601277289 +0800
+@@ -24,7 +24,7 @@
+ MYDIR = dd_rescue
+ TMPDIR ?= /tmp
+ BINTARGETS = dd_rescue 
+-LIBTARGETS = libddr_hash.so libddr_MD5.so libddr_null.so libddr_crypt.so
++LIBTARGETS = libddr_hash.so libddr_MD5.so libddr_null.so
+ #TARGETS = libfalloc-dl
+ OTHTARGETS = find_nonzero fiemap file_zblock fmt_no md5 sha256 sha512 sha224 sha384 sha1 test_aes # test_aligned_alloc
+ ifneq ($(NO_ALIGNED_ALLOC),1)
+@@ -663,7 +663,7 @@
+ 	if ./calchmac.py sha1 pass dd_rescue; then $(MAKE) check_hmac; else echo "Sorry, no more HMAC test due to missing python-hashlib support"; true; fi
+ 	$(MAKE) check_fault
+ 	#$(MAKE) check_aes
+-	$(MAKE) check_crypt
++	#$(MAKE) check_crypt
+ 	$(MAKE) check_sparse
+ 
+ check_xattr_storehash: $(TARGETS)
+@@ -792,23 +792,23 @@
+ 	./test_sparse.sh "-H 15"
+ 	./test_sparse.sh "-H 15 -L ./libddr_null.so=unsparse"
+ 	./test_sparse.sh "-H 15 -L ./libddr_hash.so=sha256"
+-	./test_sparse.sh "-H 15 -L ./libddr_crypt.so=AES192-CTR:weakrnd:pbkdf2:pass=ABC:skiphole:" "encrypt" "decrypt"
+-	./test_sparse.sh "-H 15 -L ./libddr_crypt.so=AES192-CTR:weakrnd:pbkdf2:pass=ABC:" "encrypt" "decrypt"
++	#./test_sparse.sh "-H 15 -L ./libddr_crypt.so=AES192-CTR:weakrnd:pbkdf2:pass=ABC:skiphole:" "encrypt" "decrypt"
++	#./test_sparse.sh "-H 15 -L ./libddr_crypt.so=AES192-CTR:weakrnd:pbkdf2:pass=ABC:" "encrypt" "decrypt"
+ 	if test $(HAVE_LZO) = 1; then ./test_sparse.sh "-H 15 -L ./libddr_lzo.so=" "compress" "decompress"; fi
+ 	if test $(HAVE_LZMA) = 1; then ./test_sparse.sh "-H 15 -L ./libddr_lzma.so=" "compress" "decompress"; fi
+ 	# Sparse files with odd sizes
+ 	./test_sparse.sh "-H 15 -L ./libddr_null.so=unsparse" "" "" 8388612
+ 	./test_sparse.sh "-H 15 -L ./libddr_hash.so=sha256" "" "" 8388612
+-	./test_sparse.sh "-H 15 -L ./libddr_crypt.so=AES192-CTR:weakrnd:pbkdf2:pass=ABC:skiphole:" "encrypt" "decrypt" 8388612
+-	./test_sparse.sh "-H 15 -L ./libddr_crypt.so=AES192-CTR:weakrnd:pbkdf2:pass=ABC:" "encrypt" "decrypt" 8388612
++	#./test_sparse.sh "-H 15 -L ./libddr_crypt.so=AES192-CTR:weakrnd:pbkdf2:pass=ABC:skiphole:" "encrypt" "decrypt" 8388612
++	#./test_sparse.sh "-H 15 -L ./libddr_crypt.so=AES192-CTR:weakrnd:pbkdf2:pass=ABC:" "encrypt" "decrypt" 8388612
+ 	if test $(HAVE_LZO) = 1; then ./test_sparse.sh "-H 15 -L ./libddr_lzo.so=" "compress" "decompress" 8388612; fi
+ 	if test $(HAVE_LZMA) = 1; then ./test_sparse.sh "-H 15 -L ./libddr_lzma.so=" "compress" "decompress" 8388612; fi
+ 	# Sparse files with holes at end and at beginning
+ 	./test_sparse.sh "-H 15 " "" "" 7596032 1
+ 	./test_sparse.sh "-H 15 -L ./libddr_null.so=unsparse" "" "" 7596032 1
+ 	./test_sparse.sh "-H 15 -L ./libddr_hash.so=sha256" "" "" 7596032 1
+-	./test_sparse.sh "-H 15 -L ./libddr_crypt.so=AES192-CTR:weakrnd:pbkdf2:pass=ABC:skiphole:" "encrypt" "decrypt" 7596032 1
+-	./test_sparse.sh "-H 15 -L ./libddr_crypt.so=AES192-CTR:weakrnd:pbkdf2:pass=ABC:" "encrypt" "decrypt" 7596032 1
++	#./test_sparse.sh "-H 15 -L ./libddr_crypt.so=AES192-CTR:weakrnd:pbkdf2:pass=ABC:skiphole:" "encrypt" "decrypt" 7596032 1
++	#./test_sparse.sh "-H 15 -L ./libddr_crypt.so=AES192-CTR:weakrnd:pbkdf2:pass=ABC:" "encrypt" "decrypt" 7596032 1
+ 	if test $(HAVE_LZO) = 1; then ./test_sparse.sh "-H 15 -L ./libddr_lzo.so=" "compress" "decompress" 7596032 1; fi
+ 	if test $(HAVE_LZMA) = 1; then ./test_sparse.sh "-H 15 -L ./libddr_lzma.so=" "compress" "decompress" 7596032 1; fi
+ 	if test $(HAVE_LZO) = 1; then ./test_sparse_compress_crypt.sh; fi
