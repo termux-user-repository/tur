@@ -1,0 +1,24 @@
+--- a/Makefile	2025-12-08 01:50:24.911983400 +0800
++++ b/Makefile	2025-12-30 21:09:44.892212677 +0800
+@@ -248,7 +248,7 @@
+ #	test -e Makefile || ln -s $(SRCDIR)/Makefile .
+ 
+ config.h: $(SRCDIR)/configure $(SRCDIR)/config.h.in
+-	$(SRCDIR)/configure && touch config.h
++	touch config.h
+ 	test -e test_crypt.sh || ln -s $(SRCDIR)/test_crypt.sh .
+ 	test -e test_lzo_fuzz.sh || ln -s $(SRCDIR)/test_lzo_fuzz.sh .
+ 	test -e test_lzo_dec.sh || ln -s $(SRCDIR)/test_lzo_dec.sh .
+@@ -257,10 +257,10 @@
+ 	test -e calchmac.py || ln -s $(SRCDIR)/calchmac.py .
+ 
+ $(SRCDIR)/configure: $(SRCDIR)/configure.ac
+-	cd $(SRCDIR) && autoconf
++	cd $(SRCDIR)
+ 
+ $(SRCDIR)/config.h.in: $(SRCDIR)/configure.ac
+-	cd $(SRCDIR) && autoheader && touch config.h.in
++	cd $(SRCDIR) && touch config.h.in
+ 
+ # The headers for x86 intrinsics cause breakage while preprocessing 
+ # for dependency generation :-( Workaround ...
