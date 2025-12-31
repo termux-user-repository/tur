@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="A native debugger extension for code-server based on LLD
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="1.12.1"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL="https://raw.githubusercontent.com/vadimcn/codelldb/refs/tags/v$TERMUX_PKG_VERSION/LICENSE"
 TERMUX_PKG_SHA256=6eedaf734957b02e4bcc408ea0ecb55de0f6b2ab18e92339327e863fdad86aed
 TERMUX_PKG_AUTO_UPDATE=true
