@@ -1,0 +1,28 @@
+Description: Fix spelling errors in code
+ s/implmented/implemented, s/adress/address
+Author: Tobias Frost <tobi@debian.org>
+Last-Update: 2017-07-24
+---
+This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+--- a/src/ssg/ssgSaveDXF.cxx
++++ b/src/ssg/ssgSaveDXF.cxx
+@@ -102,7 +102,7 @@
+     }
+   }
+ 	else
+-		ulSetError ( UL_WARNING, "ssgSaveDXF: OpenGL mode %d not implmented yet. Parts or all of the model are ignored!' for writing", (int)mode ) ;
++		ulSetError ( UL_WARNING, "ssgSaveDXF: OpenGL mode %d not implemented yet. Parts or all of the model are ignored!' for writing", (int)mode ) ;
+ }
+ 
+ 
+--- a/src/ssg/ssgLoadMDL.cxx
++++ b/src/ssg/ssgLoadMDL.cxx
+@@ -1858,7 +1858,7 @@
+             fseek(fp, -12, SEEK_CUR);
+             unsigned long addr = ftell(fp);
+             if(addr&1L)
+-              printf("strange... found RIFF, but on an odd adress %lx\n", addr);
++              printf("strange... found RIFF, but on an odd address %lx\n", addr);
+             else
+               printf("found a good RIFF header at address %lx\n", addr);
+             FindBGLBeginRIFF(fp);
