@@ -4,8 +4,9 @@ blender
 blender4
 chromium-beta
 chromium-beta-host-tools
-code-server
 code-oss
+code-server
+code-server-extension-codelldb
 electron-jumbo
 electron-jumbo-host-tools
 hello-tur
