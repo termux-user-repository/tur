@@ -1,0 +1,29 @@
+Description: Avoid desktop OSG missing PVRTC compression modes
+Author: Fervi (IntinteDAO) <lordfervi@protonmail.com>
+
+--- a/simgear/scene/util/SGImageUtils.cxx
++++ b/simgear/scene/util/SGImageUtils.cxx
+@@ -1077,21 +1077,8 @@
+ 
+ #else // OSG_GLES2_AVAILABLE
+ 
+-    if (caps.supportsTextureCompression(osg::Texture::USE_PVRTC_4BPP_COMPRESSION))
+-    {
+-        out_mode = osg::Texture::USE_PVRTC_4BPP_COMPRESSION;
+-        return true;
+-    }
+-    else if (caps.supportsTextureCompression(osg::Texture::USE_PVRTC_2BPP_COMPRESSION))
+-    {
+-        out_mode = osg::Texture::USE_PVRTC_2BPP_COMPRESSION;
+-        return true;
+-    }
+-    else if (caps.supportsTextureCompression(osg::Texture::USE_ETC_COMPRESSION))
+-    {
+-        out_mode = osg::Texture::USE_ETC_COMPRESSION;
+-        return true;
+-    }
++    out_mode = osg::Texture::USE_ETC_COMPRESSION;
++    return true;
+ 
+ #endif
+ 

@@ -1,0 +1,58 @@
+Description: Fix infinite loop and stall on archives smaller than 1MB
+ In DownloadTerrasyncSharedData, the extraction loop waited for at least 1MB
+ before feeding bytes to libarchive to prevent feeding short error bodies.
+ However, if an archive was smaller than 1MB (e.g. Airports_archive.tgz which is 223 bytes),
+ or while waiting for the first megabyte, the thread spun in a busy loop without
+ waiting and never extracted the file even after the network download completed.
+ Track reply completion via m_replyFinished and wait on m_bufferWait when buffer
+ has < 1MB so small archives extract immediately and the setup dialog closes cleanly.
+Author: Fervi (IntinteDAO) <lordfervi@protonmail.com>
+
+--- a/src/GUI/DownloadTerrasyncSharedData.hxx
++++ b/src/GUI/DownloadTerrasyncSharedData.hxx
+@@ -76,6 +76,7 @@
+     QPointer<QNetworkReply> m_download;
+     std::unique_ptr<simgear::ArchiveExtractor> m_archive;
+     bool m_haveFirstMByte = false;
++    bool m_replyFinished = false;
+     quint64 m_totalSize = 0;
+     uint32_t m_pathPrefixLength = 0;
+ 
+--- a/src/GUI/DownloadTerrasyncSharedData.cxx
++++ b/src/GUI/DownloadTerrasyncSharedData.cxx
+@@ -131,6 +131,7 @@
+ 
+     m_totalSize = 0;
+     m_haveFirstMByte = false;
++    m_replyFinished = false;
+ 
+     emit beginArchive(item.archiveName);
+     m_items.pop_front();
+@@ -179,6 +180,11 @@
+         onNetworkError(r->error());
+     }
+ #endif
++    {
++        std::unique_lock g(m_mutex);
++        m_replyFinished = true;
++        m_bufferWait.notify_one();
++    }
+ }
+ 
+ void DownloadTerrasyncSharedData::updateProgress()
+@@ -202,12 +208,14 @@
+             std::unique_lock g(m_mutex);
+             if (m_buffer.isEmpty()) {
+                 m_bufferWait.wait_for(g, 100ms);
++                continue;
+             }
+ 
+             // don't start passing bytes to the archive extractor, until we have 1MB
+             // this is necessary to avoid passing redirect/404 page bytes in, and breaking
+             // the extractor.
+-            if (!m_haveFirstMByte && (m_buffer.size() < 0x100000)) {
++            if (!m_haveFirstMByte && !m_replyFinished && (m_buffer.size() < 0x100000)) {
++                m_bufferWait.wait_for(g, 100ms);
+                 continue;
+             } else {
+                 m_haveFirstMByte = true;

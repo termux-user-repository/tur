@@ -1,0 +1,16 @@
+Description: Include network socket headers
+Author: Fervi (IntinteDAO) <lordfervi@protonmail.com>
+
+--- a/src/FDM/JSBSim/input_output/FGfdmSocket.h
++++ b/src/FDM/JSBSim/input_output/FGfdmSocket.h
+@@ -48,6 +48,10 @@
+   #include <netdb.h>
+ #endif
+ 
++#include <netinet/in.h>
++#include <arpa/inet.h>
++#include <sys/socket.h>
++
+ /*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ FORWARD DECLARATIONS
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
