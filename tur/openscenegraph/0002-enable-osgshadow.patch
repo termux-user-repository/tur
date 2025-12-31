@@ -1,0 +1,16 @@
+Description: Enable osgShadow module in OpenSceneGraph
+ FlightGear's fork commented out osgShadow, but it is needed by games like
+ Speed Dreams when using the OSG graphics backend.
+Author: Fervi <lordfervi@protonmail.com>
+
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -22,7 +22,7 @@
+         osgParticle
+         # osgUI
+         # osgVolume
+-        # # osgShadow
++        osgShadow
+         osgSim
+         osgTerrain
+         # osgWidget

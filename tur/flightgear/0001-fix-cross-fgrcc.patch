@@ -1,0 +1,35 @@
+Description: Generate dummy resource stubs during cross-compilation
+Author: Fervi (IntinteDAO) <lordfervi@protonmail.com>
+
+--- a/src/EmbeddedResources/CMakeLists.txt
++++ b/src/EmbeddedResources/CMakeLists.txt
+@@ -1,3 +1,21 @@
++if(CMAKE_CROSSCOMPILING OR CROSS_COMPILING)
++  file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/FlightGear-resources.hxx
++"#ifndef _FG_FLIGHTGEAR_EMBEDDED_RESOURCES
++#define _FG_FLIGHTGEAR_EMBEDDED_RESOURCES
++
++void initFlightGearEmbeddedResources();
++
++#endif
++")
++  file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/FlightGear-resources.cxx
++"#include <simgear/embedded_resources/EmbeddedResourceManager.hxx>
++
++void initFlightGearEmbeddedResources()
++{
++  simgear::EmbeddedResourceManager::instance();
++}
++")
++else()
+ add_executable(fgrcc fgrcc.cxx fgrcc.hxx)
+ target_link_libraries(fgrcc SimGearCore)
+ 
+@@ -27,6 +45,7 @@
+     COMMENT
+       "Re-generating embedded resources"
+ )
++endif()
+ 
+ # set automatically by add_custom_command? 
+ #set_source_files_properties(${EMBEDDED_RESOURCE_SOURCES} PROPERTIES GENERATED TRUE)
