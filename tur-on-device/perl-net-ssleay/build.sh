@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="Perl bindings for OpenSSL and LibreSSL"
 TERMUX_PKG_LICENSE="Artistic-License-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION=1.94
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://github.com/radiator-software/p5-net-ssleay/archive/refs/tags/${TERMUX_PKG_VERSION/-/_}.tar.gz
 TERMUX_PKG_SHA256=a73aee174e400030ba10d78fa8c4cf60c4d1275302d66379c23271dc91c14e7c
 TERMUX_PKG_DEPENDS="perl, openssl"
