@@ -1,0 +1,23 @@
+diff -ur orig/src/Makefile.am mod/src/Makefile.am
+--- orig/src/Makefile.am	2011-04-28 21:03:06.000000000 +0200
++++ mod/src/Makefile.am	2026-01-05 14:20:42.506256426 +0100
+@@ -445,5 +445,5 @@
+ LIBS += @LIBCURL@
+ endif
+ 
+-warmux_LDADD=$(top_srcdir)/lib/fixedpoint/libfixedpoint.a $(top_srcdir)/lib/warmux/libwarmux.a
+-warmux_DEPENDENCIES=$(top_srcdir)/lib/fixedpoint/libfixedpoint.a $(top_srcdir)/lib/warmux/libwarmux.a
++warmux_LDADD=$(top_builddir)/lib/fixedpoint/libfixedpoint.a $(top_builddir)/lib/warmux/libwarmux.a
++warmux_DEPENDENCIES=$(top_builddir)/lib/fixedpoint/libfixedpoint.a $(top_builddir)/lib/warmux/libwarmux.a
+diff -ur orig/tools/list_games/Makefile.am mod/tools/list_games/Makefile.am
+--- orig/tools/list_games/Makefile.am	2011-04-28 21:03:12.000000000 +0200
++++ mod/tools/list_games/Makefile.am	2026-01-05 14:33:50.108835357 +0100
+@@ -14,5 +14,5 @@
+ 
+ LIBS += @LIBCURL@ @LIBINTL@
+ 
+-warmux_list_games_LDADD=$(top_srcdir)/lib/warmux/libwarmux.a
+-warmux_list_games_DEPENDENCIES=$(top_srcdir)/lib/warmux/libwarmux.a
++warmux_list_games_LDADD=$(top_builddir)/lib/warmux/libwarmux.a
++warmux_list_games_DEPENDENCIES=$(top_builddir)/lib/warmux/libwarmux.a
+\ Brak znaku nowej linii na końcu pliku

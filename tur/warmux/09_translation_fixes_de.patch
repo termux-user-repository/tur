@@ -1,0 +1,33 @@
+Description: Fixes for German translation.
+Author: Bruno Kleinert <fuddl@debian.org>
+Bug-Debian: http://bugs.debian.org/623867
+
+--- a/po/de.po
++++ b/po/de.po
+@@ -744,7 +744,7 @@ msgstr "Computer oder menschlicher Spieler?"
+ msgid ""
+ "Click/wheelmouse to change the team.\n"
+ "You can't select the same team several times."
+-msgstr "Wähle Maskottchen des Teams. Alle Team müssen verschiedene haben."
++msgstr "Wähle Maskottchen des Teams. Alle Teams müssen verschiedene haben."
+ 
+ #. Client Mode
+ #: src/menu/network_menu.cpp:167 src/network/network.cpp:456
+@@ -834,7 +834,7 @@ msgid ""
+ "Current weapon and ammo left, long click to display its help.\n"
+ "Click to open selection menu."
+ msgstr ""
+-"Aktuelle Waffe und Vorrat. Klicken, um Waffenmenu zu öffnen, gedrückt "
++"Aktuelle Waffe und Munitionsvorrat. Klicken, um Waffenmenu zu öffnen, gedrückt "
+ "halten, um Hilfe anzuzeigen."
+ 
+ #: src/menu/game_mode_editor.cpp:88
+@@ -1147,7 +1147,7 @@ msgstr "Spiel hosten"
+ 
+ #: src/game/game_classic.cpp:196
+ msgid "Hurry up, you are too slow !!"
+-msgstr "Beeilung, ihr seit zu langsam!"
++msgstr "Beeilung, ihr seid zu langsam!"
+ 
+ #: src/menu/results_menu.cpp:367
+ msgid "I like WarMUX :)"

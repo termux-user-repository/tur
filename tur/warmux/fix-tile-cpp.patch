@@ -1,0 +1,12 @@
+diff -ur orig/src/map/tile.cpp mod/src/map/tile.cpp
+--- orig/src/map/tile.cpp	2011-04-28 21:03:06.000000000 +0200
++++ mod/src/map/tile.cpp	2026-01-05 20:25:13.326616236 +0100
+@@ -673,7 +673,7 @@
+     TileItem_NonEmpty *t = static_cast<TileItem_NonEmpty*>(item[i]);
+ 
+     if (t->NeedSynch()) {
+-      SynchTileInfo info = { i, t->GetSynchsum() };
++      SynchTileInfo info = { (uint16_t)i, (uint16_t)t->GetSynchsum() };
+       list.push_back(info);
+     }
+   }

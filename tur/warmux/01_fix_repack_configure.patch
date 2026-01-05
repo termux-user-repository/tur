@@ -1,0 +1,28 @@
+Description: Fix autreconf with the repacked tarball.
+Author: Felix Geyer <debfx-pkg@fobos.de>
+
+diff -Nr -u4 warmux-11.01.orig/configure.ac warmux-11.01/configure.ac
+--- warmux-11.01.orig/configure.ac	2011-02-13 15:12:25.000000000 +0100
++++ warmux-11.01/configure.ac	2011-02-13 15:28:20.974249373 +0100
+@@ -376,21 +376,16 @@
+                  lib/fixedpoint/Makefile
+                  lib/warmux/Makefile
+                  po/Makefile
+                  ], [AM_POSTPROCESS_PO_MAKEFILE])
+-if test "${WIN32}" = "yes"; then
+-AC_CONFIG_FILES([build/win32_setup/create_setup.sh],
+-                [chmod +x build/win32_setup/create_setup.sh])
+-else
+ AC_CONFIG_FILES([lib/warmux-server/Makefile
+                  doc/Makefile
+                  tools/Makefile
+                  tools/list_games/Makefile
+                  tools/servers/Makefile
+                  tools/servers/game_server/Makefile
+                  tools/servers/index_server/Makefile
+                  ])
+-fi
+ 
+ AM_CONFIG_HEADER(lib/warmux/include/config_autotools.h)
+ 
+ AC_OUTPUT
