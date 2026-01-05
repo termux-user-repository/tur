@@ -19,11 +19,11 @@ TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 termux_step_pre_configure() {
 	aclocal -I m4
 	autoreconf -vfi
-	
+
 	# Fix library checks by ensuring LDFLAGS is used and LIBS is clean
 	export LIBS="-lSDL -lSDL_image -lSDL_mixer -lSDL_net -lSDL_ttf -lSDL_gfx -lcurl -lxml2 -lfribidi -lpng16 -lz -lm"
 	export LDFLAGS="$LDFLAGS $LIBS"
-	
+
 	# Fix C++11 narrowing errors and missing includes
 	export CXXFLAGS="$CXXFLAGS -Wno-c++11-narrowing -Wno-narrowing -I$TERMUX_PREFIX/include/SDL -I$TERMUX_PREFIX/include/fribidi"
 	export CPPFLAGS="$CPPFLAGS -I$TERMUX_PREFIX/include/SDL -I$TERMUX_PREFIX/include/fribidi"
