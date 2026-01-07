@@ -17,28 +17,29 @@ termux_step_pre_configure() {
 termux_step_configure() {
 	cd $TERMUX_PKG_BUILDDIR
 
-    # Replace potential prefix-based tool paths
-    sed -i 's@\${prefix}/bin@/usr/bin@g' $TERMUX_PKG_SRCDIR/configure
-    sed -i 's@$prefix/bin@/usr/bin@g' $TERMUX_PKG_SRCDIR/configure
+	# Replace potential prefix-based tool paths
+	sed -i 's@\${prefix}/bin@/usr/bin@g' $TERMUX_PKG_SRCDIR/configure
+	sed -i 's@$prefix/bin@/usr/bin@g' $TERMUX_PKG_SRCDIR/configure
 
-    mkdir -p "$TERMUX_PKG_BUILDDIR/wrappers"
-    cat > "$TERMUX_PKG_BUILDDIR/wrappers/sdl-config" << 'EOF'
+	mkdir -p "$TERMUX_PKG_BUILDDIR/wrappers"
+	cat > "$TERMUX_PKG_BUILDDIR/wrappers/sdl-config" << 'EOF'
 #!/bin/sh
 case "$1" in
-    --version) pkg-config --modversion sdl ;;
-    --cflags) pkg-config --cflags sdl ;;
-    --libs) pkg-config --libs sdl ;;
-    --prefix) pkg-config --variable=prefix sdl ;;
-    --exec-prefix) pkg-config --variable=exec_prefix sdl ;;
-    *) 
-        echo "Unknown option: $1" >&2
-        exit 1 
-        ;;
+	--version) pkg-config --modversion sdl ;;
+	--cflags) pkg-config --cflags sdl ;;
+	--libs) pkg-config --libs sdl ;;
+	--prefix) pkg-config --variable=prefix sdl ;;
+	--exec-prefix) pkg-config --variable=exec_prefix sdl ;;
+	*) 
+		echo "Unknown option: $1" >&2
+		exit 1 
+		;;
 esac
 EOF
-    chmod +x "$TERMUX_PKG_BUILDDIR/wrappers/sdl-config"
-    export SDL_CONFIG="$TERMUX_PKG_BUILDDIR/wrappers/sdl-config"
-    export CPPFLAGS="$CPPFLAGS -DLOCALEDIR=\\\"$TERMUX_PREFIX/share/locale\\\""
+
+	chmod +x "$TERMUX_PKG_BUILDDIR/wrappers/sdl-config"
+	export SDL_CONFIG="$TERMUX_PKG_BUILDDIR/wrappers/sdl-config"
+	export CPPFLAGS="$CPPFLAGS -DLOCALEDIR=\\\"$TERMUX_PREFIX/share/locale\\\""
 
 	sh $TERMUX_PKG_SRCDIR/configure \
 		--prefix=$TERMUX_PREFIX \
