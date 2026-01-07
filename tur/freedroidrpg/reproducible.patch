@@ -1,0 +1,20 @@
+Author: Reiner Herrmann <reiner@reiner-h.de>
+Description: Drop build flags from the comment in the head of the save file
+ the save file is a lua script, and has some information about the game
+ in a comment in the head. including build flags there causes the build to
+ become unreproducible (as they may contain differing paths).
+ as they provide not really useful information and are not used elsewhere,
+ they can be safely dropped.
+Forwarded: no
+
+--- freedroidrpg.orig/src/savestruct_internal.c
++++ freedroidrpg/src/savestruct_internal.c
+@@ -571,8 +571,6 @@
+ 	autostr_append(strout,
+ 		"SAVEGAME: %s %s %s;sizeof(tux_t)=%d;sizeof(enemy)=%d;sizeof(bullet)=%d\n",
+ 		SAVEGAME_VERSION, SAVEGAME_REVISION, VERSION, (int)sizeof(tux_t), (int)sizeof(enemy), (int)sizeof(bullet));
+-	autostr_append(strout, "BUILD_CFLAGS: %s\n", BUILD_CFLAGS);
+-	autostr_append(strout, "BUILD_LDFLAGS: %s\n", BUILD_LDFLAGS);
+ 	autostr_append(strout, "VERSION: %s\n", freedroid_version);
+ 	autostr_append(strout, "--]]\n");
+ 

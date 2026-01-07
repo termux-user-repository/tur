@@ -1,0 +1,108 @@
+Author: Bart Mertens
+Description: Reduces output on stdout/stderr
+Forwarded: no
+
+--- freedroidrpg.orig/src/graphics.c
++++ freedroidrpg/src/graphics.c
+@@ -574,16 +574,16 @@
+ 	// Since we want to use openGl, it might be good to check the OpenGL vendor string
+ 	// provided by the graphics driver.  Let's see...
+ 	//
+-	fprintf(stderr, "\n-OpenGL--------------------------------------------------------------------------");
+-	fprintf(stderr, "\nVendor     : %s", glGetString(GL_VENDOR));
++        DebugPrintf(1, stderr, "\n-OpenGL--------------------------------------------------------------------------");
++	DebugPrintf(1, stderr, "\nVendor     : %s", glGetString(GL_VENDOR));
+ 	open_gl_check_error_status(__FUNCTION__);
+-	fprintf(stderr, "\nRenderer   : %s", glGetString(GL_RENDERER));
++	DebugPrintf(1, stderr, "\nRenderer   : %s", glGetString(GL_RENDERER));
+ 	open_gl_check_error_status(__FUNCTION__);
+-	fprintf(stderr, "\nVersion    : %s", glGetString(GL_VERSION));
++	DebugPrintf(1, stderr, "\nVersion    : %s", glGetString(GL_VERSION));
+ 	open_gl_check_error_status(__FUNCTION__);
+-	fprintf(stderr, "\nExtensions : %s", glGetString(GL_EXTENSIONS));
++	DebugPrintf(1, stderr, "\nExtensions : %s", glGetString(GL_EXTENSIONS));
+ 	open_gl_check_error_status(__FUNCTION__);
+-	fprintf(stderr, "\n\n");
++	DebugPrintf(1, stderr, "\n\n");
+ }
+ #endif
+ 
+@@ -675,11 +675,11 @@
+ 		GameConfig.next_time_height_of_screen = GameConfig.screen_height;
+ 		break;
+ 	default:
+-		DebugPrintf(-4, "\nTesting if color depth %d bits is available... ", vid_bpp);
++		DebugPrintf(1, "\nTesting if color depth %d bits is available... ", vid_bpp);
+ 		if (video_mode_ok_check_result == vid_bpp) {
+-			DebugPrintf(-4, "YES.");
++			DebugPrintf(1, "YES.");
+ 		} else {
+-			DebugPrintf(-4, "NO! \nThe closest we will get is %d bits per pixel.", video_mode_ok_check_result);
++			DebugPrintf(1, "NO! \nThe closest we will get is %d bits per pixel.", video_mode_ok_check_result);
+ 			/*
+ 			   ErrorMessage ( __FUNCTION__  , "\
+ 			   SDL reported, that the video mode mentioned \nabove is not supported UNDER THE COLOR DEPTH MENTIONED ABOVE!\n\
+@@ -705,8 +705,8 @@
+ 		SDL_GL_GetAttribute(SDL_GL_BLUE_SIZE, &blue_size);
+ 		SDL_GL_GetAttribute(SDL_GL_ALPHA_SIZE, &alpha_size);
+ 		SDL_GL_GetAttribute(SDL_GL_DEPTH_SIZE, &depth_size);
+-		fprintf(stderr, "\nvideo mode set (bpp=%d RGBA=%d%d%d%d depth=%d)",
+-			buffer_size, red_size, green_size, blue_size, alpha_size, depth_size);
++		DebugPrintf(1, stderr, "\nvideo mode set (bpp=%d RGBA=%d%d%d%d depth=%d)",
++			    buffer_size, red_size, green_size, blue_size, alpha_size, depth_size);
+ 
+ 		SDL_PixelFormat *fmt = Screen->format;
+ 		fprintf(stderr, "\npixel format (shift/mask) : red: %d/0x%.8x, green: %d/0x%.8x, blue: %d/0x%.8x, alpha: %d/0x%.8x\n",
+@@ -752,7 +752,7 @@
+ 
+ 	// We note the screen resolution used.
+ 	//
+-	DebugPrintf(-4, "\nUsing screen resolution %d x %d.\n", GameConfig.screen_width, GameConfig.screen_height);
++	DebugPrintf(1, "\nUsing screen resolution %d x %d.\n", GameConfig.screen_width, GameConfig.screen_height);
+ 
+ 	// We query the available video configuration on this system.
+ 	//
+--- freedroidrpg.orig/src/init.c
++++ freedroidrpg/src/init.c
+@@ -907,7 +907,7 @@
+ 	// We mention the version of FreedroidRPG, so that debug reports
+ 	// are easier to assign to the different versions of the game.
+ 
+-	DebugPrintf(-4, "\nHello, this is FreedroidRPG, version %s.\n", freedroid_version);
++	DebugPrintf(1, "\nHello, this is FreedroidRPG, version %s.\n", freedroid_version);
+ }
+ 
+ /* -----------------------------------------------------------------
+--- freedroidrpg.orig/src/main.c
++++ freedroidrpg/src/main.c
+@@ -428,7 +428,7 @@
+ 			//
+ 			if (Me.time_since_last_visit_or_respawn[i] > 600 && !(curShip.AllLevels[i]->flags & NO_RESPAWN)) {
+ 
+-				DebugPrintf(-10, "\nNow respawning all bots on level : %d (%s). ", i, curShip.AllLevels[i]->Levelname);
++				DebugPrintf(1, "\nNow respawning all bots on level : %d (%s). ", i, curShip.AllLevels[i]->Levelname);
+ 				Me.time_since_last_visit_or_respawn[i] = 0;
+ 
+ 				respawn_level(i);
+--- freedroidrpg.orig/src/misc.c
++++ freedroidrpg/src/misc.c
+@@ -1508,8 +1508,8 @@
+ void Terminate(int exit_code)
+ {
+ 	if (!do_benchmark) {
+-		printf("\n---------------------------------------------------------------------------------");
+-		printf("\nTermination of freedroidRPG initiated... ");
++	        DebugPrintf(1, "\n---------------------------------------------------------------------------------");
++	        DebugPrintf(1, "\nTermination of freedroidRPG initiated... ");
+ 	}
+ 
+ 	// Save the config file only in case of success.
+@@ -1529,7 +1529,7 @@
+ 	free_memory_before_exit();
+ 
+ 	if (!do_benchmark) {
+-		printf("Thank you for playing freedroidRPG.\n\n");
++	        DebugPrintf(1, "Thank you for playing freedroidRPG.\n\n");
+ 	}
+ 
+ IMMEDIATE_EXIT:
