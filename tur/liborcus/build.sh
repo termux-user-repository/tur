@@ -3,13 +3,15 @@ TERMUX_PKG_DESCRIPTION="File import filter library for spreadsheet documents."
 TERMUX_PKG_LICENSE="MPL-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="0.20.1"
-TERMUX_PKG_SRCURL=https://gitlab.com/orcus/orcus/-/archive/${TERMUX_PKG_VERSION}/orcus-${TERMUX_PKG_VERSION}.tar.gz
+TERMUX_PKG_REVISION=1
+TERMUX_PKG_SRCURL="https://gitlab.com/orcus/orcus/-/archive/${TERMUX_PKG_VERSION}/orcus-${TERMUX_PKG_VERSION}.tar.gz"
 TERMUX_PKG_SHA256=ff2d2dd1fb0625baeeafe8ac1bfffd467b27a880995b5d6c25a21fa2e6d4d0e5
 TERMUX_PKG_DEPENDS="boost, libc++, libixion, zlib"
 TERMUX_PKG_BUILD_DEPENDS="boost-headers, mdds"
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 --disable-python
+boost_cv_lib_system=yes
 "
 
 termux_step_pre_configure() {
