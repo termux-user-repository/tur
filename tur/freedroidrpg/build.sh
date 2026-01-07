@@ -30,9 +30,9 @@ case "$1" in
 	--libs) pkg-config --libs sdl ;;
 	--prefix) pkg-config --variable=prefix sdl ;;
 	--exec-prefix) pkg-config --variable=exec_prefix sdl ;;
-	*) 
+	*)
 		echo "Unknown option: $1" >&2
-		exit 1 
+		exit 1
 		;;
 esac
 EOF
