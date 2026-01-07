@@ -3,9 +3,9 @@ TERMUX_PKG_DESCRIPTION="Lightweight coding agent that runs in your terminal"
 TERMUX_PKG_LICENSE="Apache-2.0, MIT"
 TERMUX_PKG_LICENSE_FILE="../LICENSE, ../NOTICE"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="0.77.0"
+TERMUX_PKG_VERSION="0.79.0"
 TERMUX_PKG_SRCURL="https://github.com/openai/codex/archive/refs/tags/rust-v$TERMUX_PKG_VERSION.tar.gz"
-TERMUX_PKG_SHA256=77aa0f45be7a8ca4724941345c638a94f9b30310152107ddb14832b1a1c374d2
+TERMUX_PKG_SHA256=a2b9d5ff073bb95be4012f729d4de31335888026c9b236b6c1cade211d0e41e3
 TERMUX_PKG_DEPENDS="libc++, openssl"
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_UPDATE_VERSION_SED_REGEXP='s/rust-v//'
@@ -29,5 +29,7 @@ termux_step_make() {
 termux_step_make_install() {
 	install -Dm700 -t $TERMUX_PREFIX/bin target/${CARGO_TARGET_NAME}/release/codex
 
-	install -Dm600 -t $TERMUX_PREFIX/share/doc/$TERMUX_PKG_NAME ../docs/*
+	rm -rf $TERMUX_PREFIX/share/doc/$TERMUX_PKG_NAME
+	mkdir -p $TERMUX_PREFIX/share/doc/$TERMUX_PKG_NAME
+	cp -Rfv ../docs/* $TERMUX_PREFIX/share/doc/$TERMUX_PKG_NAME/
 }
