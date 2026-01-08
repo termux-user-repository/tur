@@ -1,0 +1,22 @@
+Author: Julien Puydt
+Description: Don't run the checks in headless mode (pbuilder, buildbot...)
+Forwarded: not-needed
+
+--- freedroidrpg.orig/Makefile.am
++++ freedroidrpg/Makefile.am
+@@ -38,14 +38,7 @@
+ CHECKFLAGS=env SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy
+ 
+ check:
+-	$(CHECKFLAGS) ./src/freedroidRPG -nb text      || exit 1
+-	$(CHECKFLAGS) ./src/freedroidRPG -nb dialog    || exit 2
+-	$(CHECKFLAGS) ./src/freedroidRPG -nb loadship  || exit 3
+-	$(CHECKFLAGS) ./src/freedroidRPG -nb dynarray  || exit 4
+-	$(CHECKFLAGS) ./src/freedroidRPG -nb mapgen    || exit 5
+-	$(CHECKFLAGS) ./src/freedroidRPG -nb leveltest || exit 6
+-	$(CHECKFLAGS) ./src/freedroidRPG -nb event     || exit 7
+-
++	exit 0
+ 
+ dist-hook:
+ 	find $(distdir) -name ".git"         | xargs rm -rf

@@ -1,0 +1,15 @@
+Author: Bart Martens
+Description: Don't show framerate by default
+Forwarded: no
+
+--- freedroidrpg.orig/src/init.c
++++ freedroidrpg/src/init.c
+@@ -658,7 +658,7 @@
+ 	GameConfig.Current_Sound_FX_Volume = 0.5;
+ 	GameConfig.Current_Sound_Output_Fmt = SOUND_OUTPUT_FMT_STEREO;
+ 	GameConfig.WantedTextVisibleTime = 3;
+-	GameConfig.Draw_Framerate = TRUE;
++       GameConfig.Draw_Framerate = FALSE;
+ 	GameConfig.Draw_Position = TRUE;
+ 	GameConfig.All_Texts_Switch = FALSE;
+ 	GameConfig.enemy_energy_bars_visible = TRUE;
