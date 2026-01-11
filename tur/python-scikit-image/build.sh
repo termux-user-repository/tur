@@ -3,9 +3,12 @@ TERMUX_PKG_DESCRIPTION="Image processing in Python"
 TERMUX_PKG_LICENSE="BSD 2-Clause, BSD 3-Clause, MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="0.26.0"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://github.com/scikit-image/scikit-image/archive/refs/tags/v$TERMUX_PKG_VERSION.tar.gz
 TERMUX_PKG_SHA256=09bb8cbb2a7b0c4f24fd4caeda6357732c64c2556520bdbad1dc15fb498e6a08
-TERMUX_PKG_AUTO_UPDATE=true
+# packages that do not target aarch64 for dependency infrastructure reasons
+# cannot auto update because of 'ERROR: Obtaining update order failed'
+TERMUX_PKG_AUTO_UPDATE=false
 TERMUX_PKG_DEPENDS="libandroid-complex-math, libc++, python, python-pip, python-numpy, python-pillow, python-pywavelets, python-scipy"
 TERMUX_PKG_ANTI_BUILD_DEPENDS="python-pillow, python-pywavelets, python-scipy"
 TERMUX_PKG_PYTHON_COMMON_DEPS="wheel, 'Cython>=3.0.4', meson-python, build"
@@ -17,6 +20,7 @@ TERMUX_MESON_WHEEL_CROSSFILE="$TERMUX_PKG_TMPDIR/wheel-cross-file.txt"
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 --cross-file $TERMUX_MESON_WHEEL_CROSSFILE
 "
+TERMUX_PKG_EXCLUDED_ARCHES="aarch64, x86_64"
 
 termux_step_pre_configure() {
 	if $TERMUX_ON_DEVICE_BUILD; then

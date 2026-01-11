@@ -5,5 +5,7 @@ packages/arpack-ng
 packages/qrupdate-ng
 packages/octave
 packages/virglrenderer-android
+packages/manim
+packages/python-scikit-image
 x11-packages/octave-x
 x11-packages/wine-stable

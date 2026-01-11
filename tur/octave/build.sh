@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="GNU Octave is a high-level language, primarily intended 
 TERMUX_PKG_LICENSE="GPL-3.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION=1:9.2.0
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://ftpmirror.gnu.org/octave/octave-${TERMUX_PKG_VERSION#*:}.tar.xz
 TERMUX_PKG_SHA256=21417afb579105b035cac0bea09201522e384893ae90a781b8727efa32765807
 TERMUX_PKG_DEPENDS="arpack-ng, bzip2, fftw, fontconfig, freetype, glpk, graphicsmagick, libcurl, libhdf5, libiconv, libopenblas, libsndfile, openssl, pcre2, portaudio, qhull, qrupdate-ng, rapidjson, readline, suitesparse, sundials, zlib"
@@ -39,7 +40,7 @@ gl_cv_have_weak=no
 "
 
 # FIXME: Diable for arm temporarily
-TERMUX_PKG_EXCLUDED_ARCHES="arm"
+TERMUX_PKG_EXCLUDED_ARCHES="arm, aarch64, x86_64"
 
 source $TERMUX_SCRIPTDIR/common-files/setup_toolchain_gcc.sh
 

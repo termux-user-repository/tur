@@ -3,10 +3,13 @@ TERMUX_PKG_DESCRIPTION="SUite of Nonlinear and DIfferential/ALgebraic equation S
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="1:7.5.0"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://github.com/LLNL/sundials/releases/download/v${TERMUX_PKG_VERSION#*:}/sundials-${TERMUX_PKG_VERSION#*:}.tar.gz
 TERMUX_PKG_SHA256=089ac659507def738b7a65b574ffe3a900d38569e3323d9709ebed3e445adecc
 TERMUX_PKG_DEPENDS="libopenblas, suitesparse"
-TERMUX_PKG_AUTO_UPDATE=true
+# packages that do not target aarch64 for dependency infrastructure reasons
+# cannot auto update because of 'ERROR: Obtaining update order failed'
+TERMUX_PKG_AUTO_UPDATE=false
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 -DCMAKE_SYSTEM_NAME=Linux
 -DBUILD_ARKODE=ON
@@ -25,6 +28,7 @@ TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 -DENABLE_PTHREAD=ON
 -DEXAMPLES_INSTALL=OFF
 "
+TERMUX_PKG_EXCLUDED_ARCHES="aarch64, x86_64"
 TERMUX_PKG_RM_AFTER_INSTALL="examples/"
 
 source $TERMUX_SCRIPTDIR/common-files/setup_toolchain_gcc.sh

@@ -3,18 +3,22 @@ TERMUX_PKG_DESCRIPTION="A Suite of Sparse matrix packages."
 TERMUX_PKG_LICENSE="GPL-3.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="1:7.9.0"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://github.com/DrTimothyAldenDavis/SuiteSparse/archive/refs/tags/v${TERMUX_PKG_VERSION#*:}.tar.gz
 TERMUX_PKG_SHA256=bc0b3987a502913959581614ab67098f9f203a45bb424870f2342375f96dbcb7
 TERMUX_PKG_DEPENDS="libandroid-complex-math, blas-openblas, libopenblas, libgmp, libmpfr"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_FORCE_CMAKE=true
-TERMUX_PKG_AUTO_UPDATE=true
+# packages that do not target aarch64 for dependency infrastructure reasons
+# cannot auto update because of 'ERROR: Obtaining update order failed'
+TERMUX_PKG_AUTO_UPDATE=false
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 -DCMAKE_SYSTEM_NAME=Linux
 -DBLA_VENDOR=Generic
 -DALLOW_64BIT_BLAS=OFF
 -DGRAPHBLAS_CROSS_TOOLCHAIN_FLAGS_NATIVE=\"-DCMAKE_TOOLCHAIN_FILE=$TERMUX_PKG_BUILDER_DIR/graphblas-host-toolchain.cmake\"
 "
+TERMUX_PKG_EXCLUDED_ARCHES="aarch64, x86_64"
 
 source $TERMUX_SCRIPTDIR/common-files/setup_toolchain_gcc.sh
 
