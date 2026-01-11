@@ -1,0 +1,32 @@
+--- a/configure.ac
++++ b/configure.ac
+@@ -281,22 +281,14 @@
+ AC_CHECK_HEADER(SDL_rotozoom.h,,AC_MSG_ERROR(Please install SDL_gfx))
+ AC_CHECK_LIB(SDL_gfx, rotozoomSurfaceXY,, AC_MSG_ERROR(Please install SDL_gfx))
+ AC_MSG_CHECKING([whether SDL_gfx - version >= 2.0.22 ])
+-AC_RUN_IFELSE([
+-#include <stdio.h>
++AC_COMPILE_IFELSE([
+ #include <SDL_gfxPrimitives.h>
+-#undef main
+-int main(void)
+-{
+-  FILE *f = fopen("conftest.out", "wt+");
+-  fprintf(f, "%i.%i.%i\n",
+-         SDL_GFXPRIMITIVES_MAJOR, SDL_GFXPRIMITIVES_MINOR, SDL_GFXPRIMITIVES_MICRO);
+-  fclose(f);
+-  int ver = SDL_GFXPRIMITIVES_MAJOR*1000+SDL_GFXPRIMITIVES_MINOR*100+SDL_GFXPRIMITIVES_MICRO;
+-  return ver < 2022;
+-}],
+-  [echo "`cat conftest.out`, OK"],
+-  [cat conftest.out
+-   AC_MSG_ERROR(Please upgrade SDL_gfx)])
++#if SDL_GFXPRIMITIVES_MAJOR < 2 || (SDL_GFXPRIMITIVES_MAJOR == 2 && SDL_GFXPRIMITIVES_MINOR == 0 && SDL_GFXPRIMITIVES_MICRO < 22)
++#error too old
++#endif
++],
++  [echo "OK"],
++  [AC_MSG_ERROR(Please upgrade SDL_gfx)])
+ 
+ dnl === Check for curl =====================================================
+ 

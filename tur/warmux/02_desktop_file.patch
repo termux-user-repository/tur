@@ -1,0 +1,16 @@
+Description: Remove deprecated entries and fix icon name.
+Author: Felix Geyer <debfx-pkg@fobos.de>
+
+--- warmux-11.01.orig/data/warmux.desktop
++++ warmux-11.01/data/warmux.desktop
+@@ -1,9 +1,7 @@
+ [Desktop Entry]
+-Version=1.0
+-Encoding=UTF-8
+ Name=Warmux
+ Type=Application
+-Icon=warmux_128x128.png
++Icon=warmux
+ Exec=warmux
+ Terminal=false
+ StartupNotify=false

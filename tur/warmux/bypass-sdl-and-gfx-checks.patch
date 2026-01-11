@@ -1,0 +1,45 @@
+diff -ur orig/configure.ac mod/configure.ac
+--- orig/configure.ac	2026-01-05 17:40:35.707159983 +0100
++++ mod/configure.ac	2026-01-05 17:41:28.630269221 +0100
+@@ -208,9 +208,9 @@
+ 
+ dnl === Check for SDL ======================================================
+ 
+-AM_PATH_SDL($SDL_VERSION,
+-            :,
+-            AC_MSG_ERROR([*** SDL version $SDL_VERSION not found!]))
++dnl AM_PATH_SDL($SDL_VERSION,
++dnl             :,
++dnl             AC_MSG_ERROR([*** SDL version $SDL_VERSION not found!]))
+ CXXFLAGS="$CXXFLAGS $SDL_CFLAGS"
+ CFLAGS="$CFLAGS $SDL_CFLAGS"
+ CPPFLAGS="$CPPFLAGS $SDL_CFLAGS"
+@@ -278,17 +278,17 @@
+ if test "$static" = yes; then
+   LIBS="$LIBS -lm -ldl -lfreetype -lz"
+ fi
+-AC_CHECK_HEADER(SDL_rotozoom.h,,AC_MSG_ERROR(Please install SDL_gfx))
+-AC_CHECK_LIB(SDL_gfx, rotozoomSurfaceXY,, AC_MSG_ERROR(Please install SDL_gfx))
+-AC_MSG_CHECKING([whether SDL_gfx - version >= 2.0.22 ])
+-AC_COMPILE_IFELSE([
+-#include <SDL_gfxPrimitives.h>
+-#if SDL_GFXPRIMITIVES_MAJOR < 2 || (SDL_GFXPRIMITIVES_MAJOR == 2 && SDL_GFXPRIMITIVES_MINOR == 0 && SDL_GFXPRIMITIVES_MICRO < 22)
+-#error too old
+-#endif
+-],
+-  [echo "OK"],
+-  [AC_MSG_ERROR(Please upgrade SDL_gfx)])
++dnl AC_CHECK_HEADER(SDL_rotozoom.h,,AC_MSG_ERROR(Please install SDL_gfx))
++dnl AC_CHECK_LIB(SDL_gfx, rotozoomSurfaceXY,, AC_MSG_ERROR(Please install SDL_gfx))
++dnl dnl AC_MSG_CHECKING([whether SDL_gfx - version >= 2.0.22 ])
++dnl dnl AC_COMPILE_IFELSE([
++dnl dnl #include <SDL_gfxPrimitives.h>
++dnl dnl #if SDL_GFXPRIMITIVES_MAJOR < 2 || (SDL_GFXPRIMITIVES_MAJOR == 2 && SDL_GFXPRIMITIVES_MINOR == 0 && SDL_GFXPRIMITIVES_MICRO < 22)
++dnl dnl #error too old
++dnl dnl #endif
++dnl dnl ],
++dnl dnl   [echo "OK"],
++dnl dnl   [AC_MSG_ERROR(Please upgrade SDL_gfx)])
+ 
+ dnl === Check for curl =====================================================
+ 

@@ -1,0 +1,14 @@
+Description: Fix FTBFS with libpng 1.5.
+Author: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
+Bug-Debian: http://bugs.debian.org/649788
+
+--- warmux-11.04.1+repack.orig/src/graphic/surface.cpp
++++ warmux-11.04.1+repack/src/graphic/surface.cpp
+@@ -25,6 +25,7 @@
+ #include <SDL_image.h>
+ #include <SDL_rotozoom.h>
+ #include <png.h>
++#include <zlib.h>
+ 
+ #include "graphic/surface.h"
+ #include "tool/math_tools.h"

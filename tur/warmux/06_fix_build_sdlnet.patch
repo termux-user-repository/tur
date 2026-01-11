@@ -1,0 +1,14 @@
+Description: Fix FTBFS with libsdl-net 1.2.8.
+Author: Felix Geyer <debfx-pkg@fobos.de>
+
+--- warmux-11.04.1+repack.orig/lib/warmux/action/action.cpp
++++ warmux-11.04.1+repack/lib/warmux/action/action.cpp
+@@ -85,7 +85,7 @@
+ {
+   m_creator = _creator;
+ 
+-  m_header.len = SDLNet_Read32(buffer);
++  m_header.len = SDLNet_Read32(const_cast<char*>(buffer));
+   ASSERT(m_header.len >= sizeof(Header));
+   buffer += 4;
+   // All of the following could be skipped for the actions we now,

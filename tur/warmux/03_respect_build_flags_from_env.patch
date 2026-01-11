@@ -1,0 +1,23 @@
+Description: Don't reset CFLAGS/CXXFLAGS but use the environment variables.
+Author: Felix Geyer <debfx-pkg@fobos.de>
+
+--- warmux-11.01.orig/configure.ac
++++ warmux-11.01/configure.ac
+@@ -43,8 +43,6 @@
+   AC_MSG_ERROR([*** No C++ compiler can be found!])
+ fi
+ 
+-AX_CFLAGS_WARN_ALL([CXXFLAGS])
+-
+ # ==========================================================================
+ # == Set flags for various environments                                    =
+ # ==========================================================================
+@@ -186,8 +184,6 @@
+ 
+   if test "x${debug}" = "xyes"; then
+     GCC_FLAGS="$GCC_FLAGS -O0 -g -DDEBUG -DWMX_LOG"
+-  else
+-    GCC_FLAGS="$GCC_FLAGS -O2"
+   fi
+ 
+   if test "x${logging}" = "xyes"; then
