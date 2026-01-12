@@ -1,0 +1,12 @@
+diff -ur orig/configure.ac mod/configure.ac
+--- orig/configure.ac	2026-01-05 17:41:28.630269221 +0100
++++ mod/configure.ac	2026-01-05 17:49:54.193737187 +0100
+@@ -375,7 +375,7 @@
+ dnl === Data file substitution.                                          ===
+ dnl ========================================================================
+ 
+-DATA_FILES=`cd data ; find . \( -name CVS -o -name ".svn*" -o -name "Makefile*" -o -name "warmux*.desktop" \) -prune -o -name ".#*" -o -type d -o -print`
++DATA_FILES=`cd $srcdir/data ; find . \( -name CVS -o -name ".svn*" -o -name "Makefile*" -o -name "warmux*.desktop" \) -prune -o -name ".#*" -o -type d -o -print`
+ DATA_FILES=`echo $DATA_FILES`
+ 
+ AC_SUBST([DATA_FILES])
