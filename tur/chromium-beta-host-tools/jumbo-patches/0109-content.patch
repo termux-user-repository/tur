@@ -1541,23 +1541,23 @@ index 53bbf01740..1a1f75e042 100644
          SpareRenderProcessHostManagerImpl::Get().WarmupSpare(browser_context,
                                                               timeout);
 @@ -1809,7 +1809,7 @@ RenderFrameHostManager::GetFrameHostForNavigation(
-   IsSameSiteGetter is_same_site_getter(is_same_site);
    std::string site_instance_reason;
    std::string* reason_output =
--      base::FeatureList::IsEnabled(features::kHoldbackDebugReasonStringRemoval)
-+      base::FeatureList::IsEnabled(::features::kHoldbackDebugReasonStringRemoval)
+       (base::FeatureList::IsEnabled(
+-           features::kHoldbackDebugReasonStringRemoval) ||
++           ::features::kHoldbackDebugReasonStringRemoval) ||
+        request->IsInitialWebUINavigation())
            ? &site_instance_reason
            : reason;
-   scoped_refptr<SiteInstanceImpl> dest_site_instance =
 @@ -1817,7 +1817,7 @@ RenderFrameHostManager::GetFrameHostForNavigation(
                                            browsing_context_group_swap,
                                            reason_output);
-   if (reason && base::FeatureList::IsEnabled(
--                    features::kHoldbackDebugReasonStringRemoval)) {
-+                    ::features::kHoldbackDebugReasonStringRemoval)) {
+   if (reason && (base::FeatureList::IsEnabled(
+-                     features::kHoldbackDebugReasonStringRemoval) ||
++                     ::features::kHoldbackDebugReasonStringRemoval) ||
+                  request->IsInitialWebUINavigation())) {
      reason->append(site_instance_reason);
    }
- 
 @@ -2803,8 +2803,8 @@ RenderFrameHostManager::ShouldSwapBrowsingInstancesForNavigation(
              current_instance->GetRelatedActiveContentsCount()),
          51);
@@ -2527,3 +2527,72 @@ index 77571a37e4..1d8906af14 100644
      return NavigationThrottle::PROCEED;
    }
  
+--- a/content/browser/webui/web_ui_data_source_impl.cc
++++ b/content/browser/webui/web_ui_data_source_impl.cc
+@@ -250,7 +250,7 @@
+ }
+ 
+ void WebUIDataSourceImpl::AddLocalizedStrings(
+-    base::span<const webui::LocalizedString> strings) {
++    base::span<const ::webui::LocalizedString> strings) {
+   for (const auto& str : strings)
+     AddLocalizedString(str.name, str.id);
+ }
+@@ -289,7 +289,7 @@
+ }
+ 
+ void WebUIDataSourceImpl::AddResourcePaths(
+-    base::span<const webui::ResourcePath> paths) {
++    base::span<const ::webui::ResourcePath> paths) {
+   for (const auto& resource : paths) {
+     AddResourcePath(resource.path, resource.id);
+ #if BUILDFLAG(LOAD_WEBUI_FROM_DISK)
+@@ -372,7 +372,7 @@
+   add_load_time_data_defaults_ = false;
+   std::string locale = GetContentClient()->browser()->GetApplicationLocale();
+   base::Value::Dict defaults;
+-  webui::SetLoadTimeDataDefaults(locale, &defaults);
++  ::webui::SetLoadTimeDataDefaults(locale, &defaults);
+   AddLocalizedStrings(defaults);
+ }
+ 
+@@ -420,7 +420,7 @@
+   // Set strings last so that it won't be overridden by any other resources.
+   if (use_strings_js_) {
+     std::string generated_js;
+-    webui::AppendJsonJS(localized_strings_, &generated_js,
++    ::webui::AppendJsonJS(localized_strings_, &generated_js,
+                         /*from_js_module=*/true);
+     resource_map[kStringsJsPath] = std::move(generated_js);
+   }
+@@ -533,7 +533,7 @@
+     URLDataSource::GotDataCallback callback,
+     bool from_js_module) {
+   std::string template_data;
+-  webui::AppendJsonJS(localized_strings_, &template_data, from_js_module);
++  ::webui::AppendJsonJS(localized_strings_, &template_data, from_js_module);
+   std::move(callback).Run(
+       base::MakeRefCounted<base::RefCountedString>(std::move(template_data)));
+ }
+--- a/content/browser/gpu/gpu_disk_cache_factory.cc
++++ b/content/browser/gpu/gpu_disk_cache_factory.cc
+@@ -21,7 +21,7 @@
+   DCHECK(!factory_instance);
+   // Setup static reserved handles and their mapping to specific paths.
+   gpu::GpuDiskCacheFactory::HandleToPathMap handle_to_path_map;
+-  if (features::IsShaderDiskCacheEnabled(
++  if (::features::IsShaderDiskCacheEnabled(
+           base::CommandLine::ForCurrentProcess())) {
+     base::FilePath compositor_cache_dir =
+         GetContentClient()->browser()->GetShaderDiskCacheDirectory();
+--- a/content/browser/gpu/gpu_process_host.cc
++++ b/content/browser/gpu/gpu_process_host.cc
+@@ -947,7 +947,7 @@
+       viz_main_pending_remote.InitWithNewPipeAndPassReceiver());
+   viz::GpuHostImpl::InitParams params;
+   params.restart_id = host_id_;
+-  params.disable_gpu_shader_disk_cache = !features::IsShaderDiskCacheEnabled(
++  params.disable_gpu_shader_disk_cache = !::features::IsShaderDiskCacheEnabled(
+       base::CommandLine::ForCurrentProcess());
+   params.product = GetContentClient()->browser()->GetProduct();
+   params.deadline_to_synchronize_surfaces =
