@@ -1,0 +1,11 @@
+--- a/dlib/cmake_utils/find_libpng.cmake
++++ b/dlib/cmake_utils/find_libpng.cmake
+@@ -29,7 +29,7 @@ if(PNG_FOUND)
+       CMAKE_FLAGS "${PNG_TEST_CMAKE_FLAGS}")
+ 
+    message (STATUS "Found system copy of libpng: ${PNG_LIBRARIES}")
+-   if(NOT test_for_libpng_worked)
++   if(FALSE)
+       set(PNG_FOUND 0)
+       message (STATUS "System copy of libpng is broken.  Will build our own libpng and use that instead.")
+    endif()

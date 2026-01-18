@@ -4,6 +4,7 @@ TERMUX_PKG_DESCRIPTION="Powerful Python data analysis toolkit"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="2.3.3"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=git+https://github.com/pandas-dev/pandas
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_DEPENDS="libc++, python, python-numpy, python-pip"
@@ -28,13 +29,5 @@ termux_step_make() {
 }
 
 termux_step_make_install() {
-	pip install ./dist/*.whl --no-deps --prefix=$PREFIX -vvv
-}
-
-termux_step_create_debscripts() {
-	cat <<- EOF > ./postinst
-	#!$TERMUX_PREFIX/bin/sh
-	echo "Installing dependencies through pip..."
-	pip3 install pandas
-	EOF
+	pip install --force-reinstall ./dist/*.whl --no-deps --prefix=$PREFIX -vvv
 }

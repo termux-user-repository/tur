@@ -3,12 +3,20 @@ TERMUX_PKG_DESCRIPTION="Fundamental algorithms for scientific computing in Pytho
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="1:1.17.0"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=git+https://github.com/scipy/scipy
-TERMUX_PKG_DEPENDS="libc++ (>= 29), libopenblas, python, python-numpy"
+TERMUX_PKG_DEPENDS="libc++ (>= 29), libopenblas, python, python-numpy, python-pip"
+<<<<<<< Updated upstream
 TERMUX_PKG_BUILD_DEPENDS="python-numpy-static"
-TERMUX_PKG_PYTHON_COMMON_DEPS="wheel, 'Cython>=3.0.4', meson-python, build"
+TERMUX_PKG_PYTHON_COMMON_DEPS="wheel, 'Cython==3.0.8', meson-python, build"
 _NUMPY_VERSION=$(. $TERMUX_SCRIPTDIR/packages/python-numpy/build.sh; echo $TERMUX_PKG_VERSION)
 TERMUX_PKG_PYTHON_BUILD_DEPS="pythran, 'pybind11>=2.10.4', 'numpy==$_NUMPY_VERSION'"
+=======
+TERMUX_PKG_BUILD_DEPENDS="python-numpy-static, pybind11"
+TERMUX_PKG_PYTHON_COMMON_BUILD_DEPS="wheel, 'Cython==3.0.8', meson-python, build"
+_NUMPY_VERSION=$(. $TERMUX_SCRIPTDIR/packages/python-numpy/build.sh; echo $TERMUX_PKG_VERSION)
+TERMUX_PKG_PYTHON_CROSS_BUILD_DEPS="pythran, 'numpy==$_NUMPY_VERSION'"
+>>>>>>> Stashed changes
 TERMUX_PKG_ON_DEVICE_BUILD_NOT_SUPPORTED=true
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_UPDATE_TAG_TYPE="latest-release-tag"
@@ -62,7 +70,7 @@ termux_step_configure() {
 	cp -f $TERMUX_MESON_CROSSFILE $TERMUX_MESON_WHEEL_CROSSFILE
 	sed -i 's|^\(\[binaries\]\)$|\1\npython = '\'$(command -v python)\''|g' \
 		$TERMUX_MESON_WHEEL_CROSSFILE
-	sed -i 's|^\(\[properties\]\)$|\1\nnumpy-include-dir = '\'$PYTHON_SITE_PKG/numpy/_core/include\''|g' \
+	sed -i 's|^\(\[properties\]\)$|\1\nnumpy-include-dir = '\'$TERMUX_PYTHON_HOME/site-packages/numpy/_core/include\''|g' \
 		$TERMUX_MESON_WHEEL_CROSSFILE
 
 	(unset PYTHONPATH && termux_step_configure_meson)
@@ -77,5 +85,5 @@ termux_step_make() {
 termux_step_make_install() {
 	local _pyv="${TERMUX_PYTHON_VERSION/./}"
 	local _whl="scipy-${TERMUX_PKG_VERSION#*:}-cp$_pyv-cp$_pyv-linux_$TERMUX_ARCH.whl"
-	pip install --no-deps --prefix=$TERMUX_PREFIX $TERMUX_PKG_SRCDIR/dist/$_whl
+	pip install --force-reinstall --no-deps --prefix=$TERMUX_PREFIX $TERMUX_PKG_SRCDIR/dist/$_whl
 }

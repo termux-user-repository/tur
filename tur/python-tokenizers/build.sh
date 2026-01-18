@@ -3,8 +3,9 @@ TERMUX_PKG_DESCRIPTION="Fast State-of-the-Art Tokenizers optimized for Research 
 TERMUX_PKG_LICENSE="Apache-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="0.22.2"
-TERMUX_PKG_SRCURL=https://github.com/huggingface/tokenizers/archive/refs/tags/v$TERMUX_PKG_VERSION.tar.gz
-TERMUX_PKG_SHA256=ea401ee4db62dfd59c29d9d8c117d03263eb41a6d52b33d129b8d0d15c2c68cb
+TERMUX_PKG_REVISION=1
+TERMUX_PKG_SRCURL="https://github.com/huggingface/tokenizers/archive/refs/tags/v$TERMUX_PKG_VERSION.tar.gz"
+TERMUX_PKG_SHA256=05bffc70e12de04d4c060f9ecd404519aa069e93151c5642e7d731298d9273f6
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_DEPENDS="libc++, python, python-pip"
 TERMUX_PKG_PYTHON_COMMON_DEPS="wheel"
@@ -44,6 +45,7 @@ termux_step_make_install() {
 	export PYO3_CROSS_PYTHON_VERSION=$TERMUX_PYTHON_VERSION
 	export PYO3_CROSS_LIB_DIR=$TERMUX_PREFIX/lib
 	export PYTHONPATH=$TERMUX_PREFIX/lib/python${TERMUX_PYTHON_VERSION}/site-packages
+	export ANDROID_API_LEVEL="$TERMUX_PKG_API_LEVEL"
 
 	build-python -m maturin build \
 				--target $CARGO_BUILD_TARGET \
@@ -53,15 +55,22 @@ termux_step_make_install() {
 
 	local _pyver="${TERMUX_PYTHON_VERSION/./}"
 	local _tag="cp39-abi3"
+
+	local wheel_arch
+	case "$TERMUX_ARCH" in
+		aarch64) wheel_arch=arm64_v8a ;;
+		arm)     wheel_arch=armeabi_v7a ;;
+		x86_64)  wheel_arch=x86_64 ;;
+		i686)    wheel_arch=x86 ;;
+		*)
+			echo "ERROR: Unknown architecture: $TERMUX_ARCH"
+			return 1 ;;
+	esac
+
 	# Fix wheel name, although it it built with tag `cp39-abi3`, but it is linked against `python3.x.so`
 	# so it will not work on other pythons.
-	if [ "$TERMUX_ARCH" = "arm" ]; then
-		mv ./target/wheels/tokenizers-$TERMUX_PKG_VERSION-$_tag-linux_armv7l.whl \
-			./target/wheels/tokenizers-$TERMUX_PKG_VERSION-py$_pyver-none-any.whl
-	else
-		mv ./target/wheels/tokenizers-$TERMUX_PKG_VERSION-$_tag-linux_$TERMUX_ARCH.whl \
-			./target/wheels/tokenizers-$TERMUX_PKG_VERSION-cp$_pyver-cp$_pyver-linux_$TERMUX_ARCH.whl
-	fi
+	mv "target/wheels/tokenizers-${TERMUX_PKG_VERSION}-${_tag}-android_${TERMUX_PKG_API_LEVEL}_${wheel_arch}.whl" \
+		"target/wheels/tokenizers-${TERMUX_PKG_VERSION}-py${_pyver}-none-any.whl"
 
-	pip install --no-deps ./target/wheels/*.whl --prefix $TERMUX_PREFIX
+	pip install --force-reinstall --no-deps ./target/wheels/*.whl --prefix $TERMUX_PREFIX
 }

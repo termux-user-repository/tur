@@ -1,0 +1,11 @@
+--- a/dlib/cmake_utils/find_libjxl.cmake
++++ b/dlib/cmake_utils/find_libjxl.cmake
+@@ -43,7 +43,7 @@ if(JXL_FOUND)
+         test_if_libjxl_is_broken
+         CMAKE_FLAGS "${JXL_TEST_CMAKE_FLAGS}")
+ 
+-    if(NOT test_for_libjxl_worked)
++    if(FALSE)
+         set(JXL_FOUND 0)
+         message (STATUS "System copy of libjxl is either too old or broken.  Will disable JPEG XL support.")
+     endif()
