@@ -8,7 +8,7 @@ TERMUX_PKG_SRCURL="https://github.com/openai/tiktoken/archive/refs/tags/$TERMUX_
 TERMUX_PKG_SHA256=2e1ad31b47086480b168460c3c5794e868544bfcd7c781343599f72179794cbe
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_DEPENDS="libc++, python, python-pip"
-TERMUX_PKG_PYTHON_COMMON_DEPS="wheel, setuptools-rust"
+TERMUX_PKG_PYTHON_COMMON_BUILD_DEPS="wheel, setuptools-rust"
 TERMUX_PKG_BUILD_IN_SRC=true
 
 termux_step_pre_configure() {
