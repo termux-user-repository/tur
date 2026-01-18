@@ -17,7 +17,7 @@ TERMUX_PKG_DEPENDS="libc++, python, qt6-qtbase, qt6-qtdeclarative, shiboken6"
 TERMUX_PKG_RECOMMENDS="qt6-qtcharts, qt6-qtmultimedia, qt6-qtnetworkauth, qt6-qtscxml, qt6-qtsvg, qt6-qttranslations, qt6-qtwebsockets, qt6-shadertools"
 # error during configure if libllvm and libllvm-static are not both installed
 TERMUX_PKG_BUILD_DEPENDS="libllvm-static, python-numpy, qt6-qtcharts, qt6-qtmultimedia, qt6-qtnetworkauth, qt6-qtscxml, qt6-qtsvg, qt6-qttools, qt6-qtwebsockets, qt6-shadertools"
-TERMUX_PKG_PYTHON_COMMON_DEPS="requests"
+TERMUX_PKG_PYTHON_COMMON_BUILD_DEPS="requests"
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 -DCMAKE_SYSTEM_NAME=Linux
 -DNUMPY_INCLUDE_DIR=$TERMUX_PREFIX/lib/python$TERMUX_PYTHON_VERSION/site-packages/numpy/_core/include
