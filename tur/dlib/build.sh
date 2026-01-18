@@ -3,9 +3,10 @@ TERMUX_PKG_DESCRIPTION="a modern C++ toolkit containing machine learning algorit
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="20.0"
-TERMUX_PKG_SRCURL=https://github.com/davisking/dlib/archive/refs/tags/v$TERMUX_PKG_VERSION.tar.gz
+TERMUX_PKG_REVISION=1
+TERMUX_PKG_SRCURL="https://github.com/davisking/dlib/archive/refs/tags/v$TERMUX_PKG_VERSION.tar.gz"
 TERMUX_PKG_SHA256=705749801c7896f5c19c253b6be639f4cef2c1831a9606955f01b600b3d86d80
-TERMUX_PKG_DEPENDS="libx11, libxcb, libopenblas, python"
+TERMUX_PKG_DEPENDS="libx11, libxcb, libopenblas, libpng, libjpeg-turbo, libjxl, libwebp, python"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_AUTO_UPDATE=true
 
@@ -65,5 +66,5 @@ termux_step_make() {
 
 termux_step_make_install() {
 	export PYTHONPATH=$TERMUX_PREFIX/lib/python${TERMUX_PYTHON_VERSION}/site-packages
-	pip install --no-deps ./dist/*.whl --prefix=$TERMUX_PREFIX
+	pip install --force-reinstall --no-deps ./dist/*.whl --prefix=$TERMUX_PREFIX
 }

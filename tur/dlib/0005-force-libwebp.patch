@@ -1,0 +1,11 @@
+--- a/dlib/cmake_utils/find_libwebp.cmake
++++ b/dlib/cmake_utils/find_libwebp.cmake
+@@ -45,7 +45,7 @@ if(WEBP_FOUND)
+         test_if_libwebp_is_broken
+         CMAKE_FLAGS "${WEBP_TEST_CMAKE_FLAGS}")
+ 
+-    if(NOT test_for_libwebp_worked)
++    if(FALSE)
+         set(WEBP_FOUND 0)
+         message (STATUS "System copy of libwebp is either too old or broken.  Will disable WebP support.")
+     endif()

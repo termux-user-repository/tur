@@ -3,10 +3,11 @@ TERMUX_PKG_DESCRIPTION="Dataframes powered by a multithreaded, vectorized query 
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="1.33.1"
-TERMUX_PKG_SRCURL=https://github.com/pola-rs/polars/releases/download/py-$TERMUX_PKG_VERSION/polars-$TERMUX_PKG_VERSION.tar.gz
+TERMUX_PKG_REVISION=1
+TERMUX_PKG_SRCURL="https://github.com/pola-rs/polars/releases/download/py-$TERMUX_PKG_VERSION/polars-$TERMUX_PKG_VERSION.tar.gz"
 TERMUX_PKG_SHA256=fa3fdc34eab52a71498264d6ff9b0aa6955eb4b0ae8add5d3cb43e4b84644007
 TERMUX_PKG_AUTO_UPDATE=true
-TERMUX_PKG_DEPENDS="libc++, python"
+TERMUX_PKG_DEPENDS="libc++, python, python-pip"
 TERMUX_PKG_PYTHON_COMMON_DEPS="wheel"
 TERMUX_PKG_PYTHON_BUILD_DEPS="maturin"
 TERMUX_PKG_BUILD_IN_SRC=true
@@ -67,15 +68,35 @@ termux_step_make() {
 	export CARGO_BUILD_TARGET=${CARGO_TARGET_NAME}
 	export PYO3_CROSS_LIB_DIR=$TERMUX_PREFIX/lib
 	export PYTHONPATH=$TERMUX_PREFIX/lib/python${TERMUX_PYTHON_VERSION}/site-packages
+	export ANDROID_API_LEVEL="$TERMUX_PKG_API_LEVEL"
 
 	build-python -m maturin build \
 				--target $CARGO_BUILD_TARGET \
 				--release --skip-auditwheel \
 				--interpreter python${TERMUX_PYTHON_VERSION}
+
+	local _pyver="${TERMUX_PYTHON_VERSION/./}"
+	local _tag="cp39-abi3"
+
+	local wheel_arch
+	case "$TERMUX_ARCH" in
+		aarch64) wheel_arch=arm64_v8a ;;
+		arm)     wheel_arch=armeabi_v7a ;;
+		x86_64)  wheel_arch=x86_64 ;;
+		i686)    wheel_arch=x86 ;;
+		*)
+			echo "ERROR: Unknown architecture: $TERMUX_ARCH"
+			return 1 ;;
+	esac
+
+	# Fix wheel name, although it it built with tag `cp39-abi3`, but it is linked against `python3.x.so`
+	# so it will not work on other pythons.
+	mv "target/wheels/polars-${TERMUX_PKG_VERSION}-${_tag}-android_${TERMUX_PKG_API_LEVEL}_${wheel_arch}.whl" \
+		"target/wheels/polars-${TERMUX_PKG_VERSION}-py${_pyver}-none-any.whl"
 }
 
 termux_step_make_install() {
-	pip install --no-deps ./target/wheels/*.whl --prefix $TERMUX_PREFIX
+	pip install --force-reinstall --no-deps ./target/wheels/*.whl --prefix $TERMUX_PREFIX
 }
 
 termux_step_post_make_install() {
