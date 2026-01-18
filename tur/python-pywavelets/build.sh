@@ -9,7 +9,7 @@ TERMUX_PKG_SHA256=8b6916bbe47ebb079aa47ea14b191cff715751929e8e83db252b259aa6d113
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_DEPENDS="libc++, python, python-pip, python-numpy"
 TERMUX_PKG_BUILD_DEPENDS="python-numpy-static"
-TERMUX_PKG_PYTHON_COMMON_DEPS="wheel, 'Cython>=3.0.4', meson-python, build"
+TERMUX_PKG_PYTHON_COMMON_BUILD_DEPS="wheel, 'Cython>=3.0.4', meson-python, build"
 
 TERMUX_MESON_WHEEL_CROSSFILE="$TERMUX_PKG_TMPDIR/wheel-cross-file.txt"
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="

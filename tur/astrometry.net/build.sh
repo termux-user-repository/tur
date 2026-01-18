@@ -10,7 +10,7 @@ TERMUX_PKG_SHA256=e4eef1b658ba5ad462282b661c0ca3a5c538ba1716e853f7970b7b9fa4a334
 TERMUX_PKG_DEPENDS="cfitsio, curl, file, libandroid-glob, libbz2, libcairo, libjpeg-turbo, libpng, netpbm, python, python-numpy, python-fitsio, swig, wcslib, zlib"
 TERMUX_PKG_SUGGESTS="astrometry.net-data-basic"
 _NUMPY_VERSION=$(. $TERMUX_SCRIPTDIR/packages/python-numpy/build.sh; echo $TERMUX_PKG_VERSION)
-TERMUX_PKG_PYTHON_COMMON_DEPS="wheel, setuptools, 'numpy==$_NUMPY_VERSION'"
+TERMUX_PKG_PYTHON_COMMON_BUILD_DEPS="wheel, setuptools, 'numpy==$_NUMPY_VERSION'"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_EXCLUDED_ARCHES="arm" # FIXME: arm cross-compile C compiler fails for unknown reason

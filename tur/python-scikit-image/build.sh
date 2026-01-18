@@ -9,9 +9,9 @@ TERMUX_PKG_SHA256=09bb8cbb2a7b0c4f24fd4caeda6357732c64c2556520bdbad1dc15fb498e6a
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_DEPENDS="libandroid-complex-math, libc++, python, python-pip, python-numpy, python-pillow, python-pywavelets, python-scipy"
 TERMUX_PKG_ANTI_BUILD_DEPENDS="python-pillow, python-pywavelets, python-scipy"
-TERMUX_PKG_PYTHON_COMMON_DEPS="wheel, 'Cython>=3.0.4', meson-python, build"
+TERMUX_PKG_PYTHON_COMMON_BUILD_DEPS="wheel, 'Cython>=3.0.4', meson-python, build"
 _NUMPY_VERSION=$(. $TERMUX_SCRIPTDIR/packages/python-numpy/build.sh; echo $TERMUX_PKG_VERSION)
-TERMUX_PKG_PYTHON_BUILD_DEPS="pythran, 'numpy==$_NUMPY_VERSION'"
+TERMUX_PKG_PYTHON_CROSS_BUILD_DEPS="pythran, 'numpy==$_NUMPY_VERSION'"
 TERMUX_PKG_SETUP_PYTHON=true
 
 TERMUX_MESON_WHEEL_CROSSFILE="$TERMUX_PKG_TMPDIR/wheel-cross-file.txt"

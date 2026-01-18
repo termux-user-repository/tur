@@ -8,7 +8,7 @@ TERMUX_PKG_SRCURL="https://github.com/esheldon/fitsio/archive/refs/tags/${TERMUX
 TERMUX_PKG_SHA256=9d2f59844d6c4a8c4dd3730610800669056553d7a77a6585ce58008a53469f36
 TERMUX_PKG_DEPENDS="cfitsio, python, python-pip, python-numpy"
 _NUMPY_VERSION=$(. $TERMUX_SCRIPTDIR/packages/python-numpy/build.sh; echo $TERMUX_PKG_VERSION)
-TERMUX_PKG_PYTHON_COMMON_DEPS="wheel, 'numpy==$_NUMPY_VERSION'"
+TERMUX_PKG_PYTHON_COMMON_BUILD_DEPS="wheel, 'numpy==$_NUMPY_VERSION'"
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_BUILD_IN_SRC=true
 

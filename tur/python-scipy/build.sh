@@ -6,17 +6,10 @@ TERMUX_PKG_VERSION="1:1.17.0"
 TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=git+https://github.com/scipy/scipy
 TERMUX_PKG_DEPENDS="libc++ (>= 29), libopenblas, python, python-numpy, python-pip"
-<<<<<<< Updated upstream
-TERMUX_PKG_BUILD_DEPENDS="python-numpy-static"
-TERMUX_PKG_PYTHON_COMMON_DEPS="wheel, 'Cython==3.0.8', meson-python, build"
-_NUMPY_VERSION=$(. $TERMUX_SCRIPTDIR/packages/python-numpy/build.sh; echo $TERMUX_PKG_VERSION)
-TERMUX_PKG_PYTHON_BUILD_DEPS="pythran, 'pybind11>=2.10.4', 'numpy==$_NUMPY_VERSION'"
-=======
 TERMUX_PKG_BUILD_DEPENDS="python-numpy-static, pybind11"
 TERMUX_PKG_PYTHON_COMMON_BUILD_DEPS="wheel, 'Cython==3.0.8', meson-python, build"
 _NUMPY_VERSION=$(. $TERMUX_SCRIPTDIR/packages/python-numpy/build.sh; echo $TERMUX_PKG_VERSION)
 TERMUX_PKG_PYTHON_CROSS_BUILD_DEPS="pythran, 'numpy==$_NUMPY_VERSION'"
->>>>>>> Stashed changes
 TERMUX_PKG_ON_DEVICE_BUILD_NOT_SUPPORTED=true
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_UPDATE_TAG_TYPE="latest-release-tag"
