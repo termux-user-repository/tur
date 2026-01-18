@@ -1,0 +1,8 @@
+--- a/cffi_dist/go.mod
++++ b/cffi_dist/go.mod
+@@ -23,4 +23,4 @@
+ 	golang.org/x/text v0.32.0 // indirect
+ )
+ 
+-// replace github.com/bogdanfinn/tls-client => ../
++replace github.com/bogdanfinn/tls-client => ../
