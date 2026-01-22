@@ -23,4 +23,3 @@ termux_step_post_configure() {
 	# Remove doc and po from SUBDIRS to skip documentation and missing po directory
 	sed -i 's/^SUBDIRS = .*/SUBDIRS = lib-src src data etc/' Makefile
 }
-
