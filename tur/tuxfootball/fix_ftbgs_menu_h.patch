@@ -1,0 +1,22 @@
+From: Debian Games Team <pkg-games-devel@lists.alioth.debian.org>
+Date: Sat, 7 Oct 2017 20:30:01 +0200
+Subject: fix_ftbfs_menu_h
+
+===================================================================
+---
+ src/menu/elements/menulabel.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/menu/elements/menulabel.cpp b/src/menu/elements/menulabel.cpp
+index 1aa7780..c8eba9f 100644
+--- a/src/menu/elements/menulabel.cpp
++++ b/src/menu/elements/menulabel.cpp
+@@ -27,7 +27,7 @@
+ 
+ #include <iostream>
+ 
+-#include "menu.h"
++#include "menu/menu.h"
+ 
+ MenuLabel::MenuLabel(Menu *menu, std::string name, std::string identifier) :
+ 				MenuItem(menu, name, identifier)
