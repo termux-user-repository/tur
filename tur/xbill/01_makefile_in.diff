@@ -1,0 +1,36 @@
+Description: Fix up paths
+Author: Barry deFreese <bddebian@comcast.net>
+--- a/Makefile.in
++++ b/Makefile.in
+@@ -13,9 +13,9 @@
+ prefix=@prefix@
+ exec_prefix=@exec_prefix@
+ bindir=@bindir@
+-mandir=@mandir@
++mandir=/usr/share/man
+ datadir=@datadir@
+-localstatedir=@localstatedir@
++localstatedir=/var/games
+ top_srcdir = @top_srcdir@
+ srcdir = @srcdir@
+ VPATH = @srcdir@
+@@ -23,7 +23,7 @@
+ ALL_CFLAGS =	$(CFLAGS) $(CPPFLAGS) -I$(srcdir)
+ ALL_LDFLAGS =	$(CFLAGS) $(LDFLAGS)
+ IMAGE_DEFINES=-DIMAGES=\"${datadir}/xbill\"
+-SCORE_DEFINES=-DSCOREFILE=\"${localstatedir}/xbill/scores\"
++SCORE_DEFINES=-DSCOREFILE=\"${localstatedir}/xbill.scores\"
+ 
+ PROG =	xbill
+ 
+@@ -85,8 +85,8 @@
+ 	$(INSTALL) ${PROG} ${DESTDIR}${bindir}/${PROG}
+ 	$(MKINSTALLDIRS) ${DESTDIR}${mandir}/${MANDIR}
+ 	$(INSTALL_DATA) ${srcdir}/${MAN} ${DESTDIR}${mandir}/${MANDIR}
+-	$(MKINSTALLDIRS) ${DESTDIR}${localstatedir}/xbill
+-	$(INSTALL_DATA) -m 0666 ${srcdir}/scores ${DESTDIR}${localstatedir}/xbill
++	$(MKINSTALLDIRS) ${DESTDIR}${localstatedir}
++	$(INSTALL_DATA) -o root -g games -m 0664 ${srcdir}/scores ${DESTDIR}${localstatedir}/xbill.scores.default
+ 	$(MKINSTALLDIRS) ${DESTDIR}${datadir}/xbill
+ 	$(MKINSTALLDIRS) ${DESTDIR}${datadir}/xbill/pixmaps
+ 	$(MKINSTALLDIRS) ${DESTDIR}${datadir}/xbill/bitmaps
