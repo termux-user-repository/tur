@@ -1,0 +1,52 @@
+From a70691fb003cae1a33f06d682269285f9baa2dd9 Mon Sep 17 00:00:00 2001
+From: Martin Erik Werner <martinerikwerner@gmail.com>
+Date: Sun, 28 Jun 2015 19:00:23 +0200
+Subject: [PATCH 2/3] At least try building for other archs than x86*
+
+Allow attempting to build for other architectures than x86 and x86_64,
+whether or not the build will succeed or produce sane output is another
+question... It emits plenty of warnings about it now though...
+
+Configuration of the FPU controller is disabled on all but x86*, and the
+uninformed hope and prayer is that defaults will be fine without messing
+with them.
+---
+ math/ieee.cpp      | 2 ++
+ support/platform.h | 4 ++--
+ 2 files changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/src/gvl/math/ieee.cpp b/src/gvl/math/ieee.cpp
+index 8b740d4..e0803d2 100644
+--- a/src/gvl/math/ieee.cpp
++++ b/src/gvl/math/ieee.cpp
+@@ -54,6 +54,8 @@ void gvl_init_ieee()
+ {
+ #if GVL_MSVCPP
+ // Nothing needs to be done, TODO: we should however check that the x87 state is right
++#elif !GVL_X86 && !GVL_X86_64
++// No idea what to do, but run with defaults and pray it doesn't mess things up
+ #elif GVL_GCC && GVL_WIN32
+     unsigned int const flags = _RC_NEAR | _PC_53 | _EM_INVALID | _EM_DENORMAL | _EM_ZERODIVIDE | _EM_OVERFLOW | _EM_UNDERFLOW | _EM_INEXACT;
+     _control87(flags, _MCW_EM | _MCW_PC | _MCW_RC);
+diff --git a/src/gvl/support/platform.h b/src/gvl/support/platform.h
+index 86dcaa6..1857b7c 100644
+--- a/src/gvl/support/platform.h
++++ b/src/gvl/support/platform.h
+@@ -88,12 +88,12 @@
+ # elif defined(__i386__) || defined(_M_IX86) || defined(i386) || defined(i486) || defined(intel) || defined(x86) || defined(i86pc)
+ #  define GVL_X86 1
+ # else
+-#  error "Unknown architecture, please add it"
++#  warning "Unknown architecture, please add it"
+ # endif
+ #endif
+ 
+ #if !GVL_LITTLE_ENDIAN && !GVL_BIG_ENDIAN
+-# if GVL_X86 || GVL_X86_64
++# if GVL_X86 || GVL_X86_64 || __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN
+ #  define GVL_LITTLE_ENDIAN 1
+ # else
+ #  define GVL_BIG_ENDIAN 1
+-- 
+2.4.6
+

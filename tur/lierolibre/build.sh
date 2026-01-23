@@ -1,0 +1,9 @@
+TERMUX_PKG_HOMEPAGE=https://launchpad.net/lierolibre
+TERMUX_PKG_DESCRIPTION="Old-school earthworm action game"
+TERMUX_PKG_LICENSE="GPL-3.0"
+TERMUX_PKG_MAINTAINER="@termux"
+TERMUX_PKG_VERSION=0.5
+TERMUX_PKG_SRCURL=http://deb.debian.org/debian/pool/main/l/lierolibre/lierolibre_${TERMUX_PKG_VERSION}.orig.tar.gz
+TERMUX_PKG_SHA256=ba0fd3c32e9592cb922768a8c9b59b85b796848d53b582b09b33452538bb9c36
+TERMUX_PKG_DEPENDS="libconfig, sdl, boost"
+TERMUX_PKG_GROUPS="games"

@@ -1,0 +1,13 @@
+--- lierolibre-0.5.orig/configure.ac
++++ lierolibre-0.5/configure.ac
+@@ -50,9 +50,7 @@
+ 
+ PKG_CHECK_MODULES([LIBCONFIGXX], [libconfig++])
+ 
+-PKG_CHECK_MODULES([SDL_MIXER], [SDL_mixer],
+-	[SDL_MIXER_CFLAGS=`pkg-config --cflags SDL_mixer` \
+-	SDL_MIXER_LIBS=`pkg-config --libs SDL_mixer`],
++PKG_CHECK_MODULES([SDL_MIXER], [SDL_mixer], [],
+ 	[pkgcSDLM="no"])
+ 
+ # Fall back on a quite stupid header check if pkg-config doesn't work

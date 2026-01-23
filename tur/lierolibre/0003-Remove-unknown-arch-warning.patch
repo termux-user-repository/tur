@@ -1,0 +1,26 @@
+From a9592533eeabed075b13d11c64f63f503dc13343 Mon Sep 17 00:00:00 2001
+From: Martin Erik Werner <martinerikwerner@gmail.com>
+Date: Sun, 28 Jun 2015 19:31:30 +0200
+Subject: [PATCH 3/3] Remove unknown arch warning
+
+The warning was just excessivley spammy, remove it.
+---
+ support/platform.h | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/src/gvl/support/platform.h b/src/gvl/support/platform.h
+index 1857b7c..ff6a7d2 100644
+--- a/src/gvl/support/platform.h
++++ b/src/gvl/support/platform.h
+@@ -87,8 +87,6 @@
+ #  define GVL_X86_64 1
+ # elif defined(__i386__) || defined(_M_IX86) || defined(i386) || defined(i486) || defined(intel) || defined(x86) || defined(i86pc)
+ #  define GVL_X86 1
+-# else
+-#  warning "Unknown architecture, please add it"
+ # endif
+ #endif
+ 
+-- 
+2.4.6
+
