@@ -1,11 +1,14 @@
 --- a/meli/Cargo.toml
 +++ b/meli/Cargo.toml
-@@ -69,7 +69,7 @@
- optional = true
- 
- [features]
--default = ["sqlite3", "notmuch", "smtp", "dbus-notifications", "gpgme", "cli-docs", "jmap", "static"]
-+default = ["sqlite3", "notmuch", "smtp", "gpgme", "cli-docs", "jmap"]
+@@ -27,11 +27,9 @@
+     "sqlite3",
+     "notmuch",
+     "smtp",
+-    "dbus-notifications",
+     "gpgme",
+     "cli-docs",
+     "jmap",
+-    "static",
+ ]
  notmuch = ["melib/notmuch"]
  jmap = ["melib/jmap"]
- sqlite3 = ["melib/sqlite3"]
