@@ -1,0 +1,20 @@
+--- a/vendor/gitee.com/chunanyong/dm/zq.go
++++ b/vendor/gitee.com/chunanyong/dm/zq.go
+@@ -933,7 +933,7 @@
+ 		} else {
+ 			var dataBytes = param.bytes[:len(param.bytes)]
+ 			if len(dataBytes) > int(Dm_build_750) {
+-				if dm_build_937.dm_build_845.dm_build_418.MsgVersion >= Dm_build_704 && len(dataBytes) < 0xffffffff &&
++				if dm_build_937.dm_build_845.dm_build_418.MsgVersion >= Dm_build_704 && uint32(len(dataBytes)) < uint32(0xffffffff) &&
+ 					isComplexType(param.tp, param.scale) {
+ 					dm_build_937.dm_build_845.dm_build_417.Dm_build_141(uint16(Dm_build_754))
+ 					dm_build_937.dm_build_845.dm_build_417.Dm_build_165(dataBytes)
+@@ -1206,7 +1206,7 @@
+ 			case []byte:
+ 				if dataBytes, ok := dm_build_982[i].([]byte); ok {
+ 					if len(dataBytes) > int(Dm_build_750) {
+-						if dm_build_981.dm_build_845.dm_build_418.MsgVersion >= Dm_build_704 && len(dataBytes) < 0xffffffff &&
++						if dm_build_981.dm_build_845.dm_build_418.MsgVersion >= Dm_build_704 && uint32(len(dataBytes)) < uint32(0xffffffff) &&
+ 							isComplexType(int(dm_build_981.dm_build_954[i].colType), int(dm_build_981.dm_build_954[i].scale)) {
+ 							dm_build_981.dm_build_845.dm_build_417.Dm_build_141(uint16(Dm_build_754))
+ 							dm_build_981.dm_build_845.dm_build_417.Dm_build_165(dataBytes)
