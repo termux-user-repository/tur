@@ -2464,11 +2464,11 @@ index 99f590d854..016c264e0e 100644
      if (base::FeatureList::IsEnabled(
 -            features::kCopyFromSurfaceAlwaysCallCallback)) {
 +            ::features::kCopyFromSurfaceAlwaysCallCallback)) {
-       std::move(callback).Run(base::unexpected<std::string>(
-           "Main Host or FrameHost is no longer available."));
+       std::move(callback).Run(base::unexpected<content::CopyFromSurfaceError>(
+           content::CopyFromSurfaceError::kFrameGone));
      }
 @@ -229,7 +229,7 @@ void RenderWidgetHostViewBase::CopyMainAndPopupFromSurface(
-          const viz::CopyOutputBitmapWithMetadata& main_result) {
+          const content::CopyFromSurfaceResult& main_result) {
          if (!popup_frame_host) {
            if (base::FeatureList::IsEnabled(
 -                  features::kCopyFromSurfaceAlwaysCallCallback)) {
