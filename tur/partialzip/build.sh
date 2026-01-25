@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://github.com/marcograss/partialzip
 TERMUX_PKG_DESCRIPTION="A CLI utility to download file within ZIP archive, without the need to download entire ZIP archive"
 TERMUX_PKG_LICENSE="MPL-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="5.0.0"
+TERMUX_PKG_VERSION="6.0.0"
 TERMUX_PKG_SRCURL=https://github.com/marcograss/partialzip/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz
-TERMUX_PKG_SHA256=447aa4c7c216e4d67674f0843b283ac0e01320f432cae14385f78619f6813d37
+TERMUX_PKG_SHA256=4966d31dd4bdfde69621b6e70889c53c1ac98e07511e113f937db57ba0522930
 TERMUX_PKG_DEPENDS="openssl, libcurl"
 ## contains indirect deps from `zip` crate
 TERMUX_PKG_BUILD_DEPENDS="bzip2, zstd"
