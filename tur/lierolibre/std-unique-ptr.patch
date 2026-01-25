@@ -1,0 +1,298 @@
+diff -ur temp_src/lierolibre-0.5-orig/src/controller/localController.hpp temp_src/lierolibre-0.5-work/src/controller/localController.hpp
+--- a/src/controller/localController.hpp	2012-11-15 22:14:33.000000000 +0100
++++ b/src/controller/localController.hpp	2026-01-23 15:55:46.429227221 +0100
+@@ -1,3 +1,4 @@
++#include <memory>
+ /*
+  * Copyright (c) 2007-2010, Erik Lindroos <gliptic@gmail.com>
+  * Copyright (c) 2010, "basro"
+@@ -71,11 +72,11 @@
+ 	bool running();
+ 
+ 	Game game;
+-	std::auto_ptr<WeaponSelection> ws;
++	std::unique_ptr<WeaponSelection> ws;
+ 	State state;
+ 	int fadeValue;
+ 	bool goingToMenu;
+-	std::auto_ptr<ReplayWriter> replay;
++	std::unique_ptr<ReplayWriter> replay;
+ };
+ 
+ #endif // LIERO_CONTROLLER_LOCAL_CONTROLLER_HPP
+diff -ur temp_src/lierolibre-0.5-orig/src/controller/replayController.hpp temp_src/lierolibre-0.5-work/src/controller/replayController.hpp
+--- a/src/controller/replayController.hpp	2012-11-15 22:14:33.000000000 +0100
++++ b/src/controller/replayController.hpp	2026-01-23 15:55:46.432143345 +0100
+@@ -1,3 +1,4 @@
++#include <memory>
+ /*
+  * Copyright (c) 2007-2010, Erik Lindroos <gliptic@gmail.com>
+  * Copyright (c) 2010, "basro"
+@@ -67,11 +68,11 @@
+ 	Game* currentGame();
+ 	bool running();
+ 
+-	std::auto_ptr<Game> game;
++	std::unique_ptr<Game> game;
+ 	State state;
+ 	int fadeValue;
+ 	bool goingToMenu;
+-	std::auto_ptr<ReplayReader> replay;
++	std::unique_ptr<ReplayReader> replay;
+ 	gvl::shared_ptr<Common> common;
+ 	//gvl::shared_ptr<Settings> settings;
+ };
+diff -ur temp_src/lierolibre-0.5-orig/src/filesystem.hpp temp_src/lierolibre-0.5-work/src/filesystem.hpp
+--- a/src/filesystem.hpp	2012-11-15 22:14:33.000000000 +0100
++++ b/src/filesystem.hpp	2026-01-23 15:55:15.103985146 +0100
+@@ -85,7 +85,7 @@
+ std::size_t fileLength(FILE* f);
+ 
+ struct dir_itr_imp;
+-typedef std::auto_ptr<dir_itr_imp> dir_itr_imp_ptr;
++typedef std::unique_ptr<dir_itr_imp> dir_itr_imp_ptr;
+ 
+ 
+ void dir_itr_init( dir_itr_imp_ptr & m_imp, char const* dir_path );
+diff -ur temp_src/lierolibre-0.5-orig/src/gfx/blit.cpp temp_src/lierolibre-0.5-work/src/gfx/blit.cpp
+--- a/src/gfx/blit.cpp	2012-11-15 22:14:33.000000000 +0100
++++ b/src/gfx/blit.cpp	2026-01-23 16:11:56.450919811 +0100
+@@ -191,7 +191,7 @@
+ void blitImageOnMap(Common& common, Level& level, PalIdx* mem, int x, int y, int width, int height)
+ {
+ 	int pitch = width;
+-	SDL_Rect clipRect = {0, 0, level.width, level.height};
++	SDL_Rect clipRect = {0, 0, static_cast<Uint16>(level.width), static_cast<Uint16>(level.height)};
+ 	
+ 	CLIP_IMAGE(clipRect);
+ 	
+@@ -240,7 +240,7 @@
+ 	int height = 16;
+ 	int pitch = width;
+ 	
+-	SDL_Rect clip = {0, 0, level.width, level.height};
++	SDL_Rect clip = {0, 0, static_cast<Uint16>(level.width), static_cast<Uint16>(level.height)};
+ 	
+ 	CLIP_IMAGE(clip);
+ 	
+diff -ur temp_src/lierolibre-0.5-orig/src/gfx.cpp temp_src/lierolibre-0.5-work/src/gfx.cpp
+--- a/src/gfx.cpp	2012-11-15 22:14:33.000000000 +0100
++++ b/src/gfx.cpp	2026-01-23 16:04:33.003127272 +0100
+@@ -1965,7 +1965,7 @@
+ 
+ 		if(selection == MaNewGame)
+ 		{
+-			std::auto_ptr<Controller> newController(new LocalController(common, settings));
++			std::unique_ptr<Controller> newController(new LocalController(common, settings));
+ 
+ 			Level* oldLevel = controller->currentLevel();
+ 
+@@ -1984,7 +1984,7 @@
+ 				newController->swapLevel(newLevel);
+ 			}
+ 
+-			controller = newController;
++			controller = std::move(newController);
+ 		}
+ 		else if(selection == MaResumeGame)
+ 		{
+diff -ur temp_src/lierolibre-0.5-orig/src/gfx.hpp temp_src/lierolibre-0.5-work/src/gfx.hpp
+--- a/src/gfx.hpp	2012-11-15 22:14:33.000000000 +0100
++++ b/src/gfx.hpp	2026-01-23 15:55:46.434615289 +0100
+@@ -1,3 +1,4 @@
++#include <memory>
+ /*
+  * Copyright (c) 2007-2010, Erik Lindroos <gliptic@gmail.com>
+  * Copyright (c) 2010, "basro"
+@@ -263,7 +264,7 @@
+ 	gvl::rect lastUpdateRect; // Last region that was updated when flipping
+ 	Rand rand; // PRNG for things that don't affect the game
+ 	gvl::shared_ptr<Common> common;
+-	std::auto_ptr<Controller> controller;
++	std::unique_ptr<Controller> controller;
+ 
+ 	std::vector<Joystick> joysticks;
+ };
+diff -ur temp_src/lierolibre-0.5-orig/src/gvl/containers/bounded_rectangle_packing.hpp temp_src/lierolibre-0.5-work/src/gvl/containers/bounded_rectangle_packing.hpp
+--- a/src/gvl/containers/bounded_rectangle_packing.hpp	2012-11-15 22:14:33.000000000 +0100
++++ b/src/gvl/containers/bounded_rectangle_packing.hpp	2026-01-23 15:55:15.125544942 +0100
+@@ -313,7 +313,7 @@
+ 		bool occupied;
+ 		bool splittable;
+ 		node* parent;
+-		std::auto_ptr<node> children[2];
++		std::unique_ptr<node> children[2];
+ 		int largest_free_width;
+ 		int largest_free_height;
+ 		gvl::rect enclosing_;
+@@ -355,7 +355,7 @@
+ 		root->propagate_largest_();
+ 	}
+ 
+-	std::auto_ptr<node> root;
++	std::unique_ptr<node> root;
+ };
+ 
+ #if 0
+diff -ur temp_src/lierolibre-0.5-orig/src/gvl/io/brigade2.h temp_src/lierolibre-0.5-work/src/gvl/io/brigade2.h
+--- a/src/gvl/io/brigade2.h	2012-11-15 22:14:33.000000000 +0100
++++ b/src/gvl/io/brigade2.h	2026-01-23 15:55:46.437994126 +0100
+@@ -1,3 +1,4 @@
++#include <memory>
+ /*
+  * Copyright (c) 2010, Erik Lindroos <gliptic@gmail.com>
+  * This software is released under the The BSD-2-Clause License:
+@@ -513,7 +514,7 @@
+ 
+ 	uint8_t const* cur_; // Pointer into first_
+ 	uint8_t const* end_; // End of data in first_
+-	std::auto_ptr<bucket> first_;
++	std::unique_ptr<bucket> first_;
+ 	list<bucket> mem_buckets_;
+ 	bucket_source* source_;
+ };
+diff -ur temp_src/lierolibre-0.5-orig/src/gvl/io/brigade2.hpp temp_src/lierolibre-0.5-work/src/gvl/io/brigade2.hpp
+--- a/src/gvl/io/brigade2.hpp	2012-11-15 22:14:33.000000000 +0100
++++ b/src/gvl/io/brigade2.hpp	2026-01-23 15:57:59.482636154 +0100
+@@ -73,7 +73,7 @@
+ 		bucket* b;
+ 	};
+ 
+-	// IMPORTANT: TODO: std::auto_ptr isn't necessarily safe
++	// IMPORTANT: TODO: std::unique_ptr isn't necessarily safe
+ 	// to have in a struct that is meant to be copied. How
+ 	// do we fix this? Temporarily, we have a copy ctor that
+ 	// does const_cast.
+@@ -81,7 +81,7 @@
+ 	{
+ 		auto_read_result(auto_read_result const& other)
+ 		: s(other.s)
+-		, b(const_cast<std::auto_ptr<bucket>&>(other.b))
++		, b(std::move(const_cast<std::unique_ptr<bucket>&>(other.b)))
+ 		{
+ 		}
+ 
+@@ -105,7 +105,7 @@
+ 		}
+ 
+ 		status s;
+-		std::auto_ptr<bucket> b;
++		std::unique_ptr<bucket> b;
+ 	};
+ 
+ 	virtual read_result read(size_type amount = 0, bucket* dest = 0) = 0;
+@@ -251,7 +251,7 @@
+ 
+ protected:
+ 
+-	std::auto_ptr<bucket_data> data_;
++	std::unique_ptr<bucket_data> data_;
+ 	long begin_;
+ 	long end_;
+ };
+@@ -595,7 +595,7 @@
+ 
+ 	uint8_t const* cur_; // Pointer into first_
+ 	uint8_t const* end_; // End of data in first_
+-	std::auto_ptr<bucket> first_;
++	std::unique_ptr<bucket> first_;
+ 	list<bucket> mem_buckets_;
+ 	bucket_source* source_;
+ };
+diff -ur temp_src/lierolibre-0.5-orig/src/gvl/io/deflate_filter.hpp temp_src/lierolibre-0.5-work/src/gvl/io/deflate_filter.hpp
+--- a/src/gvl/io/deflate_filter.hpp	2012-11-15 22:14:33.000000000 +0100
++++ b/src/gvl/io/deflate_filter.hpp	2026-01-23 15:55:46.440943633 +0100
+@@ -1,3 +1,4 @@
++#include <memory>
+ /*
+  * Copyright (c) 2010, Erik Lindroos <gliptic@gmail.com>
+  * This software is released under the The BSD-2-Clause License:
+@@ -199,8 +200,8 @@
+ 	}
+ 
+ 	z_stream str;
+-	std::auto_ptr<bucket_data_mem> buffer;
+-	std::auto_ptr<bucket> in_bucket;
++	std::unique_ptr<bucket_data_mem> buffer;
++	std::unique_ptr<bucket> in_bucket;
+ 
+ 	bool compress;
+ 	bool ended; // TODO: The stream should have some state for closed
+diff -ur temp_src/lierolibre-0.5-orig/src/menu/menu.hpp temp_src/lierolibre-0.5-work/src/menu/menu.hpp
+--- a/src/menu/menu.hpp	2012-11-15 22:14:33.000000000 +0100
++++ b/src/menu/menu.hpp	2026-01-23 15:55:15.152196668 +0100
+@@ -97,13 +97,13 @@
+ 
+ 	bool onLeftRight(Common& common, int dir)
+ 	{
+-		std::auto_ptr<ItemBehavior> b(getItemBehavior(common, selection()));
++		std::unique_ptr<ItemBehavior> b(getItemBehavior(common, selection()));
+ 		return b->onLeftRight(*this, selection(), dir);
+ 	}
+ 
+ 	int onEnter(Common& common)
+ 	{
+-		std::auto_ptr<ItemBehavior> b(getItemBehavior(common, selection()));
++		std::unique_ptr<ItemBehavior> b(getItemBehavior(common, selection()));
+ 		return b->onEnter(*this, selection());
+ 	}
+ 
+@@ -111,7 +111,7 @@
+ 	{
+ 		for(std::size_t i = 0; i < items.size(); ++i)
+ 		{
+-			std::auto_ptr<ItemBehavior> b(getItemBehavior(common, i));
++			std::unique_ptr<ItemBehavior> b(getItemBehavior(common, i));
+ 
+ 			b->onUpdate(*this, i);
+ 		}
+diff -ur temp_src/lierolibre-0.5-orig/src/replay.cpp temp_src/lierolibre-0.5-work/src/replay.cpp
+--- a/src/replay.cpp	2012-11-15 22:14:33.000000000 +0100
++++ b/src/replay.cpp	2026-01-23 15:55:46.443387886 +0100
+@@ -1,3 +1,4 @@
++#include <memory>
+ /*
+  * Copyright (c) 2007-2010, Erik Lindroos <gliptic@gmail.com>
+  * Copyright (c) 2010, "basro"
+@@ -440,7 +441,7 @@
+ 
+ uint32_t const replayMagic = ('L' << 24) | ('R' << 16) | ('P' << 8) | 'F';
+ 
+-std::auto_ptr<Game> ReplayReader::beginPlayback(gvl::shared_ptr<Common> common)
++std::unique_ptr<Game> ReplayReader::beginPlayback(gvl::shared_ptr<Common> common)
+ {
+ 	uint32_t readMagic = gvl::read_uint32(reader);
+ 	if(readMagic != replayMagic)
+@@ -451,7 +452,7 @@
+ 	
+ 	gvl::shared_ptr<Settings> settings(new Settings);
+ 
+-	std::auto_ptr<Game> game(new Game(common, settings));
++	std::unique_ptr<Game> game(new Game(common, settings));
+ 
+ 	read(reader, context, *game);
+ #ifdef DEBUG_REPLAYS
+diff -ur temp_src/lierolibre-0.5-orig/src/replay.hpp temp_src/lierolibre-0.5-work/src/replay.hpp
+--- a/src/replay.hpp	2012-11-15 22:14:33.000000000 +0100
++++ b/src/replay.hpp	2026-01-23 15:55:15.164929538 +0100
+@@ -127,7 +127,7 @@
+ 		// Nothing
+ 	}
+ 
+-	std::auto_ptr<Game> beginPlayback(gvl::shared_ptr<Common> common);
++	std::unique_ptr<Game> beginPlayback(gvl::shared_ptr<Common> common);
+ 	bool playbackFrame();
+ 
+ 	gvl::filter_ptr str;
+diff -ur temp_src/lierolibre-0.5-orig/src/worm.hpp temp_src/lierolibre-0.5-work/src/worm.hpp
+--- a/src/worm.hpp	2012-11-15 22:14:33.000000000 +0100
++++ b/src/worm.hpp	2026-01-23 15:55:15.170333787 +0100
+@@ -432,7 +432,7 @@
+ 	//Viewport* viewport; // !CLONING
+ 	int index; // 0 or 1
+ 
+-	std::auto_ptr<WormAI> ai;
++	std::unique_ptr<WormAI> ai;
+ 
+ 	int reacts[4];
+ 	WormWeapon weapons[5];

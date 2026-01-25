@@ -1,0 +1,205 @@
+From b27e3604aa6bfbfcc50db1000b394d06c87ae2f2 Mon Sep 17 00:00:00 2001
+From: Martin Erik Werner <martinerikwerner@gmail.com>
+Date: Mon, 17 Aug 2015 15:54:53 +0200
+Subject: [PATCH] Adapt to new libconfig++
+
+The new libconfig++ have removed operator[](const std::string &), so use
+const char* instead via c_str().
+
+Thanks to Simon McVittie for preparing a patch, which initially went
+unnoticed, but eventually helped in creating the final result here.
+---
+ src/common.cpp       | 12 ++++++------
+ src/configCompat.cpp |  6 +++---
+ src/configHelper.cpp | 14 +++++---------
+ src/constants.cpp    |  6 +++---
+ src/gfx/palette.cpp  |  6 +++---
+ 5 files changed, 20 insertions(+), 24 deletions(-)
+
+diff --git a/src/common.cpp b/src/common.cpp
+index 2d6ada5..4942b05 100644
+--- a/src/common.cpp
++++ b/src/common.cpp
+@@ -162,7 +162,7 @@ void Texts::loadFromCFG(std::string cfgFilePath)
+ 	const libconfig::Setting &sgmodes = texts["gameModes"];
+ 	for(int i = 0; i < 4; ++i)
+ 	{
+-		gameModes[i] = (char const*)sgmodes["gameModes" + to_string(i)];
++		gameModes[i] = (char const*)sgmodes[("gameModes" + to_string(i)).c_str()];
+ 	}
+ 
+ 	const libconfig::Setting &sgmspec = texts["gameModeSpec"];
+@@ -181,13 +181,13 @@ void Texts::loadFromCFG(std::string cfgFilePath)
+ 	const libconfig::Setting &swstates = texts["weapStates"];
+ 	for(int i = 0; i < 3; ++i)
+ 	{
+-		 weapStates[i] = (char const*)swstates["weapStates" + to_string(i)];
++		 weapStates[i] = (char const*)swstates[("weapStates" + to_string(i)).c_str()];
+ 	}
+ 
+ 	const libconfig::Setting &sknames = texts["keyNames"];
+ 	for(int i = 1; i < 177; ++i) // First key starts at 1
+ 	{
+-		keyNames[i] = (char const*)sknames["keyNames" + to_string(i)];
++		keyNames[i] = (char const*)sknames[("keyNames" + to_string(i)).c_str()];
+ 	}
+ 
+ 	selWeap = (char const*)texts["selWeap"];
+@@ -315,8 +315,8 @@ void Common::loadPaletteFromCFG(std::string cfgFilePath)
+ 	const libconfig::Setting &scanim = palette["colorAnim"];
+ 	for(int i = 0; i < 4; ++i)
+ 	{
+-		colorAnim[i].from = (int)scanim["colorAnim" + to_string(i) + "from"];
+-		colorAnim[i].to = (int)scanim["colorAnim" + to_string(i) + "to"];
++		colorAnim[i].from = (int)scanim[("colorAnim" + to_string(i) + "from").c_str()];
++		colorAnim[i].to = (int)scanim[("colorAnim" + to_string(i) + "to").c_str()];
+ 	}
+ }
+ 
+@@ -383,7 +383,7 @@ void Common::loadMaterialsFromCFG(std::string cfgFilePath)
+ 
+ 	for(int i = 0; i < 256; ++i)
+ 	{
+-		const libconfig::Setting &smflags = smaterials["flags" + to_string(i)];
++		const libconfig::Setting &smflags = smaterials[("flags" + to_string(i)).c_str()];
+ 		materials[i].flags = smflags;
+ 	}
+ }
+diff --git a/src/configCompat.cpp b/src/configCompat.cpp
+index 1aeb262..a72c40f 100644
+--- a/src/configCompat.cpp
++++ b/src/configCompat.cpp
+@@ -160,19 +160,19 @@ void Common::loadConstantsFromCFGVer0(string cfgFilePath)
+ 	const Setting &vconstants = constants["Values"];
+ 	for(int i = 0; i < MaxC; ++i)
+ 	{
+-		C[i] = (int)vconstants[valueConstantsNamesCFGVer0[i]];
++		C[i] = (int)vconstants[valueConstantsNamesCFGVer0[i].c_str()];
+ 	}
+ 
+ 	const Setting &sconstants = constants["Strings"];
+ 	for(int i = 0; i < MaxS; ++i)
+ 	{
+-		S[i]= (char const*)sconstants[stringConstantsNamesCFGVer0[i]];
++		S[i]= (char const*)sconstants[stringConstantsNamesCFGVer0[i].c_str()];
+ 	}
+ 
+ 	const Setting &hconstants = constants["Hacks"];
+ 	for(int i = 0; i < MaxH; ++i)
+ 	{
+-		H[i] = (bool)hconstants[hackConstantsNamesVer0[i]];
++		H[i] = (bool)hconstants[hackConstantsNamesVer0[i].c_str()];
+ 	}
+ }
+ 
+diff --git a/src/configHelper.cpp b/src/configHelper.cpp
+index fcd1f3f..a63bddc 100644
+--- a/src/configHelper.cpp
++++ b/src/configHelper.cpp
+@@ -54,15 +54,11 @@ template Uint8 ConfigHelper::getValue<Uint8, const Setting, int>(const Setting &
+ 
+ template Uint8 ConfigHelper::getValue<Uint8, const Setting, char const*>(const Setting &node, char const* index);
+ 
+-template Uint8 ConfigHelper::getValue<Uint8, const Setting, string>(const Setting &node, string index);
+-
+ // Non-const
+ template Uint8 ConfigHelper::getValue<Uint8, Setting, int>(Setting &node, int index);
+ 
+ template Uint8 ConfigHelper::getValue<Uint8, Setting, char const*>(Setting &node, char const* index);
+ 
+-template Uint8 ConfigHelper::getValue<Uint8, Setting, string>(Setting &node, string index);
+-
+ 
+ // Since we still need specialisation per value type (Setting::Type),
+ // no need to templateify these
+@@ -72,7 +68,7 @@ void ConfigHelper::put(Setting &node, string variable, string value)
+ 	{
+ 		node.add(variable, Setting::TypeString) = value;
+ 	} else {
+-		Setting &var = node[variable];
++		Setting &var = node[variable.c_str()];
+ 		var = value;
+ 	}
+ }
+@@ -83,7 +79,7 @@ void ConfigHelper::put(Setting &node, string variable, int value)
+ 	{
+ 		node.add(variable, Setting::TypeInt) = value;
+ 	} else {
+-		Setting &var = node[variable];
++		Setting &var = node[variable.c_str()];
+ 		var = value;
+ 	}
+ }
+@@ -94,7 +90,7 @@ void ConfigHelper::put(Setting &node, string variable, Uint8 value)
+ 	{
+ 		node.add(variable, Setting::TypeInt) = value;
+ 	} else {
+-		Setting &var = node[variable];
++		Setting &var = node[variable.c_str()];
+ 		var = value;
+ 	}
+ }
+@@ -105,7 +101,7 @@ void ConfigHelper::put(Setting &node, string variable, bool value)
+ 	{
+ 		node.add(variable, Setting::TypeBoolean) = value;
+ 	} else {
+-		Setting &var = node[variable];
++		Setting &var = node[variable.c_str()];
+ 		var = value;
+ 	}
+ }
+@@ -135,6 +131,6 @@ Setting& ConfigHelper::getSubgroup(Setting &node, string groupName)
+ 	{
+ 		node.add(groupName, Setting::TypeGroup);
+ 	}
+-	return node[groupName];
++	return node[groupName.c_str()];
+ }
+ 
+diff --git a/src/constants.cpp b/src/constants.cpp
+index 7fced6a..cf7bbfc 100644
+--- a/src/constants.cpp
++++ b/src/constants.cpp
+@@ -523,19 +523,19 @@ void Common::loadConstantsFromCFG(std::string cfgFilePath)
+ 	const libconfig::Setting &vconstants = constants["Values"];
+ 	for(int i = 0; i < MaxC; ++i)
+ 	{
+-		C[i] = (int)vconstants[valueConstantsNames[i]];
++		C[i] = (int)vconstants[valueConstantsNames[i].c_str()];
+ 	}
+ 
+ 	const libconfig::Setting &sconstants = constants["Strings"];
+ 	for(int i = 0; i < MaxS; ++i)
+ 	{
+-		S[i]= (char const*)sconstants[stringConstantsNames[i]];
++		S[i]= (char const*)sconstants[stringConstantsNames[i].c_str()];
+ 	}
+ 
+ 	const libconfig::Setting &hconstants = constants["Hacks"];
+ 	for(int i = 0; i < MaxH; ++i)
+ 	{
+-		H[i] = (bool)hconstants[hackConstantsNames[i]];
++		H[i] = (bool)hconstants[hackConstantsNames[i].c_str()];
+ 	}
+ }
+ 
+diff --git a/src/gfx/palette.cpp b/src/gfx/palette.cpp
+index 3fd08c4..3d3bf22 100644
+--- a/src/gfx/palette.cpp
++++ b/src/gfx/palette.cpp
+@@ -124,9 +124,9 @@ void Palette::readFromCFG(std::string cfgFilePath)
+ 
+ 	for(int i = 0; i < 256; ++i)
+ 	{
+-		entries[i].r = cfgHelp.getValue<Uint8>(spentries, "entries" + to_string(i) + "r");
+-		entries[i].g = cfgHelp.getValue<Uint8>(spentries, "entries" + to_string(i) + "g");
+-		entries[i].b = cfgHelp.getValue<Uint8>(spentries, "entries" + to_string(i) + "b");
++		entries[i].r = cfgHelp.getValue<Uint8>(spentries, ("entries" + to_string(i) + "r").c_str());
++		entries[i].g = cfgHelp.getValue<Uint8>(spentries, ("entries" + to_string(i) + "g").c_str());
++		entries[i].b = cfgHelp.getValue<Uint8>(spentries, ("entries" + to_string(i) + "b").c_str());
+ 	}
+ }
+ 
+-- 
+2.4.6
+

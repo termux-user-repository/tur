@@ -1,0 +1,228 @@
+--- a/src/gvl/math/ieee.cpp.orig	2026-01-23 14:59:15.523515836 +0100
++++ b/src/gvl/math/ieee.cpp	2026-01-23 14:59:30.932081449 +0100
+@@ -31,7 +31,7 @@
+ #include <excpt.h>
+ #endif
+ 
+-#if GVL_GCC && GVL_LINUX
++#if GVL_GCC && GVL_LINUX && !defined(__ANDROID__)
+ #include <fpu_control.h>
+ #endif
+ #include <float.h>
+@@ -57,11 +57,11 @@
+ #elif GVL_GCC && GVL_WIN32
+     unsigned int const flags = _RC_NEAR | _PC_53 | _EM_INVALID | _EM_DENORMAL | _EM_ZERODIVIDE | _EM_OVERFLOW | _EM_UNDERFLOW | _EM_INEXACT;
+     _control87(flags, _MCW_EM | _MCW_PC | _MCW_RC);
+-#elif GVL_GCC && GVL_LINUX
++#elif GVL_GCC && GVL_LINUX && !defined(__ANDROID__)
+ 	fpu_control_t v = _FPU_DOUBLE | _FPU_MASK_IM | _FPU_MASK_DM | _FPU_MASK_ZM | _FPU_MASK_OM | _FPU_MASK_UM | _FPU_MASK_PM | _FPU_RC_NEAREST;
+ 	_FPU_SETCW(v);
+ #else
+-#  error "Don't know what to do on this platform"
++//#  error "Don't know what to do on this platform"
+ #endif
+ }
+ 
+@@ -97,4 +97,4 @@
+ 	fprintf(stderr, "gvl_flush_to_zero_context is unsupported");
+ 	exit(1);
+ #endif
+-}
++}
+\ Brak znaku nowej linii na końcu pliku
+--- a/src/gvl/io/encoding.hpp.orig	2026-01-23 14:59:15.527515779 +0100
++++ b/src/gvl/io/encoding.hpp	2026-01-23 15:00:19.475357708 +0100
+@@ -34,6 +34,8 @@
+ #include "../containers/string.hpp"
+ #include <cstring>
+ #include <string> // TEMP (maybe)
++#include <memory>
++#include <cstdint>
+ 
+ 
+ namespace gvl
+@@ -43,10 +45,14 @@
+ struct basic_text_writer
+ {
+ 	DerivedT& derived()
+-	{ return *static_cast<DerivedT*>(this); }
++	{
++		return *static_cast<DerivedT*>(this);
++	}
+ 
+ 	DerivedT const& derived() const
+-	{ return *static_cast<DerivedT const*>(this); }
++	{
++		return *static_cast<DerivedT const*>(this);
++	}
+ };
+ 
+ 
+@@ -79,12 +85,17 @@
+ 	// Different naming to avoid infinite recursion if
+ 	// not defined in DerivedT.
+ 	bucket_source* get_source()
+-	{ return derived()->source(); }
++	{
++		return derived()->source();
++	}
+ 	*/
+ 
+ 	/*
+ 	shared_ptr<stream> get_source()
+-	{ return source_; }*/
++	{
++		return source_;
++	}
++	*/
+ 
+ 	uint8_t get()
+ 	{
+@@ -108,7 +119,7 @@
+ 
+ 			stream::read_status status = next_bucket_(uint32_t(len));
+ 			if(status != stream::read_ok)
+-				throw stream_read_error(status, "Read error in get()");
++				throw stream_read_error(status, "Read error in get()");
+ 		}
+ 	}
+ 
+@@ -236,10 +247,14 @@
+ 	shared_ptr<stream> detach();
+ 
+ 	stream& source()
+-	{ return *source_; }
++	{
++		return *source_;
++	}
+ 
+ 	bool has_source() const
+-	{ return source_.get() != 0; }
++	{
++		return source_.get() != 0;
++	}
+ 
+ 	void attach(shared_ptr<stream> source_new)
+ 	{
+@@ -311,7 +326,7 @@
+ 
+ 	uint8_t const* cur_; // Pointer into first_
+ 	uint8_t const* end_; // End of data in first_
+-	std::auto_ptr<bucket> first_;
++	std::unique_ptr<bucket> first_;
+ 	shared_ptr<stream> source_;
+ };
+ 
+@@ -426,10 +441,14 @@
+ 	}
+ 
+ 	stream& sink()
+-	{ return *sink_; }
++	{
++		return *sink_;
++	}
+ 
+ 	bool has_sink() const
+-	{ return sink_.get() != 0; }
++	{
++		return sink_.get() != 0;
++	}
+ 
+ 	void attach(shared_ptr<stream> new_sink)
+ 	{
+@@ -455,11 +474,8 @@
+ 		std::swap(end_, b.end_);
+ 		std::swap(cap_, b.cap_);
+ 
+-		{ // auto_ptr doesn't have swap, so we need to do this
+-			std::auto_ptr<bucket_data_mem> tmp = buffer_;
+-			buffer_ = b.buffer_;
+-			b.buffer_ = tmp;
+-		}
++		std::swap(buffer_, b.buffer_);
++
+ 		std::swap(estimated_needed_buffer_size_, b.estimated_needed_buffer_size_);
+ 	}
+ 
+@@ -505,7 +521,7 @@
+ 	uint8_t* end_; // End of capacity in buffer_
+ 	bucket_size cap_;
+ 	//list<bucket> mem_buckets_;
+-	std::auto_ptr<bucket_data_mem> buffer_;
++	std::unique_ptr<bucket_data_mem> buffer_;
+ 	bucket_size estimated_needed_buffer_size_;
+ 	bucket_size max_bucket_size;
+ };
+@@ -520,16 +536,23 @@
+ 	}
+ 
+ 	void flush()
+-	{ w.flush(); }
++	{
++		w.flush();
++	}
+ 
+ 	void put(uint32_t c)
+-	{ w.put((uint8_t)c); }
++	{
++		w.put((uint8_t)c);
++	}
+ 
+ 	void put(uint8_t const* b, std::size_t length)
+-	{ w.put(b, length); }
++	{
++		w.put(b, length);
++	}
+ 
+ 	Writer& w;
+-};*/
++};
++*/
+ 
+ template<typename D>
+ inline D& operator<<(basic_text_writer<D>& self_, uint32_t x)
+@@ -583,7 +606,7 @@
+ inline D& operator<<(basic_text_writer<D>& self_, void const* ptr)
+ {
+ 	// TODO: Very TEMP
+-	return (self_ << uint32_t(ptr));
++	return (self_ << uintptr_t(ptr));
+ }
+ 
+ struct endl_tag_ {};
+@@ -612,7 +635,9 @@
+ 	}
+ 
+ 	void put(uint32_t x)
+-	{ buffer.push_back(x); }
++	{
++		buffer.push_back(x);
++	}
+ 
+ 	void put(uint8_t const* p, std::size_t len)
+ 	{
+@@ -651,4 +676,4 @@
+ 
+ }
+ 
+-#endif // UUID_ADEA58A2C81F42C25E8CAFA32ED72A18
++#endif // UUID_ADEA58A2C81F42C25E8CAFA32ED72A18
+\ Brak znaku nowej linii na końcu pliku
+--- a/src/gvl/sockets/socketstream.hpp.orig	2026-01-23 14:59:15.531515723 +0100
++++ b/src/gvl/sockets/socketstream.hpp	2026-01-23 15:00:51.498161392 +0100
+@@ -95,7 +95,7 @@
+ 	{
+ 		if(flags::all(connecting) && flags::no(error_occured))
+ 		{
+-			std::auto_ptr<select_fd_set> fdset(new_select_fd_set());
++			std::unique_ptr<select_fd_set> fdset(new_select_fd_set());
+ 
+ 			fdset->set(sock);
+ 
+@@ -196,4 +196,4 @@
+ 
+ } // namespace gvl
+ 
+-#endif // UUID_A55DFD76DE724F2E2A89CE91B9EDB4DA
++#endif // UUID_A55DFD76DE724F2E2A89CE91B9EDB4DA
+\ Brak znaku nowej linii na końcu pliku

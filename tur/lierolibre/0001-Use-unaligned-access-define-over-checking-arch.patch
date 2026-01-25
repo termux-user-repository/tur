@@ -1,0 +1,26 @@
+From 396f19b6b7743d394307f70f0c0108419824437b Mon Sep 17 00:00:00 2001
+From: Martin Erik Werner <martinerikwerner@gmail.com>
+Date: Sun, 28 Jun 2015 16:31:34 +0200
+Subject: [PATCH 1/3] Use unaligned access define over checking arch
+
+This todo item seems like it done, and just needed implementing...
+---
+ io/encoding.hpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/gvl/io/encoding.hpp b/src/gvl/io/encoding.hpp
+index c491677..89bb612 100644
+--- a/src/gvl/io/encoding.hpp
++++ b/src/gvl/io/encoding.hpp
+@@ -374,7 +374,7 @@ struct octet_stream_writer
+ 		// inlining of the common case
+ 		if(std::size_t(end_ - cur_) >= len)
+ 		{
+-#if GVL_X86 || GVL_X86_64 // TODO: A define that says whether unaligned access is allowed
++#if GVL_UNALIGNED_ACCESS
+ 			if(len < 64) // TODO: Tweak this limit
+ 			{
+ 				while(len > 4)
+-- 
+2.4.6
+
