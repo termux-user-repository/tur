@@ -5,7 +5,7 @@ TERMUX_PKG_DESCRIPTION="A fully integrated 3D graphics creation suite"
 TERMUX_PKG_LICENSE="GPL-3.0-or-later"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="5.0.1"
-TERMUX_PKG_REVISION=2
+TERMUX_PKG_REVISION=3
 TERMUX_PKG_SRCURL=git+https://projects.blender.org/blender/blender
 # Blender does not support 32-bit
 TERMUX_PKG_EXCLUDED_ARCHES="arm, i686"
