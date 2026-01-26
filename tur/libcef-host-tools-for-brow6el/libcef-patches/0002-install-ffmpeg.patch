@@ -1,0 +1,20 @@
+--- a/cef/cmake/cef_variables.cmake.in
++++ b/cef/cmake/cef_variables.cmake.in
+@@ -232,6 +232,7 @@
+   set(CEF_BINARY_FILES
+     chrome-sandbox
+     libcef.so
++    libffmpeg.so
+     libEGL.so
+     libGLESv2.so
+     libvk_swiftshader.so
+--- a/cef/tools/make_distrib.py
++++ b/cef/tools/make_distrib.py
+@@ -1367,6 +1367,7 @@
+   binaries = [
+       {'path': 'chrome_sandbox', 'out_path': 'chrome-sandbox'},
+       {'path': libcef_so},
++      {'path': 'libffmpeg.so'},
+       {'path': 'libEGL.so'},
+       {'path': 'libGLESv2.so'},
+       {'path': 'libvk_swiftshader.so'},
