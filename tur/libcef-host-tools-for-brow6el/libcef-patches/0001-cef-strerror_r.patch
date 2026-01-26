@@ -1,0 +1,11 @@
+--- a/cef/libcef_dll/base/cef_logging.cc
++++ b/cef/libcef_dll/base/cef_logging.cc
+@@ -38,7 +38,7 @@
+ #if defined(OS_POSIX)
+ // From base/posix/safe_strerror.cc
+ 
+-#if defined(__GLIBC__) || defined(OS_NACL)
++#if defined(__GLIBC__) || defined(OS_NACL) || defined(__ANDROID__)
+ #define USE_HISTORICAL_STRERRO_R 1
+ #else
+ #define USE_HISTORICAL_STRERRO_R 0
