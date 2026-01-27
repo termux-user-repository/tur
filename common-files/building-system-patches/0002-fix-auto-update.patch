@@ -1,7 +1,7 @@
 Only search packages from TUR repository when auto-updating.
 --- a/scripts/bin/update-packages
 +++ b/scripts/bin/update-packages
-@@ -336,6 +336,11 @@ _should_update() {
+@@ -415,6 +417,11 @@ _should_update() {
  		termux_error_exit "directory '${pkg_dir}' is not a package."
  	fi
  
@@ -13,31 +13,31 @@ Only search packages from TUR repository when auto-updating.
  	# `[[ "$(<"$file")" =~ regex ]]` is bash builtin solution for `grep -q` without spawning extra process
  	# it is needed to pre-fetch and filter packages as fast as possible (it is 6.5 times faster than `grep`)
  	case "${PACKAGES_OPT_OUT:-}" in
-@@ -378,7 +383,7 @@ echo "INFO: Running update for: $*"
- 
- if [[ "$1" == "@all" ]]; then
+@@ -471,7 +478,7 @@ if [[ "$1" == "@all" ]]; then
+ 	# pre-cache the latest tags and eliminate packages without updates
+ 	# when it is possible to determine that from the API response alone.
  	_fetch_and_cache_tags
--	for repo_dir in $(jq --raw-output 'del(.pkg_format) | keys | .[]' "${TERMUX_SCRIPTDIR}/repo.json"); do
-+	for repo_dir in "tur" "tur-on-device" "tur-multilib" "tur-hacking"; do
- 		for pkg_dir in "${repo_dir}"/*; do
- 			_unix_millis="$(date +%10s%3N)"
- 			! _should_update "${pkg_dir}" && continue # Skip if not needed.
-@@ -398,7 +403,7 @@ else
- 	for pkg in "$@"; do
- 		_unix_millis="$(date +%10s%3N)"
- 		if [ ! -d "${pkg}" ]; then # If only package name is given, try to find it's directory.
--			for repo_dir in $(jq --raw-output 'del(.pkg_format) | keys | .[]' "${TERMUX_SCRIPTDIR}/repo.json"); do
-+			for repo_dir in "tur" "tur-on-device" "tur-multilib" "tur-hacking"; do
- 				if [ -d "${repo_dir}/${pkg}" ]; then
- 					pkg="${repo_dir}/${pkg}"
- 					break
+-	for channel in $(jq --raw-output 'del(.pkg_format) | keys | .[]' "${TERMUX_SCRIPTDIR}/repo.json"); do
++	for channel in "tur" "tur-on-device" "tur-multilib" "tur-hacking"; do
+ 		for pkg_dir in "${channel}"/*; do
+ 			# Check if we should be putting this package into the list.
+ 			# Skip it if:
+@@ -489,7 +496,7 @@ fi
+ for pkg_dir in "$@"; do
+ 	_unix_millis="$(date +%10s%3N)"
+ 	if [[ ! -d "${pkg_dir}" ]]; then # If only package name is given, try to find it's directory.
+-		for channel in $(jq --raw-output 'del(.pkg_format) | keys | .[]' "${TERMUX_SCRIPTDIR}/repo.json"); do
++		for channel in "tur" "tur-on-device" "tur-multilib" "tur-hacking"; do
+ 			if [[ -d "${channel}/${pkg_dir}" ]]; then
+ 				pkg_dir="${channel}/${pkg_dir}"
+ 				break
 Sleep 1s after update in order to not reach GitHub rate limit.
 --- a/scripts/bin/update-packages
 +++ b/scripts/bin/update-packages
-@@ -118,6 +118,7 @@
- 	echo # Newline.
- 	echo "INFO: Updating ${TERMUX_PKG_NAME} [Current version: ${TERMUX_PKG_VERSION}]"
- 	termux_pkg_auto_update
+@@ -130,6 +130,7 @@ _update() {
+ 	exec {IPC_FIFO_FD}<>"$IPC_FIFO"
+ 	termux_pkg_auto_update 3>& "${IPC_FIFO_FD}"
+ 	exec {IPC_FIFO_FD}>&-
 +	sleep 1s
  }
  
@@ -45,14 +45,14 @@ Sleep 1s after update in order to not reach GitHub rate limit.
 Do not run check-updated step, which will make it easy to reach GitHub rate limit.
 --- a/scripts/bin/update-packages
 +++ b/scripts/bin/update-packages
-@@ -195,6 +195,7 @@
+@@ -316,6 +317,7 @@ _fetch_and_cache_tags() {
  }
  
  _check_updated() {
 +	return 1
- 	if [[ -n "${_LATEST_TAGS[${1##*/}]:-}" ]]; then
- 		(
- 			set +eu
+ 	local latest_tag="${_LATEST_TAGS[${1##*/}]:-}"
+ 
+ 	if [[ -z "${latest_tag}" ]]; then
 --- a/scripts/bin/build-package-dry-run-simulation.sh
 +++ b/scripts/bin/build-package-dry-run-simulation.sh
 @@ -12,6 +12,10 @@ TERMUX_PACKAGES_DIRECTORIES="

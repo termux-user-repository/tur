@@ -1,9 +1,9 @@
 --- a/scripts/updates/utils/termux_pkg_upgrade_version.sh
 +++ b/scripts/updates/utils/termux_pkg_upgrade_version.sh
-@@ -96,7 +96,7 @@
- 		fi
+@@ -129,7 +129,7 @@ termux_pkg_upgrade_version() {
  	done
  
+ 	# check cleanup conditions
 -	local big_package=false
 +	local big_package=true
  	while IFS= read -r p; do
