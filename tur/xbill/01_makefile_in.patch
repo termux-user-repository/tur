@@ -7,10 +7,10 @@ Author: Barry deFreese <bddebian@comcast.net>
  exec_prefix=@exec_prefix@
  bindir=@bindir@
 -mandir=@mandir@
-+mandir=/usr/share/man
++mandir=@prefix@/share/man
  datadir=@datadir@
 -localstatedir=@localstatedir@
-+localstatedir=/var/games
++localstatedir=@prefix@/var/games
  top_srcdir = @top_srcdir@
  srcdir = @srcdir@
  VPATH = @srcdir@
@@ -30,7 +30,7 @@ Author: Barry deFreese <bddebian@comcast.net>
 -	$(MKINSTALLDIRS) ${DESTDIR}${localstatedir}/xbill
 -	$(INSTALL_DATA) -m 0666 ${srcdir}/scores ${DESTDIR}${localstatedir}/xbill
 +	$(MKINSTALLDIRS) ${DESTDIR}${localstatedir}
-+	$(INSTALL_DATA) -o root -g games -m 0664 ${srcdir}/scores ${DESTDIR}${localstatedir}/xbill.scores.default
++	$(INSTALL_DATA) -m 0664 ${srcdir}/scores ${DESTDIR}${localstatedir}/xbill.scores.default
  	$(MKINSTALLDIRS) ${DESTDIR}${datadir}/xbill
  	$(MKINSTALLDIRS) ${DESTDIR}${datadir}/xbill/pixmaps
  	$(MKINSTALLDIRS) ${DESTDIR}${datadir}/xbill/bitmaps
