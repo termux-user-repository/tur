@@ -434,9 +434,15 @@ termux_step_make_install() {
 			--output-dir $TERMUX_PKG_BUILDDIR/dist \
 			--${libcef_target_cpu}-build --ninja-build --minimal --no-archive
 
+	local _dist_suffix
+	_dist_suffix="$libcef_target_cpu"
+	if [ "$libcef_target_cpu" = "x64" ]; then
+		_dist_suffix="64"
+	fi
+
 	# Install all the client files
 	local _dist_dir_client _install_prefix_client
-	_dist_dir_client="$TERMUX_PKG_BUILDDIR/dist/cef_binary_${TERMUX_PKG_VERSION}_linux${libcef_target_cpu}_client"
+	_dist_dir_client="$TERMUX_PKG_BUILDDIR/dist/cef_binary_${TERMUX_PKG_VERSION}_linux${_dist_suffix}_client"
 	_install_prefix_client="$TERMUX_PREFIX/opt/$TERMUX_PKG_NAME"
 	rm -rf "$_install_prefix_client"
 	mkdir -p "$_install_prefix_client"
@@ -445,7 +451,7 @@ termux_step_make_install() {
 
 	# Install all the dev files, symlink to save space
 	local _dist_dir_dev _install_prefix_dev
-	_dist_dir_dev="$TERMUX_PKG_BUILDDIR/dist/cef_binary_${TERMUX_PKG_VERSION}_linux${libcef_target_cpu}_minimal"
+	_dist_dir_dev="$TERMUX_PKG_BUILDDIR/dist/cef_binary_${TERMUX_PKG_VERSION}_linux${_dist_suffix}_minimal"
 	_install_prefix_dev="$TERMUX_PREFIX/opt/$TERMUX_PKG_NAME-dev"
 	rm -rf "$_install_prefix_dev"
 	mkdir -p "$_install_prefix_dev"
