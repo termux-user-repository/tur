@@ -1,0 +1,14 @@
+diff --git a/android-build.jam b/android-build.jam
+new file mode 100644
+index 000000000..9fe529f17
+--- /dev/null
++++ b/android-build.jam
+@@ -0,0 +1,8 @@
++CC = @CC@ ;
++CCFLAGS = @CFLAGS@ ;
++LINK = @CC@ ;
++LINKFLAGS = @LDFLAGS@ ;
++GC_CFLAGS = -DGC_USE_BOEHM -DGC_THREADS ;
++GC_LFLAGS = -lgc ;
++
++include $(SYSTEM_BUILD_SCRIPTS)/@ARCH@-linux-build.jam ;
