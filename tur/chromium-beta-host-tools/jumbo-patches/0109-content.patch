@@ -2575,3 +2575,14 @@ index 77571a37e4..1d8906af14 100644
    } else {
      SendUpdatesToRendererIfNeeded(std::move(page_restore_params),
                                    base::NullCallback());
+--- a/content/browser/site_info.cc
++++ b/content/browser/site_info.cc
+@@ -59,7 +59,7 @@
+   }
+ 
+ #if !BUILDFLAG(IS_ANDROID)
+-  if (features::kInitialWebUIUseSeparateProcess.Get() &&
++  if (::features::kInitialWebUIUseSeparateProcess.Get() &&
+       GetContentClient()->browser()->IsInitialWebUIURL(url)) {
+     // If initial WebUIs need to use a different process separate from other
+     // WebUIs, use the full URL for process lock instead of just the TLD.
