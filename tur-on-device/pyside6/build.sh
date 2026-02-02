@@ -7,9 +7,9 @@ LICENSES/GPL-3.0-only.txt
 LICENSES/Qt-GPL-exception-1.0.txt
 "
 TERMUX_PKG_MAINTAINER="@termux"
-TERMUX_PKG_VERSION="6.10.1"
+TERMUX_PKG_VERSION="6.10.2"
 TERMUX_PKG_SRCURL="https://download.qt.io/official_releases/QtForPython/pyside6/PySide6-$TERMUX_PKG_VERSION-src/pyside-setup-everywhere-src-$TERMUX_PKG_VERSION.tar.xz"
-TERMUX_PKG_SHA256=fd54f40853d61dfd845dbb40d4f89fbd63df5ed341b3d9a2c77bb5c947a0a838
+TERMUX_PKG_SHA256=05eec38bb71bffff8860786e3c0766cc4b86affc72439bd246c54889bdcb7400
 TERMUX_PKG_AUTO_UPDATE=true
 # Some packaging code here is based on Arch Linux, other code is original
 # https://gitlab.archlinux.org/archlinux/packaging/packages/pyside6/-/blob/8a277986a1fec50c6d8479c5c1afa664d0e20347/PKGBUILD
