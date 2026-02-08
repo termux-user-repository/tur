@@ -13,23 +13,23 @@ Only search packages from TUR repository when auto-updating.
  	# `[[ "$(<"$file")" =~ regex ]]` is bash builtin solution for `grep -q` without spawning extra process
  	# it is needed to pre-fetch and filter packages as fast as possible (it is 6.5 times faster than `grep`)
  	case "${PACKAGES_OPT_OUT:-}" in
-@@ -471,7 +478,7 @@ if [[ "$1" == "@all" ]]; then
- 	# pre-cache the latest tags and eliminate packages without updates
- 	# when it is possible to determine that from the API response alone.
- 	_fetch_and_cache_tags
+@@ -490,7 +490,7 @@ fi
+ 
+ if [[ "$1" == "@all" ]]; then
+ 	declare -a PACKAGE_LIST=()
 -	for channel in $(jq --raw-output 'del(.pkg_format) | keys | .[]' "${TERMUX_SCRIPTDIR}/repo.json"); do
 +	for channel in "tur" "tur-on-device" "tur-multilib" "tur-hacking"; do
  		for pkg_dir in "${channel}"/*; do
- 			# Check if we should be putting this package into the list.
- 			# Skip it if:
-@@ -489,7 +496,7 @@ fi
- for pkg_dir in "$@"; do
- 	_unix_millis="$(date +%10s%3N)"
- 	if [[ ! -d "${pkg_dir}" ]]; then # If only package name is given, try to find it's directory.
+ 			PACKAGE_LIST+=("$pkg_dir")
+ 		done
+@@ -503,7 +503,7 @@ declare -a PACKAGE_DIRS_LIST=()
+ for pkg in "$@"; do
+ 	pkg_dir="${pkg}"
+ 	if [[ ! -d "${pkg}" ]]; then # If only package name is given, try to find its directory.
 -		for channel in $(jq --raw-output 'del(.pkg_format) | keys | .[]' "${TERMUX_SCRIPTDIR}/repo.json"); do
 +		for channel in "tur" "tur-on-device" "tur-multilib" "tur-hacking"; do
- 			if [[ -d "${channel}/${pkg_dir}" ]]; then
- 				pkg_dir="${channel}/${pkg_dir}"
+ 			if [[ -d "${channel}/${pkg}" ]]; then
+ 				pkg_dir="${channel}/${pkg}"
  				break
 Sleep 1s after update in order to not reach GitHub rate limit.
 --- a/scripts/bin/update-packages
