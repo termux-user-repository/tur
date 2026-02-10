@@ -9,8 +9,6 @@ TERMUX_PKG_DEPENDS="glu, lugaru-data, openal-soft, sdl2 | sdl2-compat"
 TERMUX_PKG_GROUPS="games"
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 -DSYSTEM_INSTALL=ON
--DCMAKE_INSTALL_BINDIR=bin
--DCMAKE_INSTALL_DATADIR=share/games
 -DCMAKE_POLICY_VERSION_MINIMUM=3.5"
 
 termux_step_pre_configure() {
