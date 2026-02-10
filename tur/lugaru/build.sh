@@ -6,6 +6,7 @@ TERMUX_PKG_VERSION="1.2"
 TERMUX_PKG_SRCURL=https://github.com/osslugaru/lugaru/releases/download/${TERMUX_PKG_VERSION}/lugaru-${TERMUX_PKG_VERSION}.tar.xz
 TERMUX_PKG_SHA256=f3ea477caf78911c69939fbdc163f9f6517c7ef2267e716a0e050be1a166ef97
 TERMUX_PKG_DEPENDS="glu, lugaru-data, openal-soft, sdl2 | sdl2-compat"
+TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_GROUPS="games"
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 -DSYSTEM_INSTALL=ON
