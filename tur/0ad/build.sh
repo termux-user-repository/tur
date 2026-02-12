@@ -18,7 +18,7 @@ termux_setup_nodejs() {
 
 termux_step_post_get_source() {
 	echo "TERMUX: Preparing sources with Revision 66 Resilience Patches..."
-	
+
 	local FCOLLADA_BASE="libraries/source/fcollada"
 	mkdir -p "$FCOLLADA_BASE"
 	if [ ! -f "$FCOLLADA_BASE/fcollada-28209.tar.xz" ]; then
@@ -146,7 +146,7 @@ termux_step_make() {
 termux_step_make_install() {
         cp $TERMUX_PKG_SRCDIR/binaries/system/pyrogenesis $TERMUX_PREFIX/libexec/0ad
         [ -f "$TERMUX_PKG_SRCDIR/binaries/system/libCollada.so" ] && install -Dm755 $TERMUX_PKG_SRCDIR/binaries/system/libCollada.so $TERMUX_PREFIX/lib/libCollada.so
-        
+
         cat <<EOF > $TERMUX_PREFIX/bin/0ad
 #!/bin/bash
 # Wyłączenie MTE na poziomie alokatora
