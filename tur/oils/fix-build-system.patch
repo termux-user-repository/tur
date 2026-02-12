@@ -1,0 +1,32 @@
+--- a/configure
++++ b/configure
+@@ -224,13 +224,15 @@ parse_flags() {
+ # No output file, no logging, no stderr.
+ # TODO: Maybe send stdout/stderr to config.log?
+ cc_quiet() {
+-  "$FLAG_cxx_for_configure" "$@" -o /dev/null >/dev/null 2>&1
++  echo "$FLAG_cxx_for_configure $@"
++  "$FLAG_cxx_for_configure" $CXXFLAGS $LDFLAGS "$@" -o /dev/null >/dev/null 2>&1
+ }
+ 
+ cc_or_die() {
+   # Used to detect
+-  local log_path=$TMP/cc_or_die.log 
+-  if ! "$FLAG_cxx_for_configure" "$@" >"$log_path" 2>&1; then
++  local log_path=$TMP/cc_or_die.log
++  echo "$FLAG_cxx_for_configure $@"
++  if ! "$FLAG_cxx_for_configure" $CXXFLAGS $LDFLAGS "$@" >"$log_path" 2>&1; then
+     log "Error running 'cc $@':"
+     cat "$log_path"
+     die "Fatal compile error running feature test"
+--- a/_build/oils.sh
++++ b/_build/oils.sh
+@@ -389,7 +389,7 @@ main() {
+   link "$compiler" "$variant" "" "$out_path" "$@"
+ 
+   if test "$variant" = opt; then
+-    strip -o "$out_path.stripped" "$out_path"
++    $STRIP -o "$out_path.stripped" "$out_path"
+   fi
+ 
+   # Symlink to unstripped binary for benchmarking

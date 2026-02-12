@@ -1,0 +1,11 @@
+--- a/configure
++++ b/configure
+@@ -373,7 +373,7 @@ int main() {
+ }
+ EOF
+   cc_or_die -o $TMP/print_expr $TMP/print_expr.c
+-  $TMP/print_expr > $TMP/print_expr.out
++  termux-proot-run $TMP/print_expr > $TMP/print_expr.out
+ }
+ 
+ # Shell note:
