@@ -16,7 +16,7 @@ termux_step_post_get_source() {
 termux_step_pre_configure() {
 	# Force disable tests to avoid dependency on cppunit
 	TERMUX_PKG_EXTRA_CONFIGURE_ARGS="--without-cppunit --with-openssl=$TERMUX_PREFIX --with-zlib=$TERMUX_PREFIX"
-	
+
 	# Avoid using -ansi which restricts to C++98
 	CXXFLAGS+=" -std=c++11"
 
