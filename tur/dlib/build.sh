@@ -25,7 +25,7 @@ termux_step_pre_configure() {
 }
 
 termux_step_configure() {
-	if [ "$TERMUX_CMAKE_BUILD" = Ninja ]; then
+	if [ "$TERMUX_PKG_CMAKE_BUILD" = Ninja ]; then
 		MAKE_PROGRAM_PATH=$(command -v ninja)
 	else
 		MAKE_PROGRAM_PATH=$(command -v make)
@@ -39,7 +39,7 @@ termux_step_configure() {
 
 termux_step_make() {
 	python setup.py bdist_wheel \
-			-G $TERMUX_CMAKE_BUILD \
+			-G $TERMUX_PKG_CMAKE_BUILD \
 			--set CMAKE_AR="$(command -v $AR)" \
 			--set CMAKE_UNAME="$(command -v uname)" \
 			--set CMAKE_RANLIB="$(command -v $RANLIB)" \
