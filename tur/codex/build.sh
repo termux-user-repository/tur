@@ -4,12 +4,34 @@ TERMUX_PKG_LICENSE="Apache-2.0, MIT"
 TERMUX_PKG_LICENSE_FILE="../LICENSE, ../NOTICE"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="0.104.0"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL="https://github.com/openai/codex/archive/refs/tags/rust-v$TERMUX_PKG_VERSION.tar.gz"
 TERMUX_PKG_SHA256=d7f93df78a5f7a89268eb1625c52322386ef27eb7ae33e6acc3e6c5a6fce80db
 TERMUX_PKG_DEPENDS="libc++, openssl"
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_UPDATE_VERSION_SED_REGEXP='s/rust-v//'
 TERMUX_PKG_BUILD_IN_SRC=true
+
+termux_step_pre_configure() {
+	termux_setup_rust
+
+	cd codex-rs
+
+	: "${CARGO_HOME:=$HOME/.cargo}"
+	export CARGO_HOME
+
+	cargo vendor
+	find ./vendor \
+		-mindepth 1 -maxdepth 1 -type d \
+		! -wholename ./vendor/cc \
+		-exec rm -rf '{}' \;
+
+	patch --silent -p1 \
+		-d ./vendor/cc/ \
+		< "$TERMUX_PKG_BUILDER_DIR"/rust-cc-do-not-concatenate-all-the-CFLAGS.diff
+
+	sed -i '/\[patch.crates-io\]/a cc = { path = "./vendor/cc" }' Cargo.toml
+}
 
 termux_step_configure() {
 	TERMUX_PKG_SRCDIR+="/codex-rs"
