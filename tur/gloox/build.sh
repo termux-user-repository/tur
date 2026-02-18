@@ -16,7 +16,12 @@ termux_step_post_get_source() {
 termux_step_pre_configure() {
 	# Force disable tests to avoid dependency on cppunit
 	TERMUX_PKG_EXTRA_CONFIGURE_ARGS="--without-cppunit --with-openssl=$TERMUX_PREFIX --with-zlib=$TERMUX_PREFIX"
-
+	
 	# Avoid using -ansi which restricts to C++98
 	CXXFLAGS+=" -std=c++11"
+
+	if [ "$TERMUX_ARCH" = "arm" ]; then
+		# ld.lld: error: non-exported symbol '__aeabi_uidiv' in '.../libclang_rt.builtins-arm-android.a(udivsi3.S.o)' is referenced by DSO '../.libs/libgloox.so'
+		LDFLAGS+=" $($CC -print-libgcc-file-name)"
+	fi
 }
