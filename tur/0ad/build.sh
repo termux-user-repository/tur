@@ -27,12 +27,12 @@ termux_step_post_get_source() {
 
 	# Download and Extract Data Tarball (Crucial for assets)
 	echo "TERMUX: Downloading game data (RC5)..."
-	 local DATA_URL="https://releases.wildfiregames.com/rc/0ad-0.28.0-rc5-unix-data.tar.gz"
-	 local DATA_FILE=$TERMUX_PKG_CACHEDIR/0ad-0.28.0-rc5-unix-data.tar.gz
-	 termux_download $DATA_URL $DATA_FILE eefa3a1646ffa94e290f9dfd7927c01becfd5a8603cd90f3146f6f09ba105fbb
+	local DATA_URL="https://releases.wildfiregames.com/rc/0ad-0.28.0-rc5-unix-data.tar.gz"
+	local DATA_FILE=$TERMUX_PKG_CACHEDIR/0ad-0.28.0-rc5-unix-data.tar.gz
+	termux_download $DATA_URL $DATA_FILE eefa3a1646ffa94e290f9dfd7927c01becfd5a8603cd90f3146f6f09ba105fbb
 
-	 echo "TERMUX: Extracting data assets..."
-	 tar -xf "$DATA_FILE" -C "$TERMUX_PKG_SRCDIR" --strip-components=1
+	echo "TERMUX: Extracting data assets..."
+	tar -xf "$DATA_FILE" -C "$TERMUX_PKG_SRCDIR" --strip-components=1
 
 #	find . -name "ufilesystem.cpp" -exec sed -i 's/#\s*if\s*OS_ANDROID/#if 0/g' {} +
 	find . -type f -name "*.h" -exec sed -i 's/#error Your compiler is trying to use an incorrect major version/#warning Bypassing SM version check/g' {} +
