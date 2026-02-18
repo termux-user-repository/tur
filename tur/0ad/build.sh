@@ -1,12 +1,11 @@
 TERMUX_PKG_HOMEPAGE=https://play0ad.com/
-TERMUX_PKG_DESCRIPTION="A free, open-source, historical Real Time Strategy (RTS) game (0.28.0 development branch)"
+TERMUX_PKG_DESCRIPTION="Free, open-source, historical RTS game of ancient warfare"
 TERMUX_PKG_LICENSE="GPL-2.0"
-TERMUX_PKG_MAINTAINER="@Antigravity"
-TERMUX_PKG_VERSION=0.28.0-dev
-TERMUX_PKG_REVISION=66
-TERMUX_PKG_SRCURL=git+https://gitea.wildfiregames.com/0ad/0ad.git
-TERMUX_PKG_GIT_BRANCH=release-0.28.0
-TERMUX_PKG_DEPENDS="boost, curl, glew, libglvnd, libicu, libnspr, libxml2, miniupnpc, openal-soft, sdl2, zlib, libenet, libvorbis, libogg, libpng, libsodium, fmt, spidermonkey, gloox"
+TERMUX_PKG_MAINTAINER="@IntinteDAO"
+TERMUX_PKG_VERSION=0.28.0-rc5
+TERMUX_PKG_SRCURL=https://releases.wildfiregames.com/rc/0ad-0.28.0-rc5-unix-build.tar.gz
+TERMUX_PKG_SHA256=becd124c28cf5af98cade3cfde82f45766138e720faa6925d8a836055d301392
+TERMUX_PKG_DEPENDS="0ad-data, boost, curl, glew, libglvnd, libicu, libnspr, libxml2, miniupnpc, openal-soft, sdl2, zlib, libenet, libvorbis, libogg, libpng, libsodium, fmt, spidermonkey, gloox"
 TERMUX_PKG_BUILD_DEPENDS="rust, python, cmake, libuuid"
 TERMUX_PKG_GROUPS="games"
 TERMUX_PKG_BUILD_IN_SRC=true
@@ -17,64 +16,28 @@ termux_setup_nodejs() {
 }
 
 termux_step_post_get_source() {
-	echo "TERMUX: Preparing sources with Revision 66 Resilience Patches..."
-
+	echo "TERMUX: Preparing 0.28.0-rc5 with data assets..."
+	
 	local FCOLLADA_BASE="libraries/source/fcollada"
 	mkdir -p "$FCOLLADA_BASE"
 	if [ ! -f "$FCOLLADA_BASE/fcollada-28209.tar.xz" ]; then
-		local BUILD_ARCHIVE_URL="https://releases.wildfiregames.com/0ad-0.27.1-unix-build.tar.xz"
-		local BUILD_ARCHIVE_FILE=$TERMUX_PKG_CACHEDIR/0ad-0.27.1-unix-build.tar.xz
-		termux_download $BUILD_ARCHIVE_URL $BUILD_ARCHIVE_FILE a0a5355eeb5968d24f283770736150d974dafecba07754d4662707dc17016bfb
-		tar -xf "$BUILD_ARCHIVE_FILE" -O "0ad-0.27.1/libraries/source/fcollada/fcollada-28209.tar.xz" > "$FCOLLADA_BASE/fcollada-28209.tar.xz"
+		# FCollada is included in the build tarball, but we ensure it's where the scripts expect it
+		tar -xf "$TERMUX_PKG_SRCDIR/../0ad-0.28.0-rc5-unix-build.tar.gz" -O "0ad-0.28.0-rc5/libraries/source/fcollada/fcollada-28209.tar.xz" > "$FCOLLADA_BASE/fcollada-28209.tar.xz" || true
 	fi
 
-	# 1. ShaderManager fix (shaders/glsl/glsl/ error)
-	local SHADER_MGR="source/graphics/ShaderManager.cpp"
-	if [ -f "$SHADER_MGR" ]; then
-		sed -i 's/name = "glsl\/" + name;/if (name.find("glsl\/") == std::string::npos) name = "glsl\/" + name;/' "$SHADER_MGR"
-	fi
+	# Download and Extract Data Tarball (Crucial for assets)
+	echo "TERMUX: Downloading game data (RC5)..."
+	# local DATA_URL="https://releases.wildfiregames.com/rc/0ad-0.28.0-rc5-unix-data.tar.gz"
+	# local DATA_FILE=$TERMUX_PKG_CACHEDIR/0ad-0.28.0-rc5-unix-data.tar.gz
+	# termux_download $DATA_URL $DATA_FILE eefa3a1646ffa94e290f9dfd7927c01becfd5a8603cd90f3146f6f09ba105fbb
+	
+	# echo "TERMUX: Extracting data assets..."
+	# tar -xf "$DATA_FILE" -C "$TERMUX_PKG_SRCDIR" --strip-components=1
 
-	# 2. GUIManager crash fix (MaybeClose Null Promise)
-	local GUI_MGR="source/gui/GUIManager.cpp"
-	if [ -f "$GUI_MGR" ]; then
-		sed -i 's/if (JS::GetPromiseState(m_ScriptPromise)/if (m_ScriptPromise.get() \&\& JS::GetPromiseState(m_ScriptPromise)/g' "$GUI_MGR"
-	fi
-
-	# 3. ScriptInterface failure skip (Engine.PushGuiPage fix)
-	local SCRIPT_INT="source/scriptinterface/ScriptInterface.cpp"
-	if [ -f "$SCRIPT_INT" ]; then
-		# Use return true to skip registration failures without breaking C++ syntax
-		sed -i 's/return false;/return true; \/\/ TERMUX FIX/g' "$SCRIPT_INT"
-	fi
-
-	# 4. SecureCRT stability (memset purge)
-	if [ -f "source/lib/secure_crt.cpp" ]; then
-		sed -i 's/memset(dst, 0, max_dst_chars);//g' source/lib/secure_crt.cpp
-		sed -i 's/memset(buf, 0, max_chars);//g' source/lib/secure_crt.cpp
-	fi
-
-	# 5. Disable UserReporter
-	if [ -f "source/ps/GameSetup/GameSetup.cpp" ]; then
-		sed -i 's/g_UserReporter.Initialize();/\/\/ g_UserReporter.Initialize();/g' source/ps/GameSetup/GameSetup.cpp
-	fi
-
-	# 6. MTE Lockdown inside main()
-	local MAIN_FILE=$(find source -name "main.cpp" | head -n 1)
-	if [ -n "$MAIN_FILE" ]; then
-		sed -i '1i #include <sys/prctl.h>\n#ifndef PR_SET_TAGGED_ADDR_CTRL\n#define PR_SET_TAGGED_ADDR_CTRL 55\n#endif' "$MAIN_FILE"
-		# Inject prctl inside main() body, not before it
-		sed -i '/extern "C" int main(int argc, char\* argv\[\])/,/^{/ s/^{/{\n    prctl(55, 1, 0, 0, 0);/' "$MAIN_FILE"
-		# Force standard main() by undefining Android macros
-		sed -i '1i #undef ANDROID\n#undef __ANDROID__\n#undef OS_ANDROID\n#define OS_LINUX 1' "$MAIN_FILE"
-	fi
-
-	# Standard Path Fixes
-	find . -name "Paths.cpp" -exec sed -i "s|/sdcard/0ad/appdata|/data/data/com.termux/files/home/.config/0ad|g" {} +
-	find . -name "Paths.cpp" -exec sed -i "s|/sdcard/0ad|$TERMUX_PREFIX/share/0ad/data|g" {} +
-	find . -name "ufilesystem.cpp" -exec sed -i 's/#\s*if\s*OS_ANDROID/#if 0/g' {} +
+#	find . -name "ufilesystem.cpp" -exec sed -i 's/#\s*if\s*OS_ANDROID/#if 0/g' {} +
 	find . -type f -name "*.h" -exec sed -i 's/#error Your compiler is trying to use an incorrect major version/#warning Bypassing SM version check/g' {} +
 
-	# VFS Alignment
+	# VFS Fix / Mocks Purge
 	local EXEPATH_CPP="source/lib/sysdep/os/unix/unix_executable_pathname.cpp"
 	if [ -f "$EXEPATH_CPP" ]; then
 		sed -i 's/T::dladdr/dladdr/g' "$EXEPATH_CPP"
@@ -119,8 +82,9 @@ termux_step_pre_configure() {
 	cd $TERMUX_PKG_SRCDIR/libraries
 	./build-source-libs.sh --without-nvtt --with-system-premake --with-system-mozjs -j${TERMUX_MAKE_PROCESSES:-4}
 	export PKG_CONFIG_PATH="$TERMUX_PREFIX/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
-	export LDFLAGS="${LDFLAGS:-} -L$TERMUX_PREFIX/lib -liconv -llog -lgloox"
+	export LDFLAGS="${LDFLAGS:-} -L$TERMUX_PREFIX/lib -liconv -llog -lgloox -Wl,--no-as-needed,-lOpenSLES,--as-needed"
 	export CXXFLAGS="${CXXFLAGS:-} -I$TERMUX_PREFIX/include/mozjs-128 -D_GNU_SOURCE -DCONFIG_ENABLE_MOCKS=0"
+	export CXXFLAGS="$CXXFLAGS -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0"
 	cd $TERMUX_PKG_SRCDIR/build/workspaces
 	./update-workspaces.sh --without-nvtt --without-atlas --without-tests --with-system-mozjs -j${TERMUX_MAKE_PROCESSES:-4}
 }
@@ -144,19 +108,6 @@ termux_step_make() {
 }
 
 termux_step_make_install() {
-        cp $TERMUX_PKG_SRCDIR/binaries/system/pyrogenesis $TERMUX_PREFIX/libexec/0ad
-        [ -f "$TERMUX_PKG_SRCDIR/binaries/system/libCollada.so" ] && install -Dm755 $TERMUX_PKG_SRCDIR/binaries/system/libCollada.so $TERMUX_PREFIX/lib/libCollada.so
-
-        cat <<EOF > $TERMUX_PREFIX/bin/0ad
-#!/bin/bash
-# Wyłączenie MTE na poziomie alokatora
-export SCUDO_OPTIONS="Memtag=0:QuarantineSizeKb=0:DeallocTypeMismatch=0"
-export MALLOC_TAGGING_CONTROL=0
-export JS_DISABLE_JIT=1
-export JS_DISABLE_SHELL_JIT=1
-
-# Uruchomienie z wymuszeniem ścieżki
-exec $TERMUX_PREFIX/libexec/0ad -nosplash "\$@"
-EOF
-        chmod +x $TERMUX_PREFIX/bin/0ad
+	cp $TERMUX_PKG_SRCDIR/binaries/system/pyrogenesis $TERMUX_PREFIX/libexec/0ad
+	[ -f "$TERMUX_PKG_SRCDIR/binaries/system/libCollada.so" ] && install -Dm755 $TERMUX_PKG_SRCDIR/binaries/system/libCollada.so $TERMUX_PREFIX/lib/libCollada.so
 }

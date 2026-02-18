@@ -1,0 +1,534 @@
+diff -ur 0ad-orig/source/graphics/Canvas2D.cpp 0ad-mod/source/graphics/Canvas2D.cpp
+--- 0ad-orig/source/graphics/Canvas2D.cpp	2025-12-22 04:24:43.000000000 +0100
++++ 0ad-mod/source/graphics/Canvas2D.cpp	2026-02-17 22:53:10.624422966 +0100
+@@ -125,6 +125,9 @@
+ 		Tech = g_Renderer.GetShaderManager().LoadEffect(str_canvas2d, defines);
+ 		// The canvas technique must be loaded because we can't render UI without it.
+ 		ENSURE(Tech);
++		if (!Tech)
++			return;
++
+ 		DeviceCommandContext->SetGraphicsPipelineState(
+ 			Tech->GetGraphicsPipelineState());
+ 		DeviceCommandContext->BeginPass();
+@@ -359,6 +362,8 @@
+ 		points[pointsIndices.back().index] + pointsIndices[pointsIndices.size() - 2].normal * halfWidth);
+ 
+ 	m->BindTechIfNeeded();
++	if (!m->Tech)
++		return;
+ 
+ 	m->DeviceCommandContext->SetTexture(
+ 		m->BindingSlots.tex,
+@@ -396,6 +401,8 @@
+ 	};
+ 
+ 	m->BindTechIfNeeded();
++	if (!m->Tech)
++		return;
+ 	DrawTextureImpl(
+ 		m->DeviceCommandContext,
+ 		g_Renderer.GetTextureManager().GetTransparentTexture(),
+@@ -434,6 +441,8 @@
+ 	};
+ 
+ 	m->BindTechIfNeeded();
++	if (!m->Tech)
++		return;
+ 	DrawTextureImpl(
+ 		m->DeviceCommandContext, texture, vertices, uvs,
+ 		multiply, add, grayscaleFactor, m->BindingSlots);
+@@ -473,6 +482,8 @@
+ 	}
+ 
+ 	m->BindTechIfNeeded();
++	if (!m->Tech)
++		return;
+ 	DrawTextureImpl(
+ 		m->DeviceCommandContext, texture, vertices, uvs,
+ 		multiply, add, grayscaleFactor, m->BindingSlots);
+@@ -481,6 +492,8 @@
+ void CCanvas2D::DrawText(CTextRenderer& textRenderer)
+ {
+ 	m->BindTechIfNeeded();
++	if (!m->Tech)
++		return;
+ 
+ 	m->DeviceCommandContext->SetUniform(
+ 		m->BindingSlots.grayscaleFactor, 0.0f);
+diff -ur 0ad-orig/source/graphics/FontManager.cpp 0ad-mod/source/graphics/FontManager.cpp
+--- 0ad-orig/source/graphics/FontManager.cpp	2025-12-22 04:24:43.000000000 +0100
++++ 0ad-mod/source/graphics/FontManager.cpp	2026-02-17 22:53:44.464126320 +0100
+@@ -130,7 +130,8 @@
+ 			if (!locale.empty())
+ 				return locale.string();
+ 
+-			if (g_L10n.GetCurrentLocale() == icu::Locale::getUS())
++			if (g_L10n.GetCurrentLocale() == icu::Locale::getUS() ||
++				g_L10n.GetCurrentLocaleString() == "en_US_POSIX")
+ 				return std::string{};
+ 
+ 			// Use the current locale, but not US English.
+@@ -152,10 +153,11 @@
+ 		return &it->second;
+ 
+ 	// TODO: use hooks or something to hotrealoding default font.
+-	const std::string defaultFont{g_ConfigDB.Get("fonts.default", std::string{})};
++	const std::string defaultFont{g_ConfigDB.Get("fonts.default", std::string{"sans-stroke-14"})};
+ 
+ 	if (defaultFont.empty())
+ 	{
++		// Should not happen with the fallback above, but keep sanity check
+ 		LOGERROR("Default font not set in config");
+ 		return nullptr;
+ 	}
+@@ -217,15 +219,17 @@
+ 		return nullptr;
+ 	}
+ 
++	bool fontLoaded = false;
+ 	const VfsPath path(L"fonts/");
+ 	for (const std::pair<const CStr, CConfigValueSet>& configPair : fontToSearch)
+ 	{
+ 		for (const CStr& fontPath : configPair.second)
+ 		{
+ 			const VfsPath fntPath{path / fontPath};
++			LOGMESSAGE("Looking for font file at: %s", fntPath.string8());
+ 			if (!VfsFileExists(fntPath))
+ 			{
+-				LOGERROR("Font file %s not found", fontPath.c_str());
++				LOGERROR("Font file %s not found in VFS", fontPath.c_str());
+ 				return nullptr;
+ 			}
+ 
+@@ -234,9 +238,16 @@
+ 				LOGERROR("Failed to load font %s", fntPath.string8());
+ 				return nullptr;
+ 			}
++			fontLoaded = true;
+ 		}
+ 	}
+ 
++	if (!fontLoaded)
++	{
++		LOGERROR("No fonts loaded for %s", localeFontName.string());
++		return nullptr;
++	}
++
+ 	// Preload the common characters for visual quality.
+ 	// Common characters are: Latin, numbers, punctuation.
+ 	std::string_view glypshSet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,;:!?\"'()[]{}<>-+=_@#$%^&*`~\\|/";
+diff -ur 0ad-orig/source/graphics/ShaderManager.cpp 0ad-mod/source/graphics/ShaderManager.cpp
+--- 0ad-orig/source/graphics/ShaderManager.cpp	2025-12-22 04:24:43.000000000 +0100
++++ 0ad-mod/source/graphics/ShaderManager.cpp	2026-02-17 22:54:42.135620237 +0100
+@@ -158,7 +158,10 @@
+ 	CXeromyces XeroFile;
+ 	PSRETURN ret = XeroFile.Load(g_VFS, tech->GetPath());
+ 	if (ret != PSRETURN_OK)
++	{
++		LOGERROR("ShaderManager: Failed to load XML for technique %s", tech->GetPath().string8().c_str());
+ 		return false;
++	}
+ 
+ 	// By default we assume that we have techinques for every dummy shader.
+ 	if (m_Device->GetBackend() == Renderer::Backend::Backend::DUMMY)
+@@ -221,11 +224,16 @@
+ 
+ 	XMBElement root = XeroFile.GetRoot();
+ 
+-	PS::StaticVector<std::string_view, 3> supportedShaders;
++	PS::StaticVector<std::string_view, 4> supportedShaders;
+ 	if (m_Device->GetBackend() == Renderer::Backend::Backend::GL_ARB && m_Device->GetCapabilities().ARBShaders)
+ 		supportedShaders.emplace_back("arb");
+ 	if (m_Device->GetBackend() == Renderer::Backend::Backend::GL)
++	{
+ 		supportedShaders.emplace_back("glsl");
++#if OS_ANDROID
++		supportedShaders.emplace_back("glsles");
++#endif
++	}
+ 	if (m_Device->GetBackend() == Renderer::Backend::Backend::VULKAN)
+ 		supportedShaders.emplace_back("spirv");
+ 
+@@ -275,7 +283,12 @@
+ 
+ 	const auto loadShaderProgramForTech = [&](const CStr& name, const CShaderDefines& defines)
+ 	{
+-		CShaderProgramPtr shaderProgram = LoadProgram(CStr{usableShader.value()} + "/" + name.c_str(), defines);
++		CStr backendPrefix = CStr{usableShader.value()} + "/";
++		CStr fullShaderName = name;
++		if (name.Left(backendPrefix.size()) != backendPrefix)
++			fullShaderName = backendPrefix + name;
++		LOGMESSAGE("ShaderManager: Loading program '%s' (original: '%s', prefix: '%s')", fullShaderName.c_str(), name.c_str(), backendPrefix.c_str());
++		CShaderProgramPtr shaderProgram = LoadProgram(fullShaderName, defines);
+ 		if (shaderProgram)
+ 		{
+ 			for (const VfsPath& shaderProgramPath : shaderProgram->GetFileDependencies())
+@@ -470,9 +483,15 @@
+ 	}
+ 
+ 	if (!techPasses.empty())
++	{
+ 		tech->SetPasses(std::move(techPasses));
++		return true;
++	}
++
++	if (tech->GetComputePipelineState())
++		return true;
+ 
+-	return true;
++	return false;
+ }
+ 
+ size_t CShaderManager::GetNumEffectsLoaded() const
+diff -ur 0ad-orig/source/graphics/TextRenderer.cpp 0ad-mod/source/graphics/TextRenderer.cpp
+--- 0ad-orig/source/graphics/TextRenderer.cpp	2025-12-22 04:24:43.000000000 +0100
++++ 0ad-mod/source/graphics/TextRenderer.cpp	2026-02-17 22:54:58.107479970 +0100
+@@ -130,9 +130,12 @@
+ {
+ 	Put(0.0f, 0.0f, buf);
+ 
+-	float w, h;
+-	m_Font->CalculateStringSize(buf, w, h);
+-	Translate(w, 0.0f);
++	if (m_Font)
++	{
++		float w, h;
++		m_Font->CalculateStringSize(buf, w, h);
++		Translate(w, 0.0f);
++	}
+ }
+ 
+ void CTextRenderer::Put(float x, float y, const wchar_t* buf)
+diff -ur 0ad-orig/source/gui/CGUI.h 0ad-mod/source/gui/CGUI.h
+--- 0ad-orig/source/gui/CGUI.h	2025-12-22 04:24:44.000000000 +0100
++++ 0ad-mod/source/gui/CGUI.h	2026-02-18 10:54:07.703203035 +0100
+@@ -601,6 +601,13 @@
+ 	//--------------------------------------------------------
+ 	//@{
+ 
++public:
++	/**
++	 * Map from event names to object which listen to a given event.
++	 */
++	std::unordered_map<CStr, std::vector<IGUIObject*>> m_EventObjects;
++
++private:
+ 	std::shared_ptr<ScriptInterface> m_ScriptInterface;
+ 
+ 	/**
+@@ -741,10 +748,7 @@
+ 	};
+ 	std::optional<ModuleArtifact> m_LoadModuleResult;
+ 
+-	/**
+-	 * Map from event names to object which listen to a given event.
+-	 */
+-	std::unordered_map<CStr, std::vector<IGUIObject*>> m_EventObjects;
++
+ };
+ 
+ #endif // INCLUDED_CGUI
+diff -ur 0ad-orig/source/gui/GUIManager.cpp 0ad-mod/source/gui/GUIManager.cpp
+--- 0ad-orig/source/gui/GUIManager.cpp	2026-01-05 04:10:32.000000000 +0100
++++ 0ad-mod/source/gui/GUIManager.cpp	2026-02-17 22:55:58.642947951 +0100
+@@ -184,6 +184,10 @@
+ 	inputs.clear();
+ 	gui.reset(new CGUI(scriptContext));
+ 	const ScriptRequest rq{gui->GetScriptInterface()};
++	sendingPromise = std::make_shared<JS::PersistentRootedObject>(rq.cx, JS::NewPromiseObject(rq.cx, nullptr));
++	// Assigning to `sendingPromise` isn't possible after `init` has been called because `init` might
++	// replace this page. So a local copy has to be made.
++	const std::shared_ptr<JS::PersistentRootedObject> localPromise{sendingPromise};
+ 
+ 	{
+ 		JS::RootedString jsName{rq.cx, JS_NewStringCopyZ(rq.cx, START_ATLAS)};
+@@ -256,11 +260,6 @@
+ 	if (hotloadData)
+ 		Script::ReadStructuredClone(rq, hotloadData, &hotloadDataVal);
+ 
+-	sendingPromise = std::make_shared<JS::PersistentRootedObject>(rq.cx);
+-	// Assigning to `sendingPromise` isn't possible after `init` has been called because `init` might
+-	// replace this page. So a local copy has to be made.
+-	const std::shared_ptr<JS::PersistentRootedObject> localPromise{sendingPromise};
+-
+ 	JS::RootedObject returnObject{rq.cx, gui->CallPageInit(rq, initData, hotloadDataVal,
+ 		utf8_from_wstring(m_Name))};
+ 
+@@ -347,6 +346,9 @@
+ 
+ InReaction CGUIManager::HandleEvent(const SDL_Event_* ev)
+ {
++	if (m_PageStack.empty())
++		return IN_PASS;
++
+ 	// We want scripts to have access to the raw input events, so they can do complex
+ 	// processing when necessary (e.g. for unit selection and camera movement).
+ 	// Sometimes they'll want to be layered behind the GUI widgets (e.g. to detect mousedowns on the
+diff -ur 0ad-orig/source/gui/ObjectBases/IGUIObject.cpp 0ad-mod/source/gui/ObjectBases/IGUIObject.cpp
+--- 0ad-orig/source/gui/ObjectBases/IGUIObject.cpp	2025-12-22 04:24:44.000000000 +0100
++++ 0ad-mod/source/gui/ObjectBases/IGUIObject.cpp	2026-02-18 10:01:34.977328412 +0100
+@@ -80,8 +80,9 @@
+ 
+ IGUIObject::~IGUIObject()
+ {
+-	if (!m_ScriptHandlers.empty())
+-		JS_RemoveExtraGCRootsTracer(m_pGUI.GetScriptInterface()->GetGeneralJSContext(), Trace, this);
++	// Remove all script handlers to update the GUI manager and remove the GC tracer.
++	while (!m_ScriptHandlers.empty())
++		UnsetScriptHandler(m_ScriptHandlers.begin()->first);
+ 
+ 	// m_Children is deleted along all other GUI Objects in the CGUI destructor
+ }
+diff -ur 0ad-orig/source/gui/Scripting/JSInterface_GUIManager.cpp 0ad-mod/source/gui/Scripting/JSInterface_GUIManager.cpp
+--- 0ad-orig/source/gui/Scripting/JSInterface_GUIManager.cpp	2025-12-22 04:24:44.000000000 +0100
++++ 0ad-mod/source/gui/Scripting/JSInterface_GUIManager.cpp	2026-02-17 22:56:15.638798477 +0100
+@@ -72,6 +72,7 @@
+ void RegisterScriptFunctions(const ScriptRequest& rq)
+ {
+ 	ScriptFunction::Register<&OpenChildPage>(rq, "OpenChildPage");
++	ScriptFunction::Register<&OpenChildPage>(rq, "PushGuiPage");
+ 	ScriptFunction::Register<&SwitchGuiPage>(rq, "SwitchGuiPage");
+ 	ScriptFunction::Register<&SetCursor>(rq, "SetCursor");
+ 	ScriptFunction::Register<&ResetCursor>(rq, "ResetCursor");
+diff -ur 0ad-orig/source/lib/secure_crt.cpp 0ad-mod/source/lib/secure_crt.cpp
+--- 0ad-orig/source/lib/secure_crt.cpp	2025-12-22 04:24:46.000000000 +0100
++++ 0ad-mod/source/lib/secure_crt.cpp	2026-02-17 22:56:34.606631609 +0100
+@@ -255,7 +255,7 @@
+ 		return -1;
+ 	}
+ 
+-#if OS_ANDROID
++#if OS_ANDROID && defined(WSECURE_CRT)
+ 	// Workaround for https://code.google.com/p/android/issues/detail?id=109074
+ 	// (vswprintf doesn't null-terminate strings)
+ 	memset(dst, 0, max_dst_chars * sizeof(tchar));
+diff -ur 0ad-orig/source/lib/sysdep/os/unix/udbg.cpp 0ad-mod/source/lib/sysdep/os/unix/udbg.cpp
+--- 0ad-orig/source/lib/sysdep/os/unix/udbg.cpp	2025-12-22 04:24:46.000000000 +0100
++++ 0ad-mod/source/lib/sysdep/os/unix/udbg.cpp	2026-02-17 22:56:49.010504857 +0100
+@@ -100,6 +100,8 @@
+ void debug_puts(const char* text)
+ {
+ 	__android_log_print(ANDROID_LOG_WARN, "pyrogenesis", "%s", text);
++	printf("%s", text);
++	fflush(stdout);
+ }
+ 
+ #else
+diff -ur 0ad-orig/source/main.cpp 0ad-mod/source/main.cpp
+--- 0ad-orig/source/main.cpp	2026-01-30 08:21:15.000000000 +0100
++++ 0ad-mod/source/main.cpp	2026-02-17 22:57:54.893924732 +0100
+@@ -797,7 +797,7 @@
+ #endif
+ }
+ 
+-#if OS_ANDROID
++#if 0
+ // In Android we compile the engine as a shared library, not an executable,
+ // so rename main() to a different symbol that the wrapper library can load
+ extern "C" __attribute__((visibility ("default"))) int pyrogenesis_main(int argc, char* argv[])
+@@ -837,6 +837,16 @@
+ 	{
+ 		g_ExitStatus = EXIT_FAILURE;
+ 	}
++	catch (const std::exception& e)
++	{
++		LOGERROR("Exception caught in main: %s", e.what());
++		g_ExitStatus = EXIT_FAILURE;
++	}
++	catch (...)
++	{
++		LOGERROR("Unknown exception caught in main");
++		g_ExitStatus = EXIT_FAILURE;
++	}
+ 
+ 	// Shut down profiler initialised by EarlyInit
+ 	g_Profiler2.Shutdown();
+diff -ur 0ad-orig/source/ps/CLogger.cpp 0ad-mod/source/ps/CLogger.cpp
+--- 0ad-orig/source/ps/CLogger.cpp	2025-12-22 04:24:49.000000000 +0100
++++ 0ad-mod/source/ps/CLogger.cpp	2026-02-17 22:58:19.689706256 +0100
+@@ -117,8 +117,8 @@
+ 	std::lock_guard<std::mutex> lock(m_Mutex);
+ 
+ 	++m_NumberOfMessages;
+-//	if (m_UseDebugPrintf)
+-//		debug_printf("MESSAGE: %s\n", message);
++	if (m_UseDebugPrintf)
++		debug_printf("MESSAGE: %s\n", message);
+ 
+ 	m_MainLog << "<p>" << cmessage << "</p>\n";
+ 	m_MainLog.flush();
+diff -ur 0ad-orig/source/ps/GameSetup/GameSetup.cpp 0ad-mod/source/ps/GameSetup/GameSetup.cpp
+--- 0ad-orig/source/ps/GameSetup/GameSetup.cpp	2025-12-29 04:10:28.000000000 +0100
++++ 0ad-mod/source/ps/GameSetup/GameSetup.cpp	2026-02-17 22:59:17.641037989 +0100
+@@ -179,9 +179,16 @@
+ 		OsPath modName(mods[i]);
+ 		// Only mount mods from the user path if they don't exist in the 'rdata' path.
+ 		if (DirectoryExists(modPath / modName / ""))
++		{
++			printf("VFS: Mounting mod %s from %s\n", modName.string8().c_str(), (modPath / modName / "").string8().c_str());
+ 			g_VFS->Mount(L"", modPath / modName / "", baseFlags, priority);
++		}
+ 		else
++		{
++			printf("VFS: Mounting mod %s from %s\n", modName.string8().c_str(), (modUserPath / modName / "").string8().c_str());
+ 			g_VFS->Mount(L"", modUserPath / modName / "", userFlags, priority);
++		}
++		fflush(stdout);
+ 
+ 		// If mod have a config/<modName>.cfg, load the configuration.
+ 		VfsPath modConfigPath{fmt::format("config/{}.cfg", mods[i].c_str())};
+@@ -202,6 +209,16 @@
+ 
+ 	const Paths paths(args);
+ 
++	printf("0 A.D. Path Debugging:\n");
++	printf("  Root:     %s\n", paths.Root().string8().c_str());
++	printf("  RData:    %s\n", paths.RData().string8().c_str());
++	printf("  GameData: %s\n", paths.GameData().string8().c_str());
++	printf("  UserData: %s\n", paths.UserData().string8().c_str());
++	printf("  Config:   %s\n", paths.Config().string8().c_str());
++	printf("  Cache:    %s\n", paths.Cache().string8().c_str());
++	printf("  Logs:     %s\n", paths.Logs().string8().c_str());
++	fflush(stdout);
++
+ 	OsPath logs(paths.Logs());
+ 	CreateDirectories(logs, 0700);
+ 
+@@ -219,15 +236,24 @@
+ 	const OsPath readonlyConfig = paths.RData()/"config"/"";
+ 
+ 	// Mount these dirs with highest priority so that mods can't overwrite them.
+-	g_VFS->Mount(L"cache/", paths.Cache(), VFS_MOUNT_ARCHIVABLE, VFS_MAX_PRIORITY);	// (adding XMBs to archive speeds up subsequent reads)
++	printf("VFS: Mounting cache/ -> %s\n", paths.Cache().string8().c_str());
++	g_VFS->Mount(L"cache/", paths.Cache(), VFS_MOUNT_ARCHIVABLE, VFS_MAX_PRIORITY);
+ 	if (readonlyConfig != paths.Config())
++	{
++		printf("VFS: Mounting config/ (readonly) -> %s\n", readonlyConfig.string8().c_str());
+ 		g_VFS->Mount(L"config/", readonlyConfig, 0, VFS_MAX_PRIORITY-1);
++	}
++	printf("VFS: Mounting config/ -> %s\n", paths.Config().string8().c_str());
+ 	g_VFS->Mount(L"config/", paths.Config(), 0, VFS_MAX_PRIORITY);
++	printf("VFS: Mounting screenshots/ -> %s\n", (paths.UserData()/"screenshots"/"").string8().c_str());
+ 	g_VFS->Mount(L"screenshots/", paths.UserData()/"screenshots"/"", 0, VFS_MAX_PRIORITY);
++	printf("VFS: Mounting saves/ -> %s\n", (paths.UserData()/"saves"/"").string8().c_str());
+ 	g_VFS->Mount(L"saves/", paths.UserData()/"saves"/"", VFS_MOUNT_WATCH, VFS_MAX_PRIORITY);
+ 
+ 	// Engine localization files (regular priority, these can be overwritten).
++	printf("VFS: Mounting l10n/ -> %s\n", (paths.RData()/"l10n"/"").string8().c_str());
+ 	g_VFS->Mount(L"l10n/", paths.RData()/"l10n"/"");
++	fflush(stdout);
+ 
+ 	// Mods will be mounted later.
+ 
+diff -ur 0ad-orig/source/ps/GameSetup/Paths.cpp 0ad-mod/source/ps/GameSetup/Paths.cpp
+--- 0ad-orig/source/ps/GameSetup/Paths.cpp	2025-12-22 04:24:49.000000000 +0100
++++ 0ad-mod/source/ps/GameSetup/Paths.cpp	2026-02-17 23:05:47.524791127 +0100
+@@ -65,7 +65,7 @@
+ 
+ #if OS_ANDROID
+ 
+-		const OsPath appdata = OsPath("/sdcard/0ad/appdata");
++		const OsPath appdata = OsPath("/data/data/com.termux/files/home/.config/0ad");
+ 
+ 		// We don't make the game vs. user data distinction on Android
+ 		m_gameData = appdata/"data"/"";
+@@ -166,10 +166,10 @@
+ }
+ 
+ 
+-/*static*/ OsPath Paths::Root(const OsPath& argv0)
++/*static*/ OsPath Paths::Root([[maybe_unused]] const OsPath& argv0)
+ {
+ #if OS_ANDROID
+-	return OsPath("/sdcard/0ad"); // TODO: this is kind of bogus
++	return OsPath("/data/data/com.termux/files/usr/share/0ad/data"); // TODO: this is kind of bogus
+ #else
+ 
+ 	// get full path to executable
+@@ -198,6 +198,9 @@
+ 
+ /*static*/ OsPath Paths::RootData([[maybe_unused]] const OsPath& argv0)
+ {
++	const char* envRData = getenv("PYROGENESIS_RDATA");
++	if (envRData && envRData[0] != '\0')
++		return OsPath(envRData)/"";
+ 
+ #ifdef INSTALLED_DATADIR
+ 	return OsPath(STRINGIZE(INSTALLED_DATADIR))/"";
+@@ -216,7 +219,20 @@
+ 	}
+ # endif // OS_MACOSX
+ 
+-	return Root(argv0)/"data"/"";
++	OsPath root = Root(argv0);
++	// In some environments (like Termux), the Root might already be the data directory.
++	// We check if it ends with "data" to avoid double appending.
++	if (root.Filename() == L"data")
++		return root/"";
++
++	const std::wstring rootStr = root.string();
++	if (!rootStr.empty() && (rootStr.back() == '/' || rootStr.back() == '\\'))
++	{
++		if (OsPath(rootStr.substr(0, rootStr.size() - 1)).Filename() == L"data")
++			return root/"";
++	}
++
++	return root/"data"/"";
+ 
+ #endif // INSTALLED_DATADIR
+ }
+diff -ur 0ad-orig/source/renderer/backend/gl/Device.cpp 0ad-mod/source/renderer/backend/gl/Device.cpp
+--- 0ad-orig/source/renderer/backend/gl/Device.cpp	2025-12-22 04:24:51.000000000 +0100
++++ 0ad-mod/source/renderer/backend/gl/Device.cpp	2026-02-17 23:00:21.468305780 +0100
+@@ -1023,7 +1023,17 @@
+ 
+ void CDevice::OnWindowResize(const uint32_t width, const uint32_t height)
+ {
++#if OS_ANDROID
++	if (m_BackbufferAcquired)
++	{
++		LOGWARNING("OnWindowResize called while backbuffer acquired. Deferring backbuffer clearing.");
++		m_SurfaceDrawableWidth = width;
++		m_SurfaceDrawableHeight = height;
++		return;
++	}
++#else
+ 	ENSURE(!m_BackbufferAcquired);
++#endif
+ 	m_Backbuffers.clear();
+ 	m_SurfaceDrawableWidth = width;
+ 	m_SurfaceDrawableHeight = height;
+diff -ur 0ad-orig/source/scriptinterface/ScriptContext.cpp 0ad-mod/source/scriptinterface/ScriptContext.cpp
+--- 0ad-orig/source/scriptinterface/ScriptContext.cpp	2025-12-22 04:24:52.000000000 +0100
++++ 0ad-mod/source/scriptinterface/ScriptContext.cpp	2026-02-17 23:00:45.480034827 +0100
+@@ -140,15 +140,15 @@
+ 	JS_SetGCParameter(m_cx, JSGC_MIN_LAST_DITCH_GC_PERIOD, 0);
+ 
+ 
+-	JS_SetOffthreadIonCompilationEnabled(m_cx, true);
++	JS_SetOffthreadIonCompilationEnabled(m_cx, false);
+ 
+ 	// For GC debugging:
+ 	// JS_SetGCZeal(m_cx, 2, JS_DEFAULT_ZEAL_FREQ);
+ 
+ 	JS_SetContextPrivate(m_cx, nullptr);
+ 
+-	JS_SetGlobalJitCompilerOption(m_cx, JSJITCOMPILER_ION_ENABLE, 1);
+-	JS_SetGlobalJitCompilerOption(m_cx, JSJITCOMPILER_BASELINE_ENABLE, 1);
++	JS_SetGlobalJitCompilerOption(m_cx, JSJITCOMPILER_ION_ENABLE, 0);
++	JS_SetGlobalJitCompilerOption(m_cx, JSJITCOMPILER_BASELINE_ENABLE, 0);
+ 
+ 	// Turn off Spectre mitigations - this is a huge speedup on JS code, particularly JS -> C++ calls.
+ 	JS_SetGlobalJitCompilerOption(m_cx, JSJITCOMPILER_SPECTRE_JIT_TO_CXX_CALLS, 0);
+diff -ur 0ad-orig/source/scriptinterface/ScriptInterface.cpp 0ad-mod/source/scriptinterface/ScriptInterface.cpp
+--- 0ad-orig/source/scriptinterface/ScriptInterface.cpp	2025-12-22 04:24:52.000000000 +0100
++++ 0ad-mod/source/scriptinterface/ScriptInterface.cpp	2026-02-17 23:01:05.139814689 +0100
+@@ -329,6 +329,7 @@
+ ScriptInterface_impl::ScriptInterface_impl(const char* nativeScopeName, ScriptContext& context,
+ 	JS::Compartment* compartment, std::function<bool(const VfsPath&)> allowModule) :
+ 	m_context(context), m_cx(context.GetGeneralJSContext()), m_glob(context.GetGeneralJSContext()),
++	m_rng(nullptr),
+ 	m_nativeScope(context.GetGeneralJSContext()),
+ 	m_ModuleLoader{std::move(allowModule)}
+ {
