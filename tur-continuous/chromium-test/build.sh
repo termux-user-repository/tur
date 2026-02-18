@@ -1,23 +1,23 @@
 TERMUX_PKG_HOMEPAGE=https://www.chromium.org/Home
-TERMUX_PKG_DESCRIPTION="Chromium web browser"
+TERMUX_PKG_DESCRIPTION="Chromium web browser (Testing version)"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
-TERMUX_PKG_MAINTAINER="Chongyun Lee <uchkks@protonmail.com>"
-_CHROMIUM_VERSION=125.0.6422.141
-_TEST_COMMIT=4b1e83937122185343ba92e909b021f307c719ca
-_TEST_COMMIT_POSITION=1287751
+TERMUX_PKG_MAINTAINER="@licy183"
+_CHROMIUM_VERSION=145.0.7595.0
+_TEST_COMMIT=e35e3fb0f3767f5cb7bb8207f0f24fd0566a8437
+_TEST_COMMIT_POSITION=1560342
+# https://cr-rev.appspot.com/$commit_position
+# m144-7559-1552494-70909488d8cc2cf4e9419d428f9bf77dc9e781b6: good
+# m145-7595-1562154-e35e3fb0f3767f5cb7bb8207f0f24fd0566a8437: checking
+# m145-7632-1568190-89fc59a9539ca44a7f92b3f4fa2e6b142452bdb5: bad
 TERMUX_PKG_VERSION=$_CHROMIUM_VERSION-r$_TEST_COMMIT_POSITION
-TERMUX_PKG_DEPENDS="atk, cups, dbus, gtk3, krb5, libc++, libxkbcommon, libminizip, libnss, libwayland, libx11, mesa, openssl, pango, pulseaudio, libdrm, libjpeg-turbo, libpng, libwebp, libflac, fontconfig, freetype, zlib, libxml2, libxslt, libopus, libsnappy"
+TERMUX_PKG_DEPENDS="atk, cups, dbus, fontconfig, gtk3, krb5, libc++, libevdev, libxkbcommon, libminizip, libnss, libx11, mesa, openssl, pango, pulseaudio, zlib"
+TERMUX_PKG_BUILD_DEPENDS="libffi-static"
 # TODO: Split chromium-common and chromium-headless
 # TERMUX_PKG_DEPENDS+=", chromium-common"
 # TERMUX_PKG_SUGGESTS="chromium-headless, chromium-driver"
-TERMUX_PKG_SUGGESTS="qt5-qtbase"
-TERMUX_PKG_BUILD_DEPENDS="qt5-qtbase, qt5-qtbase-cross-tools"
 # Chromium doesn't support i686 on Linux.
 TERMUX_PKG_BLACKLISTED_ARCHES="i686"
-
-TERMUX_PKG_BREAKS="chromium"
-TERMUX_PKG_CONFLICTS="chromium"
-TERMUX_PKG_PROVIDES="chromium"
+TERMUX_PKG_ON_DEVICE_BUILD_NOT_SUPPORTED=true
 
 SYSTEM_LIBRARIES="    libdrm  fontconfig"
 # TERMUX_PKG_DEPENDS="libdrm, fontconfig"
@@ -50,6 +50,7 @@ termux_step_get_source() {
 		touch "$TERMUX_PKG_CACHEDIR/.depot_tools-fetched"
 	fi
 	export PATH="$TERMUX_PKG_CACHEDIR/depot_tools:$PATH"
+	$TERMUX_PKG_CACHEDIR/depot_tools/ensure_bootstrap
 
 	# Fetch chromium source
 	local __src_dir="$HOME/chromium-sources/chromium"
@@ -92,19 +93,19 @@ termux_step_get_source() {
 	# rm -rf "$__layer1_dir/merged/.cipd"
 	popd # "$__layer1_dir"
 	pushd "$__layer1_dir/merged"
-	# gclient sync --revision src@$_CHROMIUM_VERSION --verbose --force
+	gclient sync --revision src@$_CHROMIUM_VERSION --verbose --force || bash
 	popd # "$__layer1_dir/merged"
 
 	# Layer 2, contains the source code of given commit
 	mkdir -p "$__layer2_dir"
 	pushd "$__layer2_dir"
-	# __tur_chromium_sudo rm -rf merged/ upperdir/ workdir/
+	__tur_chromium_sudo rm -rf merged/ upperdir/ workdir/
 	mkdir -p merged/ upperdir/ workdir/
 	__tur_chromium_sudo mount -t overlay -o lowerdir=$__layer1_dir/upperdir:$__src_dir,upperdir=$__layer2_dir/upperdir,workdir=$__layer2_dir/workdir overlay $__layer2_dir/merged
-	# rm -rf "$__layer2_dir/merged/.cipd"
+	rm -rf "$__layer2_dir/merged/.cipd"
 	popd # "$__layer2_dir"
 	pushd "$__layer2_dir/merged"
-	# gclient sync --revision src@$_TEST_COMMIT --verbose --force
+	gclient sync --revision src@$_TEST_COMMIT --verbose --force || bash
 	popd # "$__layer2_dir/merged"
 
 	# Layer 3, the real work dir, waiting for patches
@@ -121,17 +122,29 @@ termux_step_get_source() {
 }
 
 termux_step_post_get_source() {
-	python $TERMUX_SCRIPTDIR/common-files/apply-chromium-patches.py -v $_CHROMIUM_VERSION
+	# Apply patches related to chromium
+	local f
+	for f in $(find "$TERMUX_PKG_BUILDER_DIR/cr-patches" -maxdepth 1 -type f -name *.patch | sort); do
+		echo "Applying patch: $(basename $f)"
+		patch -p1 --silent < "$f"
+	done
 
+	# Disable jumbo build when testing
+	# # Apply patches for jumbo build
+	# local f
+	# for f in $(find "$TERMUX_PKG_BUILDER_DIR/jumbo-patches" -maxdepth 1 -type f -name *.patch | sort); do
+	# 	echo "Applying patch: $(basename $f)"
+	# 	patch -p1 --silent < "$f"
+	# done
+
+	# Use some system libs
 	python3 build/linux/unbundle/replace_gn_files.py --system-libraries \
 		$SYSTEM_LIBRARIES
-	python3 third_party/libaddressinput/chromium/tools/update-strings.py
 }
 
 termux_step_configure() {
 	cd $TERMUX_PKG_SRCDIR
 	termux_setup_ninja
-	termux_setup_nodejs
 
 	# Fetch depot_tools
 	export DEPOT_TOOLS_UPDATE=0
@@ -140,14 +153,21 @@ termux_step_configure() {
 		touch "$TERMUX_PKG_CACHEDIR/.depot_tools-fetched"
 	fi
 	export PATH="$TERMUX_PKG_CACHEDIR/depot_tools:$PATH"
+	$TERMUX_PKG_CACHEDIR/depot_tools/ensure_bootstrap
 
-	################################################################
-	# Please dont use these keys outside of Termux User Repository #
-	# You can create your own at:                                  #
-	# http://www.chromium.org/developers/how-tos/api-keys          #
-	################################################################
-	local _google_api_key _google_default_client_id _google_default_client_secret
-	eval "$(base64 -d < $TERMUX_PKG_BUILDER_DIR/google-api-keys.base64enc)"
+	# Write gpu/webgpu/dawn_commit_hash.h
+	if [ ! -f "$TERMUX_PKG_SRCDIR/gpu/webgpu/dawn_commit_hash.h" ]; then
+		cat << EOF > $TERMUX_PKG_SRCDIR/gpu/webgpu/dawn_commit_hash.h
+/* Generated by lastchange.py, do not edit.*/
+
+#ifndef GPU_WEBGPU_DAWN_COMMIT_HASH_H_
+#define GPU_WEBGPU_DAWN_COMMIT_HASH_H_
+
+#define DAWN_COMMIT_HASH "$(cat $TERMUX_PKG_SRCDIR/gpu/webgpu/DAWN_VERSION)"
+
+#endif  // GPU_WEBGPU_DAWN_COMMIT_HASH_H_
+EOF
+	fi
 
 	# Remove termux's dummy pkg-config
 	local _target_pkg_config=$(command -v pkg-config)
@@ -157,14 +177,7 @@ termux_step_configure() {
 	ln -s $_host_pkg_config $TERMUX_PKG_CACHEDIR/host-pkg-config-bin/pkg-config
 	export PATH="$TERMUX_PKG_CACHEDIR/host-pkg-config-bin:$PATH"
 
-	# For qt build
-	export PATH="$TERMUX_PREFIX/opt/qt/cross/bin:$PATH"
-
-	# Install amd64 rootfs and deps
-	env -i PATH="$PATH" sudo apt update
-	env -i PATH="$PATH" sudo apt install lsb-release -yq
-	env -i PATH="$PATH" sudo apt install libfontconfig1 libffi7 -yq
-	env -i PATH="$PATH" sudo ./build/install-build-deps.sh --no-syms --no-android --no-arm --no-chromeos-fonts --no-nacl --no-prompt
+	# Install amd64 rootfs
 	build/linux/sysroot_scripts/install-sysroot.py --arch=amd64
 	local _amd64_sysroot_path="$(pwd)/build/linux/$(ls build/linux | grep 'amd64-sysroot')"
 
@@ -172,15 +185,50 @@ termux_step_configure() {
 	./tools/rust/update_rust.py
 	./tools/clang/scripts/update.py
 
+	# Link to system tools required by the build
+	ln -sf $(command -v java) third_party/jdk/current/bin/
+
+	# Install nodejs
+	if [ ! -f "third_party/node/linux/node-linux-x64/bin/node" ]; then
+		./third_party/node/update_node_binaries
+	fi
+
+	# Download npm deps
+	if [ ! -d "third_party/node/node_modules" ]; then
+		local _npm_object_name=$(python -c "Var = str
+Str = str
+exec(open('$TERMUX_PKG_SRCDIR/DEPS').read())
+print(deps['src/third_party/node/node_modules']['objects'][0]['object_name'])
+")
+		local _npm_sha256sum=$(python -c "Var = str
+Str = str
+exec(open('$TERMUX_PKG_SRCDIR/DEPS').read())
+print(deps['src/third_party/node/node_modules']['objects'][0]['sha256sum'])
+")
+		local _npm_file="$TERMUX_PKG_SRCDIR/third_party/node/node_modules.tar.gz"
+		termux_download \
+			"https://commondatastorage.googleapis.com/chromium-nodejs/$_npm_object_name" \
+			"${_npm_file}" \
+			"${_npm_sha256sum}"
+		mkdir -p $TERMUX_PKG_SRCDIR/third_party/node/node_modules-tmp
+		tar -xf "$_npm_file" --strip-components=1 -C "$TERMUX_PKG_SRCDIR/third_party/node/node_modules-tmp"
+		mv "$TERMUX_PKG_SRCDIR/third_party/node/node_modules-tmp" "$TERMUX_PKG_SRCDIR/third_party/node/node_modules"
+	fi
+
+	# Sync rollup-related native deps in devtools
+	if [ ! -d "third_party/devtools-frontend/src/node_modules/@rollup/rollup-linux-x64-gnu" ]; then
+		if [ ! -f "third_party/devtools-frontend/src/third_party/rollup_libs/rollup.linux-x64-gnu.node" ]; then
+			termux_error_exit "rollup.linux-x64-gnu.node not found"
+		fi
+		pushd third_party/devtools-frontend/src
+		python3 scripts/deps/sync_rollup_libs.py
+		popd # third_party/devtools-frontend/src
+	fi
+
 	local CARGO_TARGET_NAME="${TERMUX_ARCH}-linux-android"
 	if [[ "${TERMUX_ARCH}" == "arm" ]]; then
 		CARGO_TARGET_NAME="armv7-linux-androideabi"
 	fi
-
-	# Link to system tools required by the build
-	mkdir -p third_party/node/linux/node-linux-x64/bin
-	ln -sf $(command -v node) third_party/node/linux/node-linux-x64/bin/
-	ln -sf $(command -v java) third_party/jdk/current/bin/
 
 	# Dummy librt.so
 	# Why not dummy a librt.a? Some of the binaries reference symbols only exists in Android
@@ -215,8 +263,6 @@ termux_step_configure() {
 		# This is needed to build cups
 		cp -Rf $TERMUX_PREFIX/bin/cups-config usr/bin/
 		chmod +x usr/bin/cups-config
-		# Cherry-pick LWG3545 for NDK r26
-		# patch -p1 < $TERMUX_SCRIPTDIR/common-files/chromium-patches/sysroot-patches/libcxx-17-lwg3545.diff
 		popd
 		mv $TERMUX_PKG_TMPDIR/sysroot $TERMUX_PKG_CACHEDIR/sysroot-$TERMUX_ARCH
 	fi
@@ -226,17 +272,18 @@ termux_step_configure() {
 	local _host_cc="$_clang_base_path/bin/clang"
 	local _host_cxx="$_clang_base_path/bin/clang++"
 	local _host_clang_version=$($_host_cc --version | grep -m1 version | sed -E 's|.*\bclang version ([0-9]+).*|\1|')
+	local _target_clang_base_path="$TERMUX_STANDALONE_TOOLCHAIN"
+	local _target_cc="$_target_clang_base_path/bin/clang"
+	local _target_clang_version=$($_target_cc --version | grep -m1 version | sed -E 's|.*\bclang version ([0-9]+).*|\1|')
 	local _target_cpu _target_sysroot="$TERMUX_PKG_CACHEDIR/sysroot-$TERMUX_ARCH"
 	local _v8_toolchain_name _v8_current_cpu _v8_sysroot_path
 	if [ "$TERMUX_ARCH" = "aarch64" ]; then
 		_target_cpu="arm64"
-		_v8_current_cpu="x64"
+		_v8_current_cpu="arm64"
 		_v8_sysroot_path="$_amd64_sysroot_path"
-		_v8_toolchain_name="clang_x64_v8_arm64"
+		_v8_toolchain_name="host"
 	elif [ "$TERMUX_ARCH" = "arm" ]; then
-		# Install i386 rootfs and deps
-		env -i PATH="$PATH" sudo apt install libfontconfig1:i386 libffi7:i386 -yq
-		env -i PATH="$PATH" sudo ./build/install-build-deps.sh --lib32 --no-syms --no-android --no-arm --no-chromeos-fonts --no-nacl --no-prompt
+		# Install i386 rootfs
 		build/linux/sysroot_scripts/install-sysroot.py --arch=i386
 		local _i386_sysroot_path="$(pwd)/build/linux/$(ls build/linux | grep 'i386-sysroot')"
 		_target_cpu="arm"
@@ -247,7 +294,7 @@ termux_step_configure() {
 		_target_cpu="x64"
 		_v8_current_cpu="x64"
 		_v8_sysroot_path="$_amd64_sysroot_path"
-		_v8_toolchain_name="clang_x64"
+		_v8_toolchain_name="host"
 	fi
 
 	local _common_args_file=$TERMUX_PKG_TMPDIR/common-args-file
@@ -255,16 +302,10 @@ termux_step_configure() {
 	touch $_common_args_file
 
 	echo "
-# Set google key to disable the warning slogan
-# Please DO NOT USE THIS KEY OUTSIDE OF TUR!
-google_api_key = \"$_google_api_key\"
-google_default_client_id = \"$_google_default_client_id\"
-google_default_client_secret = \"$_google_default_client_secret\"
 # Do official build to decrease file size
-is_official_build = false
-is_debug = true
-is_component_build = false
-symbol_level = 2
+is_official_build = true
+is_debug = false
+symbol_level = 0
 # Use our custom toolchain
 clang_version = \"$_host_clang_version\"
 use_sysroot = false
@@ -272,8 +313,8 @@ target_cpu = \"$_target_cpu\"
 target_rpath = \"$TERMUX_PREFIX/lib\"
 target_sysroot = \"$_target_sysroot\"
 custom_toolchain = \"//build/toolchain/linux/unbundle:default\"
-custom_toolchain_clang_base_path = \"$TERMUX_STANDALONE_TOOLCHAIN\"
-custom_toolchain_clang_version = "18"
+custom_toolchain_clang_base_path = \"$_target_clang_base_path\"
+custom_toolchain_clang_version = \"$_target_clang_version\"
 host_toolchain = \"$TERMUX_PKG_CACHEDIR/custom-toolchain:host\"
 v8_snapshot_toolchain = \"$TERMUX_PKG_CACHEDIR/custom-toolchain:$_v8_toolchain_name\"
 clang_use_chrome_plugins = false
@@ -282,10 +323,9 @@ chrome_pgo_phase = 0
 treat_warnings_as_errors = false
 # Use system libraries as little as possible
 use_system_freetype = false
-use_system_libdrm = true
-use_system_libffi = true
 use_custom_libcxx = false
 use_custom_libcxx_for_host = true
+use_clang_modules = false
 use_allocator_shim = false
 use_partition_alloc_as_malloc = false
 enable_backup_ref_ptr_slow_checks = false
@@ -300,7 +340,8 @@ use_ozone = true
 ozone_auto_platforms = false
 ozone_platform = \"x11\"
 ozone_platform_x11 = true
-ozone_platform_wayland = true
+# TODO: Enable wayland
+ozone_platform_wayland = false
 ozone_platform_headless = true
 angle_enable_vulkan = true
 angle_enable_swiftshader = true
@@ -309,21 +350,28 @@ angle_enable_abseil = false
 is_component_ffmpeg = true
 ffmpeg_branding = \"Chrome\"
 proprietary_codecs = true
-use_qt = true
+use_qt5 = false
+use_qt6 = false
 use_libpci = false
 use_alsa = false
 use_pulseaudio = true
 rtc_use_pipewire = false
 use_vaapi = false
-# See comments below
-enable_nacl = false
 # Host compiler (clang-13) doesn't support LTO well
 is_cfi = false
 use_cfi_icall = false
 use_thin_lto = false
+# OpenCL doesn't work out of box in Termux, use NNAPI instead
+build_tflite_with_opencl = false
+build_tflite_with_nnapi = true
 # Enable rust
 custom_target_rust_abi_target = \"$CARGO_TARGET_NAME\"
-llvm_android_mainline = true
+clang_warning_suppression_file = \"\"
+exclude_unwind_tables = false
+# Enable jumbo build (unified build)
+# use_jumbo_build = true
+# Compile pdfium as a static library
+# pdf_is_complete_lib = true
 " > $_common_args_file
 
 	if [ "$TERMUX_ARCH" = "arm" ]; then
@@ -332,40 +380,45 @@ llvm_android_mainline = true
 	fi
 
 	# Use custom toolchain
+	rm -rf $TERMUX_PKG_CACHEDIR/custom-toolchain
 	mkdir -p $TERMUX_PKG_CACHEDIR/custom-toolchain
-	cp -f $TERMUX_PKG_BUILDER_DIR/toolchain.gn.in $TERMUX_PKG_CACHEDIR/custom-toolchain/BUILD.gn
+	cp -f $TERMUX_PKG_BUILDER_DIR/toolchain-template/host-toolchain.gn.in $TERMUX_PKG_CACHEDIR/custom-toolchain/BUILD.gn
 	sed -i "s|@HOST_CC@|$_host_cc|g
 			s|@HOST_CXX@|$_host_cxx|g
 			s|@HOST_LD@|$_host_cxx|g
 			s|@HOST_AR@|$(command -v llvm-ar)|g
 			s|@HOST_NM@|$(command -v llvm-nm)|g
 			s|@HOST_IS_CLANG@|true|g
-			s|@HOST_USE_GOLD@|false|g
 			s|@HOST_SYSROOT@|$_amd64_sysroot_path|g
+			s|@V8_CURRENT_CPU@|$_target_cpu|g
 			" $TERMUX_PKG_CACHEDIR/custom-toolchain/BUILD.gn
-	sed -i "s|@V8_CC@|$_host_cc|g
-			s|@V8_CXX@|$_host_cxx|g
-			s|@V8_LD@|$_host_cxx|g
-			s|@V8_AR@|$(command -v llvm-ar)|g
-			s|@V8_NM@|$(command -v llvm-nm)|g
-			s|@V8_TOOLCHAIN_NAME@|$_v8_toolchain_name|g
-			s|@V8_CURRENT_CPU@|$_v8_current_cpu|g
-			s|@V8_V8_CURRENT_CPU@|$_target_cpu|g
-			s|@V8_IS_CLANG@|true|g
-			s|@V8_USE_GOLD@|false|g
-			s|@V8_SYSROOT@|$_v8_sysroot_path|g
-			" $TERMUX_PKG_CACHEDIR/custom-toolchain/BUILD.gn
+	if [ "$_v8_toolchain_name" != "host" ]; then
+		cat $TERMUX_PKG_BUILDER_DIR/toolchain-template/v8-toolchain.gn.in >> $TERMUX_PKG_CACHEDIR/custom-toolchain/BUILD.gn
+		sed -i "s|@V8_CC@|$_host_cc|g
+				s|@V8_CXX@|$_host_cxx|g
+				s|@V8_LD@|$_host_cxx|g
+				s|@V8_AR@|$(command -v llvm-ar)|g
+				s|@V8_NM@|$(command -v llvm-nm)|g
+				s|@V8_TOOLCHAIN_NAME@|$_v8_toolchain_name|g
+				s|@V8_CURRENT_CPU@|$_v8_current_cpu|g
+				s|@V8_V8_CURRENT_CPU@|$_target_cpu|g
+				s|@V8_IS_CLANG@|true|g
+				s|@V8_SYSROOT@|$_v8_sysroot_path|g
+				" $TERMUX_PKG_CACHEDIR/custom-toolchain/BUILD.gn
+	fi
 
 	# Generate ninja files
 	mkdir -p $TERMUX_PKG_BUILDDIR/out/Release
 	cat $_common_args_file > $TERMUX_PKG_BUILDDIR/out/Release/args.gn
 	gn gen $TERMUX_PKG_BUILDDIR/out/Release
+
+	export cr_v8_toolchain="$_v8_toolchain_name"
 }
 
 termux_step_make() {
 	cd $TERMUX_PKG_BUILDDIR
+
 	ninja -C out/Release chromedriver chrome chrome_crashpad_handler headless_shell -k 0 || bash
-	rm -rf "$TERMUX_PKG_CACHEDIR/sysroot-$TERMUX_ARCH"
 }
 
 termux_step_make_install() {
@@ -417,7 +470,7 @@ termux_step_make_install() {
 		libffmpeg.so
 
 		# Qt
-		libqt5_shim.so
+		# libqt5_shim.so
 	)
 
 	cp "${normal_files[@]/#/out/Release/}" "$TERMUX_PREFIX/opt/$TERMUX_PKG_NAME/"
