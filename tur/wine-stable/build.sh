@@ -4,7 +4,7 @@ TERMUX_PKG_LICENSE="LGPL-2.1"
 TERMUX_PKG_LICENSE_FILE="LICENSE, LICENSE.OLD, COPYING.LIB"
 TERMUX_PKG_MAINTAINER="@termux"
 TERMUX_PKG_VERSION="11.0"
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_REVISION=2
 TERMUX_PKG_SRCURL=https://dl.winehq.org/wine/source/${TERMUX_PKG_VERSION%%.*}.0/wine-$TERMUX_PKG_VERSION.tar.xz
 TERMUX_PKG_SHA256=c07a6857933c1fc60dff5448d79f39c92481c1e9db5aa628db9d0358446e0701
 TERMUX_PKG_DEPENDS="fontconfig, freetype, krb5, libandroid-spawn, libc++, libgmp, libgnutls, libxcb, libxcomposite, libxcursor, libxfixes, libxrender, opengl, pulseaudio, sdl2 | sdl2-compat, vulkan-loader, xorg-xrandr"
@@ -18,9 +18,12 @@ TERMUX_PKG_EXTRA_HOSTBUILD_CONFIGURE_ARGS="
 "
 
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
+ac_cv_header_linux_userfaultfd_h=no
 enable_wineandroid_drv=no
+enable_tools=yes
 --prefix=$TERMUX_PREFIX/opt/wine-stable
 --exec-prefix=$TERMUX_PREFIX/opt/wine-stable
+--includedir=$TERMUX_PREFIX/opt/wine-stable/include
 --libdir=$TERMUX_PREFIX/opt/wine-stable/lib
 --with-wine-tools=$TERMUX_PKG_HOSTBUILD_DIR
 --enable-nls
@@ -68,10 +71,6 @@ enable_wineandroid_drv=no
 --without-xxf86vm
 "
 
-# FIXME: This package doesn't work on arm since 8.x, but anyway
-# FIXME: I'd like to compile it.
-# TERMUX_PKG_EXCLUDED_ARCHES="arm"
-
 # Enable win64 on 64-bit arches.
 if [ "$TERMUX_ARCH_BITS" = 64 ]; then
 	TERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" --enable-win64"
@@ -81,6 +80,10 @@ fi
 if [ "$TERMUX_ARCH" = "x86_64" ]; then
 	TERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" --enable-archs=i386,x86_64"
 fi
+
+# FIXME: This package doesn't work on arm since 8.x, but anyway
+# FIXME: I'd like to compile it.
+# TERMUX_PKG_EXCLUDED_ARCHES="arm"
 
 _setup_llvm_mingw_toolchain() {
 	# LLVM-mingw's version number must not be the same as the NDK's.
@@ -140,6 +143,10 @@ termux_step_pre_configure() {
 	fi
 }
 
+termux_step_make() {
+	make -j $TERMUX_PKG_MAKE_PROCESSES
+}
+
 termux_step_make_install() {
 	make -j $TERMUX_PKG_MAKE_PROCESSES install
 
@@ -147,7 +154,9 @@ termux_step_make_install() {
 	mkdir -p $TERMUX_PREFIX/bin
 	cat << EOF > $TERMUX_PREFIX/bin/wine-stable
 #!$TERMUX_PREFIX/bin/env sh
+
 exec $TERMUX_PREFIX/opt/wine-stable/bin/wine "\$@"
+
 EOF
 	chmod +x $TERMUX_PREFIX/bin/wine-stable
 }
