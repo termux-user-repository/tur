@@ -4,7 +4,7 @@ TERMUX_PKG_LICENSE="LGPL-2.1"
 TERMUX_PKG_LICENSE_FILE="LICENSE, LICENSE.OLD, COPYING.LIB"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="11.2"
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_REVISION=2
 _REAL_VERSION="${TERMUX_PKG_VERSION/\~/-}"
 _VERSION_FOLDER="$(test "${_REAL_VERSION:3:1}" = 0 && echo ${_REAL_VERSION:0:4} || echo ${_REAL_VERSION:0:3}x)"
 TERMUX_PKG_SRCURL=(
@@ -15,8 +15,8 @@ TERMUX_PKG_SHA256=(
 	1756227bdb3feb41750afa97b44ac50a22890a88704a1f0fa14d88c4f921e183
 	c23113d0fd50c52f07d42eb3ef8bdcc80143e9d5204f445a0569307d67afcbdc
 )
-TERMUX_PKG_DEPENDS="fontconfig, freetype, krb5, libandroid-spawn, libc++, libgmp, libgnutls, libxcb, libxcomposite, libxcursor, libxfixes, libxrender, opengl, pulseaudio, sdl2, vulkan-loader, xorg-xrandr"
-TERMUX_PKG_ANTI_BUILD_DEPENDS="vulkan-loader"
+TERMUX_PKG_DEPENDS="fontconfig, freetype, krb5, libandroid-spawn, libc++, libgmp, libgnutls, libxcb, libxcomposite, libxcursor, libxfixes, libxrender, opengl, pulseaudio, sdl2 | sdl2-compat, vulkan-loader, xorg-xrandr"
+TERMUX_PKG_ANTI_BUILD_DEPENDS="sdl2-compat, vulkan-loader"
 TERMUX_PKG_BUILD_DEPENDS="libandroid-spawn-static, vulkan-loader-generic"
 TERMUX_PKG_NO_STATICSPLIT=true
 TERMUX_PKG_AUTO_UPDATE=true
@@ -33,6 +33,7 @@ enable_wineandroid_drv=no
 enable_tools=yes
 --prefix=$TERMUX_PREFIX/opt/wine-staging
 --exec-prefix=$TERMUX_PREFIX/opt/wine-staging
+--includedir=$TERMUX_PREFIX/opt/wine-staging/include
 --libdir=$TERMUX_PREFIX/opt/wine-staging/lib
 --with-wine-tools=$TERMUX_PKG_HOSTBUILD_DIR
 --enable-nls
@@ -80,12 +81,7 @@ enable_tools=yes
 --without-xxf86vm
 "
 
-# FIXME: This package doesn't work on arm since 8.x, but anyway
-# FIXME: I'd like to compile it.
-# TERMUX_PKG_EXCLUDED_ARCHES="arm"
-
 # Enable win64 on 64-bit arches.
-# TODO: Enable win32 after TUR has full support for mutilib
 if [ "$TERMUX_ARCH_BITS" = 64 ]; then
 	TERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" --enable-win64"
 fi
@@ -94,6 +90,10 @@ fi
 if [ "$TERMUX_ARCH" = "x86_64" ]; then
 	TERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" --enable-archs=i386,x86_64"
 fi
+
+# FIXME: This package doesn't work on arm since 8.x, but anyway
+# FIXME: I'd like to compile it.
+# TERMUX_PKG_EXCLUDED_ARCHES="arm"
 
 termux_pkg_auto_update() {
 	local latest_tag
@@ -148,7 +148,6 @@ termux_step_host_build() {
 	_setup_llvm_mingw_toolchain
 
 	# Make host wine-tools
-	(unset sudo; sudo apt update; sudo apt install libfreetype-dev:i386 -yqq)
 	"$TERMUX_PKG_SRCDIR/configure" ${TERMUX_PKG_EXTRA_HOSTBUILD_CONFIGURE_ARGS}
 	make -j "$TERMUX_PKG_MAKE_PROCESSES" __tooldeps__ nls/all
 }
@@ -196,7 +195,9 @@ termux_step_make_install() {
 	mkdir -p $TERMUX_PREFIX/bin
 	cat << EOF > $TERMUX_PREFIX/bin/wine-staging
 #!$TERMUX_PREFIX/bin/env sh
+
 exec $TERMUX_PREFIX/opt/wine-staging/bin/wine "\$@"
+
 EOF
 	chmod +x $TERMUX_PREFIX/bin/wine-staging
 }
