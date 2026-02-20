@@ -1,0 +1,16 @@
+`systeminfomation.networkInterfaces()` doesn't work on Android.
+
+--- a/src/classes/netstat.class.js
++++ b/src/classes/netstat.class.js
+@@ -57,6 +57,11 @@
+         });
+     }
+     updateInfo() {
++        document.getElementById("mod_netstat_iname").innerText = "Interface: (offline)";
++        document.querySelector("#mod_netstat_innercontainer > div:first-child > h2").innerHTML = "OFFLINE";
++        document.querySelector("#mod_netstat_innercontainer > div:nth-child(2) > h2").innerHTML = "--.--.--.--";
++        document.querySelector("#mod_netstat_innercontainer > div:nth-child(3) > h2").innerHTML = "--ms";
++        return;
+         window.si.networkInterfaces().then(async data => {
+             let offline = false;
+ 
