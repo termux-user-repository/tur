@@ -1,0 +1,19 @@
+Description: Don't build extra binary doc package
+ make doc builds a binary tar.gz of the docs.  It takes a while, and we
+ don't need it to build efl-doc.
+Author: Ross Vandegrift <ross@kallisti.us>
+Forwarded: not-needed
+Last-Update: 2019-10-12
+---
+This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+--- a/doc/meson.build
++++ b/doc/meson.build
+@@ -189,7 +189,7 @@
+ 
+ run_target('doc',
+   command: ['echo', 'Documentation built successfully'],
+-  depends: compress_target,
++  depends: doc_target,
+ )
+ 
+ doxyfile_conf = configuration_data()
