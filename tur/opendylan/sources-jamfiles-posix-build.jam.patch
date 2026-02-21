@@ -1,0 +1,13 @@
+diff --git a/sources/jamfiles/posix-build.jam b/sources/jamfiles/posix-build.jam
+index 47b798368..50f468ac6 100644
+--- a/sources/jamfiles/posix-build.jam
++++ b/sources/jamfiles/posix-build.jam
+@@ -56,7 +56,7 @@ CCFLAGS   += -fPIC ;
+ 
+ LINK      ?= $(CC) ;
+ UNIFYLINK ?= $(CC) -Bstatic ;
+-LINKFLAGS ?= $(CCFLAGS) ;
++LINKFLAGS = $(CCFLAGS) -Wno-error=int-conversion ;
+ 
+ #
+ # Runtime
