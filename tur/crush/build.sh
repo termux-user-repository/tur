@@ -3,9 +3,9 @@ TERMUX_PKG_DESCRIPTION="The glamourous AI coding agent for your favourite termin
 TERMUX_PKG_LICENSE="custom"
 TERMUX_PKG_LICENSE_FILE="LICENSE.md"
 TERMUX_PKG_MAINTAINER="@ancientcatz"
-TERMUX_PKG_VERSION="0.43.2"
+TERMUX_PKG_VERSION="0.43.4"
 TERMUX_PKG_SRCURL=https://github.com/charmbracelet/crush/archive/v${TERMUX_PKG_VERSION}.tar.gz
-TERMUX_PKG_SHA256=d0c77f2c8680580cb4b14be2d55530b3feb7d68e5bc741498f72d5086bc3a320
+TERMUX_PKG_SHA256=22ad2171b6d27b92d2b1189607632441194c45dd51caead655114ed2d5a731e0
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_AUTO_UPDATE=false
 TERMUX_PKG_UPDATE_TAG_TYPE="latest-release-tag"
@@ -15,7 +15,6 @@ termux_step_pre_configure() {
 }
 
 termux_step_make() {
-	export GOEXPERIMENT='greenteagc'
 	go build -ldflags "-s -w -X github.com/charmbracelet/crush/internal/version.Version=${TERMUX_PKG_VERSION}"
 }
 
