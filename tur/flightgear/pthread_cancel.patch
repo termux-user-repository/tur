@@ -1,0 +1,30 @@
+diff -ur orig/3rdparty/iaxclient/lib/unixfuncs.c mod/3rdparty/iaxclient/lib/unixfuncs.c
+--- orig/3rdparty/iaxclient/lib/unixfuncs.c	2025-02-19 09:53:41.000000000 +0100
++++ mod/3rdparty/iaxclient/lib/unixfuncs.c	2025-03-06 11:22:36.010228007 +0100
+@@ -291,7 +291,7 @@
+ cleanup:
+ 	b->CanaryRun = 0;
+ 	DBUG("WatchDogProc: cancel Canary\n");
+-	pthread_cancel( b->CanaryThread );
++	pthread_kill( b->CanaryThread , SIGUSR2);
+ 	DBUG("WatchDogProc: join Canary\n");
+ 	pthread_join( b->CanaryThread, NULL );
+ 	DBUG("WatchDogProc: forget Canary\n");
+@@ -310,7 +310,7 @@
+ 	{
+ 		b->WatchDogRun = 0;
+ 		DBUG("StopWatchDog: cancel WatchDog\n");
+-		pthread_cancel( b->WatchDogThread );
++		pthread_kill( b->WatchDogThread , SIGUSR2);
+ 		pthread_join( b->WatchDogThread, NULL );
+ 		b->IsWatchDogThreadValid = 0;
+ 	}
+@@ -319,7 +319,7 @@
+ 	{
+ 		b->CanaryRun = 0;
+ 		DBUG("StopWatchDog: cancel Canary\n");
+-		pthread_cancel( b->CanaryThread );
++		pthread_kill( b->CanaryThread , SIGUSR2);
+ 		DBUG("StopWatchDog: join Canary\n");
+ 		pthread_join( b->CanaryThread, NULL );
+ 		b->IsCanaryThreadValid = 0;
