@@ -1,0 +1,25 @@
+From: Markus Koschany <apo@debian.org>
+Date: Sat, 7 Oct 2017 20:30:19 +0200
+Subject: fullscreen mode
+
+Correct wrong fullscreen mode switch.
+
+Debian-Bug: https://bugs.debian.org/876481
+Forwarded: no
+---
+ src/main.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/main.cpp b/src/main.cpp
+index b23f6e2..cc29f64 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -67,7 +67,7 @@ int main(int argc, char *argv[])
+ 			switch(argv[i][1]) {
+ 				default:
+ 				case 'h':
+-					printf("\nTux Football [-switch]\n\nswitch can be:\n\n-h\tprint this help\n-w\trun Tux Football in windowed mode (default)\n-w\trun Tux Football in fullscreen mode\n-d\tEnable debug logging\n\n");
++					printf("\nTux Football [-switch]\n\nswitch can be:\n\n-h\tprint this help\n-w\trun Tux Football in windowed mode (default)\n-f\trun Tux Football in fullscreen mode\n-d\tEnable debug logging\n\n");
+ 					return 0;
+ 				case 'w':
+ 					fullscreen = false;

@@ -1,0 +1,16 @@
+--- a/src/graphics.h
++++ b/src/graphics.h
+@@ -37,10 +37,10 @@
+ 	~SpriteContainer() {
+ 	}
+ 	
+-	SpriteObject *operator*() {
++	SpriteObject *operator*() const {
+ 		return m_so;
+ 	}
+ 
+-	bool operator<(SpriteContainer &cont) {
++	bool operator<(const SpriteContainer &cont) const {
+ 		return (m_so->position().y() < (*cont)->position().y());
+ 	}
+ private:
