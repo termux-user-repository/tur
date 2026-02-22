@@ -1,0 +1,12 @@
+diff -ur 0ad-orig/source/lib/sysdep/os/unix/ufilesystem.cpp 0ad-mod2/source/lib/sysdep/os/unix/ufilesystem.cpp
+--- 0ad-orig/source/lib/sysdep/os/unix/ufilesystem.cpp	2025-12-22 04:24:46.000000000 +0100
++++ 0ad-mod2/source/lib/sysdep/os/unix/ufilesystem.cpp	2026-02-18 12:34:34.007017311 +0100
+@@ -49,7 +49,7 @@
+ 	wdirent ent;
+ };
+ 
+-#if OS_ANDROID
++#if 0
+ 
+ // The Crystax NDK seems to do weird things with opendir etc.
+ // To avoid that, load the symbols directly from the real libc
