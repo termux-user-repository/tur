@@ -1,0 +1,68 @@
+diff -ur orig/src/config.h mod/src/config.h
+--- orig/src/config.h	2023-08-11 00:46:34.000000000 +0200
++++ mod/src/config.h	2025-12-24 12:01:55.064016834 +0100
+@@ -502,7 +502,7 @@
+ #define SAR_DEF_LOCAL_DATA_DIR  ".config/sar2"
+ 
+ /* Game data dir */
+-#define SAR_DEF_GLOBAL_DATA_DIR "/usr/share/sar2"
++#define SAR_DEF_GLOBAL_DATA_DIR "@TERMUX_PREFIX@/share/games/sar2"
+ 
+ /* Subdirs, one of each in the local and global game dirs */
+ #define SAR_DEF_AIRCRAFTS_DIR		"aircrafts"
+@@ -564,7 +564,7 @@
+ #ifdef __MSW__
+ # define SAR_DEF_SAR_ICON_FILE		"sar2.ico"
+ #else
+-# define SAR_DEF_SAR_ICON_FILE		"/usr/share/pixmaps/sar2.xpm"
++# define SAR_DEF_SAR_ICON_FILE		"@TERMUX_PREFIX@/share/pixmaps/sar2.xpm"
+ #endif
+ 
+ /* Standard Texture Reference Names
+diff -ur orig/src/SConscript mod/src/SConscript
+--- orig/src/SConscript	2023-08-11 00:46:34.000000000 +0200
++++ mod/src/SConscript	2025-12-24 12:31:17.349349559 +0100
+@@ -29,7 +29,27 @@
+ if prefix is None:
+     prefix='/usr/local'
+ 
+-env = Environment(PREFIX = prefix, DESTDIR = destdir)
++cc_compiler = os.environ.get('CC', 'clang')
++cxx_compiler = os.environ.get('CXX', 'clang++')
++
++sys_prefix = os.environ.get('PREFIX', '/usr')
++
++env = Environment(PREFIX = prefix, DESTDIR = destdir, ENV = os.environ, CC = cc_compiler, CXX = cxx_compiler)
++
++env.Append(CPPFLAGS = ['-I' + sys_prefix + '/include'])
++env.Append(LIBPATH = [sys_prefix + '/lib'])
++
++env.Append(LINKFLAGS = [
++    '-L' + sys_prefix + '/lib',
++    '-Wl,-rpath,' + sys_prefix + '/lib',
++    '-Wl,--enable-new-dtags',
++    '-landroid-spawn',
++    '-Wl,--no-as-needed,-lOpenSLES,--as-needed'
++])
++
++#env.Append(LINKFLAGS = ['-L' + sys_prefix + '/lib', '-Wl,-rpath=' + sys_prefix + '/lib'])
++#env.Append(LIBS = ['dl', 'log', 'android'])
++
+ debug = ARGUMENTS.get('debug', 0)
+ 
+ 
+@@ -181,7 +201,13 @@
+ data='#data'
+ man='#man/sar2.6.bz2'
+ pixmap='#extra/sar2.xpm'
+-env.Alias("install", env.InstallAs('$DESTDIR/$PREFIX/share/sar2', data))
++desktop='#extra/sar2.desktop'
++appdata='#extra/sar2.appdata.xml'
++data_inst = env.InstallAs('$DESTDIR/$PREFIX/share/games/sar2', data)
++env.AlwaysBuild(data_inst)
++env.Alias("install", data_inst)
+ env.Alias("install", env.Install('$DESTDIR/$PREFIX/share/man/man6', man))
+ env.Alias("install", env.Install('$DESTDIR/$PREFIX/share/pixmaps', pixmap))
++env.Alias("install", env.Install('$DESTDIR/$PREFIX/share/applications', desktop))
++env.Alias("install", env.Install('$DESTDIR/$PREFIX/share/metainfo', appdata))
+ env.Alias("install", env.Install('$DESTDIR/$PREFIX/bin', sar2))
