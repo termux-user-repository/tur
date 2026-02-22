@@ -1,0 +1,17 @@
+From: Alexandre Detiste <tchet@debian.org>
+Subject: use standard Debian games path
+Forwarded: no
+
+diff --git a/src/Os.cpp b/src/Os.cpp
+index a741110..6de71a7 100644
+--- a/src/Os.cpp
++++ b/src/Os.cpp
+@@ -290,6 +290,8 @@ Os::appName()
+ std::string
+ Os::globalDataDir()
+ {
++    return "@TERMUX_PREFIX@/share/games/numptyphysics/data/";
++
+     std::string sourceData = thp::format("%s/data", g_appDir.c_str());
+ 
+     // Prefer './data' in the source checkout if available

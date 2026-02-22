@@ -1,0 +1,28 @@
+# https://gitweb.gentoo.org/repo/gentoo.git/plain/games-puzzle/numptyphysics/numptyphysics-0.3.8.ebuild
+From: games@gentoo.org
+Subject: respect LDFLAGS
+Forwarded: https://gitlab.com/thp/numptyphysics/-/merge_requests/39/diffs
+
+---
+
+diff '--color=auto' -NarU 2 a/external/Box2D/Source/Makefile b/external/Box2D/Source/Makefile
+--- a/makefile
++++ b/makefile
+@@ -37,7 +37,7 @@
+ 
+ $(TARGET): $(OBJECTS) $(LOCAL_LIBS)
+ 	$(SILENTMSG) "\tLD\t$@\n"
+-	$(SILENTCMD) $(CXX) -o $@ $^ $(LIBS)
++	$(SILENTCMD) $(CXX) -o $@ $^ $(LDFLAGS) $(LIBS)
+ 
+ clean: $(ADDITIONAL_CLEAN_TARGETS)
+ 	$(SILENTMSG) "\tCLEAN\n"
+--- a/mk/pkgs.mk
++++ b/mk/pkgs.mk
+@@ -1,4 +1,4 @@
+ ifneq ($(PKGS),)
+-CXXFLAGS += $(shell $(CROSS_COMPILE)pkg-config --cflags $(PKGS))
+-LIBS += $(shell $(CROSS_COMPILE)pkg-config --libs $(PKGS))
++CXXFLAGS += $(shell $(PKG_CONFIG) --cflags $(PKGS))
++LIBS += $(shell $(PKG_CONFIG) --libs $(PKGS))
+ endif
