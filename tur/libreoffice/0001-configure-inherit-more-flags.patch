@@ -1,0 +1,126 @@
+--- a/configure.ac
++++ b/configure.ac
+@@ -1370,7 +1370,7 @@
+ AC_SUBST(PTHREAD_CFLAGS)
+ AC_SUBST(PTHREAD_LIBS)
+ 
+-# Check for explicit A/C/CXX/OBJC/OBJCXX/LDFLAGS.
++# Check for explicit A/C/CPP/CXX/OBJC/OBJCXX/LDFLAGS.
+ # By default use the ones specified by our build system,
+ # but explicit override is possible.
+ AC_MSG_CHECKING(for explicit AFLAGS)
+@@ -1389,6 +1389,14 @@
+     AC_MSG_RESULT(no)
+     x_CFLAGS=[\#]
+ fi
++AC_MSG_CHECKING(for explicit CPPFLAGS)
++if test -n "$CPPFLAGS"; then
++    AC_MSG_RESULT([$CPPFLAGS])
++    x_CPPFLAGS=
++else
++    AC_MSG_RESULT(no)
++    x_CPPFLAGS=[\#]
++fi
+ AC_MSG_CHECKING(for explicit CXXFLAGS)
+ if test -n "$CXXFLAGS"; then
+     AC_MSG_RESULT([$CXXFLAGS])
+@@ -1423,12 +1431,14 @@
+ fi
+ AC_SUBST(AFLAGS)
+ AC_SUBST(CFLAGS)
++AC_SUBST(CPPFLAGS)
+ AC_SUBST(CXXFLAGS)
+ AC_SUBST(OBJCFLAGS)
+ AC_SUBST(OBJCXXFLAGS)
+ AC_SUBST(LDFLAGS)
+ AC_SUBST(x_AFLAGS)
+ AC_SUBST(x_CFLAGS)
++AC_SUBST(x_CPPFLAGS)
+ AC_SUBST(x_CXXFLAGS)
+ AC_SUBST(x_OBJCFLAGS)
+ AC_SUBST(x_OBJCXXFLAGS)
+@@ -6195,7 +6195,7 @@
+     test -d config_build && cp -p config_build/*.h CONF-FOR-BUILD/config_host 2>/dev/null
+     (
+     unset COM USING_X11 OS CPUNAME
+-    unset CC CXX SYSBASE CFLAGS
++    unset CC CXX SYSBASE CFLAGS CPPFLAGS CXXFLAGS LDFLAGS
+     unset AR LD NM OBJDUMP PKG_CONFIG RANLIB READELF STRIP
+     unset CPPUNIT_CFLAGS CPPUNIT_LIBS
+     unset LIBXML_CFLAGS LIBXML_LIBS LIBXSLT_CFLAGS LIBXSLT_LIBS XSLTPROC
+@@ -6209,6 +6219,10 @@
+         CXX_BASE=`first_arg_basename "$CXX"`
+     fi
+     test -n "$PKG_CONFIG_FOR_BUILD" && export PKG_CONFIG="$PKG_CONFIG_FOR_BUILD"
++    test -n "$CFLAGS_FOR_BUILD" && export CFLAGS="$CFLAGS_FOR_BUILD"
++    test -n "$CPPFLAGS_FOR_BUILD" && export CPPFLAGS="$CPPFLAGS_FOR_BUILD"
++    test -n "$CXXFLAGS_FOR_BUILD" && export CXXFLAGS="$CXXFLAGS_FOR_BUILD"
++    test -n "$LDFLAGS_FOR_BUILD" && export LDFLAGS="$LDFLAGS_FOR_BUILD"
+     cd CONF-FOR-BUILD
+ 
+     # Handle host configuration, which affects the cross-toolset too
+--- a/configure
++++ b/configure
+@@ -1533,12 +1533,14 @@
+ x_OBJCXXFLAGS
+ x_OBJCFLAGS
+ x_CXXFLAGS
++x_CPPFLAGS
+ x_CFLAGS
+ x_AFLAGS
+ LDFLAGS
+ OBJCXXFLAGS
+ OBJCFLAGS
+ CXXFLAGS
++CPPFLAGS
+ CFLAGS
+ AFLAGS
+ PTHREAD_LIBS
+@@ -7611,6 +7613,17 @@
+ printf "%s\n" "no" >&6; }
+     x_CFLAGS=\#
+ fi
++{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for explicit CPPFLAGS" >&5
++printf %s "checking for explicit CPPFLAGS... " >&6; }
++if test -n "$CPPFLAGS"; then
++    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $CPPFLAGS" >&5
++printf "%s\n" "$CPPFLAGS" >&6; }
++    x_CPPFLAGS=
++else
++    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
++printf "%s\n" "no" >&6; }
++    x_CPPFLAGS=\#
++fi
+ { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for explicit CXXFLAGS" >&5
+ printf %s "checking for explicit CXXFLAGS... " >&6; }
+ if test -n "$CXXFLAGS"; then
+@@ -16601,7 +16601,7 @@
+     test -d config_build && cp -p config_build/*.h CONF-FOR-BUILD/config_host 2>/dev/null
+     (
+     unset COM USING_X11 OS CPUNAME
+-    unset CC CXX SYSBASE CFLAGS
++    unset CC CXX SYSBASE CFLAGS CPPFLAGS CXXFLAGS LDFLAGS
+     unset AR LD NM OBJDUMP PKG_CONFIG RANLIB READELF STRIP
+     unset CPPUNIT_CFLAGS CPPUNIT_LIBS
+     unset LIBXML_CFLAGS LIBXML_LIBS LIBXSLT_CFLAGS LIBXSLT_LIBS XSLTPROC
+@@ -16615,6 +16628,10 @@
+         CXX_BASE=`first_arg_basename "$CXX"`
+     fi
+     test -n "$PKG_CONFIG_FOR_BUILD" && export PKG_CONFIG="$PKG_CONFIG_FOR_BUILD"
++    test -n "$CFLAGS_FOR_BUILD" && export CFLAGS="$CFLAGS_FOR_BUILD"
++    test -n "$CPPFLAGS_FOR_BUILD" && export CPPFLAGS="$CPPFLAGS_FOR_BUILD"
++    test -n "$CXXFLAGS_FOR_BUILD" && export CXXFLAGS="$CXXFLAGS_FOR_BUILD"
++    test -n "$LDFLAGS_FOR_BUILD" && export LDFLAGS="$LDFLAGS_FOR_BUILD"
+     cd CONF-FOR-BUILD
+ 
+     # Handle host configuration, which affects the cross-toolset too
+--- a/config_host.mk.in
++++ b/config_host.mk.in
+@@ -67,6 +67,7 @@
+ export CDR_CFLAGS=$(gb_SPACE)@CDR_CFLAGS@
+ export CDR_LIBS=$(gb_SPACE)@CDR_LIBS@
+ @x_CFLAGS@ export CFLAGS=@CFLAGS@
++@x_CPPFLAGS@ export CPPFLAGS=@CPPFLAGS@
+ export CLANG_16=@CLANG_16@
+ export CLANG_USE_LD=@CLANG_USE_LD@
+ export CLANGDIR=@CLANGDIR@
