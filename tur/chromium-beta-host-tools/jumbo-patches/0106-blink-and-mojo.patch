@@ -4835,17 +4835,3 @@ index 8238b11bef..5abb967f85 100644
  class Subscriber::ConsumerAbortSubscriptionAlgorithm final
      : public AbortSignal::Algorithm {
   public:
---- a/third_party/blink/renderer/modules/xr/xr_rigid_transform.h
-+++ b/third_party/blink/renderer/modules/xr/xr_rigid_transform.h
-@@ -11,10 +11,7 @@
- #include "third_party/blink/renderer/core/typed_arrays/dom_typed_array.h"
- #include "third_party/blink/renderer/modules/modules_export.h"
- #include "third_party/blink/renderer/platform/bindings/script_wrappable.h"
--
--namespace gfx {
--class Transform;
--}
-+#include "ui/gfx/geometry/transform.h"
- 
- namespace blink {
- 

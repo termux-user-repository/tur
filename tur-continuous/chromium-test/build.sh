@@ -1,51 +1,154 @@
 TERMUX_PKG_HOMEPAGE=https://www.chromium.org/Home
-TERMUX_PKG_DESCRIPTION="Chromium web browser"
+TERMUX_PKG_DESCRIPTION="Chromium web browser (Testing version)"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="@licy183"
-TERMUX_PKG_VERSION=145.0.7632.45
-TERMUX_PKG_SRCURL=https://commondatastorage.googleapis.com/chromium-browser-official/chromium-$TERMUX_PKG_VERSION-lite.tar.xz
-TERMUX_PKG_SHA256=a7ce8bd85d36e6c01d382e71c9018b0d118553a848e32dd399aea2e437476be1
+_CHROMIUM_VERSION=145.0.7562.0
+_TEST_COMMIT=5047a654857ed9bdceecec7282580460cc6688bc
+_TEST_COMMIT_POSITION=1554024
+# https://cr-rev.appspot.com/$commit_position
+# https://cr-rev.appspot.com/1554024
+# m145-7561-1552494-70909488d8cc2cf4e9419d428f9bf77dc9e781b6: good
+# m145-7562-1553956-ddbe513b6e8d5037cfa9869f8bdcd1fce72a9c21: good
+# m145-7562-1554005-5a6a5e0de77ae5c38f0f987e94ad009618fa6401: good
+# m145-7562-1554017-2738e45509b8b4205666893f1b844bb46d2ee6c8: good
+# m145-7562-1554024-5047a654857ed9bdceecec7282580460cc6688bc: bad
+# m145-7562-1554030-a631bc327a9585351b1c7a8ed86e7b063e1df486: bad
+# m145-7562-1554054-897a0ffd446f253403b5de93b6760586eebae704: bad
+# m145-7562-1554152-69cba6f6f9dfbe6a1a91c66724b734e4c3de2cc0: bad
+# m145-7563-1554347-4d98b9d3d63d00052158ece9259f8134e09b2cf9: bad
+# m145-7566-1555120-e7d2f9da824f28a1af55eed52e4752fb07dc3819: bad
+# m145-7572-1556498-6633df572f27719f6043dc6b12b2d4b41abe729b: bad
+TERMUX_PKG_VERSION=$_CHROMIUM_VERSION-r$_TEST_COMMIT_POSITION
 TERMUX_PKG_DEPENDS="atk, cups, dbus, fontconfig, gtk3, krb5, libc++, libevdev, libxkbcommon, libminizip, libnss, libx11, mesa, openssl, pango, pulseaudio, zlib"
-TERMUX_PKG_BUILD_DEPENDS="chromium-beta-host-tools, libffi-static"
+TERMUX_PKG_BUILD_DEPENDS="libffi-static"
 # TODO: Split chromium-common and chromium-headless
 # TERMUX_PKG_DEPENDS+=", chromium-common"
 # TERMUX_PKG_SUGGESTS="chromium-headless, chromium-driver"
 # Chromium doesn't support i686 on Linux.
-TERMUX_PKG_EXCLUDED_ARCHES="i686"
-TERMUX_PKG_AUTO_UPDATE=false
+TERMUX_PKG_BLACKLISTED_ARCHES="i686"
 TERMUX_PKG_ON_DEVICE_BUILD_NOT_SUPPORTED=true
 
-SYSTEM_LIBRARIES="    fontconfig"
-# TERMUX_PKG_DEPENDS="fontconfig"
+SYSTEM_LIBRARIES="    libdrm  fontconfig"
+# TERMUX_PKG_DEPENDS="libdrm, fontconfig"
+
+__tur_chromium_is_mountpoint() {
+	local path=$(readlink -f $1)
+	if [ x"$path" = x"" ]; then
+		return 1
+	fi
+	set +e
+	grep -q "$path" /proc/mounts
+	local result=$?
+	set -e
+	if [ "$result" = 0 ]; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+__tur_chromium_sudo() {
+	env -i PATH="$PATH" sudo "$@"
+}
+
+termux_step_get_source() {
+	# Fetch depot_tools
+	export DEPOT_TOOLS_UPDATE=0
+	if [ ! -f "$TERMUX_PKG_CACHEDIR/.depot_tools-fetched" ]; then
+		git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git $TERMUX_PKG_CACHEDIR/depot_tools
+		touch "$TERMUX_PKG_CACHEDIR/.depot_tools-fetched"
+	fi
+	export PATH="$TERMUX_PKG_CACHEDIR/depot_tools:$PATH"
+	$TERMUX_PKG_CACHEDIR/depot_tools/ensure_bootstrap
+
+	# Fetch chromium source
+	local __src_dir="$HOME/chromium-sources/chromium"
+	if [ ! -f "$TERMUX_PKG_CACHEDIR/.chromium-source-fetched" ]; then
+		mkdir -p "$__src_dir"
+		pushd "$__src_dir"
+		fetch --nohooks chromium || (
+			cd src && git reset --hard && git checkout main && git pull &&
+			_remote_main="$(git rev-parse origin/main)" && cd .. &&
+			gclient sync -D --nohooks --verbose --revision src@$_remote_main &&
+			gclient fetch --verbose
+		)
+		pushd src
+		gclient runhooks
+		popd # "$__src_dir/src"
+		popd # "$__src_dir"
+		touch "$TERMUX_PKG_CACHEDIR/.chromium-source-fetched"
+	fi
+
+	# umount layers
+	local __layer1_dir="$HOME/chromium-layer-1"
+	# if __tur_chromium_is_mountpoint "$__layer1_dir/merged" ; then
+	# 	__tur_chromium_sudo umount "$__layer1_dir/merged"
+	# fi
+	local __layer2_dir="$HOME/chromium-layer-2"
+	if __tur_chromium_is_mountpoint "$__layer2_dir/merged" ; then
+		__tur_chromium_sudo umount "$__layer2_dir/merged"
+	fi
+	local __layer3_dir="$HOME/chromium-layer-3"
+	if __tur_chromium_is_mountpoint "$__layer3_dir/merged" ; then
+		__tur_chromium_sudo umount "$__layer3_dir/merged"
+	fi
+
+	# Layer 1, contains the source code versioned $_CHROMIUM_VERSION
+	# mkdir -p "$__layer1_dir"
+	# pushd "$__layer1_dir"
+	# __tur_chromium_sudo rm -rf merged/ upperdir/ workdir/
+	# mkdir -p merged/ upperdir/ workdir/
+	# __tur_chromium_sudo mount -t overlay -o lowerdir=$__src_dir,upperdir=$__layer1_dir/upperdir,workdir=$__layer1_dir/workdir overlay $__layer1_dir/merged
+	# rm -rf "$__layer1_dir/merged/.cipd"
+	# popd # "$__layer1_dir"
+	# pushd "$__layer1_dir/merged"
+	# gclient sync -D --force --nohooks --verbose --revision src@$_CHROMIUM_VERSION || bash
+	# popd # "$__layer1_dir/merged"
+
+	# Layer 2, contains the source code of given commit
+	mkdir -p "$__layer2_dir"
+	pushd "$__layer2_dir"
+	__tur_chromium_sudo rm -rf merged/ upperdir/ workdir/
+	mkdir -p merged/ upperdir/ workdir/
+	__tur_chromium_sudo mount -t overlay -o lowerdir=$__layer1_dir/upperdir:$__src_dir,upperdir=$__layer2_dir/upperdir,workdir=$__layer2_dir/workdir overlay $__layer2_dir/merged
+	rm -rf "$__layer2_dir/merged/.cipd"
+	popd # "$__layer2_dir"
+	pushd "$__layer2_dir/merged"
+	gclient sync -D --force --nohooks --verbose --revision src@$_TEST_COMMIT || bash
+	popd # "$__layer2_dir/merged"
+
+	# Layer 3, the real work dir, waiting for patches
+	mkdir -p "$__layer3_dir"
+	pushd "$__layer3_dir"
+	__tur_chromium_sudo rm -rf merged/ upperdir/ workdir/
+	mkdir -p merged/ upperdir/ workdir/
+	__tur_chromium_sudo mount -t overlay -o lowerdir=$__layer2_dir/upperdir:$__layer1_dir/upperdir:$__src_dir,upperdir=$__layer3_dir/upperdir,workdir=$__layer3_dir/workdir overlay $__layer3_dir/merged
+	popd # "$__layer3_dir"
+
+	# Now, we've get the real source of given commit, just provide the symlink
+	rm -rf $$TERMUX_PKG_SRCDIR
+	ln -sfr "$__layer3_dir/merged/src" $TERMUX_PKG_SRCDIR
+}
 
 termux_step_post_get_source() {
 	# Apply patches related to chromium
 	local f
-	for f in $(find "$TERMUX_PKG_BUILDER_DIR/../chromium-beta-host-tools/cr-patches" -maxdepth 1 -type f -name *.patch | sort); do
+	for f in $(find "$TERMUX_PKG_BUILDER_DIR/cr-patches" -maxdepth 1 -type f -name *.patch | sort); do
 		echo "Applying patch: $(basename $f)"
 		patch -p1 --silent < "$f"
 	done
 
-	# Apply patches for jumbo build
-	local f
-	for f in $(find "$TERMUX_PKG_BUILDER_DIR/../chromium-beta-host-tools/jumbo-patches" -maxdepth 1 -type f -name *.patch | sort); do
-		echo "Applying patch: $(basename $f)"
-		patch -p1 --silent < "$f"
-	done
+	# Disable jumbo build when testing
+	# # Apply patches for jumbo build
+	# local f
+	# for f in $(find "$TERMUX_PKG_BUILDER_DIR/jumbo-patches" -maxdepth 1 -type f -name *.patch | sort); do
+	# 	echo "Applying patch: $(basename $f)"
+	# 	patch -p1 --silent < "$f"
+	# done
 
 	# Use some system libs
 	python3 build/linux/unbundle/replace_gn_files.py --system-libraries \
 		$SYSTEM_LIBRARIES
-
-	# Remove the source file to keep more space
-	rm -f "$TERMUX_PKG_CACHEDIR/chromium-$TERMUX_PKG_VERSION-lite.tar.xz"
-}
-
-termux_step_pre_configure() {
-	# Use prebuilt swiftshader
-	mv $TERMUX_PKG_SRCDIR/third_party/swiftshader $TERMUX_PKG_SRCDIR/third_party/swiftshader.unused
-	mkdir -p $TERMUX_PKG_SRCDIR/third_party/swiftshader/
-	cp -Rf $TERMUX_PKG_BUILDER_DIR/third_party_override/swiftshader/* $TERMUX_PKG_SRCDIR/third_party/swiftshader/
 }
 
 termux_step_configure() {
@@ -121,15 +224,15 @@ print(deps['src/third_party/node/node_modules']['objects'][0]['sha256sum'])
 		mv "$TERMUX_PKG_SRCDIR/third_party/node/node_modules-tmp" "$TERMUX_PKG_SRCDIR/third_party/node/node_modules"
 	fi
 
-	# Sync rollup-related native deps in devtools
-	if [ ! -d "third_party/devtools-frontend/src/node_modules/@rollup/rollup-linux-x64-gnu" ]; then
-		if [ ! -f "third_party/devtools-frontend/src/third_party/rollup_libs/rollup.linux-x64-gnu.node" ]; then
-			termux_error_exit "rollup.linux-x64-gnu.node not found"
-		fi
-		pushd third_party/devtools-frontend/src
-		python3 scripts/deps/sync_rollup_libs.py
-		popd # third_party/devtools-frontend/src
-	fi
+	# # Sync rollup-related native deps in devtools
+	# if [ ! -d "third_party/devtools-frontend/src/node_modules/@rollup/rollup-linux-x64-gnu" ]; then
+	# 	if [ ! -f "third_party/devtools-frontend/src/third_party/rollup_libs/rollup.linux-x64-gnu.node" ]; then
+	# 		termux_error_exit "rollup.linux-x64-gnu.node not found"
+	# 	fi
+	# 	pushd third_party/devtools-frontend/src
+	# 	python3 scripts/deps/sync_rollup_libs.py
+	# 	popd # third_party/devtools-frontend/src
+	# fi
 
 	local CARGO_TARGET_NAME="${TERMUX_ARCH}-linux-android"
 	if [[ "${TERMUX_ARCH}" == "arm" ]]; then
@@ -214,8 +317,9 @@ is_debug = false
 symbol_level = 0
 # Use our custom toolchain
 clang_version = \"$_host_clang_version\"
-use_sysroot = false
+# Using CXX23 will cause segfault, maybe a bug of clang...
 use_cxx23 = false
+use_sysroot = false
 target_cpu = \"$_target_cpu\"
 target_rpath = \"$TERMUX_PREFIX/lib\"
 target_sysroot = \"$_target_sysroot\"
@@ -228,6 +332,7 @@ clang_use_chrome_plugins = false
 dcheck_always_on = false
 chrome_pgo_phase = 0
 treat_warnings_as_errors = false
+disable_unknown_warning_option = true
 # Use system libraries as little as possible
 use_system_freetype = false
 use_custom_libcxx = false
@@ -276,9 +381,9 @@ custom_target_rust_abi_target = \"$CARGO_TARGET_NAME\"
 clang_warning_suppression_file = \"\"
 exclude_unwind_tables = false
 # Enable jumbo build (unified build)
-use_jumbo_build = true
+# use_jumbo_build = true
 # Compile pdfium as a static library
-pdf_is_complete_lib = true
+# pdf_is_complete_lib = true
 " > $_common_args_file
 
 	if [ "$TERMUX_ARCH" = "arm" ]; then
@@ -318,36 +423,15 @@ pdf_is_complete_lib = true
 	mkdir -p $TERMUX_PKG_BUILDDIR/out/Release
 	cat $_common_args_file > $TERMUX_PKG_BUILDDIR/out/Release/args.gn
 	gn gen $TERMUX_PKG_BUILDDIR/out/Release
+
+	export cr_v8_toolchain="$_v8_toolchain_name"
 }
 
 termux_step_make() {
 	cd $TERMUX_PKG_BUILDDIR
-	# Build v8 snapshot in another action
-	time ninja -C out/Release \
-						v8_context_snapshot \
-						run_mksnapshot_default \
-						run_torque \
-						generate_bytecode_builtins_list \
-						v8:run_gen-regexp-special-case
-	# Build generate steps in another action
-	time ninja -C out/Release \
-						generate_top_domain_list_variables_file \
-						generate_chrome_colors_info \
-						character_data \
-						gen_root_store_inc \
-						generate_transport_security_state \
-						generate_top_domains_trie
-	# Build swiftshader in another action
-	time ninja -C out/Release \
-						third_party/swiftshader/src/Vulkan:icd_file \
-						third_party/swiftshader/src/Vulkan:swiftshader_libvulkan
-	# Build pdfium in another action
-	time ninja -C out/Release \
-						third_party/pdfium \
-						third_party/pdfium:pdfium_public_headers
 
-	# Build other components
-	ninja -C out/Release chromedriver chrome chrome_crashpad_handler headless_shell
+	bash
+	ninja -C out/Release chromedriver chrome chrome_crashpad_handler headless_shell -k 0 || bash
 }
 
 termux_step_make_install() {
@@ -419,16 +503,53 @@ termux_step_post_make_install() {
 	rm $TERMUX_PREFIX/lib/lib{{pthread,resolv,ffi_pic}.a,rt.so}
 }
 
+termux_step_post_massage() {
+	# Except the deb file, we also create a zip file like chromium release
+	mkdir -p $TERMUX_SCRIPTDIR/output-chromium
+
+	pushd $TERMUX_PKG_MASSAGEDIR/$TERMUX_PREFIX/opt/$TERMUX_PKG_NAME
+	zip -r $TERMUX_SCRIPTDIR/output-chromium/chromium-v$TERMUX_PKG_VERSION-linux-$TERMUX_ARCH.zip ./*
+	popd
+}
+
 # TODO:
 # (2) Split packages
 
 # ######################### About system libraries ############################
 # We only pick up a few libraries to let chromium link against. Others may
-# contain linking error due to the version mismatch between Google-provided
-# sysroot and Termux.
-# Name in Chromium | libdrm fontconfig
-# Name in Termux   | libdrm fontconfig
+# contains 
+# FYI, all the available libraries and whether they can be used for linking
+# are listed below.
 #
+# Name in Chromium | libdrm libjpeg       libpng libwebp fontconfig libxslt
+# Name in Termux   | libdrm libjpeg-turbo libpng libwebp fontconfig libxslt
+#
+# Name in Chromium | freetype libxml  opus    snappy    flac    zlib
+# Name in Termux   | freetype libxml2 libopus libsnappy libflac zlib
+#
+# These libraries cannot be used as system libraries, because Chromium-provided
+# debian rootfs doesn't have them (or their headers). Maybe we should construct
+# our own rootfs later.
+# Name in Chromium | harfbuzz-ng  dav1d ffmpeg libaom libjxl libvpx libevent double-conversion jsoncpp
+# Name in Termux   | harfbuzz  libdav1d ffmpeg libaom libjxl libvpx libevent double-conversion jsoncpp
+#
+# These libraries cannot be used due to configuation errors like
+# `error: '/usr/bin/brotli', needed by 'clang_x64/brotli', missing and no known rule to make it`/
+# Name in Chromium | brotli    icu    re2
+# Name in Termux   | brotli libicu libre2
+#
+# These libraries cannot be used because they don't exist in Termux.
+# Name in Chromium | absl* crc32c, libavif, libXNVCtrl, libyuv, openh264, libSPIRV-Tools
+#
+# TODO: link against system ffmpeg
+# #############################################################################
+
+# ######################### About Native Client ###############################
+# When set `enable_nacl = true`, the following error occurs.
+# ninja: error: 'native_client/toolchain/linux_x86/pnacl_newlib/bin/arm-nacl-objcopy', needed by 'nacl_irt_arm.nexe', missing and no known rule to make it.
+# If we want to enable NaCi, maybe we should build the toolchain of NaCl too.
+# But I don't think this is necessary. NaCl existing or not will take little 
+# influence on Chromium. So I'd like to disable NaCl.
 # #############################################################################
 
 # ############################ About Sandbox ##################################
