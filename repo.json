@@ -17,6 +17,12 @@
     "component": "tur-on-device",
     "url": "https://tur.kcubeterm.com"
   },
+  "tur-waydroid": {
+    "name": "tur-waydroid",
+    "distribution": "tur-packages",
+    "component": "tur-waydroid",
+    "url": "https://tur.kcubeterm.com"
+  },
   "tur-hacking": {
     "name": "tur-hacking",
     "distribution": "tur-packages",
