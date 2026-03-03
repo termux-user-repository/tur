@@ -1,0 +1,293 @@
+diff -ur a/source/lib/posix/posix_aio.h b/source/lib/posix/posix_aio.h
+--- a/source/lib/posix/posix_aio.h	2025-12-22 04:24:46.000000000 +0100
++++ b/source/lib/posix/posix_aio.h	2026-02-21 15:41:57.204826049 +0100
+@@ -30,7 +30,7 @@
+ 
+ #if OS_WIN
+ # include "lib/sysdep/os/win/wposix/waio.h"
+-#elif OS_ANDROID || OS_OPENBSD
++#elif 1
+ // Android doesn't provide aio.h. We don't actually use aio on Linuxes (see
+ // CONFIG2_FILE_ENABLE_AIO) but we use its symbols and structs, so define
+ // them here
+diff -ur a/source/lib/secure_crt.cpp b/source/lib/secure_crt.cpp
+--- a/source/lib/secure_crt.cpp	2025-12-22 04:24:46.000000000 +0100
++++ b/source/lib/secure_crt.cpp	2026-02-21 15:42:41.217365366 +0100
+@@ -37,7 +37,7 @@
+ #include <cstdarg>
+ #include <cstdio>
+ 
+-#if OS_ANDROID
++#if 0
+ # include <boost/algorithm/string/replace.hpp>
+ #endif
+ 
+@@ -136,7 +136,7 @@
+ 	return len;
+ }
+ 
+-#if OS_ANDROID
++#if 0
+ static tstring androidFormat(const tchar *fmt)
+ {
+ 	// FIXME handle %%hs, %%ls, etc
+@@ -255,7 +255,7 @@
+ 		return -1;
+ 	}
+ 
+-#if OS_ANDROID
++#if 0
+ 	// Workaround for https://code.google.com/p/android/issues/detail?id=109074
+ 	// (vswprintf doesn't null-terminate strings)
+ 	memset(dst, 0, max_dst_chars * sizeof(tchar));
+diff -ur a/source/lib/sysdep/os/linux/lcpu.cpp b/source/lib/sysdep/os/linux/lcpu.cpp
+--- a/source/lib/sysdep/os/linux/lcpu.cpp	2025-12-22 04:24:46.000000000 +0100
++++ b/source/lib/sysdep/os/linux/lcpu.cpp	2026-02-21 15:43:10.889423456 +0100
+@@ -111,7 +111,7 @@
+ 	return memoryAvailable;
+ }
+ 
+-#if OS_ANDROID
++#if 0
+ // the current Android NDK (r7-crystax-4) doesn't support sched_setaffinity,
+ // so provide a stub implementation instead
+ 
+diff -ur a/source/lib/sysdep/os/linux/ldbg.cpp b/source/lib/sysdep/os/linux/ldbg.cpp
+--- a/source/lib/sysdep/os/linux/ldbg.cpp	2025-12-22 04:24:46.000000000 +0100
++++ b/source/lib/sysdep/os/linux/ldbg.cpp	2026-02-21 15:41:57.208395918 +0100
+@@ -46,7 +46,7 @@
+ #include <string>
+ #include <sys/syscall.h>
+ 
+-#if OS_ANDROID
++#if 0
+ 
+ // Android NDK doesn't support backtrace()
+ // TODO: use unwind.h or similar?
+diff -ur a/source/lib/sysdep/os/unix/udbg.cpp b/source/lib/sysdep/os/unix/udbg.cpp
+--- a/source/lib/sysdep/os/unix/udbg.cpp	2025-12-22 04:24:46.000000000 +0100
++++ b/source/lib/sysdep/os/unix/udbg.cpp	2026-02-21 15:41:57.208833538 +0100
+@@ -93,7 +93,7 @@
+ 	}
+ }
+ 
+-#if OS_ANDROID
++#if 0
+ 
+ #include <android/log.h>
+ 
+diff -ur a/source/lib/sysdep/os/unix/ufilesystem.cpp b/source/lib/sysdep/os/unix/ufilesystem.cpp
+--- a/source/lib/sysdep/os/unix/ufilesystem.cpp	2025-12-22 04:24:46.000000000 +0100
++++ b/source/lib/sysdep/os/unix/ufilesystem.cpp	2026-02-21 15:41:57.209287388 +0100
+@@ -49,7 +49,7 @@
+ 	wdirent ent;
+ };
+ 
+-#if OS_ANDROID
++#if 0
+ 
+ // The Crystax NDK seems to do weird things with opendir etc.
+ // To avoid that, load the symbols directly from the real libc
+diff -ur a/source/lib/sysdep/os/unix/unix.cpp b/source/lib/sysdep/os/unix/unix.cpp
+--- a/source/lib/sysdep/os/unix/unix.cpp	2025-12-22 04:24:46.000000000 +0100
++++ b/source/lib/sysdep/os/unix/unix.cpp	2026-02-21 15:41:57.209997308 +0100
+@@ -20,6 +20,9 @@
+  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+  */
+ 
++// Must be defined before any system headers to expose getlogin_r()
++#define _GNU_SOURCE
++
+ #include "precompiled.h"
+ 
+ #include "lib/code_annotation.h"
+@@ -40,8 +43,6 @@
+ #include <cstring>
+ #include <string>
+ 
+-#define GNU_SOURCE
+-
+ #include <sys/wait.h>
+ 
+ #if OS_MACOSX
+@@ -69,7 +70,7 @@
+ 	fprintf(stderr, "%ls: %ls\n", caption, msg); // must not use fwprintf, since stderr is byte-oriented
+ }
+ 
+-#if OS_MACOSX || OS_ANDROID
++#if OS_MACOSX || 0
+ static ErrorReactionInternal try_gui_display_error(const wchar_t* /*text*/, bool /*manual_break*/,
+ 	bool /*allow_suppress*/, bool /*no_continue*/)
+ {
+@@ -224,7 +225,7 @@
+ 	if (ret != ERI_NOT_IMPLEMENTED)
+ 		return ret;
+ 
+-#if OS_ANDROID
++#if 0
+ 	// Android has no easy way to get user input here,
+ 	// so continue or exit automatically
+ 	if(no_continue)
+@@ -309,7 +310,7 @@
+ 		return std::wstring(logname, logname + strlen(logname));
+ 	// TODO: maybe we should do locale conversion?
+ 
+-#if OS_ANDROID
++#if 1
+ #warning TODO: sys_get_user_name: do something more appropriate and more thread-safe
+ 	char* buf = getlogin();
+ 	if (buf)
+diff -ur a/source/lib/sysdep/os.h b/source/lib/sysdep/os.h
+--- a/source/lib/sysdep/os.h	2025-12-22 04:24:47.000000000 +0100
++++ b/source/lib/sysdep/os.h	2026-02-21 15:41:57.210618783 +0100
+@@ -56,7 +56,8 @@
+ #endif
+ // Android (subset of Linux)
+ #if defined(__ANDROID__)
+-# define OS_ANDROID 1
++# define OS_ANDROID 0
++# define OS_LINUX 1
+ #else
+ # define OS_ANDROID 0
+ #endif
+diff -ur a/source/lib/sysdep/rtl/gcc/gcc.cpp b/source/lib/sysdep/rtl/gcc/gcc.cpp
+--- a/source/lib/sysdep/rtl/gcc/gcc.cpp	2025-12-22 04:24:47.000000000 +0100
++++ b/source/lib/sysdep/rtl/gcc/gcc.cpp	2026-02-21 15:41:57.212826034 +0100
+@@ -31,7 +31,7 @@
+ // Linux glibc has posix_memalign and (obsolete) memalign
+ // Android libc has only memalign
+ // OS X and BSD probably do not have either.
+-#define HAVE_POSIX_MEMALIGN (OS_LINUX && !OS_ANDROID)
++#define HAVE_POSIX_MEMALIGN (OS_LINUX)
+ #define HAVE_MEMALIGN OS_LINUX
+ 
+ #if HAVE_POSIX_MEMALIGN
+diff -ur a/source/main.cpp b/source/main.cpp
+--- a/source/main.cpp	2026-01-30 08:21:15.000000000 +0100
++++ b/source/main.cpp	2026-02-21 15:42:26.634150439 +0100
+@@ -797,7 +797,7 @@
+ #endif
+ }
+ 
+-#if OS_ANDROID
++#if 0
+ // In Android we compile the engine as a shared library, not an executable,
+ // so rename main() to a different symbol that the wrapper library can load
+ extern "C" __attribute__((visibility ("default"))) int pyrogenesis_main(int argc, char* argv[])
+diff -ur a/source/ps/GameSetup/GameSetup.cpp b/source/ps/GameSetup/GameSetup.cpp
+--- a/source/ps/GameSetup/GameSetup.cpp	2025-12-29 04:10:28.000000000 +0100
++++ b/source/ps/GameSetup/GameSetup.cpp	2026-02-21 15:41:57.217004108 +0100
+@@ -122,7 +122,7 @@
+ #include <utility>
+ 
+ 
+-#if !(OS_WIN || OS_MACOSX || OS_ANDROID) // assume all other platforms use X11 for wxWidgets
++#if !(OS_WIN || OS_MACOSX || 0) // assume all other platforms use X11 for wxWidgets
+ #define MUST_INIT_X11 1
+ #include <X11/Xlib.h>
+ #else
+diff -ur a/source/ps/GameSetup/HWDetect.cpp b/source/ps/GameSetup/HWDetect.cpp
+--- a/source/ps/GameSetup/HWDetect.cpp	2025-12-22 04:24:49.000000000 +0100
++++ b/source/ps/GameSetup/HWDetect.cpp	2026-02-21 15:41:57.219914722 +0100
+@@ -363,7 +363,7 @@
+ 	Script::SetProperty(rq, settings, "os_unix", OS_UNIX);
+ 	Script::SetProperty(rq, settings, "os_bsd", OS_BSD);
+ 	Script::SetProperty(rq, settings, "os_linux", OS_LINUX);
+-	Script::SetProperty(rq, settings, "os_android", OS_ANDROID);
++	//Script::SetProperty(rq, settings, "os_android", OS_ANDROID);
+ 	Script::SetProperty(rq, settings, "os_macosx", OS_MACOSX);
+ 	Script::SetProperty(rq, settings, "os_win", OS_WIN);
+ 
+diff -ur a/source/ps/GameSetup/Paths.cpp b/source/ps/GameSetup/Paths.cpp
+--- a/source/ps/GameSetup/Paths.cpp	2025-12-22 04:24:49.000000000 +0100
++++ b/source/ps/GameSetup/Paths.cpp	2026-02-21 15:41:57.220472276 +0100
+@@ -63,7 +63,7 @@
+ 	else // OS-specific path handling
+ 	{
+ 
+-#if OS_ANDROID
++#if 0
+ 
+ 		const OsPath appdata = OsPath("/sdcard/0ad/appdata");
+ 
+@@ -168,7 +168,7 @@
+ 
+ /*static*/ OsPath Paths::Root(const OsPath& argv0)
+ {
+-#if OS_ANDROID
++#if 0
+ 	return OsPath("/sdcard/0ad"); // TODO: this is kind of bogus
+ #else
+ 
+diff -ur a/source/ps/TouchInput.cpp b/source/ps/TouchInput.cpp
+--- a/source/ps/TouchInput.cpp	2025-12-22 04:24:50.000000000 +0100
++++ b/source/ps/TouchInput.cpp	2026-02-21 15:45:20.410275919 +0100
+@@ -60,7 +60,7 @@
+ 
+ bool CTouchInput::IsEnabled()
+ {
+-#if OS_ANDROID || EMULATE_FINGERS_WITH_MOUSE
++#if OS_NANDROID || EMULATE_FINGERS_WITH_MOUSE
+ 	return true;
+ #else
+ 	return false;
+diff -ur a/source/third_party/glad/include/EGL/eglplatform.h b/source/third_party/glad/include/EGL/eglplatform.h
+--- a/source/third_party/glad/include/EGL/eglplatform.h	2025-12-22 04:24:54.000000000 +0100
++++ b/source/third_party/glad/include/EGL/eglplatform.h	2026-02-21 15:45:13.718698937 +0100
+@@ -94,7 +94,7 @@
+ typedef struct gbm_bo      *EGLNativePixmapType;
+ typedef void               *EGLNativeWindowType;
+ 
+-#elif defined(__ANDROID__) || defined(ANDROID)
++#elif defined(__NANDROID__) || defined(NANDROID)
+ 
+ struct ANativeWindow;
+ struct egl_native_pixmap_t;
+diff -ur a/source/third_party/glad/include/KHR/khrplatform.h b/source/third_party/glad/include/KHR/khrplatform.h
+--- a/source/third_party/glad/include/KHR/khrplatform.h	2025-12-22 04:24:54.000000000 +0100
++++ b/source/third_party/glad/include/KHR/khrplatform.h	2026-02-21 15:41:57.220826019 +0100
+@@ -107,7 +107,7 @@
+ #   define KHRONOS_APICALL __declspec(dllimport)
+ #elif defined (__SYMBIAN32__)
+ #   define KHRONOS_APICALL IMPORT_C
+-#elif defined(__ANDROID__)
++#elif 0
+ #   define KHRONOS_APICALL __attribute__((visibility("default")))
+ #else
+ #   define KHRONOS_APICALL
+diff -ur a/source/third_party/glad/include/vk_platform.h b/source/third_party/glad/include/vk_platform.h
+--- a/source/third_party/glad/include/vk_platform.h	2025-12-22 04:24:54.000000000 +0100
++++ b/source/third_party/glad/include/vk_platform.h	2026-02-21 15:44:53.171848047 +0100
+@@ -41,9 +41,9 @@
+     #define VKAPI_ATTR
+     #define VKAPI_CALL __stdcall
+     #define VKAPI_PTR  VKAPI_CALL
+-#elif defined(__ANDROID__) && defined(__ARM_ARCH) && __ARM_ARCH < 7
++#elif defined(__NANDROID__) && defined(__ARM_ARCH) && __ARM_ARCH < 7
+     #error "Vulkan is not supported for the 'armeabi' NDK ABI"
+-#elif defined(__ANDROID__) && defined(__ARM_ARCH) && __ARM_ARCH >= 7 && defined(__ARM_32BIT_STATE)
++#elif defined(__NANDROID__) && defined(__ARM_ARCH) && __ARM_ARCH >= 7 && defined(__ARM_32BIT_STATE)
+     /* On Android 32-bit ARM targets, Vulkan functions use the "hardfloat" */
+     /* calling convention, i.e. float parameters are passed in registers. This */
+     /* is true even if the rest of the application passes floats on the stack, */
+diff -ur a/source/third_party/vma/vk_mem_alloc.h b/source/third_party/vma/vk_mem_alloc.h
+--- a/source/third_party/vma/vk_mem_alloc.h	2025-12-22 04:24:54.000000000 +0100
++++ b/source/third_party/vma/vk_mem_alloc.h	2026-02-21 15:44:35.339547780 +0100
+@@ -145,7 +145,7 @@
+     #endif
+ #endif
+ 
+-#if defined(__ANDROID__) && defined(VK_NO_PROTOTYPES) && VMA_STATIC_VULKAN_FUNCTIONS
++#if defined(__NOANDROID__) && defined(VK_NO_PROTOTYPES) && VMA_STATIC_VULKAN_FUNCTIONS
+     extern PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr;
+     extern PFN_vkGetDeviceProcAddr vkGetDeviceProcAddr;
+     extern PFN_vkGetPhysicalDeviceProperties vkGetPhysicalDeviceProperties;
+@@ -2657,7 +2657,7 @@
+    #define VMA_NULL   nullptr
+ #endif
+ 
+-#if defined(__ANDROID_API__) && (__ANDROID_API__ < 16)
++#if defined(__NANDROID_API__) && (__NANDROID_API__ < 16)
+ #include <cstdlib>
+ static void* vma_aligned_alloc(size_t alignment, size_t size)
+ {
