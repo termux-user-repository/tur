@@ -1,0 +1,51 @@
+diff -ur a/libraries/source/spidermonkey/build.sh b/libraries/source/spidermonkey/build.sh
+--- a/libraries/source/spidermonkey/build.sh	2026-01-05 04:10:32.000000000 +0100
++++ b/libraries/source/spidermonkey/build.sh	2026-03-04 18:54:02.523042623 +0100
+@@ -151,7 +151,7 @@
+ 
+ 	# Build
+ 	# Debug (broken on FreeBSD)
+-	if [ "${OS}" != "FreeBSD" ]; then
++	if false; then
+ 		# shellcheck disable=SC2086
+ 		MOZCONFIG="$(pwd)/../mozconfig" \
+ 		MOZCONFIG_OPTIONS="${CONF_OPTS} \
+@@ -208,7 +208,7 @@
+ mkdir include-release
+ cp -R -L "${FOLDER}"/build-release/dist/include/* include-release/
+ 
+-if [ "${OS}" != "FreeBSD" ]; then
++if false; then
+ 	mkdir include-debug
+ 	cp -R -L "${FOLDER}"/build-debug/dist/include/* include-debug/
+ fi
+@@ -240,7 +240,7 @@
+ else
+ 	# Copy shared libs to lib/, they will also be copied to binaries/system, so the compiler and executable (resp.) can find them.
+ 	cp -L "${FOLDER}/build-${REL}/dist/bin/${LIB_PREFIX}${LIB_NAME}-${REL}${LIB_SUFFIX}" "lib/${LIB_PREFIX}${LIB_NAME}-${REL}${LIB_SUFFIX}"
+-	if [ "${OS}" != "FreeBSD" ]; then
++	if false; then
+ 		cp -L "${FOLDER}/build-${DEB}/dist/bin/${LIB_PREFIX}${LIB_NAME}-${DEB}${LIB_SUFFIX}" "lib/${LIB_PREFIX}${LIB_NAME}-${DEB}${LIB_SUFFIX}"
+ 	fi
+ fi
+diff -ur a/libraries/source/spidermonkey/patches/patch.sh b/libraries/source/spidermonkey/patches/patch.sh
+--- a/libraries/source/spidermonkey/patches/patch.sh	2025-12-22 04:23:49.000000000 +0100
++++ b/libraries/source/spidermonkey/patches/patch.sh	2026-03-04 19:07:58.688591699 +0100
+@@ -47,3 +47,17 @@
+ 
+ # Fix building with python 3.14
+ patch -p1 <"${PATCHES}"/FixPython3_14.diff
++
++# Termux: Remove explicit _FORTIFY_SOURCE injections from internal mozglue cargo build
++if [ -f "mozglue/static/rust/wrappers.cpp" ]; then
++    sed -i '1i #undef _FORTIFY_SOURCE\n#undef __USE_FORTIFY_LEVEL' mozglue/static/rust/wrappers.cpp
++fi
++if [ -f "mozglue/static/rust/build.rs" ]; then
++    sed -i 's/build.flag("-D_FORTIFY_SOURCE=2");/\/\/ build.flag("-D_FORTIFY_SOURCE=2");/g' mozglue/static/rust/build.rs
++    sed -i 's/build.flag("-D__USE_FORTIFY_LEVEL=2");/\/\/ build.flag("-D__USE_FORTIFY_LEVEL=2");/g' mozglue/static/rust/build.rs
++fi
++
++# Termux: Apply localized SpiderMonkey patches
++for p in "${PATCHES}"/0*.patch; do
++patch --no-backup-if-mismatch -f -N -p1 < "$p"
++done

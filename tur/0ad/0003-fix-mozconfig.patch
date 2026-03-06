@@ -1,0 +1,22 @@
+diff -ur a/libraries/source/spidermonkey/mozconfig b/libraries/source/spidermonkey/mozconfig
+--- a/libraries/source/spidermonkey/mozconfig	2025-12-22 04:23:49.000000000 +0100
++++ b/libraries/source/spidermonkey/mozconfig	2026-02-26 15:23:50.930107167 +0100
+@@ -17,3 +17,18 @@
+ 
+ # Setup output dir
+ mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/${BUILD_DIR}
++ac_add_options --enable-application=js
++ac_add_options --with-system-nspr
++ac_add_options --with-system-zlib
++ac_add_options --with-system-icu
++ac_add_options --enable-release
++ac_add_options --enable-optimize
++ac_add_options --enable-shared-js
++ac_add_options --enable-js-shell
++ac_add_options --disable-bootstrap
++ac_add_options --disable-debug
++ac_add_options --disable-hardening
++ac_add_options --disable-jemalloc
++ac_add_options --disable-tests
++ac_add_options --disable-strip
++ac_add_options --with-intl-api

@@ -1,0 +1,29 @@
+diff -ur b/source/ps/GameSetup/GameSetup.cpp a/source/ps/GameSetup/GameSetup.cpp
+--- b/source/ps/GameSetup/GameSetup.cpp	2026-02-21 15:41:57.217004108 +0100
++++ a/source/ps/GameSetup/GameSetup.cpp	2026-02-25 22:21:03.808560766 +0100
+@@ -493,6 +493,17 @@
+ }
+ #endif
+ 
++#if MUST_INIT_X11
++static int X11ErrorHandler([[maybe_unused]] Display* display, XErrorEvent* error)
++{
++	// Ignore BadWindow errors, which can happen during shutdown if SDL is still processing events.
++	// This prevents a crash message reported on some X11/SDL2 configurations.
++	if (error->error_code == BadWindow)
++		return 0;
++	return 0;
++}
++#endif
++
+ void EarlyInit()
+ {
+ 	// If you ever want to catch a particular allocation:
+@@ -518,6 +529,7 @@
+ 	// Xlib functions (e.g. the ones used when drawing the main menu
+ 	// before launching Atlas)
+ #if MUST_INIT_X11
++	XSetErrorHandler(X11ErrorHandler);
+ 	int status = XInitThreads();
+ 	if (status == 0)
+ 		debug_printf("Error enabling thread-safety via XInitThreads\n");

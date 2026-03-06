@@ -1,0 +1,20 @@
+--- a/source/third_party/vma/vk_mem_alloc.h	2026-02-28 19:08:35.245662030 +0100
++++ b/source/third_party/vma/vk_mem_alloc.h	2026-02-28 19:08:35.557726305 +0100
+@@ -2689,7 +2689,7 @@
+     //    // the __builtin_available checks for 10.15.
+     //    // People who use C++17 could call aligned_alloc with the 10.15 SDK already.
+     //    if (__builtin_available(macOS 10.15, iOS 13, *))
+-    //        return aligned_alloc(alignment, size);
++    //        return memalign(alignment, size);
+     //#endif
+     //#endif
+ 
+@@ -2712,7 +2712,7 @@
+ #else
+ static void* vma_aligned_alloc(size_t alignment, size_t size)
+ {
+-    return aligned_alloc(alignment, size);
++    return memalign(alignment, size);
+ }
+ #endif
+ 
