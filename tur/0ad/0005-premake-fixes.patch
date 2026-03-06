@@ -1,0 +1,30 @@
+--- a/build/premake/premake5.lua	2026-02-28 19:36:40.770243636 +0100
++++ b/build/premake/premake5.lua	2026-02-28 19:36:40.911648397 +0100
+@@ -1085,11 +1085,7 @@
+ 	-- 'real' implementations, to be linked against the main executable
+ 	-- (files are added manually and not with setup_static_lib_project
+ 	-- because not all files in the directory are included)
+-	setup_static_lib_project("mocks_real", {}, extern_libs, { no_default_link = 1, no_pch = 1 })
+-	files { "mocks/*.h", source_root.."mocks/*_real.cpp" }
+ 	-- 'test' implementations, to be linked against the test executable
+-	setup_static_lib_project("mocks_test", {}, extern_libs, { no_default_link = 1, no_pch = 1 })
+-	files { source_root.."mocks/*.h", source_root.."mocks/*_test.cpp" }
+ end
+ 
+ --------------------------------------------------------------------------------
+@@ -1155,7 +1151,6 @@
+ 		linkgroups 'On'
+ 	filter {}
+ 
+-	links { "mocks_real" }
+ 
+ 	local extra_params = {
+ 		extra_files = { "main.cpp" },
+@@ -1567,7 +1562,6 @@
+ 		links { static_lib_names_release }
+ 	filter { }
+ 
+-	links { "mocks_test" }
+ 	if not _OPTIONS["without-atlas"] then
+ 		links { "AtlasObject" }
+ 	end

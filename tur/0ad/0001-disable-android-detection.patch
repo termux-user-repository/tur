@@ -1,0 +1,36 @@
+diff -ur a/source/lib/posix/posix_aio.h b/source/lib/posix/posix_aio.h
+--- a/source/lib/posix/posix_aio.h	2025-12-22 04:24:46.000000000 +0100
++++ b/source/lib/posix/posix_aio.h	2026-03-04 13:29:19.929409440 +0100
+@@ -30,7 +30,7 @@
+ 
+ #if OS_WIN
+ # include "lib/sysdep/os/win/wposix/waio.h"
+-#elif OS_ANDROID || OS_OPENBSD
++#elif 1
+ // Android doesn't provide aio.h. We don't actually use aio on Linuxes (see
+ // CONFIG2_FILE_ENABLE_AIO) but we use its symbols and structs, so define
+ // them here
+diff -ur a/source/lib/sysdep/os/unix/unix.cpp b/source/lib/sysdep/os/unix/unix.cpp
+--- a/source/lib/sysdep/os/unix/unix.cpp	2025-12-22 04:24:46.000000000 +0100
++++ b/source/lib/sysdep/os/unix/unix.cpp	2026-03-04 13:46:07.285450455 +0100
+@@ -309,7 +309,7 @@
+ 		return std::wstring(logname, logname + strlen(logname));
+ 	// TODO: maybe we should do locale conversion?
+ 
+-#if OS_ANDROID
++#if 1
+ #warning TODO: sys_get_user_name: do something more appropriate and more thread-safe
+ 	char* buf = getlogin();
+ 	if (buf)
+diff -ur a/source/lib/sysdep/os.h b/source/lib/sysdep/os.h
+--- a/source/lib/sysdep/os.h	2025-12-22 04:24:47.000000000 +0100
++++ b/source/lib/sysdep/os.h	2026-03-04 12:56:56.697611400 +0100
+@@ -55,7 +55,7 @@
+ # define OS_LINUX 0
+ #endif
+ // Android (subset of Linux)
+-#if defined(__ANDROID__)
++#if defined(__NANDROID__)
+ # define OS_ANDROID 1
+ #else
+ # define OS_ANDROID 0

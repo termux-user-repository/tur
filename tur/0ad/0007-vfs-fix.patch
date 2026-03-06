@@ -1,0 +1,29 @@
+diff -ur a/source/lib/sysdep/os/unix/unix_executable_pathname.cpp b/source/lib/sysdep/os/unix/unix_executable_pathname.cpp
+--- a/source/lib/sysdep/os/unix/unix_executable_pathname.cpp	2025-12-22 04:24:46.000000000 +0100
++++ b/source/lib/sysdep/os/unix/unix_executable_pathname.cpp	2026-02-26 10:09:33.914797024 +0100
+@@ -33,15 +33,13 @@
+ #include <cstring>
+ 
+ #define GNU_SOURCE
+-#include "mocks/dlfcn.h"
+-#include "mocks/unistd.h"
+ 
+ OsPath unix_ExecutablePathname()
+ {
+ 	// Find the executable's filename
+ 	Dl_info dl_info;
+ 	memset(&dl_info, 0, sizeof(dl_info));
+-	if (!T::dladdr((void *)sys_ExecutablePathname, &dl_info) || !dl_info.dli_fname)
++	if (!dladdr((void *)sys_ExecutablePathname, &dl_info) || !dl_info.dli_fname)
+ 		return OsPath();
+ 	const char* path = dl_info.dli_fname;
+ 
+@@ -59,7 +57,7 @@
+ 	if (strchr(path, '/'))
+ 	{
+ 		char cwd[PATH_MAX];
+-		if (!T::getcwd(cwd, PATH_MAX))
++		if (!getcwd(cwd, PATH_MAX))
+ 			return OsPath();
+ 
+ 		char absolute[PATH_MAX];
