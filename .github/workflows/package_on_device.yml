@@ -1,6 +1,6 @@
-# Based on https://github.com/termux/termux-packages/blob/595969f581655e8cbf65182cf84bd5ffb2cf7b89/.github/workflows/packages.yml
+# Based on https://github.com/termux/termux-packages/blob/d20a0284b75b8b580ebf4e6b7b46c229748d989e/.github/workflows/packages.yml
 ##
-##  Copyright 2020 Termux
+##  Copyright 2026 Termux
 ##
 ##  Licensed under the Apache License, Version 2.0 (the "License");
 ##  you may not use this file except in compliance with the License.
@@ -33,14 +33,23 @@ on:
       packages:
         description: "A space-separated names of packages selected for rebuilding"
         required: true
+      free-space:
+        description: "Free space even if not building large package (useful when building a large number of packages)"
+        type: boolean
+        default: false
 
-# this is here because TUR package_on_device.yml always requires Docker to run termux-docker.
-# if that changes, make this conditional instead of global.
-env:
-  CLEAN_DOCKER_IMAGES: false
+permissions: {} # none
+
+concurrency:
+  # if this is a PR event, group = "pr-<number>", otherwise group = run_id so it never collides with other runs
+  group: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}-tur-on-device
+  # only cancel in-progress when it’s a PR
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
+    permissions:
+      contents: read # actions/upload-artifact doesn't need contents: write
     strategy:
       matrix:
         include:
@@ -56,14 +65,15 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
     - name: Clone repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         fetch-depth: 1000
-        path: ${{ github.workspace }}
     - name: Set process id limit for builds inside 32-bit termux-docker
       run: echo 65535 | sudo tee /proc/sys/kernel/pid_max
+
     - name: Merge repos
       run: ./setup-environment.sh
+
     - name: Gather build summary
       id: build-info
       env:
@@ -107,17 +117,20 @@ jobs:
           exit 1
         fi
 
-        GITHUB_OUTPUT="$GITHUB_OUTPUT" OLD_COMMIT="$OLD_COMMIT" HEAD_COMMIT="$HEAD_COMMIT" GITHUB_TOKEN="${{ secrets.GH_TOKEN }}" scripts/utils/termux_reuse_pr_build_artifacts.sh "${{ github.event_name }}" "${{ matrix.target_arch }}" ".github/workflows/package_on_device.yml" || true
+        OLD_COMMIT="$OLD_COMMIT" HEAD_COMMIT="$HEAD_COMMIT" GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}" scripts/utils/termux_reuse_pr_build_artifacts.sh "${{ github.event_name }}" "${{ matrix.target_arch }}" ".github/workflows/package_on_device.yml" || true
 
         if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+          # GitHub sometimes add merge commits at the end
+          # To prevent user confusion, filter them with --no-merges
           # Process tag '%ci:no-build' that may be added as line to commit message.
           # Forces CI to cancel current build with status 'passed'
-          if grep -qiP '^\s*%ci:no-build\s*$' <(git log --format="%B" -n 1 "HEAD"); then
+          if grep -qiP '^\s*%ci:no-build\s*$' <(git log --format="%B" -n 1 --no-merges "HEAD"); then
             tar cf artifacts/debs-${{ matrix.target_arch }}.tar debs
             echo "[!] Force exiting as tag '%ci:no-build' was applied to HEAD commit message."
             exit 0
           fi
-          for repo_path in $(jq --raw-output 'keys | .[]' repo.json); do
+
+          for repo_path in $(jq --raw-output 'del(.pkg_format) | keys | .[]' repo.json); do
             repo=$(jq --raw-output '.["'${repo_path}'"].name' repo.json)
             # Parse changed files and identify new packages and deleted packages.
             # Create lists of those packages that will be passed to upload job for
@@ -155,7 +168,7 @@ jobs:
           # into an array
           read -a PACKAGES <<< "${MANUAL_INPUT_PACKAGES//$'\n'/ }"
           for pkg in "${PACKAGES[@]}"; do
-            repo_paths=$(jq --raw-output 'keys | .[]' repo.json)
+            repo_paths=$(jq --raw-output 'del(.pkg_format) | keys | .[]' repo.json)
             found=false
             for repo_path in $repo_paths; do
               repo=$(jq --raw-output '.["'${repo_path}'"].name' repo.json)
@@ -173,109 +186,168 @@ jobs:
             fi
           done
         fi
-        for repo in $(jq --raw-output '.[].name' repo.json); do
+
+        for repo in $(jq --raw-output 'del(.pkg_format) | .[].name' repo.json); do
           # Fix so that lists do not contain duplicates
           if [ -f ./built_${repo}_packages.txt ]; then
-            uniq ./built_${repo}_packages.txt > ./built_${repo}_packages.txt.tmp
+            sort ./built_${repo}_packages.txt | uniq > ./built_${repo}_packages.txt.tmp
             mv ./built_${repo}_packages.txt.tmp ./built_${repo}_packages.txt
           fi
           if [ -f ./built_${repo}_subpackages.txt ]; then
-            uniq ./built_${repo}_subpackages.txt > ./built_${repo}_subpackages.txt.tmp
+            sort ./built_${repo}_subpackages.txt | uniq > ./built_${repo}_subpackages.txt.tmp
             mv ./built_${repo}_subpackages.txt.tmp ./built_${repo}_subpackages.txt
           fi
           if [ -f ./deleted_${repo}_packages.txt ]; then
-            uniq ./deleted_${repo}_packages.txt > ./deleted_${repo}_packages.txt.tmp
+            sort ./deleted_${repo}_packages.txt | uniq > ./deleted_${repo}_packages.txt.tmp
             mv ./deleted_${repo}_packages.txt.tmp ./deleted_${repo}_packages.txt
           fi
         done
-    - name: Lint packages
-      run: |
-        declare -a package_recipes
-        for repo_path in $(jq --raw-output 'keys | .[]' repo.json); do
+
+        declare -a packages=()
+        for repo_path in $(jq --raw-output 'del(.pkg_format) | keys | .[]' repo.json); do
           repo=$(jq --raw-output '.["'${repo_path}'"].name' repo.json)
-          if [ -f ./built_${repo}_packages.txt ]; then
-            package_recipes="$package_recipes $(cat ./built_${repo}_packages.txt | repo_path=${repo_path} awk '{print ENVIRON["repo_path"]"/"$1"/build.sh"}')"
+          if [ -f "./built_${repo}_packages.txt" ]; then
+            packages+=($(cat "./built_${repo}_packages.txt"))
           fi
         done
-        if [ ! -z "$package_recipes" ]; then
-          ./scripts/lint-packages.sh $package_recipes
+
+        echo "packages: ${packages[*]}"
+
+        free_space='false'
+        if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          free_space=${{ github.event.inputs.free-space }}
+        else
+          if grep -qiP '^\s*%ci:free-disk\s*$' <(git log --format="%B" -n 1 --no-merges "HEAD"); then
+            free_space=true
+          fi
         fi
-    - name: Free additional disk space (if necessary)
-      if: ${{ steps.build-info.outputs.skip-building != 'true' }}
-      # the swapfile must be renamed because, bizarrely, the ubuntu-24.04 runner
-      # doesn't have any preexisting swapfile named `/swapfile`,
-      # but the ubuntu-24.04-arm runner does.
+        if [[ "${#packages[@]}" -gt 0 ]]; then
+          for pkg in "${packages[@]}"; do
+            if grep -qFx "$pkg" ./big-pkgs.list; then
+              free_space='true'
+              break
+            fi
+            if grep -qFx "$pkg" ./scripts/big-pkgs.list; then
+              free_space='true'
+              break
+            fi
+          done
+        fi
+        echo "free-space=$free_space" >> $GITHUB_OUTPUT
+
+    - name: Lint packages
       run: |
-        if grep -Eq "^($(paste -s -d '|' ./big-pkgs.list))$" ./built_tur-on-device_packages.txt; then
-          sed -i -e 's|/swapfile|/swapfile-tur|g' ./scripts/free-space.sh
-          ./scripts/free-space.sh
+        declare -a package_recipes=()
+        for repo_path in $(jq --raw-output 'del(.pkg_format) | keys | .[]' repo.json); do
+          repo=$(jq --raw-output '.["'${repo_path}'"].name' repo.json)
+          if [ -f "./built_${repo}_packages.txt" ]; then
+            package_recipes+=($(cat "./built_${repo}_packages.txt" | repo_path="${repo_path}" awk '{print ENVIRON["repo_path"]"/"$1"/build.sh"}'))
+          fi
+        done
+
+        if [[ "${#package_recipes[@]}" -gt 0 ]]; then
+          ./scripts/lint-packages.sh "${package_recipes[@]}"
         fi
+
+    - name: Enable zram
+      if: ${{ steps.build-info.outputs.skip-building != 'true' && matrix.runner == 'ubuntu-24.04' }}
+      uses: ./.github/actions/zram
+      with:
+        algorithm: zstd
+        size: 16G
+        priority: 100
+        device_name: /dev/zram0
+
+    - name: Load Docker image
+      if: ${{ steps.build-info.outputs.free-space == 'true' && steps.build-info.outputs.skip-building != 'true' }}
+      env:
+        ARCH: ${{ matrix.target_arch }}
+      run: |
+        ./common-files/build-termux-docker.sh echo ""
+
+    - name: Free additional disk space (if needed)
+      if: ${{ steps.build-info.outputs.free-space == 'true' && steps.build-info.outputs.skip-building != 'true' }}
+      run: |
+        ./scripts/free-space.sh
+
     - name: Build packages
       if: ${{ steps.build-info.outputs.skip-building != 'true' }}
       env:
         ARCH: ${{ matrix.target_arch }}
       run: |
         ./common-files/build-termux-docker.sh login ./scripts/setup-termux.sh
-        declare -a packages
-        for repo_path in $(jq --raw-output 'keys | .[]' repo.json); do
+        declare -a packages=()
+        for repo_path in $(jq --raw-output 'del(.pkg_format) | keys | .[]' repo.json); do
           repo=$(jq --raw-output '.["'${repo_path}'"].name' repo.json)
-          if [ -f ./built_${repo}_packages.txt ]; then
-            packages="$packages $(cat ./built_${repo}_packages.txt)"
+          if [ -f "./built_${repo}_packages.txt" ]; then
+            packages+=($(cat "./built_${repo}_packages.txt"))
           fi
         done
+
+        echo "packages: ${packages[*]}"
+
         sudo chown -R 1000:1000 $(pwd)
-        if [ ! -z "$packages" ]; then
-          ./common-files/build-termux-docker.sh login ./build-package.sh -I $packages
+        if [[ "${#packages[@]}" -gt 0 ]]; then
+          ./common-files/build-termux-docker.sh login ./build-package.sh -I "${packages[@]}"
         fi
     - name: Generate build artifacts
       if: always()
       run: |
         sudo chown -R $(id -u):$(id -u) $(pwd)
-        for repo in $(jq --raw-output '.[].name' repo.json); do
+        test -d tur/output && mv tur/output/* ./output/
+
+        for repo in $(jq --raw-output 'del(.pkg_format) | .[].name' repo.json); do
           # Put package lists into directory with *.deb files so they will be transferred to
           # upload job.
           test -f ./built_${repo}_packages.txt && mv ./built_${repo}_packages.txt ./debs/
           test -f ./built_${repo}_subpackages.txt && cat ./built_${repo}_subpackages.txt >> ./debs/built_${repo}_packages.txt \
             && rm ./built_${repo}_subpackages.txt
           test -f ./deleted_${repo}_packages.txt && mv ./deleted_${repo}_packages.txt ./debs/
+
           # Move only debs from built_packages into debs/ folder before
           # creating an archive.
-          while read -r pkg; do
-            # Match both $pkg.deb and $pkg-static.deb.
-            find output \( -name "$pkg_*.deb" -o -name "$pkg-static_*.deb" \) -type f -print0 | xargs -0r mv -t debs/
-          done < <(cat ./debs/built_${repo}_packages.txt)
+          if [ -f "./debs/built_${repo}_packages.txt" ] && [ -d "output" ]; then
+            while read -r pkg; do
+              # Match both $pkg.deb and $pkg-static.deb.
+              find output \( -name "$pkg_*.deb" -o -name "$pkg-static_*.deb" \) -type f -print0 | xargs -0r mv -t debs/
+            done < <(cat "./debs/built_${repo}_packages.txt")
+          fi
         done
+
         # Files containing certain symbols (e.g. ":") will cause failure in actions/upload-artifact.
         # Archiving *.deb files in a tarball to avoid issues with uploading.
         tar cf artifacts/debs-${{ matrix.target_arch }}-${{ github.sha }}.tar debs
-        rm -rf output
     - name: Checksums for built *.deb files
       if: always()
       run: |
-        find debs -type f -name "*.deb" -exec sha256sum "{}" \; | sort -k2
+        find debs -type f -name "*.deb" -exec sha256sum "{}" \; | sort -k2 | tee checksum-${{ matrix.target_arch }}-${{ github.sha }}.txt
+    - name: Store checksums for built *.deb files
+      if: always()
+      uses: actions/upload-artifact@v6
+      with:
+        name: checksum-${{ matrix.target_arch }}-${{ github.sha }}
+        path: checksum-${{ matrix.target_arch }}-${{ github.sha }}.txt
     - name: Store *.deb files
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: debs-${{ matrix.target_arch }}-${{ github.sha }}
         path: ./artifacts
         include-hidden-files: true
         overwrite: true
         compression-level: 0
-    - name: Remove *.debs
-      if: always()
-      run: |
-        rm -rf ./artifacts ./debs
 
   upload:
-    if: github.event_name != 'pull_request' && github.ref != 'refs/heads/dev' && !startsWith(github.ref, 'refs/heads/dev/')
+    permissions:
+      contents: read
+    if: github.repository == 'termux-user-repository/tur' && github.ref == 'refs/heads/master'
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     steps:
     - name: Clone repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
     - name: Get *.deb files
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v7
       with:
         path: ./
     - name: Upload to a temporary release
