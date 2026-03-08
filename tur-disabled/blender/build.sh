@@ -5,7 +5,7 @@ TERMUX_PKG_DESCRIPTION="A fully integrated 3D graphics creation suite (legacy ve
 TERMUX_PKG_LICENSE="GPL-3.0-or-later"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="1:3.6.23"
-TERMUX_PKG_REVISION=7
+TERMUX_PKG_REVISION=8
 TERMUX_PKG_SRCURL=git+https://projects.blender.org/blender/blender
 # Blender does not support 32-bit
 TERMUX_PKG_EXCLUDED_ARCHES="arm, i686"
@@ -27,6 +27,7 @@ TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 -DWITH_JACK=OFF
 -DWITH_LINKER_MOLD=ON
 -DWITH_MATERIALX=ON
+-DLLVM_LIBRARY=$TERMUX_PREFIX/lib/libLLVM.so
 -DCMAKE_PREFIX_PATH=$TERMUX_PREFIX/opt/ffmpeg7
 "
 TERMUX_PKG_RM_AFTER_INSTALL="
@@ -57,7 +58,7 @@ termux_step_pre_configure() {
 	else
 		_ARCH=$TERMUX_ARCH
 	fi
-	python3 ./build_files/utils/make_update.py --architecture $_ARCH
+	python3 ./build_files/utils/make_update.py --architecture $_ARCH --no-libraries
 
 	# enable temporarily if debugging
 	#if [[ "$TERMUX_DEBUG_BUILD" == "true" ]]; then
