@@ -1,5 +1,5 @@
 ##
-##  Copyright 2020 Termux
+##  Copyright 2026 Termux
 ##
 ##  Licensed under the Apache License, Version 2.0 (the "License");
 ##  you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
 ##  limitations under the License.
 ##
 
-name: Packages-tur
+name: Packages-TUR
 
 on:
   push:
@@ -48,15 +48,12 @@ concurrency:
   group: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
   # only cancel in-progress when it’s a PR
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
- 
 
 jobs:
   build:
     permissions:
       contents: read # actions/upload-artifact doesn't need contents: write
     runs-on: ubuntu-24.04
-    env:
-      GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
     strategy:
       matrix:
         target_arch: [aarch64, arm, i686, x86_64]
@@ -66,7 +63,6 @@ jobs:
       uses: actions/checkout@v6
       with:
         fetch-depth: 1000
-
     - name: Set process id limit for 32-bit builds depending on aosp-libs
       run: echo 65535 | sudo tee /proc/sys/kernel/pid_max
 
@@ -116,7 +112,7 @@ jobs:
           exit 1
         fi
 
-        GITHUB_OUTPUT="$GITHUB_OUTPUT" OLD_COMMIT="$OLD_COMMIT" HEAD_COMMIT="$HEAD_COMMIT" GITHUB_TOKEN="${{ secrets.GH_TOKEN }}" scripts/utils/termux_reuse_pr_build_artifacts.sh "${{ github.event_name }}" "${{ matrix.target_arch }}" ".github/workflows/packages.yml" || true
+        OLD_COMMIT="$OLD_COMMIT" HEAD_COMMIT="$HEAD_COMMIT" GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}" scripts/utils/termux_reuse_pr_build_artifacts.sh "${{ github.event_name }}" "${{ matrix.target_arch }}" ".github/workflows/packages.yml" || true
 
         if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
           # GitHub sometimes add merge commits at the end
@@ -129,7 +125,7 @@ jobs:
             exit 0
           fi
 
-          for repo_path in $(jq --raw-output 'keys | .[]' repo.json); do
+          for repo_path in $(jq --raw-output 'del(.pkg_format) | keys | .[]' repo.json); do
             repo=$(jq --raw-output '.["'${repo_path}'"].name' repo.json)
             # tur-on-device packages cannot be built in packages.yml, only package_on_device.yml
             if [[ "${repo}" == "tur-on-device" ]]; then
@@ -171,7 +167,7 @@ jobs:
           # into an array
           read -a PACKAGES <<< "${MANUAL_INPUT_PACKAGES//$'\n'/ }"
           for pkg in "${PACKAGES[@]}"; do
-            repo_paths=$(jq --raw-output 'keys | .[]' repo.json)
+            repo_paths=$(jq --raw-output 'del(.pkg_format) | keys | .[]' repo.json)
             found=false
             for repo_path in $repo_paths; do
               repo=$(jq --raw-output '.["'${repo_path}'"].name' repo.json)
@@ -189,7 +185,8 @@ jobs:
             fi
           done
         fi
-        for repo in $(jq --raw-output '.[].name' repo.json); do
+
+        for repo in $(jq --raw-output 'del(.pkg_format) | .[].name' repo.json); do
           # Fix so that lists do not contain duplicates
           if [ -f ./built_${repo}_packages.txt ]; then
             sort ./built_${repo}_packages.txt | uniq > ./built_${repo}_packages.txt.tmp
@@ -206,7 +203,7 @@ jobs:
         done
 
         declare -a packages=()
-        for repo_path in $(jq --raw-output 'keys | .[]' repo.json); do
+        for repo_path in $(jq --raw-output 'del(.pkg_format) | keys | .[]' repo.json); do
           repo=$(jq --raw-output '.["'${repo_path}'"].name' repo.json)
           if [ -f "./built_${repo}_packages.txt" ]; then
             packages+=($(cat "./built_${repo}_packages.txt"))
@@ -251,12 +248,13 @@ jobs:
     - name: Lint packages
       run: |
         declare -a package_recipes=()
-        for repo_path in $(jq --raw-output 'keys | .[]' repo.json); do
+        for repo_path in $(jq --raw-output 'del(.pkg_format) | keys | .[]' repo.json); do
           repo=$(jq --raw-output '.["'${repo_path}'"].name' repo.json)
           if [ -f "./built_${repo}_packages.txt" ]; then
             package_recipes+=($(cat "./built_${repo}_packages.txt" | repo_path="${repo_path}" awk '{print ENVIRON["repo_path"]"/"$1"/build.sh"}'))
           fi
         done
+
         if [[ "${#package_recipes[@]}" -gt 0 ]]; then
           ./scripts/lint-packages.sh "${package_recipes[@]}"
         fi
@@ -281,7 +279,7 @@ jobs:
       run: |
         ./scripts/run-docker.sh echo ""
 
-    - name: Free additional disk space (if necessary)
+    - name: Free additional disk space (if needed)
       if: ${{ steps.build-info.outputs.free-space == 'true' && steps.build-info.outputs.skip-building != 'true' }}
       run: |
         ./scripts/free-space.sh
@@ -290,7 +288,7 @@ jobs:
       if: ${{ steps.build-info.outputs.skip-building != 'true' }}
       run: |
         declare -a packages=()
-        for repo_path in $(jq --raw-output 'keys | .[]' repo.json); do
+        for repo_path in $(jq --raw-output 'del(.pkg_format) | keys | .[]' repo.json); do
           repo=$(jq --raw-output '.["'${repo_path}'"].name' repo.json)
           if [ -f "./built_${repo}_packages.txt" ]; then
             packages+=($(cat "./built_${repo}_packages.txt"))
@@ -308,7 +306,7 @@ jobs:
       run: |
         test -d tur/output && mv tur/output/* ./output/
 
-        for repo in $(jq --raw-output '.[].name' repo.json); do
+        for repo in $(jq --raw-output 'del(.pkg_format) | .[].name' repo.json); do
           # Put package lists into directory with *.deb files so they will be transferred to
           # upload job.
           test -f ./built_${repo}_packages.txt && mv ./built_${repo}_packages.txt ./debs/
@@ -329,19 +327,16 @@ jobs:
         # Files containing certain symbols (e.g. ":") will cause failure in actions/upload-artifact.
         # Archiving *.deb files in a tarball to avoid issues with uploading.
         tar cf artifacts/debs-${{ matrix.target_arch }}-${{ github.sha }}.tar debs
-
     - name: Checksums for built *.deb files
       if: always()
       run: |
         find debs -type f -name "*.deb" -exec sha256sum "{}" \; | sort -k2 | tee checksum-${{ matrix.target_arch }}-${{ github.sha }}.txt
-
     - name: Store checksums for built *.deb files
       if: always()
       uses: actions/upload-artifact@v6
       with:
         name: checksum-${{ matrix.target_arch }}-${{ github.sha }}
         path: checksum-${{ matrix.target_arch }}-${{ github.sha }}.txt
-
     - name: Store *.deb files
       if: always()
       uses: actions/upload-artifact@v6
@@ -355,7 +350,7 @@ jobs:
   upload:
     permissions:
       contents: read
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+    if: github.repository == 'termux-user-repository/tur' && github.ref == 'refs/heads/master'
     needs: build
     runs-on: ubuntu-slim
     steps:
