@@ -1,3 +1,4 @@
+# Origin repo: tur-on-device
 TERMUX_PKG_HOMEPAGE=https://github.com/flang-compiler/flang
 TERMUX_PKG_DESCRIPTION="An out-of-tree Fortran compiler targeting LLVM"
 TERMUX_PKG_LICENSE="Apache-2.0"

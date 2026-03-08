@@ -10,7 +10,7 @@ _LLVM_COMMIT=cd736e11b188a8f6ff14041abd818ad86f36b9bb
 TERMUX_PKG_SRCURL=https://github.com/flang-compiler/classic-flang-llvm-project/archive/${_LLVM_COMMIT}.zip
 TERMUX_PKG_SHA256=6a5caa2ccfabf9492443c31762900fc7c945201d43b3a705f31d56256091b109
 TERMUX_PKG_HOSTBUILD=true
-TERMUX_PKG_DEPENDS="binutils, libc++, ncurses, ndk-sysroot, libffi, zlib"
+TERMUX_PKG_DEPENDS="llvm, libc++, ncurses, ndk-sysroot, libffi, zlib"
 TERMUX_PKG_SUGGESTS="libandroid-complex-math, classic-flang"
 TERMUX_PKG_UNDEF_SYMBOLS_FILES=all
 # XXX: We may add this package later I suppose.
