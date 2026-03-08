@@ -1,0 +1,93 @@
+diff -ur orig/src/sl/slEnvelope.cxx mod/src/sl/slEnvelope.cxx
+--- orig/src/sl/slEnvelope.cxx	2008-03-11 03:06:24.000000000 +0100
++++ mod/src/sl/slEnvelope.cxx	2025-03-06 07:54:26.811205277 +0100
+@@ -160,7 +160,7 @@
+ 
+   while ( nframes-- )
+   {
+-    register int res = (int)( (float)((int)*(src++)-0x80) * _value ) + 0x80 ;
++    int res = (int)( (float)((int)*(src++)-0x80) * _value ) + 0x80 ;
+ 
+     _value += delta ;
+ 
+@@ -175,16 +175,16 @@
+   float  _time = slScheduler::getCurrent() -> getElapsedTime ( start ) ;
+   int     step = getStepDelta ( &_time, &delta ) ;
+   float _value = delta * (_time - time[step]) + value[step] ;
+-  register float p_v = previous_value;
++  float p_v = previous_value;
+   delta /= (float) slScheduler::getCurrent() -> getRate () ;
+ 
+   while ( nframes-- )
+   {
+ 
+-    register float c_v = (float) ((int)*(src++) - 0x80);
+-    register float f=_value;
++    float c_v = (float) ((int)*(src++) - 0x80);
++    float f=_value;
+     p_v = p_v*(1.0f - f)+ f*c_v;
+-    register int res = (int)(p_v) + 0x80 ;
++    int res = (int)(p_v) + 0x80 ;
+     _value += delta ;
+ 
+     *(dst++) = ( res > 255 ) ? 255 : ( res < 0 ) ? 0 : res ;
+@@ -208,7 +208,7 @@
+ 
+   while ( nframes-- )
+   {
+-    register int res = (int)( (float)((int)*(src++)-0x80) * _value ) + 0x80 ;
++    int res = (int)( (float)((int)*(src++)-0x80) * _value ) + 0x80 ;
+ 
+     _value += delta ;
+ 
+diff -ur orig/src/sl/slScheduler.cxx mod/src/sl/slScheduler.cxx
+--- orig/src/sl/slScheduler.cxx	2008-03-11 03:06:24.000000000 +0100
++++ mod/src/sl/slScheduler.cxx	2025-03-06 07:54:34.019087576 +0100
+@@ -229,9 +229,9 @@
+       break ;
+ 
+     case 2:
+-      { register int    l = mixer_buffer_size ;
+-        register Uchar *d = mixer_buffer, *a, *b ;
+-        register int t, x = l / 100 ;
++      { int    l = mixer_buffer_size ;
++        Uchar *d = mixer_buffer, *a, *b ;
++        int t, x = l / 100 ;
+         psp[0] -> read ( l, a = mixer_inputs [ 0 ] ) ;
+         psp[1] -> read ( l, b = mixer_inputs [ 1 ] ) ;
+         while ( l-- )
+@@ -243,9 +243,9 @@
+       } break;
+ 
+     case 3:
+-      { register int    l = mixer_buffer_size ;
+-        register Uchar *d = mixer_buffer, *a, *b, *c ;
+-        register int t, x = l / 100 ;
++      { int    l = mixer_buffer_size ;
++        Uchar *d = mixer_buffer, *a, *b, *c ;
++        int t, x = l / 100 ;
+         psp[0] -> read ( l, a = mixer_inputs [ 0 ] ) ;
+         psp[1] -> read ( l, b = mixer_inputs [ 1 ] ) ;
+         psp[2] -> read ( l, c = mixer_inputs [ 2 ] ) ;
+@@ -260,17 +260,17 @@
+     default:
+       { /* How much data to get, and where to put it */
+         int l = mixer_buffer_size ;
+-        register Uchar *d = mixer_buffer ;
++        Uchar *d = mixer_buffer ;
+         /* We compute one value in here, in the loop below */
+-        register int t ;
++        int t ;
+         /* We need to determine the maximum range of values */
+         int tmax = 0x80, tmin = 0x80;
+         /* A pointer to the element about to be added to "t" */
+-        register Uchar **p ;
++        Uchar **p ;
+         /* Sound cards use offset binary, so do zero adjustment */
+         int z = ( (int) 0x8000 / mixer_gain ) - ( inputsused * 0x80 ) ;
+         /* An array of pointers to keep in step with "d" above */
+-        register Uchar * s [ SL_MAX_MIXERINPUTS + 1 ] ;
++        Uchar * s [ SL_MAX_MIXERINPUTS + 1 ] ;
+         /* First thing is to read individual channels into buffers */
+         for ( i = 0; i < inputsused; i++ )
+           psp[i] -> read ( l, s [ i ] = mixer_inputs [ i ] );

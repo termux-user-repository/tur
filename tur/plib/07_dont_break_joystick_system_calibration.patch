@@ -1,0 +1,30 @@
+Description: Don't break system calibration settings when a joystick is opened
+ plib may do additional dead-band management on top of the OS joystick driver,
+ it should not break system settings for that reason!
+Bug: https://sourceforge.net/p/plib/bugs/47/
+Bug-Debian: https://bugs.debian.org/787464
+Author: Florent Rougon <f.rougon@free.fr>
+Last-Update: 2015-06-01
+--- a/src/js/jsLinux.cxx
++++ b/src/js/jsLinux.cxx
+@@ -79,20 +79,6 @@
+   if ( num_axes > _JS_MAX_AXES )
+     num_axes = _JS_MAX_AXES ;
+ 
+-  // Remove any deadband value already done in the kernel.
+-  // Since we have our own deadband management this is save to do so.
+-  struct js_corr* corr = new js_corr[ all_axes ] ;
+-  ioctl ( os->fd, JSIOCGCORR, corr );
+-  for ( int i = 0; i < num_axes ; ++i ) {
+-    if ( corr[ i ] . type == JS_CORR_BROKEN ) {
+-      int nodeadband = ( corr[ i ] . coef[ 0 ] + corr[ i ] . coef[ 1 ] ) / 2 ;
+-      corr[ i ] . coef[ 0 ] = nodeadband ;
+-      corr[ i ] . coef[ 1 ] = nodeadband ;
+-    }
+-  }
+-  ioctl ( os->fd, JSIOCSCORR, corr );
+-  delete [] corr;
+-
+   for ( int i = 0 ; i < _JS_MAX_AXES ; i++ )
+   {
+     max       [ i ] = 32767.0f ;
