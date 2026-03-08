@@ -1,0 +1,13 @@
+diff --git a/build_files/utils/make_update.py b/build_files/utils/make_update.py
+index 3129ade..5041b1e 100755
+--- a/build_files/utils/make_update.py
++++ b/build_files/utils/make_update.py
+@@ -71,6 +71,8 @@ def get_effective_platform(args: argparse.Namespace) -> str:
+         platform = "macos"
+     elif sys.platform == "win32":
+         platform = "windows"
++    elif sys.platform == "android":
++        platform = "linux"
+     else:
+         platform = sys.platform
+ 

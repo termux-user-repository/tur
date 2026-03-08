@@ -1,0 +1,17 @@
+diff --git a/build_files/cmake/Modules/FindLLVM.cmake b/build_files/cmake/Modules/FindLLVM.cmake
+index 2bc0c06..98e3088 100644
+--- a/build_files/cmake/Modules/FindLLVM.cmake
++++ b/build_files/cmake/Modules/FindLLVM.cmake
+@@ -66,6 +66,12 @@ else()
+                PATHS ${LLVM_LIBPATH})
+ endif()
+ 
++message(STATUS "LLVM_VERSION:  ${LLVM_VERSION}")
++message(STATUS "LLVM_CONFIG:   ${LLVM_CONFIG}")
++message(STATUS "LLVM_LIBPATH:  ${LLVM_LIBPATH}")
++message(STATUS "LLVM_ROOT_DIR: ${LLVM_ROOT_DIR}")
++message(STATUS "LLVM_LIBRARY:  ${LLVM_LIBRARY}")
++
+ 
+ if(LLVM_LIBRARY AND LLVM_ROOT_DIR AND LLVM_LIBPATH)
+   if(LLVM_STATIC)
