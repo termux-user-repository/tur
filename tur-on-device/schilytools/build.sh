@@ -10,6 +10,7 @@ LGPL-2.1.txt
 "
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="2024-03-21"
+TERMUX_PKG_REVISION=1
 # upstream requests in release notes to use this mirror to obtain release tarball
 TERMUX_PKG_SRCURL="https://schilytools.pkgsrc.pub/pub/schilytools/schily-$TERMUX_PKG_VERSION.tar.bz2"
 TERMUX_PKG_SHA256=76db022e450c1791a00e69780b55d18a2e3fc39b5ff870996433f87312032024
