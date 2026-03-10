@@ -244,13 +244,15 @@ index 848ddc7610..2f6ae1b08c 100644
    sources = [
      "about_flags.cc",
      "accessibility/accessibility_labels_service.cc",
-@@ -1518,6 +1519,10 @@ static_library("browser") {
+@@ -1518,6 +1519,12 @@ static_library("browser") {
      "webauthn/webauthn_switches.cc",
      "webdata_services/web_data_service_factory.cc",
    ]
 +  jumbo_excluded_sources = [
 +    "page_content_annotations/page_content_annotations_service_factory.cc",
 +    "page_load_metrics/observers/core/ukm_page_load_metrics_observer.cc",
++    "performance_manager/chrome_browser_main_extra_parts_performance_manager.cc",
++    "performance_manager/policies/keep_alive_dse_policy.cc",
 +  ]
  
    configs += [
