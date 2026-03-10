@@ -1,0 +1,13 @@
+Necessary after Python 3.13 to direct kivy to not attempt to build for use in a non-Termnux app
+
+--- a/setup.py
++++ b/setup.py
+@@ -149,7 +149,7 @@ def check_c_source_compiles(code, include_dirs=None):
+ build_examples = build_examples or \
+     os.environ.get('KIVY_BUILD_EXAMPLES', '0') == '1'
+ 
+-platform = sys.platform
++platform = 'linux'
+ 
+ # Detect Python for android project (http://github.com/kivy/python-for-android)
+ ndkplatform = environ.get('NDKPLATFORM')
