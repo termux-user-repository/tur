@@ -11,3 +11,14 @@ Necessary after Python 3.13 to direct kivy to not attempt to build for use in a 
  
  # Detect Python for android project (http://github.com/kivy/python-for-android)
  ndkplatform = environ.get('NDKPLATFORM')
+--- a/kivy/utils.py
++++ b/kivy/utils.py
+@@ -444,7 +444,7 @@ def _get_platform():
+         return 'win'
+     elif _sys_platform == 'darwin':
+         return 'macosx'
+-    elif _sys_platform.startswith('linux'):
++    elif _sys_platform.startswith('linux') or _sys_platform.startswith('android'):
+         return 'linux'
+     elif _sys_platform.startswith('freebsd'):
+         return 'linux'
