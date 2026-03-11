@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="Open source UI framework written in Python"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="2.3.1"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL="https://github.com/kivy/kivy/archive/refs/tags/$TERMUX_PKG_VERSION.tar.gz"
 TERMUX_PKG_SHA256=83eee956b84ab7bf9e9d5b38544acc40a0e55f05cea7112fd01cda172c98244a
 TERMUX_PKG_DEPENDS="mtdev, opengl, python, python-pillow, python-pip, sdl2, sdl2-image, sdl2-mixer, sdl2-ttf"
