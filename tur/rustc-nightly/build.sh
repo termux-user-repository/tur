@@ -2,12 +2,11 @@ TERMUX_PKG_HOMEPAGE=https://www.rust-lang.org/
 TERMUX_PKG_DESCRIPTION="Rust compiler and utilities (nightly version)"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="1.96.0-2026.03.11-nightly"
+TERMUX_PKG_VERSION="1.96.0-2026.03.12-nightly"
 _RUST_VERSION=$(echo $TERMUX_PKG_VERSION | cut -d- -f1)
 _DATE="$(echo $TERMUX_PKG_VERSION | cut -d- -f2 | sed 's|\.|-|g')"
-_LZMA_VERSION=$(. $TERMUX_SCRIPTDIR/packages/liblzma/build.sh; echo $TERMUX_PKG_VERSION)
 TERMUX_PKG_SRCURL=https://static.rust-lang.org/dist/$_DATE/rustc-nightly-src.tar.xz
-TERMUX_PKG_SHA256=3fba6bbf17139668e09707cdcf0349779a2772535ae526b552986f202301e7e2
+TERMUX_PKG_SHA256=7acb51a8f0f4d7c8327bad937f907302d33f6e1693e8399957d2eef8c1d6104f
 TERMUX_PKG_DEPENDS="clang, libandroid-execinfo, libc++, libllvm (<< ${TERMUX_LLVM_NEXT_MAJOR_VERSION}), lld, openssl, zlib"
 TERMUX_PKG_BUILD_DEPENDS="wasi-libc"
 TERMUX_PKG_NO_REPLACE_GUESS_SCRIPTS=true
@@ -15,16 +14,9 @@ TERMUX_PKG_NO_STATICSPLIT=true
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_RM_AFTER_INSTALL="
 bin/llc
-bin/lld
 bin/llvm-*
 bin/opt
 bin/sh
-lib/liblzma.a
-lib/liblzma.so
-lib/liblzma.so.${_LZMA_VERSION}
-lib/libtinfo.so.6
-lib/libz.so
-lib/libz.so.1
 share/wasi-sysroot
 "
 
@@ -82,6 +74,32 @@ termux_step_pre_configure() {
 	echo "Applying patch: $(basename "${p}")"
 	sed "s|@TERMUX_PKG_API_LEVEL@|${TERMUX_PKG_API_LEVEL}|g" "${p}" \
 		| patch --silent -p1
+
+	# assist with downstream patch methods that bulk-replace
+	# string 'com.termux' throughout the repository
+	local original_prefix_component_one="/data/data/com."
+	local original_prefix_component_two="termux/files/usr"
+	local original_prefix="${original_prefix_component_one}${original_prefix_component_two}"
+	if [[ "$TERMUX_PREFIX" != "$original_prefix" ]]; then
+		local patch="$TERMUX_PKG_BUILDER_DIR/force-allow-edit-vendor.diff"
+		echo "Applying patch: $(basename "$patch")"
+		patch --silent -p1 < "$patch"
+
+		local crate=openssl-probe
+		local crate_src_dir="$(realpath "$(find "$TERMUX_PKG_SRCDIR/vendor" -name "$crate"'*' | sort | tail -n1)")"
+		local crate_dest_dir="$crate_src_dir-custom-termux-prefix"
+		cp -r "$crate_src_dir" "$crate_dest_dir"
+
+		echo "Replacing '$original_prefix' with '$TERMUX_PREFIX' in '$crate_dest_dir/src/lib.rs'"
+		sed -i -e "s|$original_prefix|$TERMUX_PREFIX|g" "$crate_dest_dir/src/lib.rs"
+
+		local dir
+		for dir in "$TERMUX_PKG_SRCDIR"/{,src/tools/cargo,src/tools/miri}; do
+			echo '' >> "$dir/Cargo.toml"
+			echo '[patch.crates-io]' >> "$dir/Cargo.toml"
+			echo "$crate = { path = \"${crate_dest_dir}\" }" >> "$dir/Cargo.toml"
+		done
+	fi
 
 	export RUST_LIBDIR=$TERMUX_PKG_BUILDDIR/_lib
 	mkdir -p $RUST_LIBDIR
