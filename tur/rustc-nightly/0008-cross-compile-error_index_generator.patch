@@ -16,10 +16,10 @@ This seems a bug since https://github.com/rust-lang/rust/pull/145007
          add_dylib_path(dylib_paths, &mut cmd);
          cmd
      }
-@@ -602,9 +602,11 @@
-     }
- 
-     fn run(self, builder: &Builder<'_>) -> ToolBuildResult {
+@@ -606,9 +606,11 @@ impl Step for ErrorIndex {
+         );
+         builder
+             .require_submodule("src/doc/book", Some("error_index_generator requires mdbook-trpl"));
 +        builder.std(self.compilers.build_compiler, self.compilers.build_compiler.host);
 +        builder.ensure(compile::Rustc::new(self.compilers.build_compiler, self.compilers.build_compiler.host));
          builder.ensure(ToolBuild {
