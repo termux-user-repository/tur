@@ -1,16 +1,16 @@
 TERMUX_PKG_HOMEPAGE=https://github.com/JustArchiNET/ArchiSteamFarm
-TERMUX_PKG_DESCRIPTION="ArchiSteamFarm"
+TERMUX_PKG_DESCRIPTION="C# application that allows you to farm steam cards using multiple steam accounts simultaneously"
 TERMUX_PKG_LICENSE="Apache-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="6.2.3.1"
+TERMUX_PKG_VERSION="6.3.3.3"
 TERMUX_PKG_SRCURL=git+https://github.com/JustArchiNET/ArchiSteamFarm
 TERMUX_PKG_GIT_BRANCH="${TERMUX_PKG_VERSION}"
 TERMUX_PKG_BUILD_IN_SRC=true
-TERMUX_PKG_DEPENDS="aspnetcore-runtime-9.0, dotnet-host, dotnet-runtime-9.0"
-TERMUX_PKG_BUILD_DEPENDS="aspnetcore-targeting-pack-9.0, dotnet-targeting-pack-9.0"
+TERMUX_PKG_DEPENDS="aspnetcore-runtime-10.0, dotnet-host, dotnet-runtime-10.0"
+TERMUX_PKG_BUILD_DEPENDS="aspnetcore-targeting-pack-10.0, dotnet-targeting-pack-10.0"
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_EXCLUDED_ARCHES="arm"
-TERMUX_DOTNET_VERSION=9.0
+TERMUX_DOTNET_VERSION=10.0
 TERMUX_PKG_UPDATE_TAG_TYPE="latest-release-tag"
 
 termux_step_pre_configure() {
