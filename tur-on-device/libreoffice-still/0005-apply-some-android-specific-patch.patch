@@ -1,0 +1,186 @@
+From 62c87df518bb297c44a9fc66ad26a81a7b85057c Mon Sep 17 00:00:00 2001
+From: Ronald Y <knyipab@gmail.com>
+Date: Sun, 22 Sep 2024 09:27:21 +0800
+Subject: [PATCH 5/8] apply some android-specific patch
+
+Change-Id: I4be7216701e300369a2ccde7b57fe0966d0645b5
+---
+ .../cpp_uno/gcc3_linux_aarch64/callvirtualfunction.cxx |  2 +-
+ bridges/source/cpp_uno/gcc3_linux_aarch64/cpp2uno.cxx  |  2 +-
+ bridges/source/cpp_uno/gcc3_linux_arm/cpp2uno.cxx      |  4 ++--
+ bridges/source/cpp_uno/gcc3_linux_arm/except.cxx       | 10 +++++-----
+ bridges/source/cpp_uno/gcc3_linux_x86-64/rtti.cxx      |  8 ++++----
+ desktop/source/app/app.cxx                             |  6 +++---
+ 6 files changed, 16 insertions(+), 16 deletions(-)
+
+diff --git a/bridges/source/cpp_uno/gcc3_linux_aarch64/callvirtualfunction.cxx b/bridges/source/cpp_uno/gcc3_linux_aarch64/callvirtualfunction.cxx
+index b944f31cf..84cf10fa4 100644
+--- a/bridges/source/cpp_uno/gcc3_linux_aarch64/callvirtualfunction.cxx
++++ b/bridges/source/cpp_uno/gcc3_linux_aarch64/callvirtualfunction.cxx
+@@ -55,7 +55,7 @@ void callVirtualFunction(
+            "m" (stackargs) // dummy input to prevent optimizing the alloca away
+         : "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8", "r9", "r10",
+           "r11", "r12", "r13", "r14", "r15", "r16", "r17",
+-#if !defined ANDROID && !defined MACOSX
++#if !defined __ANDROID__ && !defined MACOSX
+           "r18"/*TODO?*/,
+ #endif
+           "v0", "v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11",
+diff --git a/bridges/source/cpp_uno/gcc3_linux_aarch64/cpp2uno.cxx b/bridges/source/cpp_uno/gcc3_linux_aarch64/cpp2uno.cxx
+index 669c4443c..bb3c2fcbd 100644
+--- a/bridges/source/cpp_uno/gcc3_linux_aarch64/cpp2uno.cxx
++++ b/bridges/source/cpp_uno/gcc3_linux_aarch64/cpp2uno.cxx
+@@ -583,7 +583,7 @@ unsigned char * bridges::cpp_uno::shared::VtableFactory::addLocalFunctions(
+ void bridges::cpp_uno::shared::VtableFactory::flushCode(
+     unsigned char const * begin, unsigned char const * end)
+ {
+-#if !defined ANDROID && !defined MACOSX
++#if !defined __ANDROID__ && !defined MACOSX
+    static void (*clear_cache)(unsigned char const *, unsigned char const *)
+        = (void (*)(unsigned char const *, unsigned char const *)) dlsym(
+            RTLD_DEFAULT, "__clear_cache");
+diff --git a/bridges/source/cpp_uno/gcc3_linux_arm/cpp2uno.cxx b/bridges/source/cpp_uno/gcc3_linux_arm/cpp2uno.cxx
+index f476cf7df..37636b0d2 100644
+--- a/bridges/source/cpp_uno/gcc3_linux_arm/cpp2uno.cxx
++++ b/bridges/source/cpp_uno/gcc3_linux_arm/cpp2uno.cxx
+@@ -38,7 +38,7 @@
+ 
+ #include <dlfcn.h>
+ 
+-#ifdef ANDROID
++#ifdef __ANDROID__
+ #include <unistd.h>
+ #endif
+ 
+@@ -580,7 +580,7 @@ unsigned char * bridges::cpp_uno::shared::VtableFactory::addLocalFunctions(
+ void bridges::cpp_uno::shared::VtableFactory::flushCode(
+     unsigned char const *beg, unsigned char const *end)
+ {
+-#ifndef ANDROID
++#ifndef __ANDROID__
+    static void (*clear_cache)(unsigned char const*, unsigned char const*)
+        = reinterpret_cast<void (*)(unsigned char const*, unsigned char const*)>
+            (dlsym(RTLD_DEFAULT, "__clear_cache"));
+diff --git a/bridges/source/cpp_uno/gcc3_linux_arm/except.cxx b/bridges/source/cpp_uno/gcc3_linux_arm/except.cxx
+index 14bffa75a..8a6dfe6d5 100644
+--- a/bridges/source/cpp_uno/gcc3_linux_arm/except.cxx
++++ b/bridges/source/cpp_uno/gcc3_linux_arm/except.cxx
+@@ -94,7 +94,7 @@ namespace {
+         t_rtti_map m_rttis;
+         t_rtti_map m_generatedRttis;
+ 
+-#ifndef ANDROID
++#ifndef __ANDROID__
+         void * m_hApp;
+ #endif
+ 
+@@ -107,7 +107,7 @@ namespace {
+ }
+ 
+     RTTI::RTTI()
+-#ifndef ANDROID
++#ifndef __ANDROID__
+         : m_hApp( dlopen( nullptr, RTLD_LAZY ) )
+ #endif
+     {
+@@ -115,7 +115,7 @@ namespace {
+ 
+     RTTI::~RTTI()
+     {
+-#ifndef ANDROID
++#ifndef __ANDROID__
+         dlclose( m_hApp );
+ #endif
+     }
+@@ -146,7 +146,7 @@ namespace {
+             buf.append( 'E' );
+ 
+             OString symName( buf.makeStringAndClear() );
+-#ifndef ANDROID
++#ifndef __ANDROID__
+             rtti = static_cast<type_info *>(dlsym( m_hApp, symName.getStr() ));
+ #else
+             rtti = (type_info *)dlsym( RTLD_DEFAULT, symName.getStr() );
+@@ -170,7 +170,7 @@ namespace {
+                     // symbol and rtti-name is nearly identical,
+                     // the symbol is prefixed with _ZTI
+ 
+-#ifdef ANDROID
++#ifdef __ANDROID__
+                     // This code is supposed to be used only used for
+                     // inter-process UNO, says sberg. Thus it should
+                     // be unnecessary and never reached for
+diff --git a/bridges/source/cpp_uno/gcc3_linux_x86-64/rtti.cxx b/bridges/source/cpp_uno/gcc3_linux_x86-64/rtti.cxx
+index 9bce77bc8..a5bfc5b0e 100644
+--- a/bridges/source/cpp_uno/gcc3_linux_x86-64/rtti.cxx
++++ b/bridges/source/cpp_uno/gcc3_linux_x86-64/rtti.cxx
+@@ -78,7 +78,7 @@ class RTTI
+     std::vector<OString> m_rttiNames;
+     std::unordered_map<OUString, std::unique_ptr<Generated>> m_generatedRttis;
+ 
+-#if !defined ANDROID
++#if !defined __ANDROID__
+     void * m_hApp;
+ #endif
+ 
+@@ -90,7 +90,7 @@ public:
+ };
+ 
+ RTTI::RTTI()
+-#if !defined ANDROID
++#if !defined __ANDROID__
+     : m_hApp( dlopen( nullptr, RTLD_LAZY ) )
+ #endif
+ {
+@@ -98,7 +98,7 @@ RTTI::RTTI()
+ 
+ RTTI::~RTTI()
+ {
+-#if !defined ANDROID
++#if !defined __ANDROID__
+     dlclose( m_hApp );
+ #endif
+ }
+@@ -128,7 +128,7 @@ std::type_info * RTTI::getRTTI(typelib_TypeDescription const & pTypeDescr)
+     buf.append( 'E' );
+ 
+     OString symName( buf.makeStringAndClear() );
+-#if !defined ANDROID
++#if !defined __ANDROID__
+     rtti = static_cast<std::type_info *>(dlsym( m_hApp, symName.getStr() ));
+ #else
+     rtti = static_cast<std::type_info *>(dlsym( RTLD_DEFAULT, symName.getStr() ));
+diff --git a/desktop/source/app/app.cxx b/desktop/source/app/app.cxx
+index 0d66a48da..82160e1a7 100644
+--- a/desktop/source/app/app.cxx
++++ b/desktop/source/app/app.cxx
+@@ -505,7 +505,7 @@ void Desktop::Init()
+     RequestHandler::Status aStatus = RequestHandler::Enable(true);
+     if ( aStatus == RequestHandler::IPC_STATUS_PIPE_ERROR )
+     {
+-#if defined(ANDROID) || defined(EMSCRIPTEN)
++#if defined(__ANDROID__) || defined(EMSCRIPTEN)
+         // Ignore crack pipe errors on Android
+ #else
+         // Keep using this oddly named BE_PATHINFO_MISSING value
+@@ -917,7 +917,7 @@ void handleCrashReport()
+ }
+ #endif
+ 
+-#if !defined ANDROID
++#if !defined __ANDROID__
+ void handleSafeMode()
+ {
+     css::uno::Reference< css::uno::XComponentContext > xContext = ::comphelper::getProcessComponentContext();
+@@ -1973,7 +1973,7 @@ void Desktop::OpenClients()
+     // need some time, where the user won't see any results and wait for finishing the office startup...
+     bool bAllowRecoveryAndSessionManagement = ( !rArgs.IsNoRestore() ) && ( !rArgs.IsHeadless()  );
+ 
+-#if !defined ANDROID
++#if !defined __ANDROID__
+     // Enter safe mode if requested
+     if (Application::IsSafeModeEnabled()) {
+         handleSafeMode();
+-- 
+2.46.1
+
