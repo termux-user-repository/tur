@@ -261,7 +261,7 @@ jobs:
       env:
         ARCH: ${{ matrix.target_arch }}
       run: |
-        ./common-files/build-termux-docker.sh echo ""
+        ./common-files/build-termux-docker.sh true
 
     - name: Free additional disk space (if needed)
       if: ${{ steps.build-info.outputs.free-space == 'true' && steps.build-info.outputs.skip-building != 'true' }}
