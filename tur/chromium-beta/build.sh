@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://www.chromium.org/Home
 TERMUX_PKG_DESCRIPTION="Chromium web browser"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="@licy183"
-TERMUX_PKG_VERSION=146.0.7680.65
+TERMUX_PKG_VERSION=147.0.7727.3
 TERMUX_PKG_SRCURL=https://commondatastorage.googleapis.com/chromium-browser-official/chromium-$TERMUX_PKG_VERSION-lite.tar.xz
-TERMUX_PKG_SHA256=59f9ce013e5fe15b5b8d488bfaf76fbd18c935e99d840d9f9105f7b0a8822ca9
+TERMUX_PKG_SHA256=42bb5bd4dae1168db652b79a1fd5620ec397e3b79583b809e0be846d5ba7eb0e
 TERMUX_PKG_DEPENDS="atk, cups, dbus, fontconfig, gtk3, krb5, libc++, libevdev, libxkbcommon, libminizip, libnss, libx11, mesa, openssl, pango, pulseaudio, zlib"
 TERMUX_PKG_BUILD_DEPENDS="chromium-beta-host-tools, libffi-static"
 # TODO: Split chromium-common and chromium-headless
@@ -83,11 +83,9 @@ EOF
 	fi
 
 	# Remove termux's dummy pkg-config
-	local _target_pkg_config=$(command -v pkg-config)
-	local _host_pkg_config="$(cat $_target_pkg_config | grep exec | awk '{print $2}')"
 	rm -rf $TERMUX_PKG_CACHEDIR/host-pkg-config-bin
 	mkdir -p $TERMUX_PKG_CACHEDIR/host-pkg-config-bin
-	ln -s $_host_pkg_config $TERMUX_PKG_CACHEDIR/host-pkg-config-bin/pkg-config
+	ln -s /usr/bin/pkg-config "$TERMUX_PKG_CACHEDIR"/host-pkg-config-bin/pkg-config
 	export PATH="$TERMUX_PKG_CACHEDIR/host-pkg-config-bin:$PATH"
 
 	# Install amd64 rootfs
@@ -171,8 +169,6 @@ print(deps['src/third_party/node/node_modules']['objects'][0]['sha256sum'])
 		cp -Rf $TERMUX_PREFIX/include/* usr/include
 		cp -Rf $TERMUX_PREFIX/lib/* usr/lib
 		ln -sf /data ./data
-		# This is needed to build crashpad
-		rm -rf $TERMUX_PREFIX/include/spawn.h
 		# This is needed to build cups
 		cp -Rf $TERMUX_PREFIX/bin/cups-config usr/bin/
 		chmod +x usr/bin/cups-config
@@ -331,6 +327,7 @@ use_cxx23 = false
 
 termux_step_make() {
 	cd $TERMUX_PKG_BUILDDIR
+
 	# Build v8 snapshot in another action
 	time ninja -C out/Release \
 						v8_context_snapshot \
@@ -338,6 +335,7 @@ termux_step_make() {
 						run_torque \
 						generate_bytecode_builtins_list \
 						v8:run_gen-regexp-special-case
+
 	# Build generate steps in another action
 	time ninja -C out/Release \
 						generate_top_domain_list_variables_file \
@@ -346,10 +344,12 @@ termux_step_make() {
 						gen_root_store_inc \
 						generate_transport_security_state \
 						generate_top_domains_trie
+
 	# Build swiftshader in another action
 	time ninja -C out/Release \
 						third_party/swiftshader/src/Vulkan:icd_file \
 						third_party/swiftshader/src/Vulkan:swiftshader_libvulkan
+
 	# Build pdfium in another action
 	time ninja -C out/Release \
 						third_party/pdfium \
