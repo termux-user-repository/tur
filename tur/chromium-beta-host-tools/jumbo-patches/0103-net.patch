@@ -850,3 +850,22 @@ index 73ab379a2b..a8f23eece0 100644
  }  // namespace disk_cache
 +
 +#undef IsBrowserIdle
+diff --git a/net/socket/tcp_connect_job.cc b/net/socket/tcp_connect_job.cc
+index 5562515695..3c3e94150c 100644
+--- a/net/socket/tcp_connect_job.cc
++++ b/net/socket/tcp_connect_job.cc
+@@ -36,6 +36,8 @@
+ #include "url/scheme_host_port.h"
+ #include "url/url_constants.h"
+ 
++#define ToLegacyDestinationEndpoint ToLegacyDestinationEndpoint_TcpConnectJob
++
+ namespace net {
+ 
+ namespace {
+@@ -601,3 +603,5 @@ void TcpConnectJob::NotifyDelegateIfDone(int result) {
+ }
+ 
+ }  // namespace net
++
++#undef ToLegacyDestinationEndpoint

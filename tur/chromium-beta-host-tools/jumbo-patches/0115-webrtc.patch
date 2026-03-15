@@ -803,3 +803,45 @@ index a802111d9f..ea6aad2af4 100644
 +
 +#undef ClampLevelEstimateDbfs
 +#undef GetInitialSpeechLevelEstimateDbfs
+diff --git a/third_party/webrtc/common_video/h264/h264_bitstream_parser.cc b/third_party/webrtc/common_video/h264/h264_bitstream_parser.cc
+index 1a66e5a88a..5fe34c340b 100644
+--- a/third_party/webrtc/common_video/h264/h264_bitstream_parser.cc
++++ b/third_party/webrtc/common_video/h264/h264_bitstream_parser.cc
+@@ -21,6 +21,10 @@
+ #include "rtc_base/bitstream_reader.h"
+ #include "rtc_base/logging.h"
+ 
++#define kMaxAbsQpDeltaValue kMaxAbsQpDeltaValue_H264BitstreamParser
++#define kMinQpValue kMinQpValue_H264BitstreamParser
++#define kMaxQpValue kMaxQpValue_H264BitstreamParser
++
+ namespace webrtc {
+ namespace {
+ 
+@@ -362,3 +366,7 @@ std::optional<int> H264BitstreamParser::GetLastSliceQp() const {
+ }
+ 
+ }  // namespace webrtc
++
++#undef kMaxAbsQpDeltaValue
++#undef kMinQpValue
++#undef kMaxQpValue
+diff --git a/third_party/webrtc/logging/rtc_event_log/events/rtc_event_field_encoding_parser.cc b/third_party/webrtc/logging/rtc_event_log/events/rtc_event_field_encoding_parser.cc
+index 3e04b42ca4..1f354956a4 100644
+--- a/third_party/webrtc/logging/rtc_event_log/events/rtc_event_field_encoding_parser.cc
++++ b/third_party/webrtc/logging/rtc_event_log/events/rtc_event_field_encoding_parser.cc
+@@ -26,6 +26,8 @@
+ #include "rtc_base/bitstream_reader.h"
+ #include "rtc_base/checks.h"
+ 
++#define ConvertFieldType ConvertFieldType_rtc_event_field_encoding_parser
++
+ namespace webrtc {
+ 
+ namespace {
+@@ -404,3 +406,5 @@ EventParser::ParseOptionalNumericField(const FieldParameters& params,
+ }
+ 
+ }  // namespace webrtc
++
++#undef ConvertFieldType

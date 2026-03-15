@@ -1202,24 +1202,6 @@ index 2732eb3f88..69688009b2 100644
    output_name = "network_cpp_base"
  
    sources = [
-@@ -648,6 +649,7 @@ component("cpp_base") {
-     "web_transport_error_mojom_traits.cc",
-     "web_transport_error_mojom_traits.h",
-   ]
-+  jumbo_excluded_sources = []
- 
-   configs += [ "//build/config/compiler:wexit_time_destructors" ]
- 
-@@ -694,6 +696,9 @@ component("cpp_base") {
-       "p2p_param_traits.h",
-       "p2p_socket_type.h",
-     ]
-+    jumbo_excluded_sources += [
-+      "p2p_param_traits.cc",
-+    ]
- 
-     deps += [ "//services/network/public/mojom:mojom_shared" ]
-     public_deps += [ "//third_party/webrtc_overrides:webrtc_component" ]
 diff --git a/services/network/public/cpp/cross_origin_embedder_policy_parser.cc b/services/network/public/cpp/cross_origin_embedder_policy_parser.cc
 index bf9d5f41d4..8aaaf8036d 100644
 --- a/services/network/public/cpp/cross_origin_embedder_policy_parser.cc

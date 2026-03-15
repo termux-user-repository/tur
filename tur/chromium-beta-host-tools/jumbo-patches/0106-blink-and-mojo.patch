@@ -492,17 +492,15 @@ index 3ca42542b5..409c3941cc 100644
          properties,
          T("};"),
          EmptyNode(),
-@@ -740,10 +740,10 @@ def make_fill_template_properties_function(cg_context):
+@@ -740,9 +740,9 @@ def make_fill_template_properties_function(cg_context):
  
      if cg_context.dictionary.own_members:
          body.extend([
 -            T("static_assert(std::size(kOwnPropertyNames) "
 +            T("static_assert(std::size(kOwnPropertyNames_{}) ".format(cg_context.class_name) +
                "== kOwnPropertyCount);"),
--            T("properties.AppendRange(std::cbegin(kOwnPropertyNames),"
--              " std::cend(kOwnPropertyNames));"),
-+            T("properties.AppendRange(std::cbegin(kOwnPropertyNames_{}),".format(cg_context.class_name) +
-+              " std::cend(kOwnPropertyNames_{}));".format(cg_context.class_name)),
+-            T("properties.append_range(kOwnPropertyNames);"),
++            T("properties.append_range(kOwnPropertyNames_{});".format(cg_context.class_name)),
              T("DCHECK_EQ(properties.size(), kTotalPropertyCount);")
          ])
  
@@ -2148,123 +2146,6 @@ index 12b25ffde8..83d1633b15 100644
 +#ifdef __clang__
 +#pragma clang diagnostic pop
 +#endif
-diff --git a/third_party/blink/renderer/core/timing/responsiveness_metrics.cc b/third_party/blink/renderer/core/timing/responsiveness_metrics.cc
-index 08406d2138..811fe144b0 100644
---- a/third_party/blink/renderer/core/timing/responsiveness_metrics.cc
-+++ b/third_party/blink/renderer/core/timing/responsiveness_metrics.cc
-@@ -32,6 +32,11 @@
- #include "third_party/perfetto/include/perfetto/tracing/track.h"
- #include "third_party/perfetto/include/perfetto/tracing/track_event.h"
- 
-+#ifdef __clang__
-+#pragma clang diagnostic push
-+#pragma clang diagnostic ignored "-Wshorten-64-to-32"
-+#endif
-+
- namespace blink {
- 
- namespace {
-@@ -64,6 +69,10 @@ constexpr char kSlowInteractionToNextPaintTraceEventCategory[] = "latency";
- constexpr char kSlowInteractionToNextPaintTraceEventName[] =
-     "SlowInteractionToNextPaint";
- 
-+} // namespace {
-+
-+namespace responsiveness_metrics {
-+
- // These values are logged to UMA. Please keep in sync with
- // "EventTimingClickInteractionEvents" in tools/metrics/histograms/enums.xml.
- // LINT.IfChange
-@@ -81,6 +90,10 @@ enum ClickInteractionEvents {
- };
- // LINT.ThenChange(/tools/metrics/histograms/enums.xml:EventTimingClickInteractionEvents)
- 
-+} // namespace responsiveness_metrics {
-+
-+namespace {
-+
- void EmitSlowInteractionToNextPaintTraceEvent(
-     const ResponsivenessMetrics::EventTimestamps& event,
-     uint64_t event_id) {
-@@ -274,6 +287,7 @@ void ResponsivenessMetrics::RecordTapOrClickUKM(
- bool ResponsivenessMetrics::SetPointerIdAndRecordLatency(
-     PerformanceEventTiming* entry,
-     EventTimestamps event_timestamps) {
-+  using responsiveness_metrics::ClickInteractionEvents;
-   const AtomicString& event_type = entry->name();
-   auto pointer_id = entry->GetEventTimingReportingInfo()->pointer_id.value();
-   auto* pointer_info = pointer_id_entry_map_.Contains(pointer_id)
-@@ -801,3 +815,7 @@ bool ResponsivenessMetrics::TryHandleKeyboardEventSimulatedClick(
-   return true;
- }
- }  // namespace blink
-+
-+#ifdef __clang__
-+#pragma clang diagnostic pop
-+#endif
-diff --git a/third_party/blink/renderer/core/timing/soft_navigation_heuristics.cc b/third_party/blink/renderer/core/timing/soft_navigation_heuristics.cc
-index b011a33c54..30b5c74004 100644
---- a/third_party/blink/renderer/core/timing/soft_navigation_heuristics.cc
-+++ b/third_party/blink/renderer/core/timing/soft_navigation_heuristics.cc
-@@ -60,6 +60,11 @@ const char
-     kPageLoadInternalSoftNavigationNotEmittedInsufficientPaintTotalPaintAreaPercentage
-         [] = "PageLoad.Internal.SoftNavigation.NotEmittedInsufficientPaint."
-              "TotalPaintAreaPoints";
-+
-+} // namespace {
-+
-+namespace soft_navigation_heuristics {
-+
- // These values are logged to UMA. Entries should not be renumbered and numeric
- // values should never be reused. Please keep in sync with
- // "SoftNavigationOutcome" in tools/metrics/histograms/enums.xml. Note also that
-@@ -83,6 +88,10 @@ enum SoftNavigationOutcome {
- };
- // LINT.ThenChange(/tools/metrics/histograms/enums.xml:SoftNavigationOutcome)
- 
-+} // namespace soft_navigation_heuristics {
-+
-+namespace {
-+
- void OnSoftNavigationContextWasExhausted(const SoftNavigationContext& context,
-                                          uint64_t viewport_area,
-                                          uint64_t required_paint_area) {
-@@ -125,9 +134,11 @@ void OnSoftNavigationContextWasExhausted(const SoftNavigationContext& context,
-         kPageLoadInternalSoftNavigationEmittedTotalPaintAreaPoints,
-         base::saturated_cast<int>(points_val));
-   } else if (!context.HasDomModification()) {
-+    using namespace soft_navigation_heuristics;
-     base::UmaHistogramEnumeration(kPageLoadInternalSoftNavigationOutcome,
-                                   SoftNavigationOutcome::kNoDomModification);
-   } else if (!context.SatisfiesSoftNavPaintCriteria(required_paint_area)) {
-+    using namespace soft_navigation_heuristics;
-     base::UmaHistogramEnumeration(kPageLoadInternalSoftNavigationOutcome,
-                                   SoftNavigationOutcome::kInsufficientPaints);
-     uint64_t total_paint_area = context.PaintedArea();
-@@ -320,6 +331,7 @@ void SoftNavigationHeuristics::SameDocumentNavigationCommitted(
-                         "SoftNavigationHeuristics::"
-                         "SameDocumentNavigationCommittedWithoutContext",
-                         perfetto::Track::FromPointer(this), "url", url);
-+    using namespace soft_navigation_heuristics;
-     base::UmaHistogramEnumeration(
-         kPageLoadInternalSoftNavigationOutcome,
-         SoftNavigationOutcome::kNoSoftNavContextDuringUrlChange);
-@@ -337,6 +349,7 @@ void SoftNavigationHeuristics::SameDocumentNavigationCommitted(
-                         "edIntoPreviousContext",
-                         perfetto::Track::FromPointer(context), "context",
-                         *context_for_current_url_, "url", url);
-+    using namespace soft_navigation_heuristics;
-     base::UmaHistogramEnumeration(
-         kPageLoadInternalSoftNavigationOutcome,
-         SoftNavigationOutcome::
-@@ -584,6 +597,7 @@ void SoftNavigationHeuristics::ReportSoftNavigationToMetrics(
-   }
- 
-   // Count "successful soft nav" in histogram
-+  using soft_navigation_heuristics::SoftNavigationOutcome;
-   base::UmaHistogramEnumeration(kPageLoadInternalSoftNavigationOutcome,
-                                 SoftNavigationOutcome::kSoftNavigationDetected);
- }
 diff --git a/third_party/blink/renderer/core/timing/window_performance.cc b/third_party/blink/renderer/core/timing/window_performance.cc
 index c58b9bea3a..e4a20645b2 100644
 --- a/third_party/blink/renderer/core/timing/window_performance.cc
@@ -4191,9 +4072,9 @@ index 368305c6b0..969c6dcf2e 100644
  # found in the LICENSE file.
  
 +import("//build/config/jumbo.gni")
+ import("//testing/libfuzzer/fuzzer_test.gni")
  import("//testing/test.gni")
  import("//third_party/blink/renderer/build/scripts/scripts.gni")
- import("//third_party/blink/renderer/platform/platform.gni")
 @@ -189,6 +190,14 @@ blink_platform_sources("loader") {
    sources +=
        get_target_outputs(":make_platform_loader_generated_delivery_type_names")
@@ -4849,3 +4730,22 @@ index 8238b11bef..5abb967f85 100644
  
  namespace blink {
  
+diff --git a/third_party/blink/renderer/core/loader/lazy_media_helper.cc b/third_party/blink/renderer/core/loader/lazy_media_helper.cc
+index 2ae2d4fe39..67451e5e80 100644
+--- a/third_party/blink/renderer/core/loader/lazy_media_helper.cc
++++ b/third_party/blink/renderer/core/loader/lazy_media_helper.cc
+@@ -16,6 +16,8 @@
+ #include "third_party/blink/renderer/core/html_names.h"
+ #include "third_party/blink/renderer/platform/instrumentation/use_counter.h"
+ 
++#define GetRootDocumentOrNull GetRootDocumentOrNull_LazyMediaHelper
++
+ namespace blink {
+ 
+ namespace {
+@@ -73,3 +75,5 @@ bool LazyMediaHelper::ShouldDeferMediaLoad(LocalFrame& frame,
+ }
+ 
+ }  // namespace blink
++
++#undef GetRootDocumentOrNull
