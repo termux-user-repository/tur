@@ -3,7 +3,7 @@ TERMUX_PKG_DESCRIPTION="Dataframes powered by a multithreaded, vectorized query 
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="1.33.1"
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_REVISION=2
 TERMUX_PKG_SRCURL="https://github.com/pola-rs/polars/releases/download/py-$TERMUX_PKG_VERSION/polars-$TERMUX_PKG_VERSION.tar.gz"
 TERMUX_PKG_SHA256=fa3fdc34eab52a71498264d6ff9b0aa6955eb4b0ae8add5d3cb43e4b84644007
 TERMUX_PKG_AUTO_UPDATE=true
@@ -102,7 +102,4 @@ termux_step_make_install() {
 termux_step_post_make_install() {
 	# This is not necessary, and may cause file conflict
 	rm -f $PYTHONPATH/rust-toolchain.toml
-
-	# Remove the vendor sources to save space
-	rm -rf "$TERMUX_PKG_SRCDIR"/vendor
 }
