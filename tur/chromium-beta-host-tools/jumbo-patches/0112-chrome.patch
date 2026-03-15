@@ -1753,29 +1753,6 @@ index a4c5b1955d..40cc74c57b 100644
    sources = [
      "chrome_controller_client.cc",
      "chrome_controller_client.h",
-diff --git a/chrome/browser/safe_browsing/cloud_content_scanning/multipart_uploader.cc b/chrome/browser/safe_browsing/cloud_content_scanning/multipart_uploader.cc
-index d0c5dbb17b..2294d8f85f 100644
---- a/chrome/browser/safe_browsing/cloud_content_scanning/multipart_uploader.cc
-+++ b/chrome/browser/safe_browsing/cloud_content_scanning/multipart_uploader.cc
-@@ -34,6 +34,10 @@
- #include "services/network/public/mojom/data_pipe_getter.mojom.h"
- #include "services/network/public/mojom/url_response_head.mojom.h"
- 
-+#define kDataContentType                 kDataContentType_MultipartUploader
-+#define kUploadContentType               kUploadContentType_MultipartUploader
-+#define CreateFileDataPipeGetterBlocking CreateFileDataPipeGetterBlocking_MultipartUploader
-+
- namespace safe_browsing {
- 
- namespace {
-@@ -415,3 +419,7 @@ MultipartUploadRequest::CreatePageRequest(
-                                      traffic_annotation, std::move(callback));
- }
- }  // namespace safe_browsing
-+
-+#undef kDataContentType
-+#undef kUploadContentType
-+#undef CreateFileDataPipeGetterBlocking
 diff --git a/chrome/browser/safe_browsing/extension_telemetry/cookies_get_signal_processor.cc b/chrome/browser/safe_browsing/extension_telemetry/cookies_get_signal_processor.cc
 index 19cb917840..e2f55c1ee3 100644
 --- a/chrome/browser/safe_browsing/extension_telemetry/cookies_get_signal_processor.cc
@@ -2668,25 +2645,6 @@ index 64f9909c26..b308662cc8 100644
 +#undef kBackgroundCornerRadius
 +#undef kBackgroundSeparator
 +#undef kBackgroundInsets
-diff --git a/chrome/browser/ui/views/global_media_controls/media_item_ui_footer_view.cc b/chrome/browser/ui/views/global_media_controls/media_item_ui_footer_view.cc
-index 118fc8d158..5ea6283fd4 100644
---- a/chrome/browser/ui/views/global_media_controls/media_item_ui_footer_view.cc
-+++ b/chrome/browser/ui/views/global_media_controls/media_item_ui_footer_view.cc
-@@ -23,6 +23,8 @@
- #include "ui/views/layout/box_layout.h"
- #include "ui/views/layout/flex_layout.h"
- 
-+#define kDeviceIconSize kDeviceIconSize_MediaItemUIFooterView
-+
- namespace {
- 
- constexpr int kEntryMaxWidth = 150;
-@@ -207,3 +209,5 @@ void MediaItemUIFooterView::OnOverflowButtonClicked() {
- 
- BEGIN_METADATA(MediaItemUIFooterView)
- END_METADATA
-+
-+#undef kDeviceIconSize
 diff --git a/chrome/browser/ui/views/global_media_controls/media_notification_device_entry_ui.cc b/chrome/browser/ui/views/global_media_controls/media_notification_device_entry_ui.cc
 index b4edc8b5dc..ec261cf433 100644
 --- a/chrome/browser/ui/views/global_media_controls/media_notification_device_entry_ui.cc
@@ -3075,29 +3033,6 @@ index 017da9d82c..80ecf6e5fc 100644
    public = [
      "app_menu.h",
      "back_forward_button.h",
-diff --git a/chrome/browser/ui/views/toolbar/split_tabs_button.cc b/chrome/browser/ui/views/toolbar/split_tabs_button.cc
-index 98fe382252..777a2e031c 100644
---- a/chrome/browser/ui/views/toolbar/split_tabs_button.cc
-+++ b/chrome/browser/ui/views/toolbar/split_tabs_button.cc
-@@ -41,6 +41,10 @@
- #include "ui/views/controls/menu/menu_runner.h"
- #include "ui/views/view_class_properties.h"
- 
-+#define kStatusIndicatorWidth   kStatusIndicatorWidth_SplitTabsToolbarButton
-+#define kStatusIndicatorHeight  kStatusIndicatorHeight_SplitTabsToolbarButton
-+#define kStatusIndicatorSpacing kStatusIndicatorSpacing_SplitTabsToolbarButton
-+
- namespace {
- // Width of the status indicator shown across the button.
- constexpr int kStatusIndicatorWidth = 14;
-@@ -225,3 +229,7 @@ void SplitTabsToolbarButton::UpdateAccessibilityLabel(bool is_enabled) {
- 
- BEGIN_METADATA(SplitTabsToolbarButton)
- END_METADATA
-+
-+#undef kStatusIndicatorWidth
-+#undef kStatusIndicatorHeight
-+#undef kStatusIndicatorSpacing
 diff --git a/chrome/browser/ui/views/toolbar/toolbar_ink_drop_util.cc b/chrome/browser/ui/views/toolbar/toolbar_ink_drop_util.cc
 index 6a2171cb33..677c41269c 100644
 --- a/chrome/browser/ui/views/toolbar/toolbar_ink_drop_util.cc
@@ -3742,73 +3677,6 @@ index 94b7d51199..82e6e35682 100644
      deps += [
        "//chrome/browser:browser_process",
        "//chrome/browser/profiles:profile",
---- a/chrome/browser/extensions/api/tabs/tabs_event_router_platform_delegate_non_android.cc
-+++ b/chrome/browser/extensions/api/tabs/tabs_event_router_platform_delegate_non_android.cc
-@@ -165,7 +165,7 @@
-       change.GetCreateChange()->reason() ==
-           TabGroupChange::TabGroupCreationReason::
-               kInsertedFromAnotherTabstrip) {
--    for (tabs::TabInterface* tab :
-+    for (::tabs::TabInterface* tab :
-          change.GetCreateChange()->GetDetachedTabs()) {
-       std::set<std::string> changed_property_names;
-       changed_property_names.insert(kGroupIdKey);
-@@ -176,7 +176,7 @@
-              change.GetCloseChange()->reason() ==
-                  TabGroupChange::TabGroupClosureReason::
-                      kDetachedToAnotherTabstrip) {
--    for (tabs::TabInterface* tab : change.GetCloseChange()->GetDetachedTabs()) {
-+    for (::tabs::TabInterface* tab : change.GetCloseChange()->GetDetachedTabs()) {
-       std::set<std::string> changed_property_names;
-       changed_property_names.insert(kGroupIdKey);
-       router_->DispatchTabUpdatedEvent(tab->GetContents(),
-@@ -190,7 +190,7 @@
-   if (change.type == SplitTabChange::Type::kAdded &&
-       change.GetAddedChange()->reason() !=
-           SplitTabChange::SplitTabAddReason::kInsertedFromAnotherTabstrip) {
--    for (const std::pair<tabs::TabInterface*, int>& tab :
-+    for (const std::pair<::tabs::TabInterface*, int>& tab :
-          change.GetAddedChange()->tabs()) {
-       std::set<std::string> changed_property_names;
-       changed_property_names.insert(kSplitIdKey);
-@@ -201,7 +201,7 @@
-   if (change.type == SplitTabChange::Type::kRemoved &&
-       change.GetRemovedChange()->reason() !=
-           SplitTabChange::SplitTabRemoveReason::kDetachedToAnotherTabstrip) {
--    for (const std::pair<tabs::TabInterface*, int>& tab :
-+    for (const std::pair<::tabs::TabInterface*, int>& tab :
-          change.GetRemovedChange()->tabs()) {
-       std::set<std::string> changed_property_names;
-       changed_property_names.insert(kSplitIdKey);
-@@ -215,7 +215,7 @@
-     TabStripModel* tab_strip_model,
-     std::optional<tab_groups::TabGroupId> old_group,
-     std::optional<tab_groups::TabGroupId> new_group,
--    tabs::TabInterface* tab,
-+    ::tabs::TabInterface* tab,
-     int index) {
-   std::set<std::string> changed_property_names;
-   changed_property_names.insert(kGroupIdKey);
-@@ -373,7 +373,7 @@
-     const ui::ListSelectionModel& old_model) {
-   base::Value::List all_tabs;
- 
--  for (tabs::TabInterface* tab :
-+  for (::tabs::TabInterface* tab :
-        tab_strip_model->selection_model().selected_tabs()) {
-     WebContents* contents = tab->GetContents();
-     if (!contents) {
---- a/chrome/browser/extensions/api/tabs/tabs_event_router_platform_delegate_non_android.h
-+++ b/chrome/browser/extensions/api/tabs/tabs_event_router_platform_delegate_non_android.h
-@@ -65,7 +65,7 @@
-   void TabGroupedStateChanged(TabStripModel* tab_strip_model,
-                               std::optional<tab_groups::TabGroupId> old_group,
-                               std::optional<tab_groups::TabGroupId> new_group,
--                              tabs::TabInterface* tab,
-+                              ::tabs::TabInterface* tab,
-                               int index) override;
-   void OnTabGroupChanged(const TabGroupChange& change) override;
-   void OnSplitTabChanged(const SplitTabChange& change) override;
 --- a/chrome/browser/signin/bound_session_credentials/unexportable_key_obsolete_profile_garbage_collector.cc
 +++ b/chrome/browser/signin/bound_session_credentials/unexportable_key_obsolete_profile_garbage_collector.cc
 @@ -32,6 +32,8 @@
@@ -3826,23 +3694,6 @@ index 94b7d51199..82e6e35682 100644
  }  // namespace unexportable_keys
 +
 +#undef kGarbageCollectionDelay
-diff --git a/chrome/browser/extensions/api/tabs/tabs_event_router.h b/chrome/browser/extensions/api/tabs/tabs_event_router.h
-index 78bf18e261..0c5616e980 100644
---- a/chrome/browser/extensions/api/tabs/tabs_event_router.h
-+++ b/chrome/browser/extensions/api/tabs/tabs_event_router.h
-@@ -170,9 +170,9 @@ class TabsEventRouter : public favicon::FaviconDriverObserver,
-                      EventRouter::UserGestureState user_gesture);
- 
-   // TabListInterfaceObserver:
--  void OnTabAdded(tabs::TabInterface* tab, int index) override;
--  void OnActiveTabChanged(tabs::TabInterface* tab) override;
--  void OnTabMoved(tabs::TabInterface* tab,
-+  void OnTabAdded(::tabs::TabInterface* tab, int index) override;
-+  void OnActiveTabChanged(::tabs::TabInterface* tab) override;
-+  void OnTabMoved(::tabs::TabInterface* tab,
-                   int from_index,
-                   int to_index) override;
-   void OnTabListDestroyed(TabListInterface& tab_list) override;
 diff --git a/chrome/browser/autofill/personal_data_manager_factory.cc b/chrome/browser/autofill/personal_data_manager_factory.cc
 index 3b0382ac41..fbddc65cba 100644
 --- a/chrome/browser/autofill/personal_data_manager_factory.cc
@@ -3900,19 +3751,6 @@ index 016e936e86..44a7370387 100644
  }  // namespace extensions::image_writer
 +
 +#undef kExpectedMagic
-diff --git a/chrome/browser/metrics/tab_stats/tab_stats_tracker.cc b/chrome/browser/metrics/tab_stats/tab_stats_tracker.cc
-index 66e7ea82f6..6ddee59576 100644
---- a/chrome/browser/metrics/tab_stats/tab_stats_tracker.cc
-+++ b/chrome/browser/metrics/tab_stats/tab_stats_tracker.cc
-@@ -107,7 +107,7 @@ void UmaHistogramCounts10000WithTabStripModeVariant(
- 
-   const char* suffix = tabs::IsVerticalTabsFeatureEnabled() &&
-                                tab_strip.GetProfile()->GetPrefs()->GetBoolean(
--                                   prefs::kVerticalTabsEnabled)
-+                                   ::prefs::kVerticalTabsEnabled)
-                            ? ".VerticalTabStrip"
-                            : ".HorizontalTabStrip";
- 
 diff --git a/chrome/browser/policy/cloud/extension_install_policy_invalidator.cc b/chrome/browser/policy/cloud/extension_install_policy_invalidator.cc
 index e8ac3bcb93..d045287728 100644
 --- a/chrome/browser/policy/cloud/extension_install_policy_invalidator.cc
@@ -3956,42 +3794,140 @@ index 268e3832f6..0b05b142e5 100644
 +
 +#undef kRefreshButtonInsets
 diff --git a/chrome/browser/extensions/api/tabs/tabs_event_router.cc b/chrome/browser/extensions/api/tabs/tabs_event_router.cc
-index 946e666330..dce8165b98 100644
+index 85888cbd80..e8a3466654 100644
 --- a/chrome/browser/extensions/api/tabs/tabs_event_router.cc
 +++ b/chrome/browser/extensions/api/tabs/tabs_event_router.cc
-@@ -225,7 +225,7 @@ void TabsEventRouter::TrackTabList(TabListInterface& tab_list) {
+@@ -227,7 +227,7 @@ void TabsEventRouter::TrackTabList(TabListInterface& tab_list) {
    tab_list_observations_.AddObservation(&tab_list);
  
    // Bootstrap: monitor all pre-existing tabs in the tab list.
 -  std::vector<tabs::TabInterface*> tabs = tab_list.GetAllTabs();
 +  std::vector<::tabs::TabInterface*> tabs = tab_list.GetAllTabs();
    for (size_t i = 0u; i < tabs.size(); ++i) {
-     OnTabAdded(tabs[i], i);
+     OnTabAdded(tab_list, tabs[i], i);
    }
-@@ -336,7 +336,7 @@ void TabsEventRouter::DispatchEvent(
-   event_router->BroadcastEvent(std::move(event));
+@@ -389,7 +389,7 @@ void TabsEventRouter::DispatchEvent(
  }
  
--void TabsEventRouter::OnTabAdded(tabs::TabInterface* tab, int index) {
-+void TabsEventRouter::OnTabAdded(::tabs::TabInterface* tab, int index) {
+ void TabsEventRouter::UpdateTabIndices(TabListInterface& tab_list) {
+-  std::vector<tabs::TabInterface*> tabs = tab_list.GetAllTabs();
++  std::vector<::tabs::TabInterface*> tabs = tab_list.GetAllTabs();
+   for (size_t i = 0; i < tabs.size(); ++i) {
+     content::WebContents* web_contents = tabs[i]->GetContents();
+     CHECK(web_contents);
+@@ -405,7 +405,7 @@ void TabsEventRouter::UpdateTabIndices(TabListInterface& tab_list) {
+ }
+ 
+ void TabsEventRouter::OnTabAdded(TabListInterface& tab_list,
+-                                 tabs::TabInterface* tab,
++                                 ::tabs::TabInterface* tab,
+                                  int index) {
    content::WebContents* contents = tab->GetContents();
    CHECK(contents);
- 
-@@ -375,7 +375,7 @@ void TabsEventRouter::OnTabAdded(tabs::TabInterface* tab, int index) {
-   DispatchTabCreatedEvent(contents, tab->IsActivated());
+@@ -452,7 +452,7 @@ void TabsEventRouter::OnTabAdded(TabListInterface& tab_list,
  }
  
--void TabsEventRouter::OnActiveTabChanged(tabs::TabInterface* tab) {
-+void TabsEventRouter::OnActiveTabChanged(::tabs::TabInterface* tab) {
+ void TabsEventRouter::OnActiveTabChanged(TabListInterface& tab_list,
+-                                         tabs::TabInterface* tab) {
++                                         ::tabs::TabInterface* tab) {
    content::WebContents* tab_contents = tab->GetContents();
    CHECK(tab_contents);
  
-@@ -409,7 +409,7 @@ void TabsEventRouter::OnActiveTabChanged(tabs::TabInterface* tab) {
-       std::move(on_activated_args), EventRouter::UserGestureState::kUnknown);
+@@ -487,7 +487,7 @@ void TabsEventRouter::OnActiveTabChanged(TabListInterface& tab_list,
  }
  
--void TabsEventRouter::OnTabMoved(tabs::TabInterface* tab,
-+void TabsEventRouter::OnTabMoved(::tabs::TabInterface* tab,
+ void TabsEventRouter::OnTabRemoved(TabListInterface& tab_list,
+-                                   tabs::TabInterface* tab,
++                                   ::tabs::TabInterface* tab,
+                                    TabRemovedReason removed_reason) {
+   content::WebContents* web_contents = tab->GetContents();
+   CHECK(web_contents);
+@@ -508,7 +508,7 @@ void TabsEventRouter::OnTabRemoved(TabListInterface& tab_list,
+ }
+ 
+ void TabsEventRouter::OnTabMoved(TabListInterface& tab_list,
+-                                 tabs::TabInterface* tab,
++                                 ::tabs::TabInterface* tab,
                                   int from_index,
                                   int to_index) {
    CHECK(tab);
+@@ -537,7 +537,7 @@ void TabsEventRouter::OnTabMoved(TabListInterface& tab_list,
+ 
+ void TabsEventRouter::OnHighlightedTabsChanged(
+     TabListInterface& tab_list,
+-    const std::set<tabs::TabInterface*>& highlighted_tabs) {
++    const std::set<::tabs::TabInterface*>& highlighted_tabs) {
+   api::tabs::OnHighlighted::HighlightInfo highlight_info;
+   highlight_info.tab_ids.reserve(highlighted_tabs.size());
+   highlight_info.window_id = -1;
+@@ -549,7 +549,7 @@ void TabsEventRouter::OnHighlightedTabsChanged(
+     return;
+   }
+ 
+-  for (tabs::TabInterface* tab : highlighted_tabs) {
++  for (::tabs::TabInterface* tab : highlighted_tabs) {
+     content::WebContents* web_contents = tab->GetContents();
+     CHECK(web_contents);
+ 
+diff --git a/chrome/browser/extensions/api/tabs/tabs_event_router.h b/chrome/browser/extensions/api/tabs/tabs_event_router.h
+index 7c1507e4fe..841d64b4ca 100644
+--- a/chrome/browser/extensions/api/tabs/tabs_event_router.h
++++ b/chrome/browser/extensions/api/tabs/tabs_event_router.h
+@@ -192,20 +192,20 @@ class TabsEventRouter : public favicon::FaviconDriverObserver,
+ 
+   // TabListInterfaceObserver:
+   void OnTabAdded(TabListInterface& tab_list,
+-                  tabs::TabInterface* tab,
++                  ::tabs::TabInterface* tab,
+                   int index) override;
+   void OnActiveTabChanged(TabListInterface& tab_list,
+-                          tabs::TabInterface* tab) override;
++                          ::tabs::TabInterface* tab) override;
+   void OnTabRemoved(TabListInterface& tab_list,
+-                    tabs::TabInterface* tab,
++                    ::tabs::TabInterface* tab,
+                     TabRemovedReason removed_reason) override;
+   void OnTabMoved(TabListInterface& tab_list,
+-                  tabs::TabInterface* tab,
++                  ::tabs::TabInterface* tab,
+                   int from_index,
+                   int to_index) override;
+   void OnHighlightedTabsChanged(
+       TabListInterface& tab_list,
+-      const std::set<tabs::TabInterface*>& highlighted_tabs) override;
++      const std::set<::tabs::TabInterface*>& highlighted_tabs) override;
+   void OnTabListDestroyed(TabListInterface& tab_list) override;
+ 
+   // ZoomObserver:
+diff --git a/chrome/browser/extensions/api/tabs/tabs_event_router_platform_delegate_non_android.h b/chrome/browser/extensions/api/tabs/tabs_event_router_platform_delegate_non_android.h
+index ed959562b7..aba15ad707 100644
+--- a/chrome/browser/extensions/api/tabs/tabs_event_router_platform_delegate_non_android.h
++++ b/chrome/browser/extensions/api/tabs/tabs_event_router_platform_delegate_non_android.h
+@@ -68,7 +68,7 @@ class TabsEventRouterPlatformDelegate
+   void TabGroupedStateChanged(TabStripModel* tab_strip_model,
+                               std::optional<tab_groups::TabGroupId> old_group,
+                               std::optional<tab_groups::TabGroupId> new_group,
+-                              tabs::TabInterface* tab,
++                              ::tabs::TabInterface* tab,
+                               int index) override;
+   void OnTabGroupChanged(const TabGroupChange& change) override;
+   void OnSplitTabChanged(const SplitTabChange& change) override;
+diff --git a/chrome/browser/safe_browsing/extension_telemetry/script_injection_signal_processor.cc b/chrome/browser/safe_browsing/extension_telemetry/script_injection_signal_processor.cc
+index 1a09748724..6ee4ba2db0 100644
+--- a/chrome/browser/safe_browsing/extension_telemetry/script_injection_signal_processor.cc
++++ b/chrome/browser/safe_browsing/extension_telemetry/script_injection_signal_processor.cc
+@@ -7,6 +7,8 @@
+ #include "base/check.h"
+ #include "chrome/browser/safe_browsing/extension_telemetry/script_injection_signal.h"
+ 
++#define kMaxAggregatedSignals kMaxAggregatedSignals_script_injection_signal_processor
++
+ namespace safe_browsing {
+ 
+ namespace {
+@@ -100,3 +102,5 @@ void ScriptInjectionSignalProcessor::SetMaxAggregatedSignalsForTest(
+ }
+ 
+ }  // namespace safe_browsing
++
++#undef kMaxAggregatedSignals

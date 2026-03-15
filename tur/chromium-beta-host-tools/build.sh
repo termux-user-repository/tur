@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://www.chromium.org/Home
 TERMUX_PKG_DESCRIPTION="Chromium web browser (Host tools)"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="@licy183"
-TERMUX_PKG_VERSION=146.0.7680.65
+TERMUX_PKG_VERSION=147.0.7727.3
 TERMUX_PKG_SRCURL=https://commondatastorage.googleapis.com/chromium-browser-official/chromium-$TERMUX_PKG_VERSION-lite.tar.xz
-TERMUX_PKG_SHA256=59f9ce013e5fe15b5b8d488bfaf76fbd18c935e99d840d9f9105f7b0a8822ca9
+TERMUX_PKG_SHA256=42bb5bd4dae1168db652b79a1fd5620ec397e3b79583b809e0be846d5ba7eb0e
 TERMUX_PKG_DEPENDS="atk, cups, dbus, fontconfig, gtk3, krb5, libc++, libevdev, libxkbcommon, libminizip, libnss, libx11, mesa, openssl, pango, pulseaudio, zlib"
 TERMUX_PKG_BUILD_DEPENDS="libffi-static"
 # TODO: Split chromium-common and chromium-headless
@@ -29,10 +29,16 @@ termux_pkg_auto_update() {
 		return 0
 	fi
 
+	local tmpdir="$(mktemp -d)"
+	curl -sLo "${tmpdir}/tmpfile" "https://commondatastorage.googleapis.com/chromium-browser-official/chromium-$latest_version-lite.tar.xz"
+	local sha="$(sha256sum "${tmpdir}/tmpfile" | cut -d ' ' -f 1)"
+	rm -fr "${tmpdir}"
+	printf '%s\n' 'INFO: Generated checksums:' "${sha}"
+
 	local e=0
 	local uptime_now=$(cat /proc/uptime)
 	local uptime_s="${uptime_now//.*}"
-	local uptime_h_limit=4
+	local uptime_h_limit=2
 	local uptime_s_limit=$((uptime_h_limit*60*60))
 	[[ -z "${uptime_s}" ]] && [[ "$(uname -o)" != "Android" ]] && e=1
 	[[ "${uptime_s}" == 0 ]] && [[ "$(uname -o)" != "Android" ]] && e=1
@@ -48,12 +54,6 @@ termux_pkg_auto_update() {
 		EOL
 		return
 	fi
-
-	local tmpdir="$(mktemp -d)"
-	curl -sLo "${tmpdir}/tmpfile" "https://commondatastorage.googleapis.com/chromium-browser-official/chromium-$latest_version-lite.tar.xz"
-	local sha="$(sha256sum "${tmpdir}/tmpfile" | cut -d ' ' -f 1)"
-	rm -fr "${tmpdir}"
-	printf '%s\n' 'INFO: Generated checksums:' "${sha}"
 
 	termux_error_exit "ERROR: current version '${TERMUX_PKG_VERSION}', latest version '${latest_version}'."
 }
@@ -116,11 +116,9 @@ EOF
 	fi
 
 	# Remove termux's dummy pkg-config
-	local _target_pkg_config=$(command -v pkg-config)
-	local _host_pkg_config="$(cat $_target_pkg_config | grep exec | awk '{print $2}')"
 	rm -rf $TERMUX_PKG_CACHEDIR/host-pkg-config-bin
 	mkdir -p $TERMUX_PKG_CACHEDIR/host-pkg-config-bin
-	ln -s $_host_pkg_config $TERMUX_PKG_CACHEDIR/host-pkg-config-bin/pkg-config
+	ln -s /usr/bin/pkg-config "$TERMUX_PKG_CACHEDIR"/host-pkg-config-bin/pkg-config
 	export PATH="$TERMUX_PKG_CACHEDIR/host-pkg-config-bin:$PATH"
 
 	# Install amd64 rootfs
@@ -204,8 +202,6 @@ print(deps['src/third_party/node/node_modules']['objects'][0]['sha256sum'])
 		cp -Rf $TERMUX_PREFIX/include/* usr/include
 		cp -Rf $TERMUX_PREFIX/lib/* usr/lib
 		ln -sf /data ./data
-		# This is needed to build crashpad
-		rm -rf $TERMUX_PREFIX/include/spawn.h
 		# This is needed to build cups
 		cp -Rf $TERMUX_PREFIX/bin/cups-config usr/bin/
 		chmod +x usr/bin/cups-config

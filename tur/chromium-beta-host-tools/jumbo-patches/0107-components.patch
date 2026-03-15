@@ -37,7 +37,6 @@ Enable jumbo build for the following component(s)/source_set(s):
 - //components/guest_view/renderer:renderer
 - //components/history/core/browser:browser
 - //components/history_clusters/core:core
-- //components/history_embeddings:history_embeddings
 - //components/input:input
 - //components/keyed_service/core:core
 - //components/lens:lens
@@ -197,7 +196,6 @@ Enable jumbo build for the following component(s)/source_set(s):
  components/lens/BUILD.gn                      |  3 ++-
  components/leveldb_proto/BUILD.gn             |  3 ++-
  .../internal/proto_leveldb_wrapper.cc         |  6 +++++
- components/live_caption/BUILD.gn              |  3 ++-
  components/lookalikes/core/BUILD.gn           |  7 +++---
  components/media_message_center/BUILD.gn      |  4 +++-
  components/media_router/common/BUILD.gn       |  4 +++-
@@ -1605,22 +1603,6 @@ index a9999a9e5a..2452272f4c 100644
  }  // namespace history_clusters
 +
 +#undef kEngagementScoreCacheSize
-diff --git a/components/history_embeddings/BUILD.gn b/components/history_embeddings/BUILD.gn
-index b065d399c6..3bf087c937 100644
---- a/components/history_embeddings/BUILD.gn
-+++ b/components/history_embeddings/BUILD.gn
-@@ -2,9 +2,10 @@
- # Use of this source code is governed by a BSD-style license that can be
- # found in the LICENSE file.
- 
-+import("//build/config/jumbo.gni")
- import("//components/optimization_guide/features.gni")
- 
--static_library("history_embeddings") {
-+jumbo_static_library("history_embeddings") {
-   sources = [
-     "answerer.cc",
-     "answerer.h",
 diff --git a/components/input/BUILD.gn b/components/input/BUILD.gn
 index cfb2567c72..5f4e4eb7c1 100644
 --- a/components/input/BUILD.gn
@@ -1741,12 +1723,13 @@ diff --git a/components/live_caption/BUILD.gn b/components/live_caption/BUILD.gn
 index 9964868b34..59d654389c 100644
 --- a/components/live_caption/BUILD.gn
 +++ b/components/live_caption/BUILD.gn
-@@ -2,10 +2,11 @@
+@@ -2,11 +2,12 @@
  # Use of this source code is governed by a BSD-style license that can be
  # found in the LICENSE file.
  
 +import("//build/config/jumbo.gni")
  import("//build/config/ui.gni")
+ import("//components/on_device_translation/buildflags/features.gni")
  
  if (!is_android && !is_ios) {
 -  static_library("live_caption") {
@@ -4496,3 +4479,41 @@ index 19c12769fe..1d13789e98 100644
  }  // namespace policy
 +
 +#undef kExtensionInstallKeyCacheFile
+diff --git a/components/policy/core/browser/incognito/incognito_mode_policy_handler.cc b/components/policy/core/browser/incognito/incognito_mode_policy_handler.cc
+index 63df4e3d62..d2e12ef245 100644
+--- a/components/policy/core/browser/incognito/incognito_mode_policy_handler.cc
++++ b/components/policy/core/browser/incognito/incognito_mode_policy_handler.cc
+@@ -18,6 +18,8 @@
+ #include "components/strings/grit/components_strings.h"
+ #include "components/url_matcher/url_util.h"
+ 
++#define ValidateHost ValidateHost_incognito_mode_policy_handler
++
+ namespace {
+ bool IsValidAvailabilityInt(int in_value) {
+   return in_value >= 0 &&
+@@ -233,3 +235,5 @@ IncognitoModePolicyHandler::GetFilteredUrlListPolicyValue(
+ }
+ 
+ }  // namespace policy
++
++#undef ValidateHost
+diff --git a/components/webcrypto/algorithms/chacha20_poly1305.cc b/components/webcrypto/algorithms/chacha20_poly1305.cc
+index 6c1432cafe..d091edc442 100644
+--- a/components/webcrypto/algorithms/chacha20_poly1305.cc
++++ b/components/webcrypto/algorithms/chacha20_poly1305.cc
+@@ -20,6 +20,8 @@
+ #include "third_party/blink/public/platform/web_crypto_key_algorithm.h"
+ #include "third_party/boringssl/src/include/openssl/evp.h"
+ 
++#define SynthesizeImportAlgorithmForClone SynthesizeImportAlgorithmForClone_chacha20_poly1305
++
+ namespace webcrypto {
+ 
+ namespace {
+@@ -229,3 +231,5 @@ CreateChaCha20Poly1305Implementation() {
+ }
+ 
+ }  // namespace webcrypto
++
++#undef SynthesizeImportAlgorithmForClone

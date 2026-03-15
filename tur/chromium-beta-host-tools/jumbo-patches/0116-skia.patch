@@ -523,9 +523,9 @@ index eb5f62a311..35200bdf65 100644
 --- a/third_party/skia/src/gpu/ganesh/GrDirectContext.cpp
 +++ b/third_party/skia/src/gpu/ganesh/GrDirectContext.cpp
 @@ -1229,3 +1229,5 @@ sk_sp<GrDirectContext> GrDirectContext::MakeDirect3D(const GrD3DBackendContext&
+ 
      return direct;
  }
- #endif
 +
 +#undef ASSERT_SINGLE_OWNER
 diff --git a/third_party/skia/src/gpu/ganesh/GrDirectContextPriv.cpp b/third_party/skia/src/gpu/ganesh/GrDirectContextPriv.cpp
