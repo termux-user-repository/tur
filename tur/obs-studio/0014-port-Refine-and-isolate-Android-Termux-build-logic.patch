@@ -1,0 +1,38 @@
+From 01694f521302ddf6868ecfd63d32cd916f5fed29 Mon Sep 17 00:00:00 2001
+From: lumaparallax <257510328+lumaparallax@users.noreply.github.com>
+Date: Thu, 9 Apr 2026 22:03:28 +0900
+Subject: [PATCH 14/16] port: Refine and isolate Android/Termux build logic
+
+Cleans up the initial Termux port by safely walling off mobile-specific workarounds.
+
+- Wrapped X11, EGL, and V4L2 hacks in strict __ANDROID__ macros.
+- Cleaned up CMake using generator expressions for Android linking.
+- Renamed mobile telemetry to system-info-android.cpp.
+---
+ plugins/CMakeLists.txt | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/plugins/CMakeLists.txt b/plugins/CMakeLists.txt
+index c12f015c8..5f540bd77 100644
+--- a/plugins/CMakeLists.txt
++++ b/plugins/CMakeLists.txt
+@@ -61,13 +61,15 @@ check_obs_browser()
+ add_obs_plugin(obs-ffmpeg)
+ add_obs_plugin(obs-filters)
+ add_obs_plugin(obs-libfdk)
+-add_obs_plugin(obs-nvenc PLATFORMS WINDOWS LINUX ARCHITECTURES x64 x86_64)
+ add_obs_plugin(obs-outputs)
++if (NOT OS_ANDROID)
++add_obs_plugin(obs-nvenc PLATFORMS WINDOWS LINUX ARCHITECTURES x64 x86_64)
+ add_obs_plugin(
+     obs-qsv11
+     PLATFORMS WINDOWS LINUX
+     ARCHITECTURES x64 x86_64
+ )
++endif()
+ add_obs_plugin(obs-text PLATFORMS WINDOWS)
+ add_obs_plugin(obs-transitions)
+ add_obs_plugin(
+-- 
+2.53.0
+

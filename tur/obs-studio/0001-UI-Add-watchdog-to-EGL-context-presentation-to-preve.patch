@@ -1,0 +1,31 @@
+From 0f627b725cfeb696aaa0e39d704493226bdb49b9 Mon Sep 17 00:00:00 2001
+From: lumaparallax <257510328+lumaparallax@users.noreply.github.com>
+Date: Fri, 20 Mar 2026 17:18:27 +0900
+Subject: [PATCH 01/16] UI: Add watchdog to EGL context presentation to prevent
+ Termux/X11 segfaults
+
+---
+ libobs-opengl/gl-x11-egl.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/libobs-opengl/gl-x11-egl.c b/libobs-opengl/gl-x11-egl.c
+index a8d1d5d12..d6d66fe4c 100644
+--- a/libobs-opengl/gl-x11-egl.c
++++ b/libobs-opengl/gl-x11-egl.c
+@@ -517,6 +517,13 @@ static void gl_x11_egl_device_load_swapchain(gs_device_t *device, gs_swapchain_t
+ 
+ static void gl_x11_egl_device_present(gs_device_t *device)
+ {
++	struct gl_platform *plat=device->plat;
++	if(!plat || !plat->wi)
++		return;
++	if(!plat || plat->wi->surface== EGL_NO_SURFACE)
++		return;
++	if(eglGetCurrentSurface(EGL_DRAW)!=plat->wi->surface)
++		return;
+ 	Display *display = device->plat->xdisplay;
+ 
+ 	xcb_connection_t *xcb_conn = XGetXCBConnection(display);
+-- 
+2.53.0
+

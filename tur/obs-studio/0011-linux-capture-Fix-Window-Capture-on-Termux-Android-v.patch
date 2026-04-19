@@ -1,0 +1,108 @@
+From cc1415fcdec7a5e7ff77e0b9bb8f881687286fbb Mon Sep 17 00:00:00 2001
+From: lumaparallax <257510328+lumaparallax@users.noreply.github.com>
+Date: Thu, 9 Apr 2026 20:17:26 +0900
+Subject: [PATCH 11/16] linux-capture: Fix Window Capture on Termux/Android via
+ SHM readback
+
+Termux-X11 operates in Android user-space and cannot allocate hardware-backed dma-buf memory for X11 Pixmaps. This causes eglCreateImageKHR to fail with invalid arguments when attempting zero-copy texture imports.
+
+This patch bypasses the EGL hardware binding specifically for Android builds, falling back to a highly optimized MIT-SHM CPU readback loop (similar to xshm-input). This restores full Window Capture functionality without impacting standard Linux desktop builds.
+---
+ plugins/linux-capture/xcomposite-input.c | 50 ++++++++++++++++++++++++
+ 1 file changed, 50 insertions(+)
+
+diff --git a/plugins/linux-capture/xcomposite-input.c b/plugins/linux-capture/xcomposite-input.c
+index 0e86fe443..8b7e0a2ec 100644
+--- a/plugins/linux-capture/xcomposite-input.c
++++ b/plugins/linux-capture/xcomposite-input.c
+@@ -22,6 +22,10 @@
+ #include <util/dstr.h>
+ #include <util/darray.h>
+ 
++#if defined(__ANDROID__)
++#include <xcb/shm.h>
++#endif
++
+ #define WIN_STRING_DIV "\r\n"
+ #define FIND_WINDOW_INTERVAL 2.0
+ 
+@@ -61,6 +65,10 @@ struct xcompcap {
+ 	Pixmap pixmap;
+ 	gs_texture_t *gltex;
+ 
++	#if defined(__ANDROID__)
++	xcb_shm_t *xshm;
++        #endif
++
+ 	pthread_mutex_t lock;
+ 
+ 	bool show_cursor;
+@@ -335,6 +343,12 @@ void xcomp_cleanup_pixmap(Display *disp, struct xcompcap *s)
+ 		gs_texture_destroy(s->gltex);
+ 		s->gltex = 0;
+ 	}
++   #if defined(__ANDROID__)
++	if (s->xshm) {
++		xshm_xcb_detach(s->xshm);
++		s->xshm = NULL;
++	}
++   #endif
+ 
+ 	if (s->pixmap) {
+ 		XFreePixmap(disp, s->pixmap);
+@@ -387,9 +401,19 @@ void xcomp_create_pixmap(xcb_connection_t *conn, struct xcompcap *s, int log_lev
+ 		return;
+ 	}
+ 
++#if defined(__ANDROID__)
++	// TERMUX SHM OPTIMIZATION: Bypass EGL and attach Shared Memory
++	s->xshm = xshm_xcb_attach(conn, s->width, s->height);
++	if (!s->xshm) {
++		blog(LOG_ERROR, "xcompcap: Failed to attach SHM segment");
++	}
++	s->gltex = gs_texture_create(s->width, s->height, GS_BGRA_UNORM, 1, NULL, GS_DYNAMIC);
++#else
++	// STANDARD LINUX: Hardware EGL/GLX Binding
+ 	XErrorHandler prev = XSetErrorHandler(silence_x11_errors);
+ 	s->gltex = gs_texture_create_from_pixmap(s->width, s->height, GS_BGRA_UNORM, GL_TEXTURE_2D, (void *)s->pixmap);
+ 	XSetErrorHandler(prev);
++#endif
+ }
+ 
+ struct reg_item {
+@@ -655,6 +679,32 @@ static void xcompcap_video_tick(void *data, float seconds)
+ 	if (xcompcap_get_height(s) == 0 || xcompcap_get_width(s) == 0)
+ 		goto done;
+ 
++#if defined(__ANDROID__)
++	// TERMUX SHM OPTIMIZATION:
++	// Instruct X server to dump the pixmap directly into our SHM RAM block
++	if (s->gltex && s->pixmap && s->xshm && xcompcap_get_height(s) > 0 && xcompcap_get_width(s) > 0) {
++
++		xcb_shm_get_image_cookie_t img_c = xcb_shm_get_image_unchecked(
++			conn, s->pixmap, 0, 0,
++			s->width, s->height, ~0, XCB_IMAGE_FORMAT_Z_PIXMAP,
++			s->xshm->seg, 0);
++
++		xcb_shm_get_image_reply_t *img_r = xcb_shm_get_image_reply(conn, img_c, NULL);
++
++		if (img_r) {
++			// Upload directly from the shared memory pointer to the GPU
++			gs_texture_set_image(s->gltex, (void *)s->xshm->data, s->width * 4, false);
++			free(img_r);
++		}
++	}
++#endif
++
++	if (!s->gltex)
++		goto done;
++
++	if (xcompcap_get_height(s) == 0 || xcompcap_get_width(s) == 0)
++		goto done;
++
+ 	if (s->show_cursor) {
+ 		xcb_xcursor_update(conn, s->cursor);
+ 
+-- 
+2.53.0
+

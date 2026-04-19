@@ -1,0 +1,670 @@
+From 88e3fa88c86bd5335fbec6939014a6eedb2114cd Mon Sep 17 00:00:00 2001
+From: lumaparallax <257510328+lumaparallax@users.noreply.github.com>
+Date: Fri, 3 Apr 2026 07:45:20 +0900
+Subject: [PATCH 09/16] Plugin: OBS MediaCodec
+
+---
+ plugins/CMakeLists.txt                       |   1 +
+ plugins/linux-v4l2/v4l2-output.c             |   2 +-
+ plugins/obs-mediacodec/CMakeLists.txt        |  36 +++
+ plugins/obs-mediacodec/data/locale/en-US.ini |   9 +
+ plugins/obs-mediacodec/mediacodec-h264.c     | 238 +++++++++++++++++++
+ plugins/obs-mediacodec/mediacodec-hevc.c     | 232 ++++++++++++++++++
+ plugins/obs-mediacodec/obs-mediacodec.c      |  63 +++++
+ plugins/vlc-video/vlc-video-plugin.c         |   2 +-
+ 8 files changed, 581 insertions(+), 2 deletions(-)
+ create mode 100644 plugins/obs-mediacodec/CMakeLists.txt
+ create mode 100644 plugins/obs-mediacodec/data/locale/en-US.ini
+ create mode 100644 plugins/obs-mediacodec/mediacodec-h264.c
+ create mode 100644 plugins/obs-mediacodec/mediacodec-hevc.c
+ create mode 100644 plugins/obs-mediacodec/obs-mediacodec.c
+
+diff --git a/plugins/CMakeLists.txt b/plugins/CMakeLists.txt
+index c12f015c8..9d54269c1 100644
+--- a/plugins/CMakeLists.txt
++++ b/plugins/CMakeLists.txt
+@@ -54,6 +54,7 @@ add_obs_plugin(mac-capture PLATFORMS MACOS)
+ add_obs_plugin(mac-syphon PLATFORMS MACOS)
+ add_obs_plugin(mac-videotoolbox PLATFORMS MACOS)
+ add_obs_plugin(mac-virtualcam PLATFORMS MACOS)
++add_obs_plugin(obs-mediacodec PLATFORMS ANDROID)
+ add_obs_plugin(nv-filters PLATFORMS WINDOWS)
+ 
+ check_obs_browser()
+diff --git a/plugins/linux-v4l2/v4l2-output.c b/plugins/linux-v4l2/v4l2-output.c
+index 16b787cb4..63f6cb874 100644
+--- a/plugins/linux-v4l2/v4l2-output.c
++++ b/plugins/linux-v4l2/v4l2-output.c
+@@ -285,7 +285,7 @@ static bool virtualcam_start(void *data)
+ 
+ 	n = scandir("/dev", &list, scanfilter,
+ #if defined(__linux__)
+-		    versionsort
++		    alphasort
+ #else
+ 		    alphasort
+ #endif
+diff --git a/plugins/obs-mediacodec/CMakeLists.txt b/plugins/obs-mediacodec/CMakeLists.txt
+new file mode 100644
+index 000000000..2285fa060
+--- /dev/null
++++ b/plugins/obs-mediacodec/CMakeLists.txt
+@@ -0,0 +1,36 @@
++cmake_minimum_required(VERSION 3.28...3.30)
++
++option(ENABLE_MEDIACODEC "Build Android MediaCodec Hardware Encoder Plugin" ON)
++
++if(NOT ENABLE_MEDIACODEC)
++  target_disable_feature(obs-mediacodec "Android MediaCodec Hardware Encoder")
++  target_disable(obs-mediacodec)
++  return()
++endif()
++
++# Force Termux/Clang to target API 26 so AMediaCodec_createInputSurface resolves
++add_compile_options(-target aarch64-linux-android26)
++add_link_options(-target aarch64-linux-android26)
++
++add_library(obs-mediacodec MODULE)
++add_library(OBS::mediacodec ALIAS obs-mediacodec)
++
++target_sources(
++  obs-mediacodec
++  PRIVATE
++    obs-mediacodec.c
++    mediacodec-h264.c
++    mediacodec-hevc.c
++)
++
++target_link_libraries(
++  obs-mediacodec
++  PRIVATE
++    OBS::libobs
++    android
++    EGL
++    GLESv2
++    mediandk
++)
++
++set_target_properties_obs(obs-mediacodec PROPERTIES FOLDER plugins/obs-mediacodec PREFIX "")
+diff --git a/plugins/obs-mediacodec/data/locale/en-US.ini b/plugins/obs-mediacodec/data/locale/en-US.ini
+new file mode 100644
+index 000000000..09948f71c
+--- /dev/null
++++ b/plugins/obs-mediacodec/data/locale/en-US.ini
+@@ -0,0 +1,9 @@
++MediaCodecH264="MediaCodec H.264"
++MediaCodecHEVC="MediaCodec HEVC"
++Bitrate="Bitrate (Kbps)"
++KeyframeIntervalSec="Keyframe Interval (seconds)"
++Profile="Profile"
++RateControl="Rate Control"
++ErrorUnsupportedColorFormat="The device hardware encoder does not support the required color format."
++ErrorConfigureFailed="The device hardware encoder failed to configure with the provided settings."
++ErrorStartFailed="The device hardware encoder failed to start."
+diff --git a/plugins/obs-mediacodec/mediacodec-h264.c b/plugins/obs-mediacodec/mediacodec-h264.c
+new file mode 100644
+index 000000000..78a53dfc3
+--- /dev/null
++++ b/plugins/obs-mediacodec/mediacodec-h264.c
+@@ -0,0 +1,238 @@
++#include <obs-module.h>
++#include <media/NdkMediaCodec.h>
++#include <media/NdkMediaFormat.h>
++#include <string.h>
++
++#define COLOR_FormatYUV420SemiPlanar 21
++
++static void mediacodec_h264_destroy(void *data);
++
++struct mediacodec_h264_encoder {
++    obs_encoder_t *encoder;
++    AMediaCodec *codec;
++    AMediaFormat *format;
++
++    int width;
++    int height;
++
++    uint8_t *extra_data;
++    size_t extra_data_size;
++};
++
++// --- UI Hooks ---
++static const char *mediacodec_h264_get_name(void *type_data) {
++    UNUSED_PARAMETER(type_data);
++    return obs_module_text("MediaCodecH264");
++}
++
++static void mediacodec_h264_get_defaults(obs_data_t *settings) {
++    obs_data_set_default_int(settings, "bitrate", 2500);
++    obs_data_set_default_int(settings, "keyint_sec", 2);
++}
++
++static obs_properties_t *mediacodec_h264_get_properties(void *unused) {
++    UNUSED_PARAMETER(unused);
++    obs_properties_t *props = obs_properties_create();
++    obs_properties_add_int(props, "bitrate", obs_module_text("Bitrate (Kbps)"), 50, 100000, 50);
++    obs_properties_add_int(props, "keyint_sec", obs_module_text("Keyframe Interval (s)"), 1, 10, 1);
++    return props;
++}
++
++static bool mediacodec_h264_update(void *data, obs_data_t *settings) {
++    UNUSED_PARAMETER(data);
++    UNUSED_PARAMETER(settings);
++    return true;
++}
++
++// --- Lifecycle ---
++static void *mediacodec_h264_create(obs_data_t *settings, obs_encoder_t *encoder)
++{
++    struct mediacodec_h264_encoder *ctx = bzalloc(sizeof(*ctx));
++    ctx->encoder = encoder;
++
++    video_t *video = obs_encoder_video(encoder);
++    const struct video_output_info *voi = video_output_get_info(video);
++
++    ctx->width = obs_encoder_get_width(encoder);
++    ctx->height = obs_encoder_get_height(encoder);
++    int fps_num = voi->fps_num;
++    int fps_den = voi->fps_den;
++
++    int64_t bitrate = obs_data_get_int(settings, "bitrate") * 1000;
++    int keyint = (int)obs_data_get_int(settings, "keyint_sec");
++
++    blog(LOG_INFO, "[obs-mediacodec] Init H.264 Pro-Tuned (ByteBuffer): %dx%d @ %d fps, %lld bps",
++         ctx->width, ctx->height, fps_num / fps_den, (long long)bitrate);
++
++    ctx->codec = AMediaCodec_createEncoderByType("video/avc");
++    if (!ctx->codec) goto fail;
++
++    ctx->format = AMediaFormat_new();
++    AMediaFormat_setString(ctx->format, "mime", "video/avc");
++    AMediaFormat_setInt32(ctx->format, "width", ctx->width);
++    AMediaFormat_setInt32(ctx->format, "height", ctx->height);
++    AMediaFormat_setInt32(ctx->format, "bitrate", (int32_t)bitrate);
++    AMediaFormat_setInt32(ctx->format, "frame-rate", fps_num / fps_den);
++    AMediaFormat_setInt32(ctx->format, "i-frame-interval", keyint);
++
++    // --- PRO ENCODER TUNING ---
++    AMediaFormat_setInt32(ctx->format, "color-format", COLOR_FormatYUV420SemiPlanar); // NV12
++    AMediaFormat_setInt32(ctx->format, "bitrate-mode", 1);     // 1 = CBR (Constant Bitrate)
++    AMediaFormat_setInt32(ctx->format, "latency", 0);          // Low Latency stream mode
++    AMediaFormat_setInt32(ctx->format, "profile", 8);          // 8 = High Profile (H.264)
++    AMediaFormat_setInt32(ctx->format, "level", 1024);         // Level 4.0
++    AMediaFormat_setInt32(ctx->format, "color-standard", 1);   // BT.709 (Fixes washed out colors)
++    AMediaFormat_setInt32(ctx->format, "color-range", 1);      // Limited range
++    AMediaFormat_setInt32(ctx->format, "color-transfer", 3);   // SDR
++
++    if (AMediaCodec_configure(ctx->codec, ctx->format, NULL, NULL, AMEDIACODEC_CONFIGURE_FLAG_ENCODE) != AMEDIA_OK) {
++        blog(LOG_ERROR, "[obs-mediacodec] AMediaCodec_configure failed");
++        goto fail;
++    }
++
++    if (AMediaCodec_start(ctx->codec) != AMEDIA_OK) {
++        blog(LOG_ERROR, "[obs-mediacodec] AMediaCodec_start failed");
++        goto fail;
++    }
++
++    return ctx;
++
++fail:
++    mediacodec_h264_destroy(ctx);
++    return NULL;
++}
++
++static void mediacodec_h264_destroy(void *data)
++{
++    struct mediacodec_h264_encoder *ctx = data;
++    if (!ctx) return;
++
++    if (ctx->codec) {
++        // Ensure gracefully flushing hardware queues
++        AMediaCodec_flush(ctx->codec);
++        AMediaCodec_stop(ctx->codec);
++        AMediaCodec_delete(ctx->codec);
++    }
++    if (ctx->format) AMediaFormat_delete(ctx->format);
++    if (ctx->extra_data) bfree(ctx->extra_data);
++
++    bfree(ctx);
++    blog(LOG_INFO, "[obs-mediacodec] H.264 Pro-Tuned Encoder destroyed.");
++}
++
++static bool mediacodec_h264_encode(void *data, struct encoder_frame *frame, struct encoder_packet *packet, bool *received_packet)
++{
++    struct mediacodec_h264_encoder *ctx = data;
++    *received_packet = false;
++
++    // ---------------------------------------------------------
++    // 1. Ingest (Optimal NV12 Memcpy handling OBS Padding)
++    // ---------------------------------------------------------
++    ssize_t inIdx = AMediaCodec_dequeueInputBuffer(ctx->codec, 2000);
++    if (inIdx >= 0) {
++        size_t bufSize;
++        uint8_t *inBuf = AMediaCodec_getInputBuffer(ctx->codec, inIdx, &bufSize);
++
++        size_t y_plane_size = ctx->width * ctx->height;
++        size_t uv_plane_size = y_plane_size / 2;
++
++        if (inBuf && bufSize >= (y_plane_size + uv_plane_size)) {
++            uint8_t *dst = inBuf;
++
++            // Y-Plane
++            if (frame->linesize[0] == (uint32_t)ctx->width) {
++                memcpy(dst, frame->data[0], y_plane_size);
++                dst += y_plane_size;
++            } else {
++                for (int i = 0; i < ctx->height; i++) {
++                    memcpy(dst + (i * ctx->width), frame->data[0] + (i * frame->linesize[0]), ctx->width);
++                }
++                dst += y_plane_size;
++            }
++
++            // UV-Plane
++            if (frame->linesize[1] == (uint32_t)ctx->width) {
++                memcpy(dst, frame->data[1], uv_plane_size);
++            } else {
++                for (int i = 0; i < ctx->height / 2; i++) {
++                    memcpy(dst + (i * ctx->width), frame->data[1] + (i * frame->linesize[1]), ctx->width);
++                }
++            }
++
++            AMediaCodec_queueInputBuffer(ctx->codec, inIdx, 0, y_plane_size + uv_plane_size, frame->pts, 0);
++        }
++    }
++
++    // ---------------------------------------------------------
++    // 2. Async Drain Loop
++    // ---------------------------------------------------------
++    AMediaCodecBufferInfo info;
++    ssize_t outIdx;
++
++    // Continuously pull all available packets
++    while ((outIdx = AMediaCodec_dequeueOutputBuffer(ctx->codec, &info, 0)) >= 0) {
++        size_t outSize;
++        uint8_t *outBuf = AMediaCodec_getOutputBuffer(ctx->codec, outIdx, &outSize);
++
++        if (outBuf && info.size > 0) {
++
++            // Trap SPS/PPS headers
++            if (info.flags & AMEDIACODEC_BUFFER_FLAG_CODEC_CONFIG) {
++                if (!ctx->extra_data) {
++                    ctx->extra_data = bmemdup(outBuf + info.offset, info.size);
++                    ctx->extra_data_size = info.size;
++                }
++                // Release and immediately pull the next buffer
++                AMediaCodec_releaseOutputBuffer(ctx->codec, outIdx, false);
++                continue;
++            }
++            // Video Data
++            else {
++                packet->type = OBS_ENCODER_VIDEO;
++                packet->pts = info.presentationTimeUs;
++                packet->dts = info.presentationTimeUs;
++                packet->data = outBuf + info.offset;
++                packet->size = info.size;
++                packet->keyframe = (info.flags & AMEDIACODEC_BUFFER_FLAG_KEY_FRAME) != 0;
++
++                *received_packet = true;
++            }
++        }
++
++        AMediaCodec_releaseOutputBuffer(ctx->codec, outIdx, false);
++        if (*received_packet) break;
++    }
++
++    return true;
++}
++
++// Request NV12 so OBS handles the color space conversions upstream
++static void mediacodec_h264_get_video_info(void *data, struct video_scale_info *info)
++{
++    UNUSED_PARAMETER(data);
++    info->format = VIDEO_FORMAT_NV12;
++}
++
++static bool mediacodec_h264_get_extra_data(void *data, uint8_t **extra_data, size_t *size)
++{
++    struct mediacodec_h264_encoder *ctx = data;
++    if (!ctx->extra_data) return false;
++    *extra_data = ctx->extra_data;
++    *size = ctx->extra_data_size;
++    return true;
++}
++
++struct obs_encoder_info mediacodec_h264_info = {
++    .id             = "mediacodec_h264_hw",
++    .type           = OBS_ENCODER_VIDEO,
++    .codec          = "h264",
++    .get_name       = mediacodec_h264_get_name,
++    .create         = mediacodec_h264_create,
++    .destroy        = mediacodec_h264_destroy,
++    .encode         = mediacodec_h264_encode,
++    .get_video_info = mediacodec_h264_get_video_info,
++    .get_extra_data = mediacodec_h264_get_extra_data,
++    .update         = mediacodec_h264_update,
++    .get_defaults   = mediacodec_h264_get_defaults,
++    .get_properties = mediacodec_h264_get_properties,
++};
+diff --git a/plugins/obs-mediacodec/mediacodec-hevc.c b/plugins/obs-mediacodec/mediacodec-hevc.c
+new file mode 100644
+index 000000000..7dba9ed38
+--- /dev/null
++++ b/plugins/obs-mediacodec/mediacodec-hevc.c
+@@ -0,0 +1,232 @@
++#include <obs-module.h>
++#include <media/NdkMediaCodec.h>
++#include <media/NdkMediaFormat.h>
++#include <string.h>
++
++#define COLOR_FormatYUV420SemiPlanar 21
++
++static void mediacodec_hevc_destroy(void *data);
++
++struct mediacodec_hevc_encoder {
++    obs_encoder_t *encoder;
++    AMediaCodec *codec;
++    AMediaFormat *format;
++
++    int width;
++    int height;
++
++    uint8_t *extra_data;
++    size_t extra_data_size;
++};
++
++// --- UI Hooks ---
++static const char *mediacodec_hevc_get_name(void *type_data) {
++    UNUSED_PARAMETER(type_data);
++    return obs_module_text("MediaCodecHEVC");
++}
++
++static void mediacodec_hevc_get_defaults(obs_data_t *settings) {
++    obs_data_set_default_int(settings, "bitrate", 2500);
++    obs_data_set_default_int(settings, "keyint_sec", 2);
++}
++
++static obs_properties_t *mediacodec_hevc_get_properties(void *unused) {
++    UNUSED_PARAMETER(unused);
++    obs_properties_t *props = obs_properties_create();
++    obs_properties_add_int(props, "bitrate", obs_module_text("Bitrate (Kbps)"), 50, 100000, 50);
++    obs_properties_add_int(props, "keyint_sec", obs_module_text("Keyframe Interval (s)"), 1, 10, 1);
++    return props;
++}
++
++static bool mediacodec_hevc_update(void *data, obs_data_t *settings) {
++    UNUSED_PARAMETER(data);
++    UNUSED_PARAMETER(settings);
++    return true;
++}
++
++// --- Lifecycle ---
++static void *mediacodec_hevc_create(obs_data_t *settings, obs_encoder_t *encoder)
++{
++    struct mediacodec_hevc_encoder *ctx = bzalloc(sizeof(*ctx));
++    ctx->encoder = encoder;
++
++    video_t *video = obs_encoder_video(encoder);
++    const struct video_output_info *voi = video_output_get_info(video);
++
++    ctx->width = obs_encoder_get_width(encoder);
++    ctx->height = obs_encoder_get_height(encoder);
++    int fps_num = voi->fps_num;
++    int fps_den = voi->fps_den;
++
++    int64_t bitrate = obs_data_get_int(settings, "bitrate") * 1000;
++    int keyint = (int)obs_data_get_int(settings, "keyint_sec");
++
++    blog(LOG_INFO, "[obs-mediacodec] Init HEVC Pro-Tuned (ByteBuffer): %dx%d @ %d fps, %lld bps",
++         ctx->width, ctx->height, fps_num / fps_den, (long long)bitrate);
++
++    // CRITICAL: Change MIME type to HEVC
++    ctx->codec = AMediaCodec_createEncoderByType("video/hevc");
++    if (!ctx->codec) goto fail;
++
++    ctx->format = AMediaFormat_new();
++    AMediaFormat_setString(ctx->format, "mime", "video/hevc");
++    AMediaFormat_setInt32(ctx->format, "width", ctx->width);
++    AMediaFormat_setInt32(ctx->format, "height", ctx->height);
++    AMediaFormat_setInt32(ctx->format, "bitrate", (int32_t)bitrate);
++    AMediaFormat_setInt32(ctx->format, "frame-rate", fps_num / fps_den);
++    AMediaFormat_setInt32(ctx->format, "i-frame-interval", keyint);
++
++    // --- PRO ENCODER TUNING ---
++    AMediaFormat_setInt32(ctx->format, "color-format", COLOR_FormatYUV420SemiPlanar); // NV12
++    AMediaFormat_setInt32(ctx->format, "bitrate-mode", 1);     // 1 = CBR (Constant Bitrate)
++    AMediaFormat_setInt32(ctx->format, "latency", 0);          // Low Latency stream mode
++
++    // HEVC Tuning: 1 = Main Profile (Safest for Android hardware)
++    AMediaFormat_setInt32(ctx->format, "profile", 1);
++
++    AMediaFormat_setInt32(ctx->format, "color-standard", 1);   // BT.709
++    AMediaFormat_setInt32(ctx->format, "color-range", 1);      // Limited range
++    AMediaFormat_setInt32(ctx->format, "color-transfer", 3);   // SDR
++
++    if (AMediaCodec_configure(ctx->codec, ctx->format, NULL, NULL, AMEDIACODEC_CONFIGURE_FLAG_ENCODE) != AMEDIA_OK) {
++        blog(LOG_ERROR, "[obs-mediacodec] AMediaCodec_configure failed for HEVC");
++        goto fail;
++    }
++
++    if (AMediaCodec_start(ctx->codec) != AMEDIA_OK) {
++        blog(LOG_ERROR, "[obs-mediacodec] AMediaCodec_start failed for HEVC");
++        goto fail;
++    }
++
++    return ctx;
++
++fail:
++    mediacodec_hevc_destroy(ctx);
++    return NULL;
++}
++
++static void mediacodec_hevc_destroy(void *data)
++{
++    struct mediacodec_hevc_encoder *ctx = data;
++    if (!ctx) return;
++
++    if (ctx->codec) {
++        AMediaCodec_flush(ctx->codec);
++        AMediaCodec_stop(ctx->codec);
++        AMediaCodec_delete(ctx->codec);
++    }
++    if (ctx->format) AMediaFormat_delete(ctx->format);
++    if (ctx->extra_data) bfree(ctx->extra_data);
++
++    bfree(ctx);
++    blog(LOG_INFO, "[obs-mediacodec] HEVC Pro-Tuned Encoder destroyed.");
++}
++
++static bool mediacodec_hevc_encode(void *data, struct encoder_frame *frame, struct encoder_packet *packet, bool *received_packet)
++{
++    struct mediacodec_hevc_encoder *ctx = data;
++    *received_packet = false;
++
++    // 1. Ingest (Optimal NV12 Memcpy)
++    ssize_t inIdx = AMediaCodec_dequeueInputBuffer(ctx->codec, 2000);
++    if (inIdx >= 0) {
++        size_t bufSize;
++        uint8_t *inBuf = AMediaCodec_getInputBuffer(ctx->codec, inIdx, &bufSize);
++
++        size_t y_plane_size = ctx->width * ctx->height;
++        size_t uv_plane_size = y_plane_size / 2;
++
++        if (inBuf && bufSize >= (y_plane_size + uv_plane_size)) {
++            uint8_t *dst = inBuf;
++
++            // Y-Plane
++            if (frame->linesize[0] == (uint32_t)ctx->width) {
++                memcpy(dst, frame->data[0], y_plane_size);
++                dst += y_plane_size;
++            } else {
++                for (int i = 0; i < ctx->height; i++) {
++                    memcpy(dst + (i * ctx->width), frame->data[0] + (i * frame->linesize[0]), ctx->width);
++                }
++                dst += y_plane_size;
++            }
++
++            // UV-Plane
++            if (frame->linesize[1] == (uint32_t)ctx->width) {
++                memcpy(dst, frame->data[1], uv_plane_size);
++            } else {
++                for (int i = 0; i < ctx->height / 2; i++) {
++                    memcpy(dst + (i * ctx->width), frame->data[1] + (i * frame->linesize[1]), ctx->width);
++                }
++            }
++
++            AMediaCodec_queueInputBuffer(ctx->codec, inIdx, 0, y_plane_size + uv_plane_size, frame->pts, 0);
++        }
++    }
++
++    // 2. Async Drain Loop
++    AMediaCodecBufferInfo info;
++    ssize_t outIdx;
++
++    while ((outIdx = AMediaCodec_dequeueOutputBuffer(ctx->codec, &info, 0)) >= 0) {
++        size_t outSize;
++        uint8_t *outBuf = AMediaCodec_getOutputBuffer(ctx->codec, outIdx, &outSize);
++
++        if (outBuf && info.size > 0) {
++
++            // Trap VPS/SPS/PPS headers for HEVC
++            if (info.flags & AMEDIACODEC_BUFFER_FLAG_CODEC_CONFIG) {
++                if (!ctx->extra_data) {
++                    ctx->extra_data = bmemdup(outBuf + info.offset, info.size);
++                    ctx->extra_data_size = info.size;
++                }
++                AMediaCodec_releaseOutputBuffer(ctx->codec, outIdx, false);
++                continue;
++            }
++            else {
++                packet->type = OBS_ENCODER_VIDEO;
++                packet->pts = info.presentationTimeUs;
++                packet->dts = info.presentationTimeUs;
++                packet->data = outBuf + info.offset;
++                packet->size = info.size;
++                packet->keyframe = (info.flags & AMEDIACODEC_BUFFER_FLAG_KEY_FRAME) != 0;
++
++                *received_packet = true;
++            }
++        }
++
++        AMediaCodec_releaseOutputBuffer(ctx->codec, outIdx, false);
++        if (*received_packet) break;
++    }
++
++    return true;
++}
++
++static void mediacodec_hevc_get_video_info(void *data, struct video_scale_info *info)
++{
++    UNUSED_PARAMETER(data);
++    info->format = VIDEO_FORMAT_NV12;
++}
++
++static bool mediacodec_hevc_get_extra_data(void *data, uint8_t **extra_data, size_t *size)
++{
++    struct mediacodec_hevc_encoder *ctx = data;
++    if (!ctx->extra_data) return false;
++    *extra_data = ctx->extra_data;
++    *size = ctx->extra_data_size;
++    return true;
++}
++
++struct obs_encoder_info mediacodec_hevc_info = {
++    .id             = "mediacodec_hevc_hw",
++    .type           = OBS_ENCODER_VIDEO,
++    .codec          = "hevc", // Critical: Tells OBS muxer to treat this as H.265
++    .get_name       = mediacodec_hevc_get_name,
++    .create         = mediacodec_hevc_create,
++    .destroy        = mediacodec_hevc_destroy,
++    .encode         = mediacodec_hevc_encode,
++    .get_video_info = mediacodec_hevc_get_video_info,
++    .get_extra_data = mediacodec_hevc_get_extra_data,
++    .update         = mediacodec_hevc_update,
++    .get_defaults   = mediacodec_hevc_get_defaults,
++    .get_properties = mediacodec_hevc_get_properties,
++};
+diff --git a/plugins/obs-mediacodec/obs-mediacodec.c b/plugins/obs-mediacodec/obs-mediacodec.c
+new file mode 100644
+index 000000000..437785a4a
+--- /dev/null
++++ b/plugins/obs-mediacodec/obs-mediacodec.c
+@@ -0,0 +1,63 @@
++#include <obs-module.h>
++#include <media/NdkMediaCodec.h>
++
++OBS_DECLARE_MODULE()
++OBS_MODULE_USE_DEFAULT_LOCALE("obs-mediacodec", "en-US")
++
++MODULE_EXPORT const char *obs_module_name(void)
++{
++    return "Android MediaCodec HW Encoders";
++}
++
++MODULE_EXPORT const char *obs_module_description(void)
++{
++    return "Hardware encoding via Android NDK MediaCodec";
++}
++
++// Extern pointing to our specific H.264 implementation (which we will write next)
++extern struct obs_encoder_info mediacodec_h264_info;
++extern struct obs_encoder_info mediacodec_hevc_info;
++
++// Uncomment these later when we create the HEVC and AV1 .c files
++// extern struct obs_encoder_info mediacodec_av1_info;
++
++bool obs_module_load(void)
++{
++    blog(LOG_INFO, "[obs-mediacodec] Probing Android NDK for Hardware Encoders...");
++
++    // 1. Probe for Hardware H.264 (AVC)
++    AMediaCodec *h264_test = AMediaCodec_createEncoderByType("video/avc");
++    if (h264_test != NULL) {
++        blog(LOG_INFO, "[obs-mediacodec] HW H.264 (video/avc) supported! Registering.");
++        obs_register_encoder(&mediacodec_h264_info);
++
++        // Clean up our test pointer instantly
++        AMediaCodec_delete(h264_test);
++    } else {
++        blog(LOG_INFO, "[obs-mediacodec] HW H.264 NOT supported by device.");
++    }
++
++
++    // 2. Probe for Hardware HEVC (H.265)
++    AMediaCodec *hevc_test = AMediaCodec_createEncoderByType("video/hevc");
++    if (hevc_test != NULL) {
++        blog(LOG_INFO, "[obs-mediacodec] HW HEVC (video/hevc) supported! Registering.");
++        obs_register_encoder(&mediacodec_hevc_info);
++        AMediaCodec_delete(hevc_test);
++    } else {
++        blog(LOG_INFO, "[obs-mediacodec] HW HEVC NOT supported by device.");
++    }
++/*
++    // 3. Probe for Hardware AV1
++    AMediaCodec *av1_test = AMediaCodec_createEncoderByType("video/av01");
++    if (av1_test != NULL) {
++        blog(LOG_INFO, "[obs-mediacodec] HW AV1 (video/av01) supported! Registering.");
++        obs_register_encoder(&mediacodec_av1_info);
++        AMediaCodec_delete(av1_test);
++    } else {
++        blog(LOG_INFO, "[obs-mediacodec] HW AV1 NOT supported by device.");
++    }
++    */
++
++    return true;
++}
+diff --git a/plugins/vlc-video/vlc-video-plugin.c b/plugins/vlc-video/vlc-video-plugin.c
+index d92397538..4f7e24faa 100644
+--- a/plugins/vlc-video/vlc-video-plugin.c
++++ b/plugins/vlc-video/vlc-video-plugin.c
+@@ -188,7 +188,7 @@ static bool load_libvlc_module(void)
+ 	if (!libvlc_core_module)
+ 		return false;
+ #else
+-#define LIBVLC_FILE "libvlc.so.5"
++#define LIBVLC_FILE "libvlc.so"
+ #endif
+ 	libvlc_module = os_dlopen(LIBVLC_FILE);
+ 
+-- 
+2.53.0
+

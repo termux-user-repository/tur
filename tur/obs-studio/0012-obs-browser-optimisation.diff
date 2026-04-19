@@ -1,0 +1,39 @@
+From 435ced72f3864bae0756b2d5bb0a455a361cdb3d Mon Sep 17 00:00:00 2001
+From: lumaparallax <257510328+lumaparallax@users.noreply.github.com>
+Date: Thu, 9 Apr 2026 20:20:50 +0900
+Subject: [PATCH] obs-browser: Add Termux sandbox and GPU flags
+
+---
+ browser-app.cpp | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+
+diff --git a/browser-app.cpp b/browser-app.cpp
+index 5d2c4dc..0ad2f7a 100644
+--- a/browser-app.cpp
++++ b/browser-app.cpp
+@@ -92,6 +92,22 @@ void BrowserApp::OnBeforeCommandLineProcessing(const CefString &, CefRefPtr<CefC
+ 	}
+ 
+ 	command_line->AppendSwitchWithValue("autoplay-policy", "no-user-gesture-required");
++
++#ifdef __ANDROID__
++	// TERMUX OPTIMIZATIONS & FIXES
++
++	// 1. Termux Sandbox & Security Fixes
++	command_line->AppendSwitch("no-sandbox");
++	command_line->AppendSwitchWithValue("password-store", "basic");
++
++	// 2. Permissive GPU Flags (Optimizes internal Turnip/Zink rendering before RAM handoff)
++	command_line->AppendSwitch("ignore-gpu-blocklist");
++	command_line->AppendSwitch("disable-gpu-sandbox");
++	command_line->AppendSwitchWithValue("use-gl", "angle");
++	command_line->AppendSwitchWithValue("use-angle", "gles");
++
++#endif
++
+ #ifdef __APPLE__
+ 	command_line->AppendSwitch("use-mock-keychain");
+ #elif !defined(_WIN32)
+-- 
+2.53.0
+

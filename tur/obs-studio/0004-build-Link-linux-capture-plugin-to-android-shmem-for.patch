@@ -1,0 +1,26 @@
+From f0eb72d41b5571bb38be94aad955fe31a3293638 Mon Sep 17 00:00:00 2001
+From: lumaparallax <257510328+lumaparallax@users.noreply.github.com>
+Date: Fri, 20 Mar 2026 19:43:24 +0900
+Subject: [PATCH 04/16] build: Link linux-capture plugin to android-shmem for
+ XSHM screen capture
+
+---
+ plugins/linux-capture/CMakeLists.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/plugins/linux-capture/CMakeLists.txt b/plugins/linux-capture/CMakeLists.txt
+index 5a504c0e4..422788c40 100644
+--- a/plugins/linux-capture/CMakeLists.txt
++++ b/plugins/linux-capture/CMakeLists.txt
+@@ -25,7 +25,7 @@ target_sources(
+ 
+ target_link_libraries(
+   linux-capture
+-  PRIVATE OBS::libobs OBS::glad X11::X11 XCB::XCB XCB::XFIXES XCB::RANDR XCB::SHM XCB::XINERAMA XCB::COMPOSITE
++  PRIVATE OBS::libobs OBS::glad X11::X11 XCB::XCB XCB::XFIXES XCB::RANDR XCB::SHM XCB::XINERAMA XCB::COMPOSITE android-shmem
+ )
+ 
+ set_target_properties_obs(linux-capture PROPERTIES FOLDER plugins PREFIX "")
+-- 
+2.53.0
+

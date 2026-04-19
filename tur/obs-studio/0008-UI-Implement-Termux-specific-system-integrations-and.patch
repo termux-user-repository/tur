@@ -1,0 +1,249 @@
+From c1fa2278d7e7bf172fc218b89ab766b836221a37 Mon Sep 17 00:00:00 2001
+From: lumaparallax <257510328+lumaparallax@users.noreply.github.com>
+Date: Tue, 31 Mar 2026 01:59:28 +0900
+Subject: [PATCH 08/16] UI: Implement Termux-specific system integrations and
+ overrides
+
+- frontend/oauth: Implemented local file fallback for Twitch and YouTube
+  API keys (~/.config/obs-studio/*). Bypasses the need for official
+  obfuscated build keys.
+- frontend/widgets: Replaced QDesktopServices::openUrl with a custom
+  TermuxOpenUrl() shell execution (xdg-open). Bypasses Qt D-Bus
+  dependencies which are unavailable in the Termux environment.
+- frontend/OBSApp.cpp: Disabled browser hardware acceleration by default
+  to prevent GL context crashes on mobile drivers.
+- frontend/cmake: Integrated custom system-info-termux.cpp to bypass
+  SELinux PCI-bus scanning restrictions and adjusted Qt/Libpci linking.
+---
+ frontend/OBSApp.cpp                        |  2 +-
+ frontend/cmake/os-linux.cmake              |  2 +-
+ frontend/oauth/TwitchAuth.cpp              | 21 +++++++++++++---
+ frontend/oauth/YoutubeAuth.cpp             | 26 ++++++++++++++++---
+ frontend/widgets/OBSBasic_MainControls.cpp | 29 ++++++++++++++++++----
+ 5 files changed, 65 insertions(+), 15 deletions(-)
+
+diff --git a/frontend/OBSApp.cpp b/frontend/OBSApp.cpp
+index 6ade93c5d..cce353cad 100644
+--- a/frontend/OBSApp.cpp
++++ b/frontend/OBSApp.cpp
+@@ -316,7 +316,7 @@ bool OBSApp::InitGlobalConfigDefaults()
+ #endif
+ 
+ #if defined(_WIN32) || defined(__APPLE__) || defined(__linux__)
+-	config_set_default_bool(appConfig, "General", "BrowserHWAccel", true);
++	config_set_default_bool(appConfig, "General", "BrowserHWAccel", false);
+ #endif
+ 
+ #ifdef __APPLE__
+diff --git a/frontend/cmake/os-linux.cmake b/frontend/cmake/os-linux.cmake
+index b43a9b8a8..c0dc513a3 100644
+--- a/frontend/cmake/os-linux.cmake
++++ b/frontend/cmake/os-linux.cmake
+@@ -14,7 +14,7 @@ target_compile_definitions(
+ find_package(Qt6 REQUIRED COMPONENTS GuiPrivate)
+ target_link_libraries(obs-studio PRIVATE Qt::GuiPrivate Qt::DBus)
+ 
+-if(Qt6_VERSION AND Qt6_VERSION VERSION_LESS "6.9.0")
++if(Qt6_VERSION AND Qt6_VERSION VERSION_LESS "6.12")
+   target_link_libraries(obs-studio PRIVATE Qt::GuiPrivate)
+ endif()
+ 
+diff --git a/frontend/oauth/TwitchAuth.cpp b/frontend/oauth/TwitchAuth.cpp
+index 3b35e7291..05e62626e 100644
+--- a/frontend/oauth/TwitchAuth.cpp
++++ b/frontend/oauth/TwitchAuth.cpp
+@@ -9,6 +9,9 @@
+ #include <qt-wrappers.hpp>
+ #include <ui-config.h>
+ 
++#include <fstream>
++#include <cstdlib>
++
+ #include <QUuid>
+ 
+ #include "moc_TwitchAuth.cpp"
+@@ -27,6 +30,16 @@ using namespace json11;
+ #define TWITCH_STATS_DOCK_NAME "twitchStats"
+ #define TWITCH_FEED_DOCK_NAME "twitchFeed"
+ 
++static std::string GetTermuxTwitchKey() {
++    const char* home = getenv("HOME");
++    if (home) {
++        std::ifstream in(std::string(home) + "/.config/obs-studio/twitch_key.txt");
++        std::string key;
++        if (in >> key) return key; // Reads the first word (the key)
++    }
++    return "bring_your_own_key";
++}
++
+ static Auth::Def twitchDef = {"Twitch", Auth::Type::OAuth_StreamKey};
+ 
+ /* ------------------------------------------------------------------------- */
+@@ -61,7 +74,7 @@ TwitchAuth::~TwitchAuth()
+ 
+ bool TwitchAuth::MakeApiRequest(const char *path, Json &json_out)
+ {
+-	std::string client_id = TWITCH_CLIENTID;
++	std::string client_id = GetTermuxTwitchKey();
+ 	deobfuscate_str(&client_id[0], TWITCH_HASH);
+ 
+ 	std::string url = "https://api.twitch.tv/helix/";
+@@ -111,7 +124,7 @@ bool TwitchAuth::MakeApiRequest(const char *path, Json &json_out)
+ 
+ bool TwitchAuth::GetChannelInfo()
+ try {
+-	std::string client_id = TWITCH_CLIENTID;
++	std::string client_id = GetTermuxTwitchKey();
+ 	deobfuscate_str(&client_id[0], TWITCH_HASH);
+ 
+ 	if (!GetToken(TWITCH_TOKEN_URL, client_id, TWITCH_SCOPE_VERSION))
+@@ -438,7 +451,7 @@ bool TwitchAuth::RetryLogin()
+ 	}
+ 
+ 	std::shared_ptr<TwitchAuth> auth = std::make_shared<TwitchAuth>(twitchDef);
+-	std::string client_id = TWITCH_CLIENTID;
++	std::string client_id = GetTermuxTwitchKey();
+ 	deobfuscate_str(&client_id[0], TWITCH_HASH);
+ 
+ 	return GetToken(TWITCH_TOKEN_URL, client_id, TWITCH_SCOPE_VERSION, QT_TO_UTF8(login.GetCode()), true);
+@@ -453,7 +466,7 @@ std::shared_ptr<Auth> TwitchAuth::Login(QWidget *parent, const std::string &)
+ 
+ 	std::shared_ptr<TwitchAuth> auth = std::make_shared<TwitchAuth>(twitchDef);
+ 
+-	std::string client_id = TWITCH_CLIENTID;
++	std::string client_id = GetTermuxTwitchKey();
+ 	deobfuscate_str(&client_id[0], TWITCH_HASH);
+ 
+ 	if (!auth->GetToken(TWITCH_TOKEN_URL, client_id, TWITCH_SCOPE_VERSION, QT_TO_UTF8(login.GetCode()))) {
+diff --git a/frontend/oauth/YoutubeAuth.cpp b/frontend/oauth/YoutubeAuth.cpp
+index 399cab11c..7a2e11cba 100644
+--- a/frontend/oauth/YoutubeAuth.cpp
++++ b/frontend/oauth/YoutubeAuth.cpp
+@@ -14,6 +14,9 @@
+ #include <QDesktopServices>
+ #include <QRandomGenerator>
+ 
++#include <fstream>
++#include <cstdlib>
++
+ #include "moc_YoutubeAuth.cpp"
+ 
+ #define YOUTUBE_AUTH_URL "https://accounts.google.com/o/oauth2/v2/auth"
+@@ -27,6 +30,21 @@
+ 
+ #define YOUTUBE_CHAT_DOCK_NAME "ytChat"
+ 
++static std::string GetTermuxYTKey(int line_number) {
++    const char* home = getenv("HOME");
++    if (home) {
++        std::ifstream in(std::string(home) + "/.config/obs-studio/youtube_keys.txt");
++        std::string line;
++        for(int i = 0; i < line_number; ++i) {
++            std::getline(in, line);
++        }
++        // Trim whitespace
++        line.erase(line.find_last_not_of(" \n\r\t") + 1);
++        if (!line.empty()) return line;
++    }
++    return "bring_your_own_key";
++}
++
+ static const char allowedChars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+ static const int allowedCount = static_cast<int>(sizeof(allowedChars) - 1);
+ /* ------------------------------------------------------------------------- */
+@@ -217,10 +235,10 @@ std::shared_ptr<Auth> YoutubeAuth::Login(QWidget *owner, const std::string &serv
+ 	dlg.setWindowFlags(dlg.windowFlags() & ~Qt::WindowCloseButtonHint);
+ 	dlg.setWindowTitle(QTStr("YouTube.Auth.WaitingAuth.Title"));
+ 
+-	std::string clientid = YOUTUBE_CLIENTID;
+-	std::string secret = YOUTUBE_SECRET;
+-	deobfuscate_str(&clientid[0], YOUTUBE_CLIENTID_HASH);
+-	deobfuscate_str(&secret[0], YOUTUBE_SECRET_HASH);
++	std::string clientid = GetTermuxYTKey(1);
++	std::string secret = GetTermuxYTKey(2);
++//	deobfuscate_str(&clientid[0], YOUTUBE_CLIENTID_HASH);
++//	deobfuscate_str(&secret[0], YOUTUBE_SECRET_HASH);
+ 
+ 	QString state;
+ 	state = auth->GenerateState();
+diff --git a/frontend/widgets/OBSBasic_MainControls.cpp b/frontend/widgets/OBSBasic_MainControls.cpp
+index 6207cd0fb..8a7009ed5 100644
+--- a/frontend/widgets/OBSBasic_MainControls.cpp
++++ b/frontend/widgets/OBSBasic_MainControls.cpp
+@@ -49,6 +49,9 @@
+ 
+ #include <QDesktopServices>
+ 
++#include <cstdlib>
++#include <string>
++
+ #ifdef _WIN32
+ #include <sstream>
+ #endif
+@@ -68,6 +71,17 @@ using namespace std;
+ using LogUploadDialog = OBS::LogUploadDialog;
+ using LogUploadType = OBS::LogFileType;
+ 
++static void TermuxOpenUrl(const QUrl &url) {
++    // Convert the Qt URL into a standard string
++    std::string urlStr = url.toString().toStdString();
++
++    // Build a raw shell command using our custom script
++    std::string cmd = "xdg-open \"" + urlStr + "\" &";
++
++    // Force the OS to execute it directly, bypassing Qt's D-Bus
++    system(cmd.c_str());
++}
++
+ void OBSBasic::CreateInteractionWindow(obs_source_t *source)
+ {
+ 	bool closed = true;
+@@ -301,7 +315,8 @@ void OBSBasic::on_actionShowLogs_triggered()
+ 		return;
+ 
+ 	QUrl url = QUrl::fromLocalFile(QT_UTF8(logDir));
+-	QDesktopServices::openUrl(url);
++//	QDesktopServices::openUrl(url);
++        TermuxOpenUrl(url);
+ }
+ 
+ void OBSBasic::on_actionUploadCurrentLog_triggered()
+@@ -402,19 +417,22 @@ void OBSBasic::logUploadFinished(const QString &text, const QString &error, LogU
+ void OBSBasic::on_actionHelpPortal_triggered()
+ {
+ 	QUrl url = QUrl("https://obsproject.com/help", QUrl::TolerantMode);
+-	QDesktopServices::openUrl(url);
++//	QDesktopServices::openUrl(url);
++        TermuxOpenUrl(url);
+ }
+ 
+ void OBSBasic::on_actionWebsite_triggered()
+ {
+ 	QUrl url = QUrl("https://obsproject.com", QUrl::TolerantMode);
+-	QDesktopServices::openUrl(url);
++//	QDesktopServices::openUrl(url);
++	TermuxOpenUrl(url);
+ }
+ 
+ void OBSBasic::on_actionDiscord_triggered()
+ {
+ 	QUrl url = QUrl("https://obsproject.com/discord", QUrl::TolerantMode);
+-	QDesktopServices::openUrl(url);
++//	QDesktopServices::openUrl(url);
++	TermuxOpenUrl(url);
+ }
+ 
+ void OBSBasic::on_actionShowWhatsNew_triggered()
+@@ -439,7 +457,8 @@ void OBSBasic::on_actionReleaseNotes_triggered()
+ {
+ 	QString addr("https://github.com/obsproject/obs-studio/releases");
+ 	QUrl url(QString("%1/%2").arg(addr, obs_get_version_string()), QUrl::TolerantMode);
+-	QDesktopServices::openUrl(url);
++//	QDesktopServices::openUrl(url);
++	TermuxOpenUrl(url);
+ }
+ 
+ void OBSBasic::on_actionShowSettingsFolder_triggered()
+-- 
+2.53.0
+

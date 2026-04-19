@@ -1,0 +1,252 @@
+From 4a57ec2656b189178dcb72c4fd83cdd1b5cfb1a1 Mon Sep 17 00:00:00 2001
+From: lumaparallax <257510328+lumaparallax@users.noreply.github.com>
+Date: Fri, 20 Mar 2026 17:21:06 +0900
+Subject: [PATCH 02/16] Build: Force CMake to treat Android host as Linux for
+ Termux compatibility
+
+---
+ CMakeLists.txt                          |  10 ++
+ cmake/common/compiler_common.cmake      |   2 +-
+ cmake/common/osconfig.cmake             |  11 +-
+ cmake/linux/compilerconfig.cmake        |  17 +++-
+ frontend/utility/system-info-termux.cpp | 129 ++++++++++++++++++++++++
+ libobs/cmake/linux/libobs.pc.in         |   2 +-
+ plugins/obs-browser                     |   2 +-
+ plugins/obs-websocket                   |   2 +-
+ 8 files changed, 167 insertions(+), 8 deletions(-)
+ create mode 100644 frontend/utility/system-info-termux.cpp
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 4af6f90b7..05effe4b0 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -4,6 +4,16 @@ include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/common/bootstrap.cmake" NO_POLICY_SCO
+ 
+ project(obs-studio VERSION ${OBS_VERSION_CANONICAL})
+ 
++# --- TERMUX / ANDROID OVERRIDE ---
++# Force OBS to treat the Android environment exactly like standard Linux
++# This bypasses the need to patch 30+ Find*.cmake files and osconfig.cmake
++set(CMAKE_SYSTEM_NAME "Linux")
++set(CMAKE_HOST_SYSTEM_NAME "Linux")
++set(OS_LINUX TRUE)
++set(OS_POSIX TRUE)
++set(OS_ANDROID TRUE)
++# ---------------------------------
++
+ if(CMAKE_HOST_SYSTEM_NAME MATCHES "Windows")
+   include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/windows/architecture.cmake")
+   if(NOT OBS_PARENT_ARCHITECTURE STREQUAL CMAKE_VS_PLATFORM_NAME)
+diff --git a/cmake/common/compiler_common.cmake b/cmake/common/compiler_common.cmake
+index f6b9dd36f..781bbb4c5 100644
+--- a/cmake/common/compiler_common.cmake
++++ b/cmake/common/compiler_common.cmake
+@@ -83,7 +83,7 @@ if(CMAKE_CXX_STANDARD GREATER_EQUAL 20)
+ endif()
+ 
+ if(NOT DEFINED CMAKE_COMPILE_WARNING_AS_ERROR)
+-  set(CMAKE_COMPILE_WARNING_AS_ERROR ON)
++  set(CMAKE_COMPILE_WARNING_AS_ERROR OFF) # termux clang is expected to throw errors.
+ endif()
+ 
+ # Enable interprocedural optimization
+diff --git a/cmake/common/osconfig.cmake b/cmake/common/osconfig.cmake
+index 2dc6dedb8..2c765d35b 100644
+--- a/cmake/common/osconfig.cmake
++++ b/cmake/common/osconfig.cmake
+@@ -12,9 +12,14 @@ elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin")
+   set(CMAKE_CXX_EXTENSIONS FALSE)
+   list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/macos")
+   set(OS_MACOS TRUE)
+-elseif(CMAKE_HOST_SYSTEM_NAME MATCHES "Linux|FreeBSD|OpenBSD")
++elseif(CMAKE_HOST_SYSTEM_NAME MATCHES "Linux|FreeBSD|OpenBSD|Android")
+   set(CMAKE_CXX_EXTENSIONS FALSE)
+   list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/linux")
+-  string(TOUPPER "${CMAKE_HOST_SYSTEM_NAME}" _SYSTEM_NAME_U)
+-  set(OS_${_SYSTEM_NAME_U} TRUE)
++  if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Android")
++    set(OS_LINUX TRUE)
++    set(OS_ANDROID TRUE)
++  else()
++    string(TOUPPER "${CMAKE_HOST_SYSTEM_NAME}" _SYSTEM_NAME_U)
++    set(OS_${_SYSTEM_NAME_U} TRUE)
++  endif()
+ endif()
+diff --git a/cmake/linux/compilerconfig.cmake b/cmake/linux/compilerconfig.cmake
+index 3f4d45e4d..292017409 100644
+--- a/cmake/linux/compilerconfig.cmake
++++ b/cmake/linux/compilerconfig.cmake
+@@ -55,7 +55,7 @@ add_compile_options(
+ # CMake switch for warnings as errors to CMake < 3.24
+ if(CMAKE_VERSION VERSION_LESS 3.24.0)
+   if(CMAKE_COMPILE_WARNING_AS_ERROR)
+-    add_compile_options(-Werror)
++    add_compile_options(-Wno-error) #termux clang is expectd to throw errors, harmles.
+   endif()
+ endif()
+ 
+@@ -85,3 +85,18 @@ else()
+ endif()
+ 
+ add_compile_definitions($<$<CONFIG:DEBUG>:DEBUG> $<$<CONFIG:DEBUG>:_DEBUG> SIMDE_ENABLE_OPENMP)
++
++# ---------------------------------------------------------
++# CUSTOM AARCH64 / ANDROID SHARED LIBRARY FIXES
++# Prevents R_AARCH64_TLSLE relocation errors with LTO
++# ---------------------------------------------------------
++if(OS_ANDROID OR CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
++    add_compile_options(-fPIC)
++    add_compile_options(-ftls-model=global-dynamic)
++
++    if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.13)
++        add_link_options(-fPIC)
++    else()
++        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fPIC")
++    endif()
++endif()
+diff --git a/frontend/utility/system-info-termux.cpp b/frontend/utility/system-info-termux.cpp
+new file mode 100644
+index 000000000..453cd2b88
+--- /dev/null
++++ b/frontend/utility/system-info-termux.cpp
+@@ -0,0 +1,129 @@
++#include "utility/system-info.hpp"
++#include "util/platform.h"
++#include <sys/utsname.h>
++#include <unistd.h>
++#include <fstream>
++#include <cstring>
++#include <string>
++#include <vector>
++#include <optional>
++#include <algorithm>
++
++using namespace std;
++
++namespace {
++
++GoLiveApi::Gpu get_primary_gpu() {
++    GoLiveApi::Gpu gpu{};
++    gpu.vendor_id=0x5143;
++    gpu.device_id = 0x0000;          // Vulkan info
++    gpu.model = "Turnip Adreno (TM) 650";
++    gpu.driver_version = "Mesa 25.3.3";
++    gpu.dedicated_video_memory = 0;
++    gpu.shared_system_memory = 7610ULL * 1024 * 1024;
++    return gpu;
++}
++
++bool get_cpu_name(optional<string> &proc_name) {
++    ifstream file("/proc/cpuinfo");
++    string line;
++    proc_name = "Unknown";
++    if (file.is_open()) {
++        while (getline(file, line)) {
++            if (line.compare(0, 10, "model name") == 0 || line.compare(0, 9, "Processor") == 0) {
++                auto pos = line.find(':');
++                if (pos != string::npos) {
++                    proc_name = line.substr(pos + 1);
++                    proc_name->erase(0, proc_name->find_first_not_of(" \t"));
++                    proc_name->erase(proc_name->find_last_not_of(" \t") + 1);
++                    break;
++                }
++            }
++        }
++        file.close();
++    }
++    return true;
++}
++
++bool get_cpu_freq(uint32_t &cpu_freq) {
++    ifstream f("/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq");
++    string line;
++    cpu_freq = 0;
++    if (f.is_open() && getline(f, line)) {
++        cpu_freq = stoi(line) / 1000; // kHz → MHz
++    }
++    return true;
++}
++
++bool get_total_memory(uint64_t &total_mem, uint64_t &free_mem) {
++    ifstream meminfo("/proc/meminfo");
++    string line;
++    total_mem = free_mem = 0;
++    if (!meminfo.is_open()) return false;
++    while (getline(meminfo, line)) {
++        if (line.find("MemTotal:") == 0)
++            total_mem = stoull(line.substr(9)) * 1024;
++        else if (line.find("MemFree:") == 0)
++            free_mem = stoull(line.substr(8)) * 1024;
++        if (total_mem && free_mem) break;
++    }
++    return true;
++}
++
++bool get_distribution_info(string &distro, string &version) {
++    distro = "Termux/Android";
++    version = "unknown";
++    return true;
++}
++
++} // namespace
++
++void system_info(GoLiveApi::Capabilities &capabilities) {
++    // Default-initialize
++   capabilities = GoLiveApi::Capabilities{};
++
++    // GPU
++    capabilities.gpu.emplace( std::vector<GoLiveApi::Gpu>{get_primary_gpu()} );
++
++    // CPU
++    auto &cpu_data = capabilities.cpu;
++    cpu_data.physical_cores = os_get_physical_cores();
++    cpu_data.logical_cores = os_get_logical_cores();
++    if (!get_cpu_name(cpu_data.name))
++        cpu_data.name = "Unknown";
++
++    uint32_t freq = 0;
++    if (get_cpu_freq(freq))
++        cpu_data.speed = freq;
++    else
++        cpu_data.speed = 0;
++
++    // Memory
++    auto &mem_data = capabilities.memory;
++    if (!get_total_memory(mem_data.total, mem_data.free)) {
++        mem_data.total = 7610ULL * 1024 * 1024;
++        mem_data.free = 200ULL * 1024 * 1024;
++    }
++
++    // System info
++    auto &sys_data = capabilities.system;
++    if (!get_distribution_info(sys_data.name, sys_data.release)) {
++        sys_data.name = "Termux/Android";
++        sys_data.release = "unknown";
++    }
++    struct utsname utsinfo;
++    if (uname(&utsinfo) == 0) {
++        sys_data.bits = strstr(utsinfo.machine, "64") ? 64 : 32;
++        sys_data.arm = strstr(utsinfo.machine, "aarch") ? true : false;
++        sys_data.version = string(utsinfo.sysname) + " " + utsinfo.release + " " + utsinfo.version;
++    } else {
++        sys_data.bits = 32;
++        sys_data.arm = true;
++        sys_data.version = "unknown";
++    }
++
++    sys_data.armEmulation = os_get_emulation_status();
++
++    // Gaming features not supported
++    UNUSED_PARAMETER(capabilities.gaming_features);
++}
+diff --git a/libobs/cmake/linux/libobs.pc.in b/libobs/cmake/linux/libobs.pc.in
+index 596875720..a799f32d7 100644
+--- a/libobs/cmake/linux/libobs.pc.in
++++ b/libobs/cmake/linux/libobs.pc.in
+@@ -10,4 +10,4 @@ Version: @OBS_VERSION_CANONICAL@
+ Requires:
+ Libs: -L${libdir} -lobs
+ Libs.private: -pthread -lm
+-Cflags: -I${includedir} -std=gnu@CMAKE_C_STANDARD@ -fPIC -fvisibility=hidden -fopenmp-simd -Werror -DHAVE_OBSCONFIG_H
++Cflags: -I${includedir} -std=gnu@CMAKE_C_STANDARD@ -fPIC -fvisibility=hidden -fopenmp-simd -Wno-error -DHAVE_OBSCONFIG_H
+

@@ -1,0 +1,79 @@
+From 3a1ce6aaf2c54bc955eadc687593d8da84433003 Mon Sep 17 00:00:00 2001
+From: lumaparallax <257510328+lumaparallax@users.noreply.github.com>
+Date: Fri, 27 Mar 2026 02:01:40 +0900
+Subject: [PATCH] obs-websocket: Fix local IP detection for Android/Termux
+
+On Android/Termux environments, Qt6's `QNetworkInterface::allAddresses()`
+struggles with Android's strict SELinux networking policies and virtual
+interfaces. This results in heavy `AF_NETLINK` console spam and often
+returns dummy interfaces or `127.0.0.1`, which breaks the QR code
+generation in the "Show Connect Info" dialog.
+
+This patch bypasses the Qt network scanner in `GetLocalAddress()` and
+replaces it with standard POSIX `getifaddrs()`. It explicitly prioritizes
+the Android `wlan0` (Wi-Fi) and `eth0` interfaces to ensure the WebSocket
+server accurately broadcasts the correct IPv4 address for remote control apps.
+---
+ src/utils/Platform.cpp | 36 +++++++++++++++++++++++++++++++++++-
+ 1 file changed, 35 insertions(+), 1 deletion(-)
+
+diff --git a/src/utils/Platform.cpp b/src/utils/Platform.cpp
+index e8045dd..7e408af 100644
+--- a/src/utils/Platform.cpp
++++ b/src/utils/Platform.cpp
+@@ -23,10 +23,14 @@ with this program. If not, see <https://www.gnu.org/licenses/>
+ #include <QHostAddress>
+ #include <obs-frontend-api.h>
+ 
++#include <ifaddrs.h>
++#include <arpa/inet.h>
++#include <netinet/in.h>
++
+ #include "Platform.h"
+ #include "plugin-macros.generated.h"
+ 
+-std::string Utils::Platform::GetLocalAddress()
++/*std::string Utils::Platform::GetLocalAddress()
+ {
+ 	std::vector<QString> validAddresses;
+ 	for (auto address : QNetworkInterface::allAddresses()) {
+@@ -74,6 +78,36 @@ std::string Utils::Platform::GetLocalAddress()
+ 
+ 	// Return highest priority address
+ 	return preferredAddresses[0].first.toStdString();
++}*/
++
++std::string Utils::Platform::GetLocalAddress()
++{
++	std::string localIp = "127.0.0.1"; // Fallback to localhost
++	struct ifaddrs *interfaces = nullptr;
++	struct ifaddrs *temp_addr = nullptr;
++
++	if (getifaddrs(&interfaces) == 0) {
++		temp_addr = interfaces;
++		while (temp_addr != nullptr) {
++			if (temp_addr->ifa_addr != nullptr && temp_addr->ifa_addr->sa_family == AF_INET) { // IPv4 only
++				std::string ifName = temp_addr->ifa_name;
++				
++				// Prioritize Android Wi-Fi (wlan0) or Ethernet (eth0)
++				if (ifName == "wlan0" || ifName == "eth0") {
++					localIp = inet_ntoa(((struct sockaddr_in*)temp_addr->ifa_addr)->sin_addr);
++					break; // Found the correct interface, stop searching
++				} 
++				// Fallback: If not wlan0/eth0, grab the first thing that isn't loopback (lo) or cellular (rmnet)
++				else if (ifName != "lo" && localIp == "127.0.0.1" && ifName.find("rmnet") == std::string::npos) {
++					localIp = inet_ntoa(((struct sockaddr_in*)temp_addr->ifa_addr)->sin_addr);
++				}
++			}
++			temp_addr = temp_addr->ifa_next;
++		}
++		freeifaddrs(interfaces);
++	}
++
++	return localIp;
+ }
+ 
+ QString Utils::Platform::GetCommandLineArgument(QString arg)
+-- 
+2.53.0
+

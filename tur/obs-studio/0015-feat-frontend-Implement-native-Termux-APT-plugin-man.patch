@@ -1,0 +1,1547 @@
+From 384f18408c32797143059baeb06316a3b0cace42 Mon Sep 17 00:00:00 2001
+From: lumaparallax <257510328+lumaparallax@users.noreply.github.com>
+Date: Tue, 14 Apr 2026 14:46:06 +0900
+Subject: [PATCH 15/16] feat(frontend): Implement native Termux APT plugin
+ manager
+
+The standard OBS desktop plugin manager relies on fetching JSON manifests
+and pre-compiled binaries, which is incompatible with the Termux environment.
+
+This commit introduces a custom, Android-specific plugin manager:
+- Added `frontend/plugin-manager-aarch64` utilizing native `apt-cache` and
+  `dpkg` commands to manage Debian-packaged plugins.
+- Features a rewritten Idian-based UI with persistent disk caching for instant
+  load times and synchronous execution to ensure environment stability.
+- Updated `feature-plugin-manager.cmake` to compile this module exclusively
+  when `OS_ANDROID` is detected.
+- Conditionally routed headers in `OBSApp.cpp`, `SourceTreeItem.cpp`, and
+  `OBSBasic.cpp` using `__ANDROID__` macros to ensure standard Linux builds
+  remain unaffected.
+---
+ frontend/OBSApp.cpp                           |   4 +
+ frontend/cmake/feature-plugin-manager.cmake   |  24 +-
+ frontend/components/SourceTreeItem.cpp        |   4 +
+ .../plugin-manager-aarch64/PluginManager.cpp  | 276 +++++++
+ .../plugin-manager-aarch64/PluginManager.hpp  |  79 ++
+ .../PluginManagerWindow.cpp                   | 698 ++++++++++++++++++
+ .../PluginManagerWindow.hpp                   | 112 +++
+ frontend/plugin-manager-aarch64/README.md     |  16 +
+ .../icons/chevron-down.svg                    |   1 +
+ .../icons/chevron-up.svg                      |   1 +
+ .../plugin-manager-aarch64/icons/refresh.svg  |   1 +
+ .../icons/trash-grey.svg                      |   1 +
+ .../icons/trash-red.svg                       |   1 +
+ .../plugin-manager-aarch64.qrc                |   9 +
+ .../plugin-manager-aarch64.ui                 | 143 ++++
+ frontend/widgets/OBSBasic.cpp                 |   4 +
+ 16 files changed, 1368 insertions(+), 6 deletions(-)
+ create mode 100644 frontend/plugin-manager-aarch64/PluginManager.cpp
+ create mode 100644 frontend/plugin-manager-aarch64/PluginManager.hpp
+ create mode 100644 frontend/plugin-manager-aarch64/PluginManagerWindow.cpp
+ create mode 100644 frontend/plugin-manager-aarch64/PluginManagerWindow.hpp
+ create mode 100644 frontend/plugin-manager-aarch64/README.md
+ create mode 100644 frontend/plugin-manager-aarch64/icons/chevron-down.svg
+ create mode 100644 frontend/plugin-manager-aarch64/icons/chevron-up.svg
+ create mode 100644 frontend/plugin-manager-aarch64/icons/refresh.svg
+ create mode 100644 frontend/plugin-manager-aarch64/icons/trash-grey.svg
+ create mode 100644 frontend/plugin-manager-aarch64/icons/trash-red.svg
+ create mode 100644 frontend/plugin-manager-aarch64/plugin-manager-aarch64.qrc
+ create mode 100644 frontend/plugin-manager-aarch64/plugin-manager-aarch64.ui
+
+diff --git a/frontend/OBSApp.cpp b/frontend/OBSApp.cpp
+index 268e1d5b1..d6fc70886 100644
+--- a/frontend/OBSApp.cpp
++++ b/frontend/OBSApp.cpp
+@@ -19,7 +19,11 @@
+ 
+ #include <components/Multiview.hpp>
+ #include <dialogs/LogUploadDialog.hpp>
++#ifdef __ANDROID__
++#include <plugin-manager-aarch64/PluginManager.hpp>
++#else
+ #include <plugin-manager/PluginManager.hpp>
++#endif
+ #include <utility/CrashHandler.hpp>
+ #include <utility/OBSEventFilter.hpp>
+ #include <utility/OBSProxyStyle.hpp>
+diff --git a/frontend/cmake/feature-plugin-manager.cmake b/frontend/cmake/feature-plugin-manager.cmake
+index b57992518..907316223 100644
+--- a/frontend/cmake/feature-plugin-manager.cmake
++++ b/frontend/cmake/feature-plugin-manager.cmake
+@@ -1,8 +1,20 @@
+-target_sources(
++if(OS_ANDROID)
++  target_sources(
+   obs-studio
+   PRIVATE
+-    plugin-manager/PluginManager.cpp
+-    plugin-manager/PluginManager.hpp
+-    plugin-manager/PluginManagerWindow.cpp
+-    plugin-manager/PluginManagerWindow.hpp
+-)
++    plugin-manager-aarch64/plugin-manager-aarch64.qrc
++    plugin-manager-aarch64/PluginManager.cpp
++    plugin-manager-aarch64/PluginManager.hpp
++    plugin-manager-aarch64/PluginManagerWindow.cpp
++    plugin-manager-aarch64/PluginManagerWindow.hpp
++  )
++else()
++   target_sources(
++   obs-studio
++   PRIVATE
++     plugin-manager/PluginManager.cpp
++     plugin-manager/PluginManager.hpp
++     plugin-manager/PluginManagerWindow.cpp
++     plugin-manager/PluginManagerWindow.hpp
++ )
++endif()
+diff --git a/frontend/components/SourceTreeItem.cpp b/frontend/components/SourceTreeItem.cpp
+index 97236a2a4..5886f48bd 100644
+--- a/frontend/components/SourceTreeItem.cpp
++++ b/frontend/components/SourceTreeItem.cpp
+@@ -9,7 +9,11 @@
+ #include <QLineEdit>
+ #include <QPainter>
+ 
++#ifdef __ANDROID__
++#include "plugin-manager-aarch64/PluginManager.hpp"
++#else
+ #include "plugin-manager/PluginManager.hpp"
++#endif
+ 
+ #ifdef _WIN32
+ #define WIN32_LEAN_AND_MEAN
+diff --git a/frontend/plugin-manager-aarch64/PluginManager.cpp b/frontend/plugin-manager-aarch64/PluginManager.cpp
+new file mode 100644
+index 000000000..61766c1a5
+--- /dev/null
++++ b/frontend/plugin-manager-aarch64/PluginManager.cpp
+@@ -0,0 +1,276 @@
++/******************************************************************************
++    Copyright (C) 2025 by FiniteSingularity <finitesingularityttv@gmail.com>
++    Copyright (C) 2026 by lumaparallax <257510328+lumaparallax@users.noreply.github.com>
++
++    This program is free software: you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation, either version 2 of the License, or
++    (at your option) any later version.
++
++    This program is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License
++    along with this program.  If not, see <http://www.gnu.org/licenses/>.
++******************************************************************************/
++
++#include "PluginManager.hpp"
++#include "PluginManagerWindow.hpp"
++
++#include <OBSApp.hpp>
++#include <qt-wrappers.hpp>
++#include <widgets/OBSBasic.hpp>
++#include <QMessageBox>
++#include <nlohmann/json.hpp>
++
++#include <algorithm>
++#include <fstream>
++
++extern bool restart;
++
++namespace OBS {
++
++void addModuleToPluginManagerImpl(void *param, obs_module_t *newModule)
++{
++	auto &instance = *static_cast<OBS::PluginManager *>(param);
++	std::string moduleName = obs_get_module_file_name(newModule);
++	moduleName = moduleName.substr(0, moduleName.rfind("."));
++
++	if (!obs_get_module_allow_disable(moduleName.c_str()))
++		return;
++
++	const char *display_name = obs_get_module_name(newModule);
++	std::string module_name = moduleName;
++	const char *id = obs_get_module_id(newModule);
++	const char *version = obs_get_module_version(newModule);
++
++	auto it = std::find_if(instance.modules_.begin(), instance.modules_.end(),
++			       [&](OBS::ModuleInfo module) { return module.module_name == moduleName; });
++
++	if (it == instance.modules_.end()) {
++		instance.modules_.push_back({display_name ? display_name : "", module_name, id ? id : "",
++					     version ? version : "", true, true});
++	} else {
++		it->display_name = display_name ? display_name : "";
++		it->module_name = module_name;
++		it->id = id ? id : "";
++		it->version = version ? version : "";
++	}
++}
++
++constexpr std::string_view OBSPluginManagerPath = "obs-studio/plugin_manager";
++constexpr std::string_view OBSPluginManagerModulesFile = "modules.json";
++
++void PluginManager::preLoad()
++{
++	loadModules_();
++	disableModules_();
++}
++
++void PluginManager::postLoad()
++{
++	obs_enum_modules(addModuleToPluginManager, this);
++	addModuleTypes_();
++	saveModules_();
++	linkUnloadedModules_();
++}
++
++std::filesystem::path PluginManager::getConfigFilePath_()
++{
++	std::filesystem::path path = App()->userPluginManagerSettingsLocation /
++				     std::filesystem::u8path(OBSPluginManagerPath) /
++				     std::filesystem::u8path(OBSPluginManagerModulesFile);
++	return path;
++}
++
++void PluginManager::loadModules_()
++{
++	auto modulesFile = getConfigFilePath_();
++	if (std::filesystem::exists(modulesFile)) {
++		std::ifstream jsonFile(modulesFile);
++		nlohmann::json data;
++		try {
++			data = nlohmann::json::parse(jsonFile);
++		} catch (const nlohmann::json::parse_error &error) {
++			modules_.clear();
++			blog(LOG_ERROR, "Error loading modules config file: %s", error.what());
++			return;
++		}
++		modules_.clear();
++		for (auto it : data) {
++			ModuleInfo obsModule;
++			try {
++				obsModule = {it.at("display_name"),
++					     it.at("module_name"),
++					     it.at("id"),
++					     it.at("version"),
++					     it.at("enabled"),
++					     it.at("enabled"),
++					     it.at("sources"),
++					     it.at("outputs"),
++					     it.at("encoders"),
++					     it.at("services"),
++					     {}, {}, {}, {}};
++			} catch (const nlohmann::json::out_of_range &error) {
++				blog(LOG_WARNING, "Error loading module info: %s", error.what());
++				continue;
++			}
++			modules_.push_back(obsModule);
++		}
++	}
++}
++
++void PluginManager::linkUnloadedModules_()
++{
++	for (const auto &moduleInfo : modules_) {
++		if (!moduleInfo.enabled) {
++			auto obsModule = obs_get_disabled_module(moduleInfo.module_name.c_str());
++			if (!obsModule) continue;
++
++			for (const auto &source : moduleInfo.sources)
++				obs_module_add_source(obsModule, source.c_str());
++			for (const auto &output : moduleInfo.outputs)
++				obs_module_add_output(obsModule, output.c_str());
++			for (const auto &encoder : moduleInfo.encoders)
++				obs_module_add_encoder(obsModule, encoder.c_str());
++			for (const auto &service : moduleInfo.services)
++				obs_module_add_service(obsModule, service.c_str());
++		}
++	}
++}
++
++void PluginManager::saveModules_()
++{
++	auto modulesFile = getConfigFilePath_();
++	std::ofstream outFile(modulesFile);
++	nlohmann::json data = nlohmann::json::array();
++
++	for (auto const &moduleInfo : modules_) {
++		nlohmann::json modData;
++		modData["display_name"] = moduleInfo.display_name;
++		modData["module_name"] = moduleInfo.module_name;
++		modData["id"] = moduleInfo.id;
++		modData["version"] = moduleInfo.version;
++		modData["enabled"] = moduleInfo.enabled;
++		modData["sources"] = moduleInfo.sources;
++		modData["outputs"] = moduleInfo.outputs;
++		modData["encoders"] = moduleInfo.encoders;
++		modData["services"] = moduleInfo.services;
++		data.push_back(modData);
++	}
++	outFile << std::setw(4) << data << std::endl;
++}
++
++void PluginManager::addModuleTypes_()
++{
++	const char *source_id;
++	int i = 0;
++	while (obs_enum_source_types(i, &source_id)) {
++		i += 1;
++		obs_module_t *obsModule = obs_source_get_module(source_id);
++		if (!obsModule) continue;
++		std::string moduleName = obs_get_module_file_name(obsModule);
++		moduleName = moduleName.substr(0, moduleName.rfind("."));
++		auto it = std::find_if(modules_.begin(), modules_.end(),
++				       [moduleName](ModuleInfo const &m) { return m.module_name == moduleName; });
++		if (it != modules_.end()) it->sourcesLoaded.push_back(source_id);
++	}
++
++	const char *output_id;
++	i = 0;
++	while (obs_enum_output_types(i, &output_id)) {
++		i += 1;
++		obs_module_t *obsModule = obs_output_get_module(output_id);
++		if (!obsModule) continue;
++		std::string moduleName = obs_get_module_file_name(obsModule);
++		moduleName = moduleName.substr(0, moduleName.rfind("."));
++		auto it = std::find_if(modules_.begin(), modules_.end(),
++				       [moduleName](ModuleInfo const &m) { return m.module_name == moduleName; });
++		if (it != modules_.end()) it->outputsLoaded.push_back(output_id);
++	}
++
++	const char *encoder_id;
++	i = 0;
++	while (obs_enum_encoder_types(i, &encoder_id)) {
++		i += 1;
++		obs_module_t *obsModule = obs_encoder_get_module(encoder_id);
++		if (!obsModule) continue;
++		std::string moduleName = obs_get_module_file_name(obsModule);
++		moduleName = moduleName.substr(0, moduleName.rfind("."));
++		auto it = std::find_if(modules_.begin(), modules_.end(),
++				       [moduleName](ModuleInfo const &m) { return m.module_name == moduleName; });
++		if (it != modules_.end()) it->encodersLoaded.push_back(encoder_id);
++	}
++
++	const char *service_id;
++	i = 0;
++	while (obs_enum_service_types(i, &service_id)) {
++		i += 1;
++		obs_module_t *obsModule = obs_service_get_module(service_id);
++		if (!obsModule) continue;
++		std::string moduleName = obs_get_module_file_name(obsModule);
++		moduleName = moduleName.substr(0, moduleName.rfind("."));
++		auto it = std::find_if(modules_.begin(), modules_.end(),
++				       [moduleName](ModuleInfo const &m) { return m.module_name == moduleName; });
++		if (it != modules_.end()) it->servicesLoaded.push_back(service_id);
++	}
++
++	for (auto &moduleInfo : modules_) {
++		if (moduleInfo.enabledAtLaunch) {
++			moduleInfo.sources = moduleInfo.sourcesLoaded;
++			moduleInfo.encoders = moduleInfo.encodersLoaded;
++			moduleInfo.outputs = moduleInfo.outputsLoaded;
++			moduleInfo.services = moduleInfo.servicesLoaded;
++		} else {
++			for (auto const &source : moduleInfo.sources) disabledSources_.push_back(source);
++			for (auto const &output : moduleInfo.outputs) disabledOutputs_.push_back(output);
++			for (auto const &encoder : moduleInfo.encoders) disabledEncoders_.push_back(encoder);
++			for (auto const &service : moduleInfo.services) disabledServices_.push_back(service);
++		}
++	}
++}
++
++void PluginManager::disableModules_()
++{
++	for (const auto &moduleInfo : modules_) {
++		if (!moduleInfo.enabled) obs_add_disabled_module(moduleInfo.module_name.c_str());
++	}
++}
++
++void PluginManager::open()
++{
++	auto main = OBSBasic::Get();
++	PluginManagerWindow pluginManagerWindow(modules_, main);
++	auto result = pluginManagerWindow.exec();
++
++	if (result == QDialog::Accepted) {
++		modules_ = pluginManagerWindow.getModifiedModules();
++		saveModules_();
++
++		bool changed = false;
++		for (auto const &moduleInfo : modules_) {
++			if (moduleInfo.enabled != moduleInfo.enabledAtLaunch) {
++				changed = true;
++				break;
++			}
++		}
++
++		if (pluginManagerWindow.needsRestart()) {
++			QMessageBox::StandardButton button = QMessageBox::question(main,
++				"Restart Required",
++				"You have successfully applied state changes to your plugins.\n\n"
++				"• Click YES to instantly restart OBS and load these changes.\n"
++				"• Click NO to keep these changes saved, but apply them the next time you open OBS.\n\n"
++				"Do you want to restart now?");
++
++			if (button == QMessageBox::Yes) {
++				restart = true;
++				main->close();
++			}
++		}
++	}
++}
++
++}; // namespace OBS
+diff --git a/frontend/plugin-manager-aarch64/PluginManager.hpp b/frontend/plugin-manager-aarch64/PluginManager.hpp
+new file mode 100644
+index 000000000..d79c3648a
+--- /dev/null
++++ b/frontend/plugin-manager-aarch64/PluginManager.hpp
+@@ -0,0 +1,79 @@
++/******************************************************************************
++    Copyright (C) 2025 by FiniteSingularity <finitesingularityttv@gmail.com>
++    Copyright (C) 2026 by lumaparallax <257510328+lumaparallax@users.noreply.github.com>
++
++    This program is free software: you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation, either version 2 of the License, or
++    (at your option) any later version.
++
++    This program is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License
++    along with this program.  If not, see <http://www.gnu.org/licenses/>.
++******************************************************************************/
++
++#pragma once
++
++#include <obs-module.h>
++
++#include <filesystem>
++#include <string>
++#include <vector>
++
++namespace OBS {
++
++struct ModuleInfo {
++	std::string display_name;
++	std::string module_name;
++	std::string id;
++	std::string version;
++	bool enabled;
++	bool enabledAtLaunch;
++	std::vector<std::string> sources;
++	std::vector<std::string> outputs;
++	std::vector<std::string> encoders;
++	std::vector<std::string> services;
++	std::vector<std::string> sourcesLoaded;
++	std::vector<std::string> outputsLoaded;
++	std::vector<std::string> encodersLoaded;
++	std::vector<std::string> servicesLoaded;
++};
++
++class PluginManager {
++private:
++	std::vector<ModuleInfo> modules_ = {};
++	std::vector<std::string> disabledSources_ = {};
++	std::vector<std::string> disabledOutputs_ = {};
++	std::vector<std::string> disabledServices_ = {};
++	std::vector<std::string> disabledEncoders_ = {};
++	std::filesystem::path getConfigFilePath_();
++	void loadModules_();
++	void saveModules_();
++	void disableModules_();
++	void addModuleTypes_();
++	void linkUnloadedModules_();
++
++public:
++	void preLoad();
++	void postLoad();
++	void open();
++
++	friend void addModuleToPluginManagerImpl(void *param, obs_module_t *newModule);
++};
++
++void addModuleToPluginManagerImpl(void *param, obs_module_t *newModule);
++
++}; // namespace OBS
++
++// Anonymous namespace function to add module to plugin manager
++// via libobs's module enumeration.
++namespace {
++inline void addModuleToPluginManager(void *param, obs_module_t *newModule)
++{
++	OBS::addModuleToPluginManagerImpl(param, newModule);
++}
++} // namespace
+diff --git a/frontend/plugin-manager-aarch64/PluginManagerWindow.cpp b/frontend/plugin-manager-aarch64/PluginManagerWindow.cpp
+new file mode 100644
+index 000000000..9654ed63a
+--- /dev/null
++++ b/frontend/plugin-manager-aarch64/PluginManagerWindow.cpp
+@@ -0,0 +1,698 @@
++/******************************************************************************
++    Copyright (C) 2025 by FiniteSingularity <finitesingularityttv@gmail.com>
++    Copyright (C) 2026 by lumaparallax <257510328+lumaparallax@users.noreply.github.com>
++
++    This program is free software: you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation, either version 2 of the License, or
++    (at your option) any later version.
++
++    This program is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License
++    along with this program.  If not, see <http://www.gnu.org/licenses/>.
++******************************************************************************/
++
++#include "PluginManagerWindow.hpp"
++#include "ui_plugin-manager-aarch64.h"
++
++#include <Idian/PropertiesList.hpp>
++#include <Idian/Row.hpp>
++#include <Idian/ToggleSwitch.hpp>
++
++#include <QProcess>
++#include <QLabel>
++#include <QPushButton>
++#include <QMessageBox>
++#include <QCloseEvent>
++#include <QIcon>
++#include <QSize>
++#include <QLineEdit>
++#include <QRegularExpression>
++#include <QCoreApplication>
++#include <QTimer>
++#include <QVBoxLayout>
++
++// JSON Caching Headers
++#include <QJsonDocument>
++#include <QJsonArray>
++#include <QJsonObject>
++#include <QFile>
++#include <QDir>
++
++namespace OBS {
++
++// --- CUSTOM DETAILS ROW ---
++// Bypasses idian::Row's restricted column layout to allow 100% width wrapping
++// and implements the "Inner Well" styling for the expanded chevron section.
++class DetailsRow : public idian::GenericRow {
++public:
++	QLabel *contentLabel;
++
++	DetailsRow(QWidget *parent = nullptr) : GenericRow(parent) {
++		QVBoxLayout *layout = new QVBoxLayout(this);
++		layout->setContentsMargins(15, 12, 15, 15);
++
++		contentLabel = new QLabel(this);
++		contentLabel->setWordWrap(true);
++		contentLabel->setTextFormat(Qt::RichText);
++		contentLabel->setOpenExternalLinks(true);
++
++		layout->addWidget(contentLabel);
++
++		setStyleSheet(
++			"DetailsRow { background-color: rgba(0, 0, 0, 0.2); border-top: 1px solid #333; border-bottom: 1px solid #222; }"
++			"QLabel { background: transparent; border: none; }"
++		);
++	}
++
++	void setTitle(const QString &) override {}
++	void setDescription(const QString &) override {}
++};
++// --------------------------
++
++PluginManagerWindow::PluginManagerWindow(const std::vector<ModuleInfo> &modules, QWidget *parent)
++	: QDialog(parent),
++	  modules_(modules),
++	  original_modules_(modules),
++	  ui(new Ui::PluginManagerWindow)
++{
++	setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
++	ui->setupUi(this);
++
++	ui->searchBox->setStyleSheet("padding: 8px; border: 1px solid #444; border-radius: 4px; background-color: rgba(0,0,0,0.2); font-size: 11pt; color: white;");
++	ui->tabs->setStyleSheet("QTabBar::tab { padding: 8px 30px; font-size: 11pt; font-weight: bold; }");
++	ui->manageRestartLabel->setVisible(false);
++	ui->manageRestartLabel->setStyleSheet("color: #ffaa00; font-weight: bold; font-size: 11pt;");
++
++	QPushButton *applyBtn = ui->buttonBox->button(QDialogButtonBox::Apply);
++	QPushButton *cancelBtn = ui->buttonBox->button(QDialogButtonBox::Cancel);
++
++	applyBtn->setAutoDefault(false);
++	cancelBtn->setAutoDefault(false);
++	ui->refreshBtn->setAutoDefault(false);
++
++	applyBtn->setStyleSheet("background-color: #2b2b2b; color: white; border: 1px solid #555; padding: 6px 15px; border-radius: 4px; font-weight: bold;");
++	cancelBtn->setStyleSheet("padding: 6px 15px; border-radius: 4px;");
++
++	connect(applyBtn, &QPushButton::clicked, this, &PluginManagerWindow::onApplyClicked);
++	connect(cancelBtn, &QPushButton::clicked, this, &PluginManagerWindow::onCancelClicked);
++
++	ui->refreshBtn->setText("");
++	ui->refreshBtn->setIcon(QIcon(":/icons/refresh.svg"));
++	ui->refreshBtn->setIconSize(QSize(24, 24));
++	ui->refreshBtn->setStyleSheet("QPushButton { border: none; background: transparent; } QPushButton:hover { background-color: rgba(255,255,255,0.1); border-radius: 4px; }");
++
++	storeList = new idian::PropertiesList(this);
++	manageList = new idian::PropertiesList(this);
++
++	ui->storeScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
++	ui->manageScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
++
++	ui->storeScroll->setWidgetResizable(true);
++	ui->manageScroll->setWidgetResizable(true);
++	ui->storeLayout->addWidget(storeList);
++	ui->manageLayout->addWidget(manageList);
++	ui->storeLayout->addStretch();
++	ui->manageLayout->addStretch();
++
++	storeEmptyLabel = new QLabel("Initializing cache...", this);
++	manageEmptyLabel = new QLabel("Initializing cache...", this);
++	storeEmptyLabel->setStyleSheet("color: #888; font-size: 12pt; margin-top: 20px;");
++	manageEmptyLabel->setStyleSheet("color: #888; font-size: 12pt; margin-top: 20px;");
++	storeEmptyLabel->setAlignment(Qt::AlignCenter);
++	manageEmptyLabel->setAlignment(Qt::AlignCenter);
++	ui->storeLayout->addWidget(storeEmptyLabel);
++	ui->manageLayout->addWidget(manageEmptyLabel);
++
++	connect(ui->searchBox, &QLineEdit::textChanged, this, [this](const QString &text) {
++		QString query = text.toLower();
++		int storeVis = 0, manageVis = 0;
++
++		for (const auto &item : allUiRows) {
++			bool match = query.isEmpty() || item.searchString.contains(query);
++			item.row->setVisible(match);
++			if (match) {
++				if (storeList->isAncestorOf(item.row)) storeVis++;
++				if (manageList->isAncestorOf(item.row)) manageVis++;
++			}
++		}
++
++		if (!cachedPlugins.isEmpty()) {
++			storeEmptyLabel->setText(query.isEmpty() ? "No new plugins available." : "No plugins match your search.");
++			manageEmptyLabel->setText(query.isEmpty() ? "No plugins installed yet." : "No installed plugins match your search.");
++		}
++
++		storeEmptyLabel->setVisible(storeVis == 0);
++		manageEmptyLabel->setVisible(manageVis == 0);
++	});
++
++	connect(ui->refreshBtn, &QPushButton::clicked, this, [this]() {
++		ui->refreshBtn->setEnabled(false);
++		ui->searchBox->setEnabled(false);
++
++		storeEmptyLabel->setText("Updating repository... UI will freeze momentarily.");
++		manageEmptyLabel->setText("Updating repository... UI will freeze momentarily.");
++		storeEmptyLabel->setVisible(true);
++		manageEmptyLabel->setVisible(true);
++
++		QCoreApplication::processEvents();
++
++		QProcess proc(this);
++		proc.start("pkg", QStringList() << "update");
++		proc.waitForFinished();
++
++		populatePlugins();
++		saveCache();
++		reloadUI();
++
++		ui->refreshBtn->setEnabled(true);
++		ui->searchBox->setEnabled(true);
++	});
++
++	if (loadCache()) {
++		reloadUI();
++	} else {
++		QTimer::singleShot(50, this, [this]() {
++			populatePlugins();
++			saveCache();
++			reloadUI();
++		});
++	}
++}
++
++PluginManagerWindow::~PluginManagerWindow() { delete ui; }
++
++bool PluginManagerWindow::hasUnsavedChanges() const {
++	if (modules_.size() != original_modules_.size()) return true;
++	for (size_t i = 0; i < modules_.size(); ++i) {
++		if (modules_[i].enabled != original_modules_[i].enabled) return true;
++	}
++	return false;
++}
++
++void PluginManagerWindow::onApplyClicked() { accept(); }
++
++void PluginManagerWindow::onCancelClicked() {
++	if (hasUnsavedChanges()) {
++		QMessageBox::StandardButton btn = QMessageBox::warning(this, "Unsaved Changes",
++			"You have unsaved changes to your plugins.\nAre you sure you want to discard them?",
++			QMessageBox::Yes | QMessageBox::No);
++		if (btn == QMessageBox::No) return;
++	}
++	reject();
++}
++
++void PluginManagerWindow::closeEvent(QCloseEvent *event) {
++	if (hasUnsavedChanges()) {
++		QMessageBox::StandardButton btn = QMessageBox::warning(this, "Unsaved Changes",
++			"You have unsaved changes to your plugins.\nAre you sure you want to discard them?",
++			QMessageBox::Yes | QMessageBox::No);
++		if (btn == QMessageBox::No) {
++			event->ignore();
++			return;
++		}
++	}
++	event->accept();
++	reject();
++}
++
++void PluginManagerWindow::clearLayout(QLayout* layout) {
++	if (!layout) return;
++	QLayoutItem *item;
++	while ((item = layout->takeAt(0)) != nullptr) {
++		if (QWidget *w = item->widget()) { w->deleteLater(); }
++		delete item;
++	}
++}
++
++void PluginManagerWindow::populatePlugins()
++{
++	storeEmptyLabel->setText("Scanning local packages... UI will freeze momentarily.");
++	manageEmptyLabel->setText("Scanning local packages... UI will freeze momentarily.");
++	storeEmptyLabel->setVisible(true);
++	manageEmptyLabel->setVisible(true);
++	QCoreApplication::processEvents();
++
++	cachedPlugins.clear();
++
++	QProcess upgProc(this);
++	upgProc.start("apt", QStringList() << "list" << "--upgradable");
++	upgProc.waitForFinished();
++	QString upgOutput = upgProc.readAllStandardOutput();
++
++	QProcess searchProcess(this);
++	searchProcess.start("apt-cache", QStringList() << "search" << "^obs-");
++	searchProcess.waitForFinished();
++	QStringList lines = QString(searchProcess.readAllStandardOutput()).split('\n', Qt::SkipEmptyParts);
++
++	QRegularExpression xNameRegex("^X-Display-Name:\\s*(.*)$", QRegularExpression::MultilineOption);
++	QRegularExpression descRegex("^Description:\\s*(.*)$", QRegularExpression::MultilineOption);
++	QRegularExpression versionRegex("^Version:\\s*(.*)$", QRegularExpression::MultilineOption);
++	QRegularExpression homepageRegex("^Homepage:\\s*(.*)$", QRegularExpression::MultilineOption);
++	QRegularExpression sizeRegex("^Size:\\s*(\\d+)$", QRegularExpression::MultilineOption);
++	QRegularExpression installedRegex("^Installed-Size:\\s*(\\d+)$", QRegularExpression::MultilineOption);
++
++	for (const QString &line : lines) {
++		auto dashIndex = line.indexOf(" - ");
++		if (dashIndex == -1) continue;
++
++		QString pkgName = line.left(dashIndex).trimmed();
++		if (pkgName == "obs-studio" || pkgName == "obs-studio-dev") continue;
++
++		QProcess showProc(this);
++		showProc.start("apt-cache", QStringList() << "show" << pkgName);
++		showProc.waitForFinished();
++		QString fullData = showProc.readAllStandardOutput();
++
++		qsizetype firstRecordEnd = fullData.indexOf("\n\n");
++		if (firstRecordEnd != -1) {
++			fullData = fullData.left(firstRecordEnd);
++		}
++
++		QRegularExpressionMatch match;
++		FetchedPluginData data;
++		data.pkgName = pkgName;
++		data.version = (match = versionRegex.match(fullData)).hasMatch() ? match.captured(1).trimmed() : "Unknown";
++		data.homepage = (match = homepageRegex.match(fullData)).hasMatch() ? match.captured(1).trimmed() : "Unknown";
++		data.shortDesc = (match = descRegex.match(fullData)).hasMatch() ? match.captured(1).trimmed() : "No description available.";
++
++		if ((match = xNameRegex.match(fullData)).hasMatch()) {
++			data.displayName = match.captured(1).trimmed();
++		} else {
++			QString fallbackName = pkgName;
++			if (fallbackName.startsWith("obs-")) {
++				fallbackName.remove(0, 4);
++				if (fallbackName.endsWith("-source")) fallbackName.chop(7);
++				data.displayName = fallbackName;
++			}
++		}
++
++		if ((match = sizeRegex.match(fullData)).hasMatch()) {
++			double mb = match.captured(1).toDouble() / 1048576.0;
++			data.downloadSize = (mb >= 1.0) ? QString::number(mb, 'f', 1) + " MB" : QString::number(match.captured(1).toDouble() / 1024.0, 'f', 0) + " KB";
++		} else {
++			data.downloadSize = "Unknown";
++		}
++
++		if ((match = installedRegex.match(fullData)).hasMatch()) {
++			double mb = match.captured(1).toDouble() / 1024.0;
++			data.installedSize = (mb >= 1.0) ? QString::number(mb, 'f', 1) + " MB" : match.captured(1).trimmed() + " KB";
++		} else {
++			data.installedSize = "Unknown";
++		}
++
++		int descIndex = fullData.indexOf(descRegex);
++		if (descIndex != -1) {
++			int startOfLongDesc = fullData.indexOf('\n', descIndex) + 1;
++			int endOfLongDesc = fullData.indexOf(QRegularExpression("\n[A-Z][a-zA-Z0-9-]*:"), startOfLongDesc);
++			if (endOfLongDesc == -1) endOfLongDesc = fullData.length();
++
++			QString rawLongDesc = fullData.mid(startOfLongDesc, endOfLongDesc - startOfLongDesc).trimmed();
++			rawLongDesc.replace("\n .", "\n\n");
++			rawLongDesc.replace("\n ", "\n");
++			data.fullText = rawLongDesc;
++		}
++
++		QProcess checkProc(this);
++		checkProc.start("dpkg-query", QStringList() << "-W" << "-f=${Status}" << pkgName);
++		checkProc.waitForFinished();
++		data.isInstalled = QString(checkProc.readAllStandardOutput()).contains("installed");
++		data.hasUpdate = upgOutput.contains(pkgName + "/");
++
++		data.moduleName = "";
++		if (data.isInstalled) {
++			QProcess fileProc(this);
++			fileProc.start("dpkg", QStringList() << "-L" << pkgName);
++			fileProc.waitForFinished();
++			for (const QString& f : QString(fileProc.readAllStandardOutput()).split('\n')) {
++				if (f.endsWith(".so")) {
++					data.moduleName = f.mid(f.lastIndexOf('/') + 1);
++					data.moduleName.replace(".so", "");
++					break;
++				}
++			}
++		}
++
++		cachedPlugins.append(data);
++	}
++}
++
++void PluginManagerWindow::reloadUI() {
++	storeList->clear();
++	manageList->clear();
++	allUiRows.clear();
++
++	for (int i = 0; i < cachedPlugins.size(); ++i) {
++		FetchedPluginData &data = cachedPlugins[i];
++
++		idian::Row *mainRow = new idian::Row();
++
++		// Main Typography Hierarchy
++		mainRow->setTitle(QString("<span style='font-size: 13pt; font-weight: 800; color: #ffffff;'>%1</span>").arg(data.displayName));
++		mainRow->setDescription(QString("<span style='font-size: 10pt; color: #aaaaaa;'>%1</span>").arg(data.shortDesc));
++
++		DetailsRow *detailsRow = new DetailsRow();
++		detailsRow->setVisible(false);
++
++		// HTML Table for rigid alignment of metadata
++		QString detailsText = QString(
++			"<table width='100%' style='margin-bottom: 12px; margin-top: 4px;'>"
++			"<tr>"
++			"<td width='33%'><span style='color: #4CAF50;'><b>Version:</b> %1</span></td>"
++			"<td width='33%'><span style='color: #2196F3;'><b>Download:</b> %2</span></td>"
++			"<td width='33%'><span style='color: #FF9800;'><b>Installed:</b> %3</span></td>"
++			"</tr>"
++			"</table>"
++		).arg(data.version, data.downloadSize, data.installedSize);
++
++		if (data.homepage != "Unknown") {
++			detailsText += QString("<span style='font-size: 10pt;'><b>Homepage:</b> <a href='%1' style='color: #8bb4f7; text-decoration: none;'>%1</a></span><br><br>").arg(data.homepage);
++		}
++
++		if (!data.fullText.isEmpty()) {
++			QString cleanDesc = data.fullText;
++			cleanDesc.replace("\n", "<br>");
++			detailsText += QString("<div style='color: #dddddd; line-height: 1.5; font-size: 10.5pt;'>%1</div>").arg(cleanDesc);
++		}
++
++		detailsRow->contentLabel->setText(detailsText);
++		detailsRow->setAccessibleName("Loaded");
++
++		QWidget *suffixContainer = new QWidget();
++		QHBoxLayout *suffixLayout = new QHBoxLayout(suffixContainer);
++		suffixLayout->setContentsMargins(0, 0, 0, 0);
++		suffixLayout->setSpacing(15);
++
++		QPushButton *detailsBtn = new QPushButton("");
++		detailsBtn->setFixedSize(30, 30);
++		detailsBtn->setIcon(QIcon(":/icons/chevron-down.svg"));
++		detailsBtn->setIconSize(QSize(24, 24));
++		detailsBtn->setStyleSheet("background: transparent; border: none;");
++		detailsBtn->setAutoDefault(false);
++
++		if (!data.isInstalled) {
++			QPushButton *installBtn = new QPushButton("Install");
++			installBtn->setFixedSize(80, 32);
++			installBtn->setStyleSheet("background-color: #2b2b2b; border-radius: 4px; color: white; font-weight: bold; border: 1px solid #555;");
++			installBtn->setAutoDefault(false);
++
++			suffixLayout->addWidget(installBtn);
++			suffixLayout->addWidget(detailsBtn);
++			mainRow->setSuffix(suffixContainer);
++
++			storeList->addRow(mainRow);
++			storeList->addRow(detailsRow);
++
++			connect(installBtn, &QPushButton::clicked, this, [this, installBtn, i]() {
++				installBtn->setText("Installing...");
++				installBtn->setEnabled(false);
++				QCoreApplication::processEvents();
++
++				QProcess dryRunProc;
++				dryRunProc.start("apt", QStringList() << "-s" << "install" << cachedPlugins[i].pkgName);
++				dryRunProc.waitForFinished();
++
++				if (dryRunProc.exitCode() != 0) {
++					installBtn->setText("Error");
++					installBtn->setEnabled(true);
++					return;
++				}
++
++				QString output = dryRunProc.readAllStandardOutput();
++
++				if (output.contains("The following additional packages will be installed:")) {
++					QString depsString = "";
++					QStringList lines = output.split('\n');
++					bool inDepList = false;
++
++					for (const QString& line : lines) {
++						if (line.startsWith("The following additional packages will be installed:")) {
++							inDepList = true;
++							continue;
++						}
++						if (inDepList) {
++							if (line.startsWith("  ")) {
++								depsString += line.trimmed() + " ";
++							} else if (!line.trimmed().isEmpty()) {
++								break;
++							}
++						}
++					}
++
++					depsString = depsString.trimmed().replace(" ", ", ");
++
++					QString diskSpace = "Significant additional disk space will be used.";
++					qsizetype spaceIdx = output.indexOf("After this operation, ");
++					if (spaceIdx != -1) {
++						qsizetype endIdx = output.indexOf("used.", spaceIdx);
++						if (endIdx != -1) {
++							diskSpace = output.mid(spaceIdx, endIdx - spaceIdx + 5).trimmed();
++						}
++					}
++
++					QMessageBox::StandardButton reply = QMessageBox::question(this,
++						"Dependencies Required",
++						QString("To install this plugin, the following additional packages must also be installed:\n\n"
++							"<b>%1</b>\n\n"
++							"%2\n\n"
++							"Do you want to proceed?").arg(depsString, diskSpace),
++						QMessageBox::Yes | QMessageBox::No);
++
++					if (reply == QMessageBox::No) {
++						installBtn->setText("Install");
++						installBtn->setEnabled(true);
++						return;
++					}
++
++					installBtn->setText("Installing...");
++					QCoreApplication::processEvents();
++				}
++
++				QProcess installProc;
++				installProc.start("pkg", QStringList() << "install" << "-y" << cachedPlugins[i].pkgName);
++				installProc.waitForFinished();
++
++				if (installProc.exitCode() == 0) {
++					QProcess fileProc;
++					fileProc.start("dpkg", QStringList() << "-L" << cachedPlugins[i].pkgName);
++					fileProc.waitForFinished();
++					for (const QString& f : QString(fileProc.readAllStandardOutput()).split('\n')) {
++						if (f.endsWith(".so")) {
++							QString modName = f.mid(f.lastIndexOf('/') + 1);
++							modName.replace(".so", "");
++							cachedPlugins[i].moduleName = modName;
++							break;
++						}
++					}
++
++					cachedPlugins[i].isInstalled = true;
++					forceRestart_ = true;
++					saveCache();
++					reloadUI();
++				} else {
++					QString errorLog = installProc.readAllStandardError();
++					QMessageBox::critical(this, "Installation Failed", "Termux APT Error:\n\n" + errorLog);
++					installBtn->setText("Error");
++					installBtn->setStyleSheet("background-color: rgba(200, 50, 50, 0.3); color: #f44; font-weight: bold; border-radius: 4px;");
++					installBtn->setEnabled(true);
++				}
++			});
++
++		} else {
++			int modIndex = -1;
++			for (int j = 0; j < static_cast<int>(modules_.size()); ++j) {
++				if (modules_[j].module_name == data.moduleName.toStdString()) {
++					modIndex = j;
++					break;
++				}
++			}
++
++			if (modIndex == -1 && !data.moduleName.isEmpty()) {
++				ModuleInfo newMod;
++				newMod.display_name = data.displayName.toStdString();
++				newMod.module_name = data.moduleName.toStdString();
++				newMod.enabled = true;
++				newMod.enabledAtLaunch = false;
++
++				modules_.push_back(newMod);
++				modIndex = static_cast<int>(modules_.size()) - 1;
++
++				ui->manageRestartLabel->setVisible(true);
++				ui->buttonBox->button(QDialogButtonBox::Apply)->setText("Apply & Restart");
++			}
++
++			bool isEnabled = (modIndex != -1) ? modules_[modIndex].enabled : false;
++			bool isEnabledAtLaunch = (modIndex != -1) ? modules_[modIndex].enabledAtLaunch : false;
++
++			if (data.hasUpdate) {
++				QPushButton *updateBtn = new QPushButton("Update");
++				updateBtn->setFixedSize(80, 32);
++				updateBtn->setStyleSheet("background-color: rgba(50, 200, 50, 0.3); color: #4f4; border: 1px solid #4f4; border-radius: 4px; font-weight: bold; margin-right: 10px;");
++				updateBtn->setAutoDefault(false);
++				suffixLayout->addWidget(updateBtn);
++
++				connect(updateBtn, &QPushButton::clicked, this, [this, updateBtn, i]() {
++					updateBtn->setText("Updating...");
++					updateBtn->setEnabled(false);
++					QCoreApplication::processEvents();
++
++					QProcess proc;
++					proc.start("pkg", QStringList() << "upgrade" << "-y" << cachedPlugins[i].pkgName);
++					proc.waitForFinished();
++
++					if (proc.exitCode() == 0) {
++						cachedPlugins[i].hasUpdate = false;
++						forceRestart_ = true;
++						saveCache();
++						ui->manageRestartLabel->setVisible(true);
++						ui->buttonBox->button(QDialogButtonBox::Apply)->setText("Apply & Restart");
++						reloadUI();
++					} else {
++						QString errorLog = proc.readAllStandardError();
++						QMessageBox::critical(this, "Update Failed", "Termux APT Error:\n\n" + errorLog);
++						updateBtn->setText("Error");
++						updateBtn->setStyleSheet("background-color: rgba(200, 50, 50, 0.3); color: #f44; font-weight: bold; border-radius: 4px;");
++						updateBtn->setEnabled(true);
++					}
++				});
++			}
++
++			idian::ToggleSwitch *stateToggle = new idian::ToggleSwitch(isEnabled);
++
++			QPushButton *uninstallBtn = new QPushButton("");
++			uninstallBtn->setFixedSize(36, 36);
++			uninstallBtn->setIcon(QIcon(QString(":/icons/") + (isEnabledAtLaunch ? "trash-grey.svg" : "trash-red.svg")));
++			uninstallBtn->setIconSize(QSize(22, 22));
++			uninstallBtn->setToolTip(isEnabledAtLaunch ? "Disable and apply changes to unlock uninstall" : "Uninstall plugin completely");
++			uninstallBtn->setEnabled(!isEnabledAtLaunch);
++			uninstallBtn->setAutoDefault(false);
++
++			if (isEnabledAtLaunch) {
++				uninstallBtn->setStyleSheet("background: transparent; border: none; opacity: 0.5;");
++			} else {
++				uninstallBtn->setStyleSheet("QPushButton { background: transparent; border: none; } QPushButton:hover { background-color: rgba(255, 0, 0, 0.1); border-radius: 4px; }");
++			}
++
++			suffixLayout->addWidget(stateToggle);
++			suffixLayout->addWidget(uninstallBtn);
++			suffixLayout->addWidget(detailsBtn);
++			mainRow->setSuffix(suffixContainer);
++
++			manageList->addRow(mainRow);
++			manageList->addRow(detailsRow);
++
++			connect(stateToggle, &idian::ToggleSwitch::toggled, this, [this, modIndex](bool checked) {
++				if (modIndex != -1) {
++					modules_[modIndex].enabled = checked;
++					bool requiresRestart = false;
++					for (auto &m : modules_) {
++						if (m.enabledAtLaunch != m.enabled) { requiresRestart = true; break; }
++					}
++					if (modules_.size() != original_modules_.size()) requiresRestart = true;
++
++					ui->manageRestartLabel->setVisible(requiresRestart);
++					ui->buttonBox->button(QDialogButtonBox::Apply)->setText(requiresRestart ? "Apply & Restart" : "Apply Changes");
++				}
++			});
++
++			connect(uninstallBtn, &QPushButton::clicked, this, [this, uninstallBtn, i]() {
++				uninstallBtn->setEnabled(false);
++				QCoreApplication::processEvents();
++
++				QProcess proc;
++				proc.start("pkg", QStringList() << "remove" << "-y" << cachedPlugins[i].pkgName);
++				proc.waitForFinished();
++
++				if (proc.exitCode() == 0) {
++					cachedPlugins[i].isInstalled = false;
++					cachedPlugins[i].moduleName = "";
++					forceRestart_ = true;
++					saveCache();
++					reloadUI();
++				} else {
++					QString errorLog = proc.readAllStandardError();
++					QMessageBox::critical(this, "Uninstall Failed", "Termux APT Error:\n\n" + errorLog);
++					uninstallBtn->setEnabled(true);
++				}
++			});
++		}
++
++		allUiRows.append(PluginUI{mainRow, (data.displayName + " " + data.pkgName + " " + data.shortDesc).toLower()});
++
++		connect(detailsBtn, &QPushButton::clicked, this, [detailsBtn, detailsRow]() {
++			bool isNowVisible = !detailsRow->isVisible();
++			detailsRow->setVisible(isNowVisible);
++			detailsBtn->setIcon(QIcon(QString(":/icons/") + (isNowVisible ? "chevron-up.svg" : "chevron-down.svg")));
++		});
++	}
++
++	emit ui->searchBox->textChanged(ui->searchBox->text());
++}
++
++QString PluginManagerWindow::getCacheFilePath() const {
++	QString configDir = QDir::homePath() + "/.config/obs-studio/plugin_manager";
++	QDir().mkpath(configDir);
++	return configDir + "/apt_cache.json";
++}
++
++void PluginManagerWindow::saveCache() {
++	QJsonArray array;
++	for (const auto& p : cachedPlugins) {
++		QJsonObject obj;
++		obj["pkgName"] = p.pkgName;
++		obj["displayName"] = p.displayName;
++		obj["shortDesc"] = p.shortDesc;
++		obj["fullText"] = p.fullText;
++		obj["version"] = p.version;
++		obj["downloadSize"] = p.downloadSize;
++		obj["installedSize"] = p.installedSize;
++		obj["homepage"] = p.homepage;
++		obj["isInstalled"] = p.isInstalled;
++		obj["hasUpdate"] = p.hasUpdate;
++		obj["moduleName"] = p.moduleName;
++		array.append(obj);
++	}
++
++	QJsonDocument doc(array);
++	QFile file(getCacheFilePath());
++	if (file.open(QIODevice::WriteOnly)) {
++		file.write(doc.toJson());
++	}
++}
++
++bool PluginManagerWindow::loadCache() {
++	QFile file(getCacheFilePath());
++	if (!file.open(QIODevice::ReadOnly)) return false;
++
++	QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
++	if (!doc.isArray()) return false;
++
++	QJsonArray array = doc.array();
++	cachedPlugins.clear();
++
++	for (int i = 0; i < array.size(); ++i) {
++		QJsonObject obj = array[i].toObject();
++		FetchedPluginData data;
++		data.pkgName = obj["pkgName"].toString();
++		data.displayName = obj["displayName"].toString();
++		data.shortDesc = obj["shortDesc"].toString();
++		data.fullText = obj["fullText"].toString();
++		data.version = obj["version"].toString();
++		data.downloadSize = obj["downloadSize"].toString();
++		data.installedSize = obj["installedSize"].toString();
++		data.homepage = obj["homepage"].toString();
++		data.isInstalled = obj["isInstalled"].toBool();
++		data.hasUpdate = obj["hasUpdate"].toBool();
++		data.moduleName = obj["moduleName"].toString();
++
++		cachedPlugins.append(data);
++	}
++
++	return !cachedPlugins.isEmpty();
++}
++
++}; // namespace OBS
+diff --git a/frontend/plugin-manager-aarch64/PluginManagerWindow.hpp b/frontend/plugin-manager-aarch64/PluginManagerWindow.hpp
+new file mode 100644
+index 000000000..59791e832
+--- /dev/null
++++ b/frontend/plugin-manager-aarch64/PluginManagerWindow.hpp
+@@ -0,0 +1,112 @@
++/******************************************************************************
++    Copyright (C) 2025 by FiniteSingularity <finitesingularityttv@gmail.com>
++    Copyright (C) 2026 by lumaparallax <257510328+lumaparallax@users.noreply.github.com>
++
++    This program is free software: you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation, either version 2 of the License, or
++    (at your option) any later version.
++
++    This program is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License
++    along with this program.  If not, see <http://www.gnu.org/licenses/>.
++******************************************************************************/
++
++#pragma once
++
++#include "PluginManager.hpp"
++
++#include <QDialog>
++#include <vector>
++#include <string>
++#include <QList>
++#include <QString>
++#include <QCloseEvent>
++#include <QJsonDocument>
++#include <QJsonArray>
++#include <QJsonObject>
++#include <QFile>
++#include <QDir>
++
++namespace idian {
++	class PropertiesList;
++	class Row;
++}
++
++class QWidget;
++class QLayout;
++class QLabel;
++
++namespace Ui {
++class PluginManagerWindow;
++}
++
++namespace OBS {
++
++class PluginManagerWindow : public QDialog {
++	Q_OBJECT
++
++public:
++	struct FetchedPluginData {
++		QString pkgName;
++		QString displayName;
++		QString shortDesc;
++		QString fullText;
++		QString version;
++		QString downloadSize;
++		QString installedSize;
++		QString homepage;
++		bool isInstalled;
++		bool hasUpdate;
++		QString moduleName;
++	};
++
++	PluginManagerWindow(const std::vector<ModuleInfo> &modules, QWidget *parent = nullptr);
++	~PluginManagerWindow();
++
++	std::vector<ModuleInfo> getModifiedModules() const { return modules_; }
++	bool needsRestart() const { return forceRestart_ || hasUnsavedChanges(); }
++
++protected:
++	void closeEvent(QCloseEvent *event) override;
++
++private slots:
++	void onApplyClicked();
++	void onCancelClicked();
++	void populatePlugins();
++
++private:
++	Ui::PluginManagerWindow *ui;
++	std::vector<ModuleInfo> modules_;
++	std::vector<ModuleInfo> original_modules_;
++
++	idian::PropertiesList *storeList = nullptr;
++	idian::PropertiesList *manageList = nullptr;
++	QLabel *storeEmptyLabel = nullptr;
++	QLabel *manageEmptyLabel = nullptr;
++
++	struct PluginUI {
++		idian::Row* row;
++		QString searchString;
++	};
++	QList<PluginUI> allUiRows;
++
++	void reloadUI();
++	void clearLayout(QLayout* layout);
++
++	//--- Disk Cache Functions ---
++	QString getCacheFilePath() const;
++	bool loadCache();
++	void saveCache();
++
++	// Stateful Cache Variables
++	QList<FetchedPluginData> cachedPlugins;
++	bool forceRestart_ = false;
++	bool hasUnsavedChanges() const;
++};
++
++} // namespace OBS
+diff --git a/frontend/plugin-manager-aarch64/README.md b/frontend/plugin-manager-aarch64/README.md
+new file mode 100644
+index 000000000..cca861b39
+--- /dev/null
++++ b/frontend/plugin-manager-aarch64/README.md
+@@ -0,0 +1,16 @@
++# OBS Plugin Manager (Aarch64 / Termux)
++
++This directory contains a custom, mobile-optimized Plugin Manager specifically designed for the Android/Termux port of OBS Studio.
++
++## Architecture Differences
++The official desktop OBS plugin manager relies on fetching JSON manifests and managing binaries directly. In a Termux environment, plugins must be compiled natively for `aarch64` and managed via the system package manager (`apt`/`dpkg`) to ensure strict dependency resolution and environment stability.
++
++## Features
++* **Native Package Management:** Hooks directly into `apt-cache`, `apt`, and `dpkg` to search, install, update, and remove plugins natively on Android.
++* **Smart Disk Caching:** Utilizes a persistent local JSON cache (`apt_cache.json`) to provide instant, 0-second UI load times. System polling only occurs on the first boot or when explicitly requested via the Refresh button.
++* **Synchronous Stability:** Package operations execute synchronously to guarantee zero memory leaks, prevent zombie processes, and ensure clean application shutdowns.
++* **Smart Dependencies:** Runs dry-runs (`apt -s`) to warn users of installation sizes and complex dependency chains before execution.
++* **Fallback Metadata:** Gracefully handles missing `Installed-Size` or custom `X-Display-Name` metadata from local DEB packages.
++
++## Build Integration
++This module replaces the standard `plugin-manager` during the CMake build process when the Android target is detected.
+diff --git a/frontend/plugin-manager-aarch64/icons/chevron-down.svg b/frontend/plugin-manager-aarch64/icons/chevron-down.svg
+new file mode 100644
+index 000000000..608869054
+--- /dev/null
++++ b/frontend/plugin-manager-aarch64/icons/chevron-down.svg
+@@ -0,0 +1 @@
++<svg viewBox="0 0 24 24" fill="none" stroke="#888888" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><polyline points="6 9 12 15 18 9"/></svg>
+\ No newline at end of file
+diff --git a/frontend/plugin-manager-aarch64/icons/chevron-up.svg b/frontend/plugin-manager-aarch64/icons/chevron-up.svg
+new file mode 100644
+index 000000000..4bed3aab8
+--- /dev/null
++++ b/frontend/plugin-manager-aarch64/icons/chevron-up.svg
+@@ -0,0 +1 @@
++<svg viewBox="0 0 24 24" fill="none" stroke="#888888" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><polyline points="18 15 12 9 6 15"/></svg>
+\ No newline at end of file
+diff --git a/frontend/plugin-manager-aarch64/icons/refresh.svg b/frontend/plugin-manager-aarch64/icons/refresh.svg
+new file mode 100644
+index 000000000..8d51c100e
+--- /dev/null
++++ b/frontend/plugin-manager-aarch64/icons/refresh.svg
+@@ -0,0 +1 @@
++<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+\ No newline at end of file
+diff --git a/frontend/plugin-manager-aarch64/icons/trash-grey.svg b/frontend/plugin-manager-aarch64/icons/trash-grey.svg
+new file mode 100644
+index 000000000..2ab759762
+--- /dev/null
++++ b/frontend/plugin-manager-aarch64/icons/trash-grey.svg
+@@ -0,0 +1 @@
++<svg viewBox="0 0 24 24" fill="none" stroke="#555555" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+\ No newline at end of file
+diff --git a/frontend/plugin-manager-aarch64/icons/trash-red.svg b/frontend/plugin-manager-aarch64/icons/trash-red.svg
+new file mode 100644
+index 000000000..6485e7abe
+--- /dev/null
++++ b/frontend/plugin-manager-aarch64/icons/trash-red.svg
+@@ -0,0 +1 @@
++<svg viewBox="0 0 24 24" fill="none" stroke="#ff5555" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+\ No newline at end of file
+diff --git a/frontend/plugin-manager-aarch64/plugin-manager-aarch64.qrc b/frontend/plugin-manager-aarch64/plugin-manager-aarch64.qrc
+new file mode 100644
+index 000000000..64663df63
+--- /dev/null
++++ b/frontend/plugin-manager-aarch64/plugin-manager-aarch64.qrc
+@@ -0,0 +1,9 @@
++<RCC>
++    <qresource prefix="/">
++        <file>icons/chevron-down.svg</file>
++        <file>icons/chevron-up.svg</file>
++        <file>icons/refresh.svg</file>
++        <file>icons/trash-grey.svg</file>
++        <file>icons/trash-red.svg</file>
++    </qresource>
++</RCC>
+diff --git a/frontend/plugin-manager-aarch64/plugin-manager-aarch64.ui b/frontend/plugin-manager-aarch64/plugin-manager-aarch64.ui
+new file mode 100644
+index 000000000..9a2bfc9c1
+--- /dev/null
++++ b/frontend/plugin-manager-aarch64/plugin-manager-aarch64.ui
+@@ -0,0 +1,143 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<ui version="4.0">
++ <class>PluginManagerWindow</class>
++ <widget class="QDialog" name="PluginManagerWindow">
++  <property name="geometry">
++   <rect>
++    <x>0</x>
++    <y>0</y>
++    <width>800</width>
++    <height>600</height>
++   </rect>
++  </property>
++  <property name="windowTitle">
++   <string>Plugin Store (BETA)</string>
++  </property>
++  <layout class="QVBoxLayout" name="mainLayout">
++   <property name="spacing">
++    <number>15</number>
++   </property>
++   <property name="leftMargin">
++    <number>15</number>
++   </property>
++   <property name="topMargin">
++    <number>15</number>
++   </property>
++   <property name="rightMargin">
++    <number>15</number>
++   </property>
++   <property name="bottomMargin">
++    <number>15</number>
++   </property>
++
++   <item>
++    <layout class="QHBoxLayout" name="topBarLayout">
++     <property name="spacing">
++      <number>10</number>
++     </property>
++     <item>
++      <widget class="QLineEdit" name="searchBox">
++       <property name="placeholderText">
++        <string>Search all plugins...</string>
++       </property>
++      </widget>
++     </item>
++     <item>
++      <widget class="QPushButton" name="refreshBtn">
++       <property name="toolTip">
++        <string>Check repository for updates</string>
++       </property>
++       <property name="cursor">
++        <cursorShape>PointingHandCursor</cursorShape>
++       </property>
++      </widget>
++     </item>
++    </layout>
++   </item>
++
++   <item>
++    <widget class="QTabWidget" name="tabs">
++     <property name="currentIndex">
++      <number>0</number>
++     </property>
++
++     <widget class="QWidget" name="storeTab">
++      <attribute name="title">
++       <string>Store</string>
++      </attribute>
++      <layout class="QVBoxLayout" name="verticalLayout_store">
++       <property name="spacing"><number>0</number></property>
++       <property name="leftMargin"><number>0</number></property>
++       <property name="topMargin"><number>0</number></property>
++       <property name="rightMargin"><number>0</number></property>
++       <property name="bottomMargin"><number>0</number></property>
++       <item>
++        <widget class="QScrollArea" name="storeScroll">
++         <property name="widgetResizable">
++          <bool>true</bool>
++         </property>
++         <property name="frameShape">
++          <enum>QFrame::NoFrame</enum>
++         </property>
++         <widget class="QWidget" name="storeContent">
++          <layout class="QVBoxLayout" name="storeLayout"/>
++         </widget>
++        </widget>
++       </item>
++      </layout>
++     </widget>
++
++     <widget class="QWidget" name="manageTab">
++      <attribute name="title">
++       <string>Manage</string>
++      </attribute>
++      <layout class="QVBoxLayout" name="verticalLayout_manage">
++       <property name="spacing"><number>0</number></property>
++       <property name="leftMargin"><number>0</number></property>
++       <property name="topMargin"><number>0</number></property>
++       <property name="rightMargin"><number>0</number></property>
++       <property name="bottomMargin"><number>0</number></property>
++       <item>
++        <widget class="QScrollArea" name="manageScroll">
++         <property name="widgetResizable">
++          <bool>true</bool>
++         </property>
++         <property name="frameShape">
++          <enum>QFrame::NoFrame</enum>
++         </property>
++         <widget class="QWidget" name="manageContent">
++          <layout class="QVBoxLayout" name="manageLayout"/>
++         </widget>
++        </widget>
++       </item>
++      </layout>
++     </widget>
++    </widget>
++   </item>
++
++   <item>
++    <widget class="QLabel" name="manageRestartLabel">
++     <property name="text">
++      <string>⚠️ Unsaved state changes. Click Apply to save.</string>
++     </property>
++     <property name="alignment">
++      <set>Qt::AlignCenter</set>
++     </property>
++    </widget>
++   </item>
++
++   <item>
++    <widget class="QDialogButtonBox" name="buttonBox">
++     <property name="orientation">
++      <enum>Qt::Horizontal</enum>
++     </property>
++     <property name="standardButtons">
++      <set>QDialogButtonBox::Apply|QDialogButtonBox::Cancel</set>
++     </property>
++    </widget>
++   </item>
++  </layout>
++ </widget>
++ <resources/>
++ <connections/>
++</ui>
+diff --git a/frontend/widgets/OBSBasic.cpp b/frontend/widgets/OBSBasic.cpp
+index e3277eb5f..02a1871ab 100644
+--- a/frontend/widgets/OBSBasic.cpp
++++ b/frontend/widgets/OBSBasic.cpp
+@@ -23,7 +23,11 @@
+ #include "ColorSelect.hpp"
+ #include "OBSBasicControls.hpp"
+ #include "OBSBasicStats.hpp"
++#ifdef __ANDROID__
++#include "plugin-manager-aarch64/PluginManager.hpp"
++#else
+ #include "plugin-manager/PluginManager.hpp"
++#endif
+ 
+ #include <obs-module.h>
+ 
+-- 
+2.53.0
+

@@ -1,0 +1,56 @@
+From ea0c1f18f7702c7e37c623df8057dd649210bcdc Mon Sep 17 00:00:00 2001
+From: lumaparallax <257510328+lumaparallax@users.noreply.github.com>
+Date: Fri, 20 Mar 2026 17:36:53 +0900
+Subject: [PATCH 05/16] core: Fix Android Bionic timespec and strict Clang cURL
+ warnings
+
+- libobs/util/platform.c: Android's Bionic libc lacks full support for
+  timespec_get(TIME_UTC) in certain NDK levels. Falling back to the standard
+  POSIX clock_gettime(CLOCK_REALTIME) ensures accurate timestamp offsets
+  without breaking standard Linux builds.
+
+- shared/file-updater: Termux's Clang toolchain is highly strict regarding
+  function pointer casting. Added an explicit (curl_write_callback) cast
+  to the header callback to resolve compilation errors.
+---
+ libobs/util/platform.c                          | 10 ++++++++--
+ shared/file-updater/file-updater/file-updater.c |  2 +-
+ 2 files changed, 9 insertions(+), 3 deletions(-)
+
+diff --git a/libobs/util/platform.c b/libobs/util/platform.c
+index 548afc03f..f00bf42ad 100644
+--- a/libobs/util/platform.c
++++ b/libobs/util/platform.c
+@@ -799,8 +799,14 @@ static struct {
+ 
+ static void init_timespec_offset(void)
+ {
+-	timespec_offset.ts_valid = timespec_get(&timespec_offset.ts, TIME_UTC) == TIME_UTC;
+-	timespec_offset.timestamp = os_gettime_ns();
++    struct timespec ts;
++    int ret = clock_gettime(CLOCK_REALTIME, &ts);
++
++    timespec_offset.ts_valid = (ret == 0);
++    if (ret == 0)
++        timespec_offset.ts = ts;
++
++    timespec_offset.timestamp = os_gettime_ns();
+ }
+ 
+ struct timespec *os_nstime_to_timespec(uint64_t timestamp, struct timespec *storage)
+diff --git a/shared/file-updater/file-updater/file-updater.c b/shared/file-updater/file-updater/file-updater.c
+index 1f3deb021..674c780ce 100644
+--- a/shared/file-updater/file-updater/file-updater.c
++++ b/shared/file-updater/file-updater/file-updater.c
+@@ -120,7 +120,7 @@ static bool do_http_request(struct update_info *info, const char *url, long *res
+ 
+ 	if (!info->remote_url) {
+ 		// We only care about headers from the main package file
+-		curl_easy_setopt(info->curl, CURLOPT_HEADERFUNCTION, http_header);
++		curl_easy_setopt(info->curl, CURLOPT_HEADERFUNCTION, (curl_write_callback)http_header);
+ 		curl_easy_setopt(info->curl, CURLOPT_HEADERDATA, info);
+ 	}
+ 
+-- 
+2.53.0
+

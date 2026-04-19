@@ -1,0 +1,693 @@
+diff --git a/frontend/plugin-manager-aarch64/PluginManagerWindow.cpp b/frontend/plugin-manager-aarch64/PluginManagerWindow.cpp
+index 9654ed63a..20c89f41c 100644
+--- a/frontend/plugin-manager-aarch64/PluginManagerWindow.cpp
++++ b/frontend/plugin-manager-aarch64/PluginManagerWindow.cpp
+@@ -35,6 +35,7 @@
+ #include <QCoreApplication>
+ #include <QTimer>
+ #include <QVBoxLayout>
++#include <QThread>
+ 
+ // JSON Caching Headers
+ #include <QJsonDocument>
+@@ -46,8 +47,6 @@
+ namespace OBS {
+ 
+ // --- CUSTOM DETAILS ROW ---
+-// Bypasses idian::Row's restricted column layout to allow 100% width wrapping
+-// and implements the "Inner Well" styling for the expanded chevron section.
+ class DetailsRow : public idian::GenericRow {
+ public:
+ 	QLabel *contentLabel;
+@@ -141,7 +140,10 @@ PluginManagerWindow::PluginManagerWindow(const std::vector<ModuleInfo> &modules,
+ 			}
+ 		}
+ 
+-		if (!cachedPlugins.isEmpty()) {
++		if (cachedPlugins.isEmpty()) {
++			storeEmptyLabel->setText("No plugins available in repository.");
++			manageEmptyLabel->setText("No plugins currently installed.");
++		} else {
+ 			storeEmptyLabel->setText(query.isEmpty() ? "No new plugins available." : "No plugins match your search.");
+ 			manageEmptyLabel->setText(query.isEmpty() ? "No plugins installed yet." : "No installed plugins match your search.");
+ 		}
+@@ -154,23 +156,17 @@ PluginManagerWindow::PluginManagerWindow(const std::vector<ModuleInfo> &modules,
+ 		ui->refreshBtn->setEnabled(false);
+ 		ui->searchBox->setEnabled(false);
+ 
+-		storeEmptyLabel->setText("Updating repository... UI will freeze momentarily.");
+-		manageEmptyLabel->setText("Updating repository... UI will freeze momentarily.");
++		storeEmptyLabel->setText("Updating repository... Please wait.");
++		manageEmptyLabel->setText("Updating repository... Please wait.");
+ 		storeEmptyLabel->setVisible(true);
+ 		manageEmptyLabel->setVisible(true);
+ 
+-		QCoreApplication::processEvents();
+-
+-		QProcess proc(this);
+-		proc.start("pkg", QStringList() << "update");
+-		proc.waitForFinished();
+-
+-		populatePlugins();
+-		saveCache();
+-		reloadUI();
+-
+-		ui->refreshBtn->setEnabled(true);
+-		ui->searchBox->setEnabled(true);
++		QProcess *proc = new QProcess(this);
++		connect(proc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this, [this, proc]() {
++			populatePlugins();
++			proc->deleteLater();
++		});
++		proc->start("pkg", QStringList() << "update");
+ 	});
+ 
+ 	if (loadCache()) {
+@@ -178,8 +174,6 @@ PluginManagerWindow::PluginManagerWindow(const std::vector<ModuleInfo> &modules,
+ 	} else {
+ 		QTimer::singleShot(50, this, [this]() {
+ 			populatePlugins();
+-			saveCache();
+-			reloadUI();
+ 		});
+ 	}
+ }
+@@ -220,125 +214,154 @@ void PluginManagerWindow::closeEvent(QCloseEvent *event) {
+ 	reject();
+ }
+ 
+-void PluginManagerWindow::clearLayout(QLayout* layout) {
+-	if (!layout) return;
+-	QLayoutItem *item;
+-	while ((item = layout->takeAt(0)) != nullptr) {
+-		if (QWidget *w = item->widget()) { w->deleteLater(); }
+-		delete item;
+-	}
+-}
+-
+ void PluginManagerWindow::populatePlugins()
+ {
+-	storeEmptyLabel->setText("Scanning local packages... UI will freeze momentarily.");
+-	manageEmptyLabel->setText("Scanning local packages... UI will freeze momentarily.");
++	storeEmptyLabel->setText("Scanning repository... Please wait.");
++	manageEmptyLabel->setText("Scanning repository... Please wait.");
+ 	storeEmptyLabel->setVisible(true);
+ 	manageEmptyLabel->setVisible(true);
+-	QCoreApplication::processEvents();
+ 
+-	cachedPlugins.clear();
++	ui->refreshBtn->setEnabled(false);
++	ui->searchBox->setEnabled(false);
+ 
+-	QProcess upgProc(this);
+-	upgProc.start("apt", QStringList() << "list" << "--upgradable");
+-	upgProc.waitForFinished();
+-	QString upgOutput = upgProc.readAllStandardOutput();
+-
+-	QProcess searchProcess(this);
+-	searchProcess.start("apt-cache", QStringList() << "search" << "^obs-");
+-	searchProcess.waitForFinished();
+-	QStringList lines = QString(searchProcess.readAllStandardOutput()).split('\n', Qt::SkipEmptyParts);
+-
+-	QRegularExpression xNameRegex("^X-Display-Name:\\s*(.*)$", QRegularExpression::MultilineOption);
+-	QRegularExpression descRegex("^Description:\\s*(.*)$", QRegularExpression::MultilineOption);
+-	QRegularExpression versionRegex("^Version:\\s*(.*)$", QRegularExpression::MultilineOption);
+-	QRegularExpression homepageRegex("^Homepage:\\s*(.*)$", QRegularExpression::MultilineOption);
+-	QRegularExpression sizeRegex("^Size:\\s*(\\d+)$", QRegularExpression::MultilineOption);
+-	QRegularExpression installedRegex("^Installed-Size:\\s*(\\d+)$", QRegularExpression::MultilineOption);
+-
+-	for (const QString &line : lines) {
+-		auto dashIndex = line.indexOf(" - ");
+-		if (dashIndex == -1) continue;
+-
+-		QString pkgName = line.left(dashIndex).trimmed();
+-		if (pkgName == "obs-studio" || pkgName == "obs-studio-dev") continue;
+-
+-		QProcess showProc(this);
+-		showProc.start("apt-cache", QStringList() << "show" << pkgName);
+-		showProc.waitForFinished();
+-		QString fullData = showProc.readAllStandardOutput();
+-
+-		qsizetype firstRecordEnd = fullData.indexOf("\n\n");
+-		if (firstRecordEnd != -1) {
+-			fullData = fullData.left(firstRecordEnd);
+-		}
++	// Offload to background thread to prevent UI freezing
++	QThread *workerThread = QThread::create([this]() {
++		QList<FetchedPluginData> newPlugins;
+ 
+-		QRegularExpressionMatch match;
+-		FetchedPluginData data;
+-		data.pkgName = pkgName;
+-		data.version = (match = versionRegex.match(fullData)).hasMatch() ? match.captured(1).trimmed() : "Unknown";
+-		data.homepage = (match = homepageRegex.match(fullData)).hasMatch() ? match.captured(1).trimmed() : "Unknown";
+-		data.shortDesc = (match = descRegex.match(fullData)).hasMatch() ? match.captured(1).trimmed() : "No description available.";
++		// 1. Get Upgradable Packages
++		QProcess upgProc;
++		upgProc.start("apt", QStringList() << "list" << "--upgradable");
++		upgProc.waitForFinished();
++		QString upgOutput = upgProc.readAllStandardOutput();
+ 
+-		if ((match = xNameRegex.match(fullData)).hasMatch()) {
+-			data.displayName = match.captured(1).trimmed();
+-		} else {
+-			QString fallbackName = pkgName;
+-			if (fallbackName.startsWith("obs-")) {
+-				fallbackName.remove(0, 4);
+-				if (fallbackName.endsWith("-source")) fallbackName.chop(7);
+-				data.displayName = fallbackName;
+-			}
+-		}
++		// 2. Search for OBS plugins
++		QProcess searchProcess;
++		searchProcess.start("apt-cache", QStringList() << "search" << "^obs-");
++		searchProcess.waitForFinished();
++		QString searchOutput = searchProcess.readAllStandardOutput();
++		QStringList lines = searchOutput.split('\n', Qt::SkipEmptyParts);
+ 
+-		if ((match = sizeRegex.match(fullData)).hasMatch()) {
+-			double mb = match.captured(1).toDouble() / 1048576.0;
+-			data.downloadSize = (mb >= 1.0) ? QString::number(mb, 'f', 1) + " MB" : QString::number(match.captured(1).toDouble() / 1024.0, 'f', 0) + " KB";
+-		} else {
+-			data.downloadSize = "Unknown";
+-		}
++		QStringList pkgNames;
++		QMap<QString, QString> shortDescs;
+ 
+-		if ((match = installedRegex.match(fullData)).hasMatch()) {
+-			double mb = match.captured(1).toDouble() / 1024.0;
+-			data.installedSize = (mb >= 1.0) ? QString::number(mb, 'f', 1) + " MB" : match.captured(1).trimmed() + " KB";
+-		} else {
+-			data.installedSize = "Unknown";
+-		}
++		for (const QString &line : lines) {
++			int dashIndex = line.indexOf(" - ");
++			if (dashIndex == -1) continue;
+ 
+-		int descIndex = fullData.indexOf(descRegex);
+-		if (descIndex != -1) {
+-			int startOfLongDesc = fullData.indexOf('\n', descIndex) + 1;
+-			int endOfLongDesc = fullData.indexOf(QRegularExpression("\n[A-Z][a-zA-Z0-9-]*:"), startOfLongDesc);
+-			if (endOfLongDesc == -1) endOfLongDesc = fullData.length();
++			QString pkgName = line.left(dashIndex).trimmed();
++			if (pkgName == "obs-studio" || pkgName == "obs-studio-dev") continue;
+ 
+-			QString rawLongDesc = fullData.mid(startOfLongDesc, endOfLongDesc - startOfLongDesc).trimmed();
+-			rawLongDesc.replace("\n .", "\n\n");
+-			rawLongDesc.replace("\n ", "\n");
+-			data.fullText = rawLongDesc;
++			pkgNames.append(pkgName);
++			shortDescs[pkgName] = line.mid(dashIndex + 3).trimmed();
+ 		}
+ 
+-		QProcess checkProc(this);
+-		checkProc.start("dpkg-query", QStringList() << "-W" << "-f=${Status}" << pkgName);
+-		checkProc.waitForFinished();
+-		data.isInstalled = QString(checkProc.readAllStandardOutput()).contains("installed");
+-		data.hasUpdate = upgOutput.contains(pkgName + "/");
+-
+-		data.moduleName = "";
+-		if (data.isInstalled) {
+-			QProcess fileProc(this);
+-			fileProc.start("dpkg", QStringList() << "-L" << pkgName);
+-			fileProc.waitForFinished();
+-			for (const QString& f : QString(fileProc.readAllStandardOutput()).split('\n')) {
+-				if (f.endsWith(".so")) {
+-					data.moduleName = f.mid(f.lastIndexOf('/') + 1);
+-					data.moduleName.replace(".so", "");
+-					break;
++		if (!pkgNames.isEmpty()) {
++			// 3. Batch Metadata Query (Fixes N+1 Query issue)
++			QProcess showProc;
++			QStringList showArgs;
++			showArgs << "show" << pkgNames;
++			showProc.start("apt-cache", showArgs);
++			showProc.waitForFinished();
++			QString fullData = showProc.readAllStandardOutput();
++			QStringList blocks = fullData.split("\n\n", Qt::SkipEmptyParts);
++
++			QRegularExpression xNameRegex("^X-Display-Name:\\s*(.*)$", QRegularExpression::MultilineOption);
++			QRegularExpression versionRegex("^Version:\\s*(.*)$", QRegularExpression::MultilineOption);
++			QRegularExpression homepageRegex("^Homepage:\\s*(.*)$", QRegularExpression::MultilineOption);
++			QRegularExpression sizeRegex("^Size:\\s*(\\d+)$", QRegularExpression::MultilineOption);
++			QRegularExpression packageRegex("^Package:\\s*(.*)$", QRegularExpression::MultilineOption);
++
++			QMap<QString, FetchedPluginData> tempMap;
++
++			for (const QString& block : blocks) {
++				QRegularExpressionMatch match = packageRegex.match(block);
++				if (!match.hasMatch()) continue;
++				QString pkgName = match.captured(1).trimmed();
++
++				FetchedPluginData data;
++				data.pkgName = pkgName;
++				data.shortDesc = shortDescs.value(pkgName, "No description available.");
++				data.version = (match = versionRegex.match(block)).hasMatch() ? match.captured(1).trimmed() : "Unknown";
++				data.homepage = (match = homepageRegex.match(block)).hasMatch() ? match.captured(1).trimmed() : "Unknown";
++
++				if ((match = xNameRegex.match(block)).hasMatch()) {
++					data.displayName = match.captured(1).trimmed();
++				} else {
++					QString fallbackName = pkgName;
++					if (fallbackName.startsWith("obs-")) fallbackName.remove(0, 4);
++					if (fallbackName.endsWith("-source")) fallbackName.chop(7);
++					data.displayName = fallbackName;
++				}
++
++				if ((match = sizeRegex.match(block)).hasMatch()) {
++					double mb = match.captured(1).toDouble() / 1048576.0;
++					data.downloadSize = (mb >= 1.0) ? QString::number(mb, 'f', 1) + " MB" : QString::number(match.captured(1).toDouble() / 1024.0, 'f', 0) + " KB";
++				} else {
++					data.downloadSize = "Unknown";
++				}
++
++				data.isInstalled = false;
++				data.installedSize = "Unknown";
++				data.hasUpdate = upgOutput.contains(pkgName + "/");
++				data.moduleName = "";
++
++				tempMap[pkgName] = data;
++			}
++
++			// 4. Batch Installation Check
++			QProcess checkProc;
++			QStringList checkArgs;
++			checkArgs << "-W" << "-f=${Package}|${Status}|${Installed-Size}\n" << pkgNames;
++			checkProc.start("dpkg-query", checkArgs);
++			checkProc.waitForFinished();
++			QString checkOutput = checkProc.readAllStandardOutput();
++
++			for (const QString& line : checkOutput.split('\n', Qt::SkipEmptyParts)) {
++				QStringList parts = line.split('|');
++				if (parts.size() >= 3) {
++					QString pkgName = parts[0].trimmed();
++					if (tempMap.contains(pkgName)) {
++						tempMap[pkgName].isInstalled = parts[1].contains("installed");
++						double mb = parts[2].toDouble() / 1024.0;
++						tempMap[pkgName].installedSize = (mb >= 1.0) ? QString::number(mb, 'f', 1) + " MB" : parts[2].trimmed() + " KB";
++
++						if (tempMap[pkgName].isInstalled) {
++							QProcess fileProc;
++							fileProc.start("dpkg", QStringList() << "-L" << pkgName);
++							fileProc.waitForFinished();
++							for (const QString& f : QString(fileProc.readAllStandardOutput()).split('\n')) {
++								if (f.endsWith(".so")) {
++									QString mod = f.mid(f.lastIndexOf('/') + 1);
++									mod.replace(".so", "");
++									tempMap[pkgName].moduleName = mod;
++									break;
++								}
++							}
++						}
++					}
++				}
++			}
++
++			for (const QString& pkgName : pkgNames) {
++				if (tempMap.contains(pkgName)) {
++					newPlugins.append(tempMap[pkgName]);
+ 				}
+ 			}
+ 		}
+ 
+-		cachedPlugins.append(data);
+-	}
++		// Push to main thread
++		QMetaObject::invokeMethod(this, [this, newPlugins]() {
++			this->cachedPlugins = newPlugins;
++			this->saveCache();
++			this->reloadUI();
++			ui->refreshBtn->setEnabled(true);
++			ui->searchBox->setEnabled(true);
++		}, Qt::QueuedConnection);
++
++	});
++
++	connect(workerThread, &QThread::finished, workerThread, &QObject::deleteLater);
++	workerThread->start();
+ }
+ 
+ void PluginManagerWindow::reloadUI() {
+@@ -351,14 +374,12 @@ void PluginManagerWindow::reloadUI() {
+ 
+ 		idian::Row *mainRow = new idian::Row();
+ 
+-		// Main Typography Hierarchy
+ 		mainRow->setTitle(QString("<span style='font-size: 13pt; font-weight: 800; color: #ffffff;'>%1</span>").arg(data.displayName));
+ 		mainRow->setDescription(QString("<span style='font-size: 10pt; color: #aaaaaa;'>%1</span>").arg(data.shortDesc));
+ 
+ 		DetailsRow *detailsRow = new DetailsRow();
+ 		detailsRow->setVisible(false);
+ 
+-		// HTML Table for rigid alignment of metadata
+ 		QString detailsText = QString(
+ 			"<table width='100%' style='margin-bottom: 12px; margin-top: 4px;'>"
+ 			"<tr>"
+@@ -370,13 +391,7 @@ void PluginManagerWindow::reloadUI() {
+ 		).arg(data.version, data.downloadSize, data.installedSize);
+ 
+ 		if (data.homepage != "Unknown") {
+-			detailsText += QString("<span style='font-size: 10pt;'><b>Homepage:</b> <a href='%1' style='color: #8bb4f7; text-decoration: none;'>%1</a></span><br><br>").arg(data.homepage);
+-		}
+-
+-		if (!data.fullText.isEmpty()) {
+-			QString cleanDesc = data.fullText;
+-			cleanDesc.replace("\n", "<br>");
+-			detailsText += QString("<div style='color: #dddddd; line-height: 1.5; font-size: 10.5pt;'>%1</div>").arg(cleanDesc);
++			detailsText += QString("<span style='font-size: 10pt;'><b>Homepage:</b> <a href='%1' style='color: #8bb4f7; text-decoration: none;'>%1</a></span><br>").arg(data.homepage);
+ 		}
+ 
+ 		detailsRow->contentLabel->setText(detailsText);
+@@ -408,98 +423,97 @@ void PluginManagerWindow::reloadUI() {
+ 			storeList->addRow(detailsRow);
+ 
+ 			connect(installBtn, &QPushButton::clicked, this, [this, installBtn, i]() {
+-				installBtn->setText("Installing...");
++				installBtn->setText("Checking...");
+ 				installBtn->setEnabled(false);
+-				QCoreApplication::processEvents();
+-
+-				QProcess dryRunProc;
+-				dryRunProc.start("apt", QStringList() << "-s" << "install" << cachedPlugins[i].pkgName);
+-				dryRunProc.waitForFinished();
+ 
+-				if (dryRunProc.exitCode() != 0) {
+-					installBtn->setText("Error");
+-					installBtn->setEnabled(true);
+-					return;
+-				}
++				QProcess *dryRunProc = new QProcess(this);
++				connect(dryRunProc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this, [this, dryRunProc, installBtn, i](int exitCode) {
++					if (exitCode != 0) {
++						installBtn->setText("Error");
++						installBtn->setEnabled(true);
++						dryRunProc->deleteLater();
++						return;
++					}
+ 
+-				QString output = dryRunProc.readAllStandardOutput();
++					QString output = dryRunProc->readAllStandardOutput();
+ 
+-				if (output.contains("The following additional packages will be installed:")) {
+-					QString depsString = "";
+-					QStringList lines = output.split('\n');
+-					bool inDepList = false;
++					if (output.contains("The following additional packages will be installed:")) {
++						QString depsString = "";
++						QStringList lines = output.split('\n');
++						bool inDepList = false;
+ 
+-					for (const QString& line : lines) {
+-						if (line.startsWith("The following additional packages will be installed:")) {
+-							inDepList = true;
+-							continue;
+-						}
+-						if (inDepList) {
+-							if (line.startsWith("  ")) {
+-								depsString += line.trimmed() + " ";
+-							} else if (!line.trimmed().isEmpty()) {
+-								break;
++						for (const QString& line : lines) {
++							if (line.startsWith("The following additional packages will be installed:")) {
++								inDepList = true;
++								continue;
++							}
++							if (inDepList) {
++								if (line.startsWith("  ")) {
++									depsString += line.trimmed() + " ";
++								} else if (!line.trimmed().isEmpty()) {
++									break;
++								}
+ 							}
+ 						}
+-					}
+ 
+-					depsString = depsString.trimmed().replace(" ", ", ");
++						depsString = depsString.trimmed().replace(" ", ", ");
+ 
+-					QString diskSpace = "Significant additional disk space will be used.";
+-					qsizetype spaceIdx = output.indexOf("After this operation, ");
+-					if (spaceIdx != -1) {
+-						qsizetype endIdx = output.indexOf("used.", spaceIdx);
+-						if (endIdx != -1) {
+-							diskSpace = output.mid(spaceIdx, endIdx - spaceIdx + 5).trimmed();
++						QString diskSpace = "Significant additional disk space will be used.";
++						qsizetype spaceIdx = output.indexOf("After this operation, ");
++						if (spaceIdx != -1) {
++							qsizetype endIdx = output.indexOf("used.", spaceIdx);
++							if (endIdx != -1) diskSpace = output.mid(spaceIdx, endIdx - spaceIdx + 5).trimmed();
+ 						}
+-					}
+-
+-					QMessageBox::StandardButton reply = QMessageBox::question(this,
+-						"Dependencies Required",
+-						QString("To install this plugin, the following additional packages must also be installed:\n\n"
+-							"<b>%1</b>\n\n"
+-							"%2\n\n"
+-							"Do you want to proceed?").arg(depsString, diskSpace),
+-						QMessageBox::Yes | QMessageBox::No);
+ 
+-					if (reply == QMessageBox::No) {
+-						installBtn->setText("Install");
+-						installBtn->setEnabled(true);
+-						return;
++						QMessageBox::StandardButton reply = QMessageBox::question(this,
++							"Dependencies Required",
++							QString("To install this plugin, the following additional packages must also be installed:\n\n"
++								"<b>%1</b>\n\n%2\n\nDo you want to proceed?").arg(depsString, diskSpace),
++							QMessageBox::Yes | QMessageBox::No);
++
++						if (reply == QMessageBox::No) {
++							installBtn->setText("Install");
++							installBtn->setEnabled(true);
++							dryRunProc->deleteLater();
++							return;
++						}
+ 					}
+ 
+ 					installBtn->setText("Installing...");
+-					QCoreApplication::processEvents();
+-				}
+ 
+-				QProcess installProc;
+-				installProc.start("pkg", QStringList() << "install" << "-y" << cachedPlugins[i].pkgName);
+-				installProc.waitForFinished();
+-
+-				if (installProc.exitCode() == 0) {
+-					QProcess fileProc;
+-					fileProc.start("dpkg", QStringList() << "-L" << cachedPlugins[i].pkgName);
+-					fileProc.waitForFinished();
+-					for (const QString& f : QString(fileProc.readAllStandardOutput()).split('\n')) {
+-						if (f.endsWith(".so")) {
+-							QString modName = f.mid(f.lastIndexOf('/') + 1);
+-							modName.replace(".so", "");
+-							cachedPlugins[i].moduleName = modName;
+-							break;
+-						}
+-					}
++					QProcess *installProc = new QProcess(this);
++					connect(installProc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this, [this, installProc, installBtn, i](int exitCode) {
++						if (exitCode == 0) {
++							// Sync lookup for .so is extremely fast, safe for main thread here
++							QProcess fileProc;
++							fileProc.start("dpkg", QStringList() << "-L" << cachedPlugins[i].pkgName);
++							fileProc.waitForFinished();
++							for (const QString& f : QString(fileProc.readAllStandardOutput()).split('\n')) {
++								if (f.endsWith(".so")) {
++									QString modName = f.mid(f.lastIndexOf('/') + 1);
++									modName.replace(".so", "");
++									cachedPlugins[i].moduleName = modName;
++									break;
++								}
++							}
+ 
+-					cachedPlugins[i].isInstalled = true;
+-					forceRestart_ = true;
+-					saveCache();
+-					reloadUI();
+-				} else {
+-					QString errorLog = installProc.readAllStandardError();
+-					QMessageBox::critical(this, "Installation Failed", "Termux APT Error:\n\n" + errorLog);
+-					installBtn->setText("Error");
+-					installBtn->setStyleSheet("background-color: rgba(200, 50, 50, 0.3); color: #f44; font-weight: bold; border-radius: 4px;");
+-					installBtn->setEnabled(true);
+-				}
++							cachedPlugins[i].isInstalled = true;
++							forceRestart_ = true;
++							saveCache();
++							reloadUI();
++						} else {
++							QString errorLog = installProc->readAllStandardError();
++							QMessageBox::critical(this, "Installation Failed", "Termux APT Error:\n\n" + errorLog);
++							installBtn->setText("Error");
++							installBtn->setStyleSheet("background-color: rgba(200, 50, 50, 0.3); color: #f44; font-weight: bold; border-radius: 4px;");
++							installBtn->setEnabled(true);
++						}
++						installProc->deleteLater();
++					});
++					installProc->start("pkg", QStringList() << "install" << "-y" << cachedPlugins[i].pkgName);
++					dryRunProc->deleteLater();
++				});
++				dryRunProc->start("apt", QStringList() << "-s" << "install" << cachedPlugins[i].pkgName);
+ 			});
+ 
+ 		} else {
+@@ -538,26 +552,26 @@ void PluginManagerWindow::reloadUI() {
+ 				connect(updateBtn, &QPushButton::clicked, this, [this, updateBtn, i]() {
+ 					updateBtn->setText("Updating...");
+ 					updateBtn->setEnabled(false);
+-					QCoreApplication::processEvents();
+-
+-					QProcess proc;
+-					proc.start("pkg", QStringList() << "upgrade" << "-y" << cachedPlugins[i].pkgName);
+-					proc.waitForFinished();
+ 
+-					if (proc.exitCode() == 0) {
+-						cachedPlugins[i].hasUpdate = false;
+-						forceRestart_ = true;
+-						saveCache();
+-						ui->manageRestartLabel->setVisible(true);
+-						ui->buttonBox->button(QDialogButtonBox::Apply)->setText("Apply & Restart");
+-						reloadUI();
+-					} else {
+-						QString errorLog = proc.readAllStandardError();
+-						QMessageBox::critical(this, "Update Failed", "Termux APT Error:\n\n" + errorLog);
+-						updateBtn->setText("Error");
+-						updateBtn->setStyleSheet("background-color: rgba(200, 50, 50, 0.3); color: #f44; font-weight: bold; border-radius: 4px;");
+-						updateBtn->setEnabled(true);
+-					}
++					QProcess *proc = new QProcess(this);
++					connect(proc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this, [this, proc, updateBtn, i](int exitCode) {
++						if (exitCode == 0) {
++							cachedPlugins[i].hasUpdate = false;
++							forceRestart_ = true;
++							saveCache();
++							ui->manageRestartLabel->setVisible(true);
++							ui->buttonBox->button(QDialogButtonBox::Apply)->setText("Apply & Restart");
++							reloadUI();
++						} else {
++							QString errorLog = proc->readAllStandardError();
++							QMessageBox::critical(this, "Update Failed", "Termux APT Error:\n\n" + errorLog);
++							updateBtn->setText("Error");
++							updateBtn->setStyleSheet("background-color: rgba(200, 50, 50, 0.3); color: #f44; font-weight: bold; border-radius: 4px;");
++							updateBtn->setEnabled(true);
++						}
++						proc->deleteLater();
++					});
++					proc->start("pkg", QStringList() << "upgrade" << "-y" << cachedPlugins[i].pkgName);
+ 				});
+ 			}
+ 
+@@ -599,25 +613,31 @@ void PluginManagerWindow::reloadUI() {
+ 				}
+ 			});
+ 
+-			connect(uninstallBtn, &QPushButton::clicked, this, [this, uninstallBtn, i]() {
++			connect(uninstallBtn, &QPushButton::clicked, this, [this, uninstallBtn, modIndex, i]() {
+ 				uninstallBtn->setEnabled(false);
+-				QCoreApplication::processEvents();
+-
+-				QProcess proc;
+-				proc.start("pkg", QStringList() << "remove" << "-y" << cachedPlugins[i].pkgName);
+-				proc.waitForFinished();
+-
+-				if (proc.exitCode() == 0) {
+-					cachedPlugins[i].isInstalled = false;
+-					cachedPlugins[i].moduleName = "";
+-					forceRestart_ = true;
+-					saveCache();
+-					reloadUI();
+-				} else {
+-					QString errorLog = proc.readAllStandardError();
+-					QMessageBox::critical(this, "Uninstall Failed", "Termux APT Error:\n\n" + errorLog);
+-					uninstallBtn->setEnabled(true);
+-				}
++
++				QProcess *proc = new QProcess(this);
++				connect(proc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this, [this, proc, uninstallBtn, modIndex, i](int exitCode) {
++					if (exitCode == 0) {
++						cachedPlugins[i].isInstalled = false;
++						cachedPlugins[i].moduleName = "";
++
++						// Properly clean internal memory states preventing ghost entries
++						if (modIndex != -1 && modIndex < modules_.size()) {
++							modules_.erase(modules_.begin() + modIndex);
++						}
++
++						forceRestart_ = true;
++						saveCache();
++						reloadUI();
++					} else {
++						QString errorLog = proc->readAllStandardError();
++						QMessageBox::critical(this, "Uninstall Failed", "Termux APT Error:\n\n" + errorLog);
++						uninstallBtn->setEnabled(true);
++					}
++					proc->deleteLater();
++				});
++				proc->start("pkg", QStringList() << "remove" << "-y" << cachedPlugins[i].pkgName);
+ 			});
+ 		}
+ 
+@@ -646,7 +666,6 @@ void PluginManagerWindow::saveCache() {
+ 		obj["pkgName"] = p.pkgName;
+ 		obj["displayName"] = p.displayName;
+ 		obj["shortDesc"] = p.shortDesc;
+-		obj["fullText"] = p.fullText;
+ 		obj["version"] = p.version;
+ 		obj["downloadSize"] = p.downloadSize;
+ 		obj["installedSize"] = p.installedSize;
+@@ -680,7 +699,6 @@ bool PluginManagerWindow::loadCache() {
+ 		data.pkgName = obj["pkgName"].toString();
+ 		data.displayName = obj["displayName"].toString();
+ 		data.shortDesc = obj["shortDesc"].toString();
+-		data.fullText = obj["fullText"].toString();
+ 		data.version = obj["version"].toString();
+ 		data.downloadSize = obj["downloadSize"].toString();
+ 		data.installedSize = obj["installedSize"].toString();
+@@ -695,4 +713,6 @@ bool PluginManagerWindow::loadCache() {
+ 	return !cachedPlugins.isEmpty();
+ }
+ 
++// Dead code PluginManagerWindow::clearLayout(QLayout* layout) was removed
++
+ }; // namespace OBS
+diff --git a/frontend/plugin-manager-aarch64/PluginManagerWindow.hpp b/frontend/plugin-manager-aarch64/PluginManagerWindow.hpp
+index 59791e832..1689d5490 100644
+--- a/frontend/plugin-manager-aarch64/PluginManagerWindow.hpp
++++ b/frontend/plugin-manager-aarch64/PluginManagerWindow.hpp
+@@ -26,11 +26,6 @@
+ #include <QList>
+ #include <QString>
+ #include <QCloseEvent>
+-#include <QJsonDocument>
+-#include <QJsonArray>
+-#include <QJsonObject>
+-#include <QFile>
+-#include <QDir>
+ 
+ namespace idian {
+ 	class PropertiesList;
+@@ -38,7 +33,6 @@ namespace idian {
+ }
+ 
+ class QWidget;
+-class QLayout;
+ class QLabel;
+ 
+ namespace Ui {
+@@ -55,7 +49,6 @@ public:
+ 		QString pkgName;
+ 		QString displayName;
+ 		QString shortDesc;
+-		QString fullText;
+ 		QString version;
+ 		QString downloadSize;
+ 		QString installedSize;
+@@ -96,7 +89,6 @@ private:
+ 	QList<PluginUI> allUiRows;
+ 
+ 	void reloadUI();
+-	void clearLayout(QLayout* layout);
+ 
+ 	//--- Disk Cache Functions ---
+ 	QString getCacheFilePath() const;

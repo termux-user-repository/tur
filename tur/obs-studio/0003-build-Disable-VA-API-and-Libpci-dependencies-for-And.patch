@@ -1,0 +1,333 @@
+From e54653eb1a05463c69f3729a960a14599af89e7c Mon Sep 17 00:00:00 2001
+From: lumaparallax <257510328+lumaparallax@users.noreply.github.com>
+Date: Fri, 20 Mar 2026 19:16:54 +0900
+Subject: [PATCH 03/16] build: Disable VA-API and Libpci dependencies for
+ Android/Termux compatibility
+
+---
+ cmake/finders/FindLibpci.cmake          |  2 +-
+ frontend/cmake/os-linux.cmake           | 10 +--
+ frontend/utility/system-info-termux.cpp | 84 +++++++++++--------------
+ libobs-opengl/gl-x11-egl.c              | 22 +++++--
+ plugins/obs-ffmpeg/CMakeLists.txt       | 14 ++---
+ plugins/obs-ffmpeg/obs-ffmpeg-vaapi.c   |  2 +-
+ plugins/obs-ffmpeg/obs-ffmpeg.c         |  2 +-
+ 7 files changed, 67 insertions(+), 69 deletions(-)
+
+diff --git a/cmake/finders/FindLibpci.cmake b/cmake/finders/FindLibpci.cmake
+index d923b46c3..0d5a237e7 100644
+--- a/cmake/finders/FindLibpci.cmake
++++ b/cmake/finders/FindLibpci.cmake
+@@ -47,7 +47,7 @@ find_path(
+   Libpci_INCLUDE_DIR
+   NAMES pci.h
+   HINTS ${PC_Libpci_INCLUDE_DIRS}
+-  PATHS /usr/include/ /usr/local/include
++  PATHS /usr/include/ /usr/local/include /usr/include/linux
+   PATH_SUFFIXES pci
+   DOC "Libpci include directory"
+ )
+diff --git a/frontend/cmake/os-linux.cmake b/frontend/cmake/os-linux.cmake
+index d146e7297..b43a9b8a8 100644
+--- a/frontend/cmake/os-linux.cmake
++++ b/frontend/cmake/os-linux.cmake
+@@ -4,20 +4,22 @@ target_sources(
+     utility/CrashHandler_Linux.cpp
+     utility/NativeEventFilter.cpp
+     utility/platform-x11.cpp
+-    utility/system-info-posix.cpp
++    $<$<BOOL:${OS_ANDROID}>:utility/system-info-termux.cpp>
++    $<$<NOT:$<BOOL:${OS_ANDROID}>>:utility/system-info-posix.cpp>
+ )
+ target_compile_definitions(
+   obs-studio
+   PRIVATE OBS_INSTALL_PREFIX="${OBS_INSTALL_PREFIX}" $<$<BOOL:${ENABLE_PORTABLE_CONFIG}>:ENABLE_PORTABLE_CONFIG>
+ )
+-target_link_libraries(obs-studio PRIVATE Qt::DBus)
++find_package(Qt6 REQUIRED COMPONENTS GuiPrivate)
++target_link_libraries(obs-studio PRIVATE Qt::GuiPrivate Qt::DBus)
+ 
+ if(Qt6_VERSION AND Qt6_VERSION VERSION_LESS "6.9.0")
+   target_link_libraries(obs-studio PRIVATE Qt::GuiPrivate)
+ endif()
+ 
+-find_package(Libpci REQUIRED)
+-target_link_libraries(obs-studio PRIVATE Libpci::pci)
++#find_package(Libpci REQUIRED)
++#target_link_libraries(obs-studio PRIVATE Libpci::pci)
+ 
+ if(TARGET OBS::python)
+   find_package(Python REQUIRED COMPONENTS Interpreter Development)
+diff --git a/frontend/utility/system-info-termux.cpp b/frontend/utility/system-info-termux.cpp
+index 453cd2b88..919290e43 100644
+--- a/frontend/utility/system-info-termux.cpp
++++ b/frontend/utility/system-info-termux.cpp
+@@ -1,36 +1,45 @@
+-#include "utility/system-info.hpp"
++#include "system-info.hpp"
+ #include "util/platform.h"
+ #include <sys/utsname.h>
+ #include <unistd.h>
+ #include <fstream>
+-#include <cstring>
+ #include <string>
+ #include <vector>
+ #include <optional>
+-#include <algorithm>
+ 
+ using namespace std;
+ 
+ namespace {
+ 
+-GoLiveApi::Gpu get_primary_gpu() {
++// DYNAMIC GPU QUERY: Ask OBS what GPU is currently rendering!
++std::optional<std::vector<GoLiveApi::Gpu>> system_gpu_data() {
++    std::vector<GoLiveApi::Gpu> adapter_info;
+     GoLiveApi::Gpu gpu{};
+-    gpu.vendor_id=0x5143;
+-    gpu.device_id = 0x0000;          // Vulkan info
+-    gpu.model = "Turnip Adreno (TM) 650";
+-    gpu.driver_version = "Mesa 25.3.3";
+-    gpu.dedicated_video_memory = 0;
+-    gpu.shared_system_memory = 7610ULL * 1024 * 1024;
+-    return gpu;
++
++    // Enter the OBS graphics context to query the live driver
++    obs_enter_graphics();
++    const char *renderer = gs_get_renderer();
++    const char *driver_ver = gs_get_driver_version();
++    gpu.dedicated_video_memory = gs_get_gpu_dmem() * 1024;
++    gpu.shared_system_memory = gs_get_gpu_smem() * 1024;
++    obs_leave_graphics();
++
++    gpu.vendor_id = 0; // PCI bus scanning is blocked by Android SELinux
++    gpu.device_id = 0;
++    gpu.model = renderer ? renderer : "Unknown Android GPU";
++    gpu.driver_version = driver_ver ? driver_ver : "Unknown Mesa/Driver";
++
++    adapter_info.push_back(gpu);
++    return adapter_info;
+ }
+ 
+ bool get_cpu_name(optional<string> &proc_name) {
+     ifstream file("/proc/cpuinfo");
+     string line;
+-    proc_name = "Unknown";
++    proc_name = "Unknown ARM Processor";
+     if (file.is_open()) {
+         while (getline(file, line)) {
+-            if (line.compare(0, 10, "model name") == 0 || line.compare(0, 9, "Processor") == 0) {
++            if (line.compare(0, 8, "Hardware") == 0 || line.compare(0, 9, "Processor") == 0 || line.compare(0, 10, "model name") == 0) {
+                 auto pos = line.find(':');
+                 if (pos != string::npos) {
+                     proc_name = line.substr(pos + 1);
+@@ -50,47 +59,30 @@ bool get_cpu_freq(uint32_t &cpu_freq) {
+     string line;
+     cpu_freq = 0;
+     if (f.is_open() && getline(f, line)) {
+-        cpu_freq = stoi(line) / 1000; // kHz → MHz
+-    }
+-    return true;
+-}
+-
+-bool get_total_memory(uint64_t &total_mem, uint64_t &free_mem) {
+-    ifstream meminfo("/proc/meminfo");
+-    string line;
+-    total_mem = free_mem = 0;
+-    if (!meminfo.is_open()) return false;
+-    while (getline(meminfo, line)) {
+-        if (line.find("MemTotal:") == 0)
+-            total_mem = stoull(line.substr(9)) * 1024;
+-        else if (line.find("MemFree:") == 0)
+-            free_mem = stoull(line.substr(8)) * 1024;
+-        if (total_mem && free_mem) break;
++        cpu_freq = stoi(line) / 1000; // kHz -> MHz
+     }
+     return true;
+ }
+ 
+ bool get_distribution_info(string &distro, string &version) {
+-    distro = "Termux/Android";
+-    version = "unknown";
++    distro = "Android (Termux)";
++    version = "Rolling";
+     return true;
+ }
+ 
+ } // namespace
+ 
+ void system_info(GoLiveApi::Capabilities &capabilities) {
+-    // Default-initialize
+-   capabilities = GoLiveApi::Capabilities{};
++    capabilities = GoLiveApi::Capabilities{};
+ 
+     // GPU
+-    capabilities.gpu.emplace( std::vector<GoLiveApi::Gpu>{get_primary_gpu()} );
++    capabilities.gpu = system_gpu_data();
+ 
+     // CPU
+     auto &cpu_data = capabilities.cpu;
+     cpu_data.physical_cores = os_get_physical_cores();
+     cpu_data.logical_cores = os_get_logical_cores();
+-    if (!get_cpu_name(cpu_data.name))
+-        cpu_data.name = "Unknown";
++    get_cpu_name(cpu_data.name);
+ 
+     uint32_t freq = 0;
+     if (get_cpu_freq(freq))
+@@ -98,32 +90,26 @@ void system_info(GoLiveApi::Capabilities &capabilities) {
+     else
+         cpu_data.speed = 0;
+ 
+-    // Memory
++    // Memory (DYNAMIC: Using native POSIX system configuration calls)
+     auto &mem_data = capabilities.memory;
+-    if (!get_total_memory(mem_data.total, mem_data.free)) {
+-        mem_data.total = 7610ULL * 1024 * 1024;
+-        mem_data.free = 200ULL * 1024 * 1024;
+-    }
++    mem_data.total = (uint64_t)sysconf(_SC_PHYS_PAGES) * (uint64_t)sysconf(_SC_PAGESIZE);
++    mem_data.free = (uint64_t)sysconf(_SC_AVPHYS_PAGES) * (uint64_t)sysconf(_SC_PAGESIZE);
+ 
+     // System info
+     auto &sys_data = capabilities.system;
+-    if (!get_distribution_info(sys_data.name, sys_data.release)) {
+-        sys_data.name = "Termux/Android";
+-        sys_data.release = "unknown";
+-    }
++    get_distribution_info(sys_data.name, sys_data.release);
++
+     struct utsname utsinfo;
+     if (uname(&utsinfo) == 0) {
+         sys_data.bits = strstr(utsinfo.machine, "64") ? 64 : 32;
+-        sys_data.arm = strstr(utsinfo.machine, "aarch") ? true : false;
++        sys_data.arm = strstr(utsinfo.machine, "aarch") || strstr(utsinfo.machine, "arm") ? true : false;
+         sys_data.version = string(utsinfo.sysname) + " " + utsinfo.release + " " + utsinfo.version;
+     } else {
+-        sys_data.bits = 32;
++        sys_data.bits = 64;
+         sys_data.arm = true;
+         sys_data.version = "unknown";
+     }
+ 
+     sys_data.armEmulation = os_get_emulation_status();
+-
+-    // Gaming features not supported
+     UNUSED_PARAMETER(capabilities.gaming_features);
+ }
+diff --git a/libobs-opengl/gl-x11-egl.c b/libobs-opengl/gl-x11-egl.c
+index d6d66fe4c..ee814d2ce 100644
+--- a/libobs-opengl/gl-x11-egl.c
++++ b/libobs-opengl/gl-x11-egl.c
+@@ -419,7 +419,7 @@ static bool gl_x11_egl_platform_init_swapchain(struct gs_swap_chain *swap)
+ 		goto fail_window_surface;
+ 	}
+ 
+-	const EGLSurface surface = eglCreateWindowSurface(plat->edisplay, plat->config, wid, 0);
++	const EGLSurface surface = eglCreateWindowSurface(plat->edisplay, plat->config, (EGLNativeWindowType)(uintptr_t)wid, 0);
+ 	if (EGL_NO_SURFACE == surface) {
+ 		blog(LOG_ERROR, "Cannot get window EGL surface: %s", get_egl_error_string());
+ 		goto fail_window_surface;
+@@ -517,26 +517,36 @@ static void gl_x11_egl_device_load_swapchain(gs_device_t *device, gs_swapchain_t
+ 
+ static void gl_x11_egl_device_present(gs_device_t *device)
+ {
+-	struct gl_platform *plat=device->plat;
+-	if(!plat || !plat->wi)
++	// 1. Ensure the device, platform, swapchain, AND window info pointer exist
++	if (!device || !device->plat || !device->cur_swap || !device->cur_swap->wi)
+ 		return;
+-	if(!plat || plat->wi->surface== EGL_NO_SURFACE)
++
++	// 2. Ensure the swapchain actually has a valid EGL surface initialized
++	if (device->cur_swap->wi->surface == EGL_NO_SURFACE)
+ 		return;
+-	if(eglGetCurrentSurface(EGL_DRAW)!=plat->wi->surface)
++
++	// 3. Ensure the current thread's draw surface matches the swapchain's surface
++	if (eglGetCurrentSurface(EGL_DRAW) != device->cur_swap->wi->surface)
+ 		return;
++
+ 	Display *display = device->plat->xdisplay;
+ 
++	// Flush Termux:X11 event queue to prevent server hangs
+ 	xcb_connection_t *xcb_conn = XGetXCBConnection(display);
+ 	xcb_generic_event_t *xcb_event;
+ 	while ((xcb_event = xcb_poll_for_event(xcb_conn))) {
+ 		free(xcb_event);
+ 	}
+ 
++	// Uncap framerate
+ 	if (eglSwapInterval(device->plat->edisplay, 0) == EGL_FALSE) {
+ 		blog(LOG_ERROR, "eglSwapInterval failed");
+ 	}
+-	if (!eglSwapBuffers(device->plat->edisplay, device->cur_swap->wi->surface))
++
++	// Present the frame safely
++	if (!eglSwapBuffers(device->plat->edisplay, device->cur_swap->wi->surface)) {
+ 		blog(LOG_ERROR, "Cannot swap EGL buffers: %s", get_egl_error_string());
++	}
+ }
+ 
+ static struct gs_texture *gl_x11_egl_device_texture_create_from_dmabuf(gs_device_t *device, unsigned int width,
+diff --git a/plugins/obs-ffmpeg/CMakeLists.txt b/plugins/obs-ffmpeg/CMakeLists.txt
+index 7d37eeb6e..7c3c364ae 100644
+--- a/plugins/obs-ffmpeg/CMakeLists.txt
++++ b/plugins/obs-ffmpeg/CMakeLists.txt
+@@ -23,9 +23,9 @@ target_sources(
+     $<$<BOOL:${ENABLE_NEW_MPEGTS_OUTPUT}>:obs-ffmpeg-rist.h>
+     $<$<BOOL:${ENABLE_NEW_MPEGTS_OUTPUT}>:obs-ffmpeg-srt.h>
+     $<$<BOOL:${ENABLE_NEW_MPEGTS_OUTPUT}>:obs-ffmpeg-url.h>
+-    $<$<PLATFORM_ID:Linux,FreeBSD,OpenBSD>:obs-ffmpeg-vaapi.c>
+-    $<$<PLATFORM_ID:Linux,FreeBSD,OpenBSD>:vaapi-utils.c>
+-    $<$<PLATFORM_ID:Linux,FreeBSD,OpenBSD>:vaapi-utils.h>
++    #$<$<PLATFORM_ID:Linux,FreeBSD,OpenBSD>:obs-ffmpeg-vaapi.c>
++    # $<$<PLATFORM_ID:Linux,FreeBSD,OpenBSD>:vaapi-utils.c>
++    #$<$<PLATFORM_ID:Linux,FreeBSD,OpenBSD>:vaapi-utils.h>
+     obs-ffmpeg-audio-encoders.c
+     obs-ffmpeg-av1.c
+     obs-ffmpeg-compat.h
+@@ -65,10 +65,10 @@ target_link_libraries(
+     FFmpeg::swresample
+     $<$<PLATFORM_ID:Windows>:OBS::w32-pthreads>
+     $<$<PLATFORM_ID:Windows>:ws2_32>
+-    $<$<PLATFORM_ID:Linux,FreeBSD,OpenBSD>:Libva::va>
+-    $<$<PLATFORM_ID:Linux,FreeBSD,OpenBSD>:Libva::drm>
+-    $<$<PLATFORM_ID:Linux,FreeBSD,OpenBSD>:Libpci::pci>
+-    $<$<PLATFORM_ID:Linux,FreeBSD,OpenBSD>:Libdrm::Libdrm>
++    #  $<$<PLATFORM_ID:Linux,FreeBSD,OpenBSD>:Libva::va>
++    #$<$<PLATFORM_ID:Linux,FreeBSD,OpenBSD>:Libva::drm>
++    #$<$<PLATFORM_ID:Linux,FreeBSD,OpenBSD>:Libpci::pci>
++    #$<$<PLATFORM_ID:Linux,FreeBSD,OpenBSD>:Libdrm::Libdrm>
+     $<$<BOOL:${ENABLE_NEW_MPEGTS_OUTPUT}>:Librist::Librist>
+     $<$<BOOL:${ENABLE_NEW_MPEGTS_OUTPUT}>:Libsrt::Libsrt>
+ )
+diff --git a/plugins/obs-ffmpeg/obs-ffmpeg-vaapi.c b/plugins/obs-ffmpeg/obs-ffmpeg-vaapi.c
+index 32d5f4fa5..c7b1ce925 100644
+--- a/plugins/obs-ffmpeg/obs-ffmpeg-vaapi.c
++++ b/plugins/obs-ffmpeg/obs-ffmpeg-vaapi.c
+@@ -40,7 +40,7 @@
+ #include <libavformat/avformat.h>
+ #include <libavfilter/avfilter.h>
+ 
+-#include <pci/pci.h>
++#include <linux/pci.h>
+ 
+ #include "vaapi-utils.h"
+ #include "obs-ffmpeg-formats.h"
+diff --git a/plugins/obs-ffmpeg/obs-ffmpeg.c b/plugins/obs-ffmpeg/obs-ffmpeg.c
+index d7880e51c..56df4b70b 100644
+--- a/plugins/obs-ffmpeg/obs-ffmpeg.c
++++ b/plugins/obs-ffmpeg/obs-ffmpeg.c
+@@ -9,7 +9,7 @@
+ #include <dxgi.h>
+ #endif
+ 
+-#if !defined(_WIN32) && !defined(__APPLE__)
++#if !defined(_WIN32) && !defined(__APPLE__) && !defined(__ANDROID__)
+ #include "vaapi-utils.h"
+ 
+ #define LIBAVUTIL_VAAPI_AVAILABLE
+-- 
+2.53.0
+
