@@ -1,0 +1,19 @@
+TERMUX_PKG_HOMEPAGE="https://github.com/zaphoyd/websocketpp"
+TERMUX_PKG_DESCRIPTION="C++ websocket client/server library"
+TERMUX_PKG_LICENSE="BSD 3-Clause"
+TERMUX_PKG_MAINTAINER="@lumaparallax"
+
+TERMUX_PKG_VERSION="0.8.2"
+
+TERMUX_PKG_SRCURL="git+https://github.com/zaphoyd/websocketpp.git"
+TERMUX_PKG_GIT_BRANCH="${TERMUX_PKG_VERSION}"
+
+TERMUX_PKG_AUTO_UPDATE=false
+
+TERMUX_PKG_DEPENDS="boost, openssl, zlib"
+
+TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
+-DBUILD_EXAMPLES=OFF
+-DBUILD_TESTS=OFF
+-DCMAKE_POLICY_VERSION_MINIMUM=3.5
+"
