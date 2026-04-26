@@ -17,20 +17,6 @@
 name: Packages-TUR
 
 on:
-  push:
-    branches:
-    - master
-    - dev
-    - 'dev/**'
-    paths:
-    - 'tur/**'
-    - 'tur-multilib/**'
-    - 'tur-hacking/**'
-  pull_request:
-    paths:
-    - 'tur/**'
-    - 'tur-multilib/**'
-    - 'tur-hacking/**'
   workflow_dispatch:
     inputs:
       packages:

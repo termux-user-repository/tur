@@ -1,5 +1,6 @@
 TERMUX_PKG_HOMEPAGE=https://github.com/bahdotsh/feedr
-TERMUX_PKG_DESCRIPTION="A feature-rich terminal-based RSS/Atom feed reader written in Rust"
+TERMUX_PKG_DESCRIPTION="A feature-rich terminal-based RSS/Atom feed re
+ader written in Rust"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@everywhereless"
 TERMUX_PKG_VERSION="0.7.0"
