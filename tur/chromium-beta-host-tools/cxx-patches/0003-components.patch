@@ -508,10 +508,10 @@ index a62f21b152..17b53b0cc8 100644
 --- a/components/accessibility_annotator/content/content_annotator/content_annotator_service.cc
 +++ b/components/accessibility_annotator/content/content_annotator/content_annotator_service.cc
 @@ -225,13 +225,15 @@ void ContentAnnotatorService::GenerateAnnotations(
- void ContentAnnotatorService::HandleModelExecutionResult(
-     optimization_guide::OptimizationGuideModelExecutionResult result,
-     std::unique_ptr<optimization_guide::ModelQualityLogEntry> log_entry) {
--  const std::optional<std::string> extracted_data =
+     return;
+   }
+
+-  std::optional<std::string> extracted_data =
 -      base::OptionalFromExpected(result.response)
 -          .transform([](const optimization_guide::proto::Any& any) {
 -            auto metadata = optimization_guide::ParsedAnyMetadata<
@@ -529,7 +529,7 @@ index a62f21b152..17b53b0cc8 100644
 +  }
  
    if (extracted_data.has_value() && !extracted_data->empty()) {
-     // TODO(crbug.com/482383206): Handle model execution response.
+     accessibility_annotator_backend_->SetContentAnnotationsCacheData(
 diff --git a/components/accessibility_annotator/core/storage/accessibility_annotator_database.cc b/components/accessibility_annotator/core/storage/accessibility_annotator_database.cc
 index c84ec94988..bdba9f4b64 100644
 --- a/components/accessibility_annotator/core/storage/accessibility_annotator_database.cc
@@ -14460,14 +14460,23 @@ diff --git a/components/contextual_search/input_state_model.cc b/components/cont
 index 6c21bb5782..39f37d3c75 100644
 --- a/components/contextual_search/input_state_model.cc
 +++ b/components/contextual_search/input_state_model.cc
-@@ -11,6 +11,7 @@
- #include <string_view>
+@@ -12,6 +12,7 @@
  #include <vector>
  
+ #include "base/check.h"
 +#include "base/containers/contains.h"
  #include "components/contextual_search/contextual_search_session_handle.h"
  #include "components/contextual_search/contextual_search_types.h"
  #include "components/contextual_search/pref_names.h"
+@@ -98,7 +98,7 @@ std::optional<omnibox::ModelMode> GetActiveModelFromUrl(
+   size_t max_matched_params = 0;
+ 
+   for (const auto& model_config : model_configs) {
+-    if (!std::ranges::contains(allowed_models, model_config.model())) {
++    if (!base::Contains(allowed_models, model_config.model())) {
+       continue;
+     }
+     if (model_config.aim_url_params().size() == 0) {
 @@ -220,7 +221,7 @@ template <typename T, typename U>
  bool AreItemsAllowed(const T& items, const U& allowed_items) {
    return std::all_of(items.begin(), items.end(),

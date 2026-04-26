@@ -12339,3 +12339,17 @@ index 0ec8bea97c..676c3fffa2 100644
    schemes->push_back({std::string(new_scheme), type});
  }
  
+diff --git a/net/device_bound_sessions/session_store_impl.cc b/net/device_bound_sessions/session_store_impl.cc
+index d49fd2728a..771e7eebcf 100644
+--- a/net/device_bound_sessions/session_store_impl.cc
++++ b/net/device_bound_sessions/session_store_impl.cc
+@@ -376,7 +376,8 @@ void SessionStoreImpl::OnGetAllKeysForGarbageCollection(
+     for (const auto& [_, session_proto] : site_sessions.sessions()) {
+       if (std::string_view wrapped_key = session_proto.wrapped_key();
+           !wrapped_key.empty()) {
+-        known_wrapped_keys.emplace(std::from_range, wrapped_key);
++        std::vector<uint8_t> key(wrapped_key.begin(), wrapped_key.end());
++        known_wrapped_keys.emplace(std::move(key));
+       }
+     }
+   }

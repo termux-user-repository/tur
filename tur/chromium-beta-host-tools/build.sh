@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://www.chromium.org/Home
 TERMUX_PKG_DESCRIPTION="Chromium web browser (Host tools)"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="@licy183"
-TERMUX_PKG_VERSION=147.0.7727.3
+TERMUX_PKG_VERSION=147.0.7727.116
 TERMUX_PKG_SRCURL=https://commondatastorage.googleapis.com/chromium-browser-official/chromium-$TERMUX_PKG_VERSION-lite.tar.xz
-TERMUX_PKG_SHA256=42bb5bd4dae1168db652b79a1fd5620ec397e3b79583b809e0be846d5ba7eb0e
+TERMUX_PKG_SHA256=44be73f82b1b670255b3c58676be08844ddf1bf5727d5fcdf430d214aa8d15bb
 TERMUX_PKG_DEPENDS="atk, cups, dbus, fontconfig, gtk3, krb5, libc++, libevdev, libxkbcommon, libminizip, libnss, libx11, mesa, openssl, pango, pulseaudio, zlib"
 TERMUX_PKG_BUILD_DEPENDS="libffi-static"
 # TODO: Split chromium-common and chromium-headless
@@ -72,6 +72,14 @@ termux_step_post_get_source() {
 		echo "Applying patch: $(basename $f)"
 		patch -p1 --silent < "$f"
 	done
+
+	# Enable jumbo build for //components and //chrome
+	python \
+		"$TERMUX_SCRIPTDIR/common-files/rewrite_gn_jumbo.py" \
+		"$TERMUX_PKG_SRCDIR" \
+		--verbose \
+		--subdirs chrome \
+		--subdirs components
 
 	# Apply patches for jumbo build
 	local f

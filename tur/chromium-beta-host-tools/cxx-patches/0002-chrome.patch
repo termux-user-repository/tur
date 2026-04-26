@@ -1242,7 +1242,7 @@ index cf6d28c7ca..6f758ab98b 100644
  #include "components/autofill/core/browser/data_manager/personal_data_manager.h"
  #include "components/autofill/core/browser/form_structure.h"
  #include "components/autofill/core/browser/foundations/autofill_client.h"
-@@ -34,7 +35,7 @@ void ActorKeyMetricsRecorder::OnSuggestionsGenerated(
+@@ -55,7 +56,7 @@
      FormGlobalId form_id,
      const base::flat_set<FillingProduct>& products) {
    for (FillingProduct product : products) {
@@ -1251,24 +1251,33 @@ index cf6d28c7ca..6f758ab98b 100644
    }
  }
  
-@@ -43,7 +44,7 @@ void ActorKeyMetricsRecorder::OnFormFilled(
-     base::span<const FieldGlobalId> field_ids,
-     const base::flat_set<FillingProduct>& products) {
-   for (FillingProduct product : products) {
--    states_[std::to_underlying(product)].actor_filled_fields[form_id].insert(
-+    states_[base::to_underlying(product)].actor_filled_fields[form_id].insert(
-         field_ids.begin(), field_ids.end());
-   }
+@@ -95,7 +96,7 @@
+       std::holds_alternative<const CreditCard*>(filling_payload)
+           ? FillingProduct::kCreditCard
+           : FillingProduct::kAddress;
+-  states_[std::to_underlying(product)].actor_filled_fields[form_id].insert(
++  states_[base::to_underlying(product)].actor_filled_fields[form_id].insert(
+       filled_field_ids.begin(), filled_field_ids.end());
  }
-@@ -70,7 +71,7 @@ void ActorKeyMetricsRecorder::RecordKeyMetrics(
+ 
+@@ -110,7 +111,7 @@
          product != FillingProduct::kCreditCard) {
        return;
      }
 -    ProductState& state = states_[std::to_underlying(product)];
 +    ProductState& state = states_[base::to_underlying(product)];
-     if (state.recorded_forms.contains(form_structure.global_id())) {
+     if (state.recorded_forms.contains(form.global_id())) {
        return;
      }
+@@ -247,7 +248,7 @@
+   };
+ 
+   if (product) {
+-    return check_state(states_[std::to_underlying(*product)]);
++    return check_state(states_[base::to_underlying(*product)]);
+   }
+ 
+   return std::ranges::any_of(states_, check_state);
 diff --git a/chrome/browser/autofill/actor/actor_key_metrics_recorder.h b/chrome/browser/autofill/actor/actor_key_metrics_recorder.h
 index f1f4cba046..b2ba39f23c 100644
 --- a/chrome/browser/autofill/actor/actor_key_metrics_recorder.h
@@ -1496,18 +1505,18 @@ index bc3337ab02..fd08cb7c48 100644
  
  #include "base/containers/adapters.h"
 +#include "base/containers/contains.h"
- #include "components/omnibox/common/logger.h"
  #include "base/feature_list.h"
  #include "base/logging.h"
-@@ -867,7 +868,7 @@ bool ContextualTasksUiService::HandleNavigationImpl(
+ #include "base/metrics/histogram_functions.h"
+@@ -847,7 +848,7 @@
    if (is_nav_to_ai &&
        net::GetValueForKeyInQuery(url_params.url, kDebugParam,
                                   &debug_param_value) &&
 -      debug_param_value.contains(kDebugNoCobrowseValue)) {
 +      base::Contains(debug_param_value, kDebugNoCobrowseValue)) {
      if (original_url_is_virtual) {
-       OMNIBOX_LOG("nav_trace") << "ContextualTasks navigation trace: HandleNavigationImpl "
-                  "posting LoadUrlInWebContents for debug param";
+       OMNIBOX_LOG("nav_trace")
+           << "ContextualTasks navigation trace: HandleNavigationImpl "
 diff --git a/chrome/browser/contextual_tasks/contextual_tasks_url_loader_factory_interceptor.cc b/chrome/browser/contextual_tasks/contextual_tasks_url_loader_factory_interceptor.cc
 index a31144a90e..1875bd5860 100644
 --- a/chrome/browser/contextual_tasks/contextual_tasks_url_loader_factory_interceptor.cc
@@ -6428,10 +6437,10 @@ index 4c489821a2..24ec335197 100644
  #include "base/base64.h"
  #include "base/base64url.h"
 +#include "base/containers/contains.h"
+ #include "base/containers/fixed_flat_map.h"
  #include "base/feature_list.h"
  #include "base/metrics/histogram_functions.h"
- #include "base/metrics/histogram_macros.h"
-@@ -267,7 +268,7 @@ bool MatchHasSideTypeAndRenderType(
+@@ -268,7 +269,7 @@
      const omnibox::GroupConfigMap& suggestion_groups_map) {
    omnibox::GroupId group_id =
        match.suggestion_group_id.value_or(omnibox::GROUP_INVALID);
@@ -6740,18 +6749,6 @@ index 13f0ab8cb3..b31cd5e253 100644
              printer.options.at(kCUPSEnterprisePrinter) == kValueTrue);
  #endif  // BUILDFLAG(IS_CHROMEOS)
  
-diff --git a/chrome/browser/ui/webui/sanitized_image_source.cc b/chrome/browser/ui/webui/sanitized_image_source.cc
-index 6a893b6ab8..2114f7d200 100644
---- a/chrome/browser/ui/webui/sanitized_image_source.cc
-+++ b/chrome/browser/ui/webui/sanitized_image_source.cc
-@@ -10,6 +10,7 @@
- #include <string>
- #include <string_view>
- 
-+#include "base/containers/contains.h"
- #include "base/memory/ref_counted_memory.h"
- #include "base/strings/strcat.h"
- #include "base/strings/string_util.h"
 diff --git a/chrome/browser/ui/webui/settings/captions_handler.cc b/chrome/browser/ui/webui/settings/captions_handler.cc
 index b1d09d7dff..37ec2331c3 100644
 --- a/chrome/browser/ui/webui/settings/captions_handler.cc
@@ -10326,3 +10323,68 @@ index 0d7cb23de4..153f462564 100644
          continue;
        }
  
+diff --git a/chrome/browser/glic/selection/selection_overlay_untrusted_ui.cc b/chrome/browser/glic/selection/selection_overlay_untrusted_ui.cc
+index 150b3d5214..14d08c4e62 100644
+--- a/chrome/browser/glic/selection/selection_overlay_untrusted_ui.cc
++++ b/chrome/browser/glic/selection/selection_overlay_untrusted_ui.cc
+@@ -5,6 +5,7 @@
+ #include "chrome/browser/glic/selection/selection_overlay_untrusted_ui.h"
+ 
+ #include "base/feature_list.h"
++#include "base/containers/contains.h"
+ #include "chrome/browser/glic/public/glic_enabling.h"
+ #include "chrome/browser/glic/resources/grit/glic_browser_resources.h"
+ #include "chrome/browser/glic/selection/selection_overlay_controller.h"
+@@ -98,8 +99,8 @@ SelectionOverlayUntrustedUI::SelectionOverlayUntrustedUI(content::WebUI* web_ui)
+                                  resource.id);
+ 
+     std::string_view path(resource.path);
+-    if (path.contains(".svg") ||
+-        path.contains("post_selection_paint_worklet.js")) {
++    if (base::Contains(path, ".svg") ||
++        base::Contains(path, "post_selection_paint_worklet.js")) {
+       html_source->AddResourcePath(
+           base::StrCat({"selection-overlay/", resource.path}), resource.id);
+     }
+diff --git a/chrome/browser/autocomplete/chrome_autocomplete_provider_client.cc b/chrome/browser/autocomplete/chrome_autocomplete_provider_client.cc
+index 16a9ede9ae..77e0c2b723 100644
+--- a/chrome/browser/autocomplete/chrome_autocomplete_provider_client.cc
++++ b/chrome/browser/autocomplete/chrome_autocomplete_provider_client.cc
+@@ -10,6 +10,7 @@
+ #include <string>
+ #include <vector>
+ 
++#include "base/containers/contains.h"
+ #include "base/feature_list.h"
+ #include "base/functional/callback_helpers.h"
+ #include "base/strings/cstring_view.h"
+@@ -204,7 +205,7 @@ bool IsContextualSearchFeatureEnabled(
+     return false;
+   }
+ 
+-  return std::ranges::contains(
++  return base::Contains(
+              kEnglishExpansionCountryCodes,
+              variations_service->GetStoredPermanentCountry()) &&
+          features->application_locale_storage() &&
+diff --git a/chrome/browser/glic/host/context/glic_page_features_manager.cc b/chrome/browser/glic/host/context/glic_page_features_manager.cc
+index 53f1ee8215..37f1d5f2e6 100644
+--- a/chrome/browser/glic/host/context/glic_page_features_manager.cc
++++ b/chrome/browser/glic/host/context/glic_page_features_manager.cc
+@@ -6,6 +6,7 @@
+ 
+ #include <algorithm>
+ 
++#include "base/containers/contains.h"
+ #include "base/functional/bind.h"
+ #include "base/metrics/histogram_functions.h"
+ #include "base/strings/utf_string_conversions.h"
+@@ -122,7 +123,7 @@ void GlicPageFeaturesManager::OnCheckResult(base::Value result) {
+         check_count_ == 0
+             ? YoutubeSummarizeVideoZSS::kButtonFoundOnFirstCheck
+             : YoutubeSummarizeVideoZSS::kButtonFoundOnSecondCheck);
+-    if (!std::ranges::contains(
++    if (!base::Contains(
+             cached_features_,
+             mojom::LightweightPageFeature::kYtAskButtonPresent)) {
+       cached_features_.push_back(
