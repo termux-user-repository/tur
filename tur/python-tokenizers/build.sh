@@ -2,13 +2,12 @@ TERMUX_PKG_HOMEPAGE=https://github.com/huggingface/tokenizers
 TERMUX_PKG_DESCRIPTION="Fast State-of-the-Art Tokenizers optimized for Research and Production"
 TERMUX_PKG_LICENSE="Apache-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="0.22.2"
-TERMUX_PKG_REVISION=3
+TERMUX_PKG_VERSION="0.23.1"
 TERMUX_PKG_SRCURL="https://github.com/huggingface/tokenizers/archive/refs/tags/v$TERMUX_PKG_VERSION.tar.gz"
-TERMUX_PKG_SHA256=05bffc70e12de04d4c060f9ecd404519aa069e93151c5642e7d731298d9273f6
+TERMUX_PKG_SHA256=aa906ad27ece40261e075e171e4a8873c2c5cfdbb64205170735d425f214c7ef
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_DEPENDS="libc++, python, python-pip"
-TERMUX_PKG_PYTHON_COMMON_BUILD_DEPS="maturin"
+TERMUX_PKG_PYTHON_COMMON_BUILD_DEPS="'maturin<1.13'"
 TERMUX_PKG_BUILD_IN_SRC=true
 
 termux_step_post_get_source() {
@@ -68,9 +67,9 @@ termux_step_make_install() {
 			echo "ERROR: Unknown architecture: $TERMUX_ARCH"
 			return 1 ;;
 	esac
-	local native_wheel_ext="${TERMUX_PKG_VERSION}-cp39-abi3-android_${ANDROID_API_LEVEL}_${native_wheel_arch}.whl"
+	local native_wheel_ext="${TERMUX_PKG_VERSION}-cp310-abi3-android_${ANDROID_API_LEVEL}_${native_wheel_arch}.whl"
 
-	# Fix wheel name, although it it built with tag `cp39-abi3`, but it is linked against `python3.x.so`
+	# Fix wheel name, although it it built with tag `cp310-abi3`, but it is linked against `python3.x.so`
 	# so it will not work on other pythons.
 	local _whl_orig="target/wheels/tokenizers-${native_wheel_ext}"
 	local _whl_dest="tokenizers-${TERMUX_PKG_VERSION}-py${TERMUX_PYTHON_VERSION/./}-none-any.whl"
