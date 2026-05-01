@@ -12353,3 +12353,27 @@ index d49fd2728a..771e7eebcf 100644
        }
      }
    }
+diff --git a/media/gpu/vaapi/vaapi_wrapper.cc b/media/gpu/vaapi/vaapi_wrapper.cc
+index f661ca1dc1..9b60e85126 100644
+--- a/media/gpu/vaapi/vaapi_wrapper.cc
++++ b/media/gpu/vaapi/vaapi_wrapper.cc
+@@ -676,8 +676,8 @@ bool IsLowPowerIntelProcessor() {
+         base::MatchPattern(cpuid.cpu_brand(), "Intel(R) Core(TM) *Y CPU*");
+ 
+     return cpuid.family() == kPentiumAndLaterFamily &&
+-           (cpuid.cpu_brand().contains("Pentium") ||
+-            cpuid.cpu_brand().contains("Celeron") || is_core_y_processor);
++           (base::Contains(cpuid.cpu_brand(), "Pentium") ||
++            base::Contains(cpuid.cpu_brand(), "Celeron") || is_core_y_processor);
+   }();
+ 
+   return is_low_power_intel;
+@@ -1721,7 +1721,7 @@ int VaapiWrapper::GetMaxNumDecoderInstances() {
+   constexpr int kAMDStoneyRidgeMaxNumOfInstances = 10;
+   auto va_display_state_handle = VADisplayStateSingleton::GetHandle();
+   if (va_display_state_handle &&
+-      va_display_state_handle->vendor_string().contains("stoney")) {
++      base::Contains(va_display_state_handle->vendor_string(), "stoney")) {
+     return kAMDStoneyRidgeMaxNumOfInstances;
+   }
+   // TODO(andrescj): we can relax this once we extract video decoding into its

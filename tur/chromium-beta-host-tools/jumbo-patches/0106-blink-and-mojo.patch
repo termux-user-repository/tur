@@ -4749,3 +4749,75 @@ index 2ae2d4fe39..67451e5e80 100644
  }  // namespace blink
 +
 +#undef GetRootDocumentOrNull
+diff --git a/third_party/blink/renderer/core/annotation/annotation_agent_impl.cc b/third_party/blink/renderer/core/annotation/annotation_agent_impl.cc
+index 3e04c36079..6ba30349d9 100644
+--- a/third_party/blink/renderer/core/annotation/annotation_agent_impl.cc
++++ b/third_party/blink/renderer/core/annotation/annotation_agent_impl.cc
+@@ -179,7 +179,7 @@ bool ShouldUseIsValidRangeAndMarkable(mojom::blink::AnnotationType type) {
+ // instant.
+ int GetGlicSmoothScrollThresholdInDIPs() {
+   const base::FeatureParam<int> glic_smooth_scroll_threshold_in_dips{
+-      &features::kProgrammaticScrollAnimationOverride,
++      &::features::kProgrammaticScrollAnimationOverride,
+       "glic_smooth_scroll_threshold_in_dips", 15000};
+   return glic_smooth_scroll_threshold_in_dips.Get();
+ }
+diff --git a/third_party/blink/renderer/core/html/html_login_element.cc b/third_party/blink/renderer/core/html/html_login_element.cc
+index a355aa2042..96f6846b30 100644
+--- a/third_party/blink/renderer/core/html/html_login_element.cc
++++ b/third_party/blink/renderer/core/html/html_login_element.cc
+@@ -27,6 +27,8 @@
+ #include "third_party/blink/renderer/platform/instrumentation/use_counter.h"
+ #include "third_party/blink/renderer/platform/wtf/functional.h"
+ 
++#define IsEnterKeyKeydownEvent IsEnterKeyKeydownEvent_html_login_element
++
+ namespace blink {
+ 
+ namespace {
+@@ -212,3 +214,5 @@ void HTMLLoginElement::Trace(Visitor* visitor) const {
+ }
+ 
+ }  // namespace blink
++
++#undef IsEnterKeyKeydownEvent
+diff --git a/third_party/blink/renderer/core/paint/svg_mask_painter.cc b/third_party/blink/renderer/core/paint/svg_mask_painter.cc
+index 7b16fc4f70..97f2b4cbb0 100644
+--- a/third_party/blink/renderer/core/paint/svg_mask_painter.cc
++++ b/third_party/blink/renderer/core/paint/svg_mask_painter.cc
+@@ -27,6 +27,9 @@
+ #include "third_party/blink/renderer/platform/graphics/scoped_image_rendering_settings.h"
+ #include "ui/gfx/geometry/rect_conversions.h"
+ 
++#define ScopedMaskLuminanceLayer ScopedMaskLuminanceLayer_svg_mask_painter
++#define ToMaskSourceIfSVGMask    SToMaskSourceIfSVGMask_svg_mask_painter
++
+ namespace blink {
+ 
+ namespace {
+@@ -333,3 +336,6 @@ gfx::RectF SVGMaskPainter::ResourceBoundsForSVGChild(
+ }
+ 
+ }  // namespace blink
++
++#undef ScopedMaskLuminanceLayer
++#undef ToMaskSourceIfSVGMask
+diff --git a/third_party/blink/renderer/core/timing/performance_timing.cc b/third_party/blink/renderer/core/timing/performance_timing.cc
+index bb862c3284..a5039ffbfd 100644
+--- a/third_party/blink/renderer/core/timing/performance_timing.cc
++++ b/third_party/blink/renderer/core/timing/performance_timing.cc
+@@ -22,6 +22,8 @@
+ #include "third_party/blink/renderer/platform/loader/fetch/resource_load_timing.h"
+ #include "third_party/blink/renderer/platform/loader/fetch/resource_response.h"
+ 
++#define ToIntegerMilliseconds ToIntegerMilliseconds_performance_timing
++
+ // Legacy support for NT1(https://www.w3.org/TR/navigation-timing/).
+ namespace blink {
+ 
+@@ -386,3 +388,5 @@ void PerformanceTiming::Trace(Visitor* visitor) const {
+ }
+ 
+ }  // namespace blink
++
++#undef ToIntegerMilliseconds

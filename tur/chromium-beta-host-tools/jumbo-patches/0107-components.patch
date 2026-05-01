@@ -2434,3 +2434,53 @@ index 4c54404c61..482574b839 100644
  #include "test_sample.pb.h"
  
  // base dependencies
+diff --git a/components/metrics/metrics_log.cc b/components/metrics/metrics_log.cc
+index 164e37e056..f112995a2f 100644
+--- a/components/metrics/metrics_log.cc
++++ b/components/metrics/metrics_log.cc
+@@ -382,8 +382,8 @@ void MetricsLog::RecordCoreSystemProfile(MetricsServiceClient* client,
+   // Exclude these switches which are very frequently on the command line but
+   // serve no meaningful purpose.
+   static const char* const kSwitchesToFilter[] = {
+-      switches::kFlagSwitchesBegin,
+-      switches::kFlagSwitchesEnd,
++      ::switches::kFlagSwitchesBegin,
++      ::switches::kFlagSwitchesEnd,
+   };
+ 
+   for (const char* filter_switch : kSwitchesToFilter)
+diff --git a/components/omnibox/browser/BUILD.gn b/components/omnibox/browser/BUILD.gn
+index ef72313073..a277e8bdbc 100644
+--- a/components/omnibox/browser/BUILD.gn
++++ b/components/omnibox/browser/BUILD.gn
+@@ -316,6 +316,9 @@ jumbo_source_set("browser") {
+     "zero_suggest_verbatim_match_provider.cc",
+     "zero_suggest_verbatim_match_provider.h",
+   ]
++  jumbo_excluded_sources = [
++    "omnibox_metrics_provider.cc",
++  ]
+ 
+   public_deps = [
+     ":aim_eligibility_service_features",
+diff --git a/components/omnibox/browser/remote_suggestions_service.cc b/components/omnibox/browser/remote_suggestions_service.cc
+index c6a07cdf91..c6bdfb59ae 100644
+--- a/components/omnibox/browser/remote_suggestions_service.cc
++++ b/components/omnibox/browser/remote_suggestions_service.cc
+@@ -36,6 +36,9 @@
+ #include "services/network/public/mojom/url_response_head.mojom.h"
+ #include "third_party/metrics_proto/omnibox_event.pb.h"
+ 
++#define kMaxPageTitleLength kMaxPageTitleLength_remote_suggestions_service
++#define TruncateUTF16       TruncateUTF16_remote_suggestions_service
++
+ namespace {
+ 
+ // Maximum length of page title sent to Suggest via `pageTitle` CGI param,
+@@ -833,3 +836,6 @@ void RemoteSuggestionsService::OnIndexedRequestCompleted(
+         .Run(request_index, source, response_code, std::move(response_body));
+   }
+ }
++
++#undef kMaxPageTitleLength
++#undef TruncateUTF16

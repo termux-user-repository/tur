@@ -3682,3 +3682,235 @@ index c37dd28a45..0f6ee5c96a 100644
      sources = lib_sources
      deps = lib_deps
      public_deps = lib_public_deps
+diff --git a/chrome/browser/BUILD.gn b/chrome/browser/BUILD.gn
+index d7dfe42837..fb1edefbfa 100644
+--- a/chrome/browser/BUILD.gn
++++ b/chrome/browser/BUILD.gn
+@@ -1585,6 +1585,7 @@ jumbo_source_set("browser") {
+     "page_load_metrics/observers/core/ukm_page_load_metrics_observer.cc",
+     "performance_manager/chrome_browser_main_extra_parts_performance_manager.cc",
+     "performance_manager/policies/keep_alive_dse_policy.cc",
++    "ssl/typed_navigation_upgrade_throttle.cc",
+   ]
+ 
+   if (is_android) {
+diff --git a/chrome/browser/extensions/api/instance_id/instance_id_api.cc b/chrome/browser/extensions/api/instance_id/instance_id_api.cc
+index 37c3e417be..9f1c1526fd 100644
+--- a/chrome/browser/extensions/api/instance_id/instance_id_api.cc
++++ b/chrome/browser/extensions/api/instance_id/instance_id_api.cc
+@@ -18,6 +18,8 @@
+ 
+ static_assert(BUILDFLAG(ENABLE_EXTENSIONS_CORE));
+ 
++#define kDisabled kDisabled_instance_id_api
++
+ namespace extensions {
+ 
+ namespace {
+@@ -177,3 +179,5 @@ void InstanceIDDeleteIDFunction::DeleteIDCompleted(
+ }
+ 
+ }  // namespace extensions
++
++#undef kDisabled
+diff --git a/chrome/browser/extensions/api/messaging/launch_context.cc b/chrome/browser/extensions/api/messaging/launch_context.cc
+index 6476f0e5a4..35e1f8e128 100644
+--- a/chrome/browser/extensions/api/messaging/launch_context.cc
++++ b/chrome/browser/extensions/api/messaging/launch_context.cc
+@@ -258,7 +258,7 @@ LaunchContext::BackgroundLaunchResult LaunchContext::LaunchInBackground(
+ 
+   if (send_connect_id && !connect_id.empty()) {
+     command_line.AppendArg(base::StrCat(
+-        {"--", switches::kNativeMessagingConnectId, "=", connect_id}));
++        {"--", ::switches::kNativeMessagingConnectId, "=", connect_id}));
+   }
+ 
+   if (auto state = LaunchNativeProcess(
+diff --git a/chrome/browser/glic/host/context/glic_tab_data.cc b/chrome/browser/glic/host/context/glic_tab_data.cc
+index 141d2b5d64..c132a854fb 100644
+--- a/chrome/browser/glic/host/context/glic_tab_data.cc
++++ b/chrome/browser/glic/host/context/glic_tab_data.cc
+@@ -32,6 +32,8 @@
+ #include "ui/gfx/image/image_skia_rep.h"
+ #include "ui/gfx/skia_util.h"
+ 
++#define IsForeground IsForeground_glic_tab_data
++
+ namespace glic {
+ 
+ namespace {
+@@ -359,3 +361,5 @@ bool FaviconEquals(const ::SkBitmap& a, const ::SkBitmap& b) {
+ }
+ 
+ }  // namespace glic
++
++#undef IsForeground
+diff --git a/chrome/browser/media/router/discovery/BUILD.gn b/chrome/browser/media/router/discovery/BUILD.gn
+index 47c1ecba72..2f149bc5da 100644
+--- a/chrome/browser/media/router/discovery/BUILD.gn
++++ b/chrome/browser/media/router/discovery/BUILD.gn
+@@ -59,6 +59,7 @@ jumbo_source_set("discovery") {
+     "media_sink_discovery_metrics.cc",
+     "media_sink_discovery_metrics.h",
+   ]
++  jumbo_excluded_sources = []
+   deps = [
+     "//base",
+     "//base:i18n",
+@@ -92,6 +93,7 @@ jumbo_source_set("discovery") {
+ 
+   if (is_posix) {
+     sources += [ "discovery_network_list_posix.cc" ]
++    jumbo_excluded_sources += [ "discovery_network_list_posix.cc" ]
+   }
+ 
+   if (is_mac) {
+diff --git a/chrome/browser/ui/views/passwords/password_change/successful_password_change_view.cc b/chrome/browser/ui/views/passwords/password_change/successful_password_change_view.cc
+index 17e448a1f7..0725214c04 100644
+--- a/chrome/browser/ui/views/passwords/password_change/successful_password_change_view.cc
++++ b/chrome/browser/ui/views/passwords/password_change/successful_password_change_view.cc
+@@ -29,6 +29,8 @@
+ #include "ui/views/layout/flex_layout.h"
+ #include "ui/views/vector_icons.h"
+ 
++#define ComputeRowMargins ComputeRowMargins_successful_password_change_view
++
+ namespace {
+ 
+ // Returns margins for a dialog.
+@@ -247,3 +249,5 @@ void SuccessfulPasswordChangeView::AddedToWidget() {
+ 
+ BEGIN_METADATA(SuccessfulPasswordChangeView)
+ END_METADATA
++
++#undef ComputeRowMargins
+diff --git a/chrome/browser/ui/views/tabs/tab_strip_action_container.cc b/chrome/browser/ui/views/tabs/tab_strip_action_container.cc
+index 16d8b565c9..958a5e75e7 100644
+--- a/chrome/browser/ui/views/tabs/tab_strip_action_container.cc
++++ b/chrome/browser/ui/views/tabs/tab_strip_action_container.cc
+@@ -74,6 +74,12 @@
+ #include "components/private_ai/features.h"
+ #endif  // !BUILDFLAG(IS_ANDROID)
+ 
++#define kExpansionInDuration  kExpansionInDuration_tab_strip_action_container
++#define kExpansionOutDuration kExpansionOutDuration_tab_strip_action_container
++#define kOpacityInDuration    kOpacityInDuration_tab_strip_action_container
++#define kOpacityOutDuration   kOpacityOutDuration_tab_strip_action_container
++#define kOpacityDelay         kOpacityDelay_tab_strip_action_container
++
+ namespace {
+ 
+ constexpr base::TimeDelta kExpansionInDuration = base::Milliseconds(500);
+@@ -1048,3 +1054,9 @@ void TabStripActionContainer::FinalizeHideGlicActorTaskIcon() {
+ 
+ BEGIN_METADATA(TabStripActionContainer)
+ END_METADATA
++
++#undef kExpansionInDuration
++#undef kExpansionOutDuration
++#undef kOpacityInDuration
++#undef kOpacityOutDuration
++#undef kOpacityDelay
+diff --git a/chrome/browser/vr/renderers/grid_renderer.cc b/chrome/browser/vr/renderers/grid_renderer.cc
+index efb602063e..f6cd1b170e 100644
+--- a/chrome/browser/vr/renderers/grid_renderer.cc
++++ b/chrome/browser/vr/renderers/grid_renderer.cc
+@@ -6,6 +6,9 @@
+ 
+ #include "device/vr/vr_gl_util.h"
+ 
++#define kVertexShader   kVertexShader_grid_renderer
++#define kFragmentShader kFragmentShader_grid_renderer
++
+ namespace vr {
+ 
+ namespace {
+@@ -75,3 +78,6 @@ void GridRenderer::Draw(const gfx::Transform& model_view_proj_matrix,
+   glDisableVertexAttribArray(position_handle_);
+ }
+ }  // namespace vr
++
++#undef kVertexShader
++#undef kFragmentShader
+diff --git a/chrome/browser/vr/renderers/radial_gradient_quad_renderer.cc b/chrome/browser/vr/renderers/radial_gradient_quad_renderer.cc
+index 14969f133f..2f9d133d31 100644
+--- a/chrome/browser/vr/renderers/radial_gradient_quad_renderer.cc
++++ b/chrome/browser/vr/renderers/radial_gradient_quad_renderer.cc
+@@ -11,6 +11,17 @@
+ #include "ui/gfx/geometry/size_f.h"
+ #include "ui/gfx/geometry/transform.h"
+ 
++#define kPositionDataSize kPositionDataSize_radial_gradient_quad_renderer
++#define kPositionDataOffset kPositionDataOffset_radial_gradient_quad_renderer
++#define kOffsetScaleDataSize kOffsetScaleDataSize_radial_gradient_quad_renderer
++#define kOffsetScaleDataOffset kOffsetScaleDataOffset_radial_gradient_quad_renderer
++#define kCornerPositionDataSize kCornerPositionDataSize_radial_gradient_quad_renderer
++#define kCornerPositionDataOffset kCornerPositionDataOffset_radial_gradient_quad_renderer
++#define kDataStride kDataStride_radial_gradient_quad_renderer
++#define kInnerRectOffset kInnerRectOffset_radial_gradient_quad_renderer
++#define kVertexShader kVertexShader_radial_gradient_quad_renderer
++#define kFragmentShader kFragmentShader_radial_gradient_quad_renderer
++
+ namespace vr {
+ 
+ namespace {
+@@ -203,3 +214,14 @@ void RadialGradientQuadRenderer::Draw(
+ }
+ 
+ }  // namespace vr
++
++#undef kPositionDataSize
++#undef kPositionDataOffset
++#undef kOffsetScaleDataSize
++#undef kOffsetScaleDataOffset
++#undef kCornerPositionDataSize
++#undef kCornerPositionDataOffset
++#undef kDataStride
++#undef kInnerRectOffset
++#undef kVertexShader
++#undef kFragmentShader
+diff --git a/components/gwp_asan/client/BUILD.gn b/components/gwp_asan/client/BUILD.gn
+index 4dc57404f3..f7c93c8240 100644
+--- a/components/gwp_asan/client/BUILD.gn
++++ b/components/gwp_asan/client/BUILD.gn
+@@ -51,6 +51,7 @@ jumbo_source_set("client") {
+     "thread_local_random_bit_generator.h",
+     "thread_local_state.h",
+   ]
++  jumbo_excluded_sources = []
+ 
+   if (is_win) {
+     sources += [ "guarded_page_allocator_win.cc" ]
+@@ -73,6 +74,9 @@ jumbo_source_set("client") {
+       "sampling_malloc_shims.cc",
+       "sampling_malloc_shims.h",
+     ]
++    jumbo_excluded_sources += [
++      "extreme_lightweight_detector_malloc_shims.cc",
++    ]
+   }
+ 
+   if (use_partition_alloc) {
+@@ -82,6 +86,9 @@ jumbo_source_set("client") {
+       "sampling_partitionalloc_shims.cc",
+       "sampling_partitionalloc_shims.h",
+     ]
++    jumbo_excluded_sources += [
++      "sampling_partitionalloc_shims.cc",
++    ]
+   }
+ 
+   configs += [
+diff --git a/components/gwp_asan/client/lightweight_detector/poison_metadata_recorder.cc b/components/gwp_asan/client/lightweight_detector/poison_metadata_recorder.cc
+index dd6418e1f8..bd7e8c9383 100644
+--- a/components/gwp_asan/client/lightweight_detector/poison_metadata_recorder.cc
++++ b/components/gwp_asan/client/lightweight_detector/poison_metadata_recorder.cc
+@@ -84,7 +84,7 @@ void PoisonMetadataRecorder::RecordAndZap(void* ptr, size_t size) {
+   slot_metadata.alloc_ptr = reinterpret_cast<uintptr_t>(ptr);
+ 
+   const void* trace[LightweightDetectorState::kMaxStackFrames];
+-  size_t len = AllocationInfo::GetStackTrace(trace);
++  size_t len = ::gwp_asan::internal::AllocationInfo::GetStackTrace(trace);
+   slot_metadata.dealloc.trace_len =
+       Pack(reinterpret_cast<uintptr_t*>(trace), len,
+            slot_metadata.deallocation_stack_trace,

@@ -1406,3 +1406,76 @@ index afa5209484..5bb5c6861d 100644
 +
 +#undef kAACPrimingFrameCount
 +#undef kAACRemainderFrameCount
+diff --git a/gpu/command_buffer/service/webgpu_decoder_impl.cc b/gpu/command_buffer/service/webgpu_decoder_impl.cc
+index 9d7c387a7a..7bb885f6f7 100644
+--- a/gpu/command_buffer/service/webgpu_decoder_impl.cc
++++ b/gpu/command_buffer/service/webgpu_decoder_impl.cc
+@@ -10,6 +10,9 @@
+ #include <string_view>
+ #include <vector>
+ 
++// Macro 'Status' from X11/Xlib.h will cause confliction
++#undef Status
++
+ #include "base/auto_reset.h"
+ #include "base/bits.h"
+ #include "base/compiler_specific.h"
+diff --git a/media/audio/alsa/alsa_input.cc b/media/audio/alsa/alsa_input.cc
+index 6386c367b2..15a95dc88f 100644
+--- a/media/audio/alsa/alsa_input.cc
++++ b/media/audio/alsa/alsa_input.cc
+@@ -21,6 +21,8 @@
+ #include "media/base/audio_sample_types.h"
+ #include "media/base/audio_timestamp_helper.h"
+ 
++#define kAlsaSampleFormat kAlsaSampleFormat_alsa_input
++
+ namespace media {
+ 
+ static const snd_pcm_format_t kAlsaSampleFormat = SND_PCM_FORMAT_S16;
+@@ -367,3 +369,5 @@ void AlsaPcmInputStream::HandleError(const char* method, int error) {
+ }
+ 
+ }  // namespace media
++
++#undef kAlsaSampleFormat
+diff --git a/media/audio/alsa/audio_manager_alsa.cc b/media/audio/alsa/audio_manager_alsa.cc
+index 3082aef4ba..2815cc281d 100644
+--- a/media/audio/alsa/audio_manager_alsa.cc
++++ b/media/audio/alsa/audio_manager_alsa.cc
+@@ -28,6 +28,9 @@
+ #include "media/base/limits.h"
+ #include "media/base/media_switches.h"
+ 
++#define kMaxOutputStreams kMaxOutputStreams_alsa
++#define kSampleFormat     kSampleFormat_alsa
++
+ namespace media {
+ 
+ // Maximum number of output streams that can be open simultaneously.
+@@ -371,3 +374,6 @@ AudioInputStream* AudioManagerAlsa::MakeInputStream(
+ }
+ 
+ }  // namespace media
++
++#undef kMaxOutputStreams
++#undef kSampleFormat
+diff --git a/media/audio/pulse/pulse_input.cc b/media/audio/pulse/pulse_input.cc
+index a46f182f01..29ee139cdf 100644
+--- a/media/audio/pulse/pulse_input.cc
++++ b/media/audio/pulse/pulse_input.cc
+@@ -16,6 +16,8 @@
+ #include "media/audio/pulse/pulse_util.h"
+ #include "media/base/audio_timestamp_helper.h"
+ 
++#define kSampleFormat kSampleFormat_PulseInput
++
+ namespace media {
+ 
+ using pulse::AutoPulseLock;
+@@ -413,3 +415,5 @@ bool PulseAudioInputStream::GetSourceInformation(pa_source_info_cb_t callback) {
+ }
+ 
+ }  // namespace media
++
++#undef kSampleFormat

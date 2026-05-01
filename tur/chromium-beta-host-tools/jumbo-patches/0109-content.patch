@@ -2442,3 +2442,268 @@ index 11b2a226ba..dbcb301e99 100644
  }  // namespace content
 +
 +#undef BindOnceForRvalueMemberMethod
+diff --git a/content/browser/devtools/protocol/emulation_handler.cc b/content/browser/devtools/protocol/emulation_handler.cc
+index d5d449a8f7..c005a2e1b5 100644
+--- a/content/browser/devtools/protocol/emulation_handler.cc
++++ b/content/browser/devtools/protocol/emulation_handler.cc
+@@ -45,6 +45,8 @@
+ #include "ui/display/mojom/screen_orientation.mojom.h"
+ #include "ui/events/gesture_detection/gesture_provider_config_helper.h"
+ 
++#define kCommandIsOnlyAvailableAtTopTarget kCommandIsOnlyAvailableAtTopTarget_emulation_handler
++
+ namespace content {
+ namespace protocol {
+ 
+@@ -1354,3 +1356,5 @@ void EmulationHandler::OnOrientationLockChanged(
+ 
+ }  // namespace protocol
+ }  // namespace content
++
++#undef kCommandIsOnlyAvailableAtTopTarget
+diff --git a/content/browser/installedapp/installed_app_provider_impl.cc b/content/browser/installedapp/installed_app_provider_impl.cc
+index 4c0e69daca..047bfece11 100644
+--- a/content/browser/installedapp/installed_app_provider_impl.cc
++++ b/content/browser/installedapp/installed_app_provider_impl.cc
+@@ -62,7 +62,7 @@ void InstalledAppProviderImpl::FilterInstalledApps(
+     bool add_saved_related_applications,
+     FilterInstalledAppsCallback callback) {
+   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+-  if (!base::FeatureList::IsEnabled(features::kInstalledAppProvider)) {
++  if (!base::FeatureList::IsEnabled(::features::kInstalledAppProvider)) {
+     base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+         FROM_HERE,
+         base::BindOnce(std::move(callback),
+@@ -92,7 +92,7 @@ void InstalledAppProviderImpl::FilterInstalledApps(
+   base::ConcurrentCallbacks<FetchRelatedAppsTaskResult> concurrent;
+ 
+ #if BUILDFLAG(IS_WIN)
+-  if (base::FeatureList::IsEnabled(features::kFilterInstalledAppsWinMatching)) {
++  if (base::FeatureList::IsEnabled(::features::kFilterInstalledAppsWinMatching)) {
+     StartTask(std::make_unique<FetchRelatedWinAppsTask>(
+                   native_win_app_fetcher_factory_.Run()),
+               related_apps, concurrent.CreateCallback());
+@@ -101,7 +101,7 @@ void InstalledAppProviderImpl::FilterInstalledApps(
+ 
+ #if !BUILDFLAG(IS_ANDROID)
+   if (base::FeatureList::IsEnabled(
+-          features::kFilterInstalledAppsWebAppMatching)) {
++          ::features::kFilterInstalledAppsWebAppMatching)) {
+     StartTask(std::make_unique<FetchRelatedWebAppsTask>(
+                   render_frame_host().GetBrowserContext()),
+               related_apps, concurrent.CreateCallback());
+diff --git a/content/browser/interest_group/ad_auction_headers_util.cc b/content/browser/interest_group/ad_auction_headers_util.cc
+index a695e4a749..f1bd6c3a01 100644
+--- a/content/browser/interest_group/ad_auction_headers_util.cc
++++ b/content/browser/interest_group/ad_auction_headers_util.cc
+@@ -337,7 +337,7 @@ void ProcessAdAuctionResponseHeaders(
+   // We intentionally leave the `Ad-Auction-Result` response header in place.
+ 
+   if (base::FeatureList::IsEnabled(
+-          features::kFledgeBiddingAndAuctionNonceSupport)) {
++          ::features::kFledgeBiddingAndAuctionNonceSupport)) {
+     if (std::optional<std::string> ad_auction_results =
+             headers->GetNormalizedHeader(
+                 kAdAuctionResultNonceResponseHeaderKey)) {
+diff --git a/content/browser/interest_group/ad_auction_result_metrics.cc b/content/browser/interest_group/ad_auction_result_metrics.cc
+index 44c4114c36..5c2d479a4f 100644
+--- a/content/browser/interest_group/ad_auction_result_metrics.cc
++++ b/content/browser/interest_group/ad_auction_result_metrics.cc
+@@ -53,9 +53,9 @@ AdAuctionResultMetrics::~AdAuctionResultMetrics() {
+ 
+ bool AdAuctionResultMetrics::ShouldRunAuction() {
+   num_requested_auctions_++;
+-  if (!base::FeatureList::IsEnabled(features::kFledgeLimitNumAuctions))
++  if (!base::FeatureList::IsEnabled(::features::kFledgeLimitNumAuctions))
+     return true;
+-  if (num_requested_auctions_ > features::kFledgeLimitNumAuctionsParam.Get()) {
++  if (num_requested_auctions_ > ::features::kFledgeLimitNumAuctionsParam.Get()) {
+     num_auctions_not_run_due_to_auction_limit_++;
+     return false;
+   }
+diff --git a/content/browser/interest_group/ad_auction_service_impl.cc b/content/browser/interest_group/ad_auction_service_impl.cc
+index 0f75f76282..8a8768402b 100644
+--- a/content/browser/interest_group/ad_auction_service_impl.cc
++++ b/content/browser/interest_group/ad_auction_service_impl.cc
+@@ -425,7 +425,7 @@ void AdAuctionServiceImpl::RunAdAuction(
+   // been invalidated or the current frame's `PageImpl` has changed to a
+   // different one, abort the auction.
+   // See crbug.com/1422301.
+-  if (base::FeatureList::IsEnabled(features::kDetectInconsistentPageImpl) &&
++  if (base::FeatureList::IsEnabled(::features::kDetectInconsistentPageImpl) &&
+       (!GetFrame()->auction_initiator_page() ||
+        GetFrame()->auction_initiator_page().get() !=
+            &(GetFrame()->GetPage()))) {
+@@ -463,7 +463,7 @@ void AdAuctionServiceImpl::RunAdAuction(
+ 
+   // Try to preconnect to owner and bidding signals origins if this is an
+   // on-device auction.
+-  if (base::FeatureList::IsEnabled(features::kFledgeUsePreconnectCache) &&
++  if (base::FeatureList::IsEnabled(::features::kFledgeUsePreconnectCache) &&
+       !config.server_response.has_value()) {
+     size_t n_owners_cached = PreconnectToBuyerOrigins(config);
+     for (const blink::AuctionConfig& component_config :
+@@ -749,7 +749,7 @@ scoped_refptr<SiteInstance> AdAuctionServiceImpl::GetFrameSiteInstance() {
+ network::mojom::ClientSecurityStatePtr
+ AdAuctionServiceImpl::GetClientSecurityState() {
+   if (base::FeatureList::IsEnabled(
+-          features::kFledgeOnlyUseIpAddressSpaceInClientSecurityState)) {
++          ::features::kFledgeOnlyUseIpAddressSpaceInClientSecurityState)) {
+     PolicyContainerHost* policies = GetFrame()->policy_container_host();
+     // This matches what GetFrame()->BuildClientSecurityState() does, in the no
+     // PolicyContainer case. According to comments there, PolicyContainerHost
+@@ -876,7 +876,7 @@ bool AdAuctionServiceImpl::JoinOrLeaveApiAllowedFromRenderer(
+             kCrossOriginOwnerInterestGroupSubframeCheckFailed);
+ 
+     if (base::FeatureList::IsEnabled(
+-            features::kFledgeModifyInterestGroupPolicyCheckOnOwner)) {
++            ::features::kFledgeModifyInterestGroupPolicyCheckOnOwner)) {
+       return false;
+     }
+   }
+@@ -954,7 +954,7 @@ void AdAuctionServiceImpl::OnAuctionComplete(
+   // been invalidated or the current frame's `PageImpl` has changed to a
+   // different one, abort the auction.
+   // See crbug.com/1422301.
+-  if (base::FeatureList::IsEnabled(features::kDetectInconsistentPageImpl) &&
++  if (base::FeatureList::IsEnabled(::features::kDetectInconsistentPageImpl) &&
+       (!GetFrame()->auction_initiator_page() ||
+        GetFrame()->auction_initiator_page().get() !=
+            &(GetFrame()->GetPage()))) {
+@@ -1265,7 +1265,7 @@ AdAuctionPageData* AdAuctionServiceImpl::GetAdAuctionPageData() {
+   // been invalidated or the current frame's `PageImpl` has changed to a
+   // different one, signal that state is no longer available.
+   // See crbug.com/1422301.
+-  if (base::FeatureList::IsEnabled(features::kDetectInconsistentPageImpl) &&
++  if (base::FeatureList::IsEnabled(::features::kDetectInconsistentPageImpl) &&
+       (!GetFrame()->auction_initiator_page() ||
+        GetFrame()->auction_initiator_page().get() !=
+            &(GetFrame()->GetPage()))) {
+diff --git a/content/browser/interest_group/auction_process_manager.cc b/content/browser/interest_group/auction_process_manager.cc
+index 989e8ac857..70a592d5d7 100644
+--- a/content/browser/interest_group/auction_process_manager.cc
++++ b/content/browser/interest_group/auction_process_manager.cc
+@@ -99,7 +99,7 @@ AuctionProcessManager::WorkletProcess::WorkletProcess(
+   if (is_idle_) {
+     remove_idle_process_from_manager_timer_.Start(
+         FROM_HERE,
+-        features::kFledgeStartAnticipatoryProcessExpirationTime.Get(),
++        ::features::kFledgeStartAnticipatoryProcessExpirationTime.Get(),
+         base::BindOnce(&RecordIdleProcessExpiredUma, true)
+             .Then(base::BindOnce(&WorkletProcess::RemoveFromProcessManager,
+                                  base::Unretained(this),
+@@ -393,7 +393,7 @@ void AuctionProcessManager::MaybeStartAnticipatoryProcess(
+     SiteInstance* frame_site_instance,
+     WorkletType worklet_type) {
+   if (!base::FeatureList::IsEnabled(
+-          features::kFledgeStartAnticipatoryProcesses)) {
++          ::features::kFledgeStartAnticipatoryProcesses)) {
+     return;
+   }
+ 
+diff --git a/content/browser/interest_group/auction_runner.cc b/content/browser/interest_group/auction_runner.cc
+index 7cd885aad5..7638b67865 100644
+--- a/content/browser/interest_group/auction_runner.cc
++++ b/content/browser/interest_group/auction_runner.cc
+@@ -761,7 +761,7 @@ void AuctionRunner::UpdateInterestGroupsPostAuction() {
+   });
+ 
+   if (base::FeatureList::IsEnabled(
+-          features::kFledgeDelayPostAuctionInterestGroupUpdate)) {
++          ::features::kFledgeDelayPostAuctionInterestGroupUpdate)) {
+     interest_group_manager_->UpdateInterestGroupsOfOwnersWithDelay(
+         std::move(update_owners), client_security_state_.Clone(),
+         std::move(user_agent_override_), std::move(attestation_callback_),
+diff --git a/content/browser/interest_group/auction_url_loader_factory_proxy.cc b/content/browser/interest_group/auction_url_loader_factory_proxy.cc
+index 9eedf1306b..034767abb8 100644
+--- a/content/browser/interest_group/auction_url_loader_factory_proxy.cc
++++ b/content/browser/interest_group/auction_url_loader_factory_proxy.cc
+@@ -63,7 +63,7 @@ net::IsolationInfo CreateTrustedSellerSignalsIsolationInfo(
+     const url::Origin& top_frame_origin,
+     const url::Origin& seller_origin) {
+   if (base::FeatureList::IsEnabled(
+-          features::kFledgeUseNonTransientNIKForSeller)) {
++          ::features::kFledgeUseNonTransientNIKForSeller)) {
+     return net::IsolationInfo::Create(
+         net::IsolationInfo::RequestType::kOther, top_frame_origin,
+         seller_origin, net::SiteForCookies(), /*nonce=*/std::nullopt,
+diff --git a/content/browser/interest_group/auction_worklet_manager.cc b/content/browser/interest_group/auction_worklet_manager.cc
+index c98b255e28..abf66cb6ff 100644
+--- a/content/browser/interest_group/auction_worklet_manager.cc
++++ b/content/browser/interest_group/auction_worklet_manager.cc
+@@ -338,7 +338,7 @@ void AuctionWorkletManager::WorkletOwner::RequestWorkletService(
+     // When `kFledgeUseKVv2SignalsCache` is enabled, the TrustedSignalsCache
+     // manages KVv2 fetches in the browser process, so don't need get a key to
+     // pass to the worklet process.
+-    if (!base::FeatureList::IsEnabled(features::kFledgeUseKVv2SignalsCache)) {
++    if (!base::FeatureList::IsEnabled(::features::kFledgeUseKVv2SignalsCache)) {
+       waiting_on_trusted_signals_kvv2_public_key_ = true;
+       worklet_manager_->delegate()->GetTrustedKeyValueServerKey(
+           url::Origin::Create(worklet_info_.signals_url.value_or(GURL())),
+@@ -688,7 +688,7 @@ void AuctionWorkletManager::WorkletOwner::LoadWorkletIfReady(
+ 
+       for (size_t i = 0;
+            i < static_cast<size_t>(
+-                   features::kFledgeSellerWorkletThreadPoolSize.Get());
++                   ::features::kFledgeSellerWorkletThreadPoolSize.Get());
+            ++i) {
+         worklet_debugs_.emplace_back(new DebuggableAuctionWorklet(
+             delegate->GetFrame(), process_handle_, worklet_info_.script_url,
+@@ -722,7 +722,7 @@ void AuctionWorkletManager::WorkletOwner::LoadWorkletIfReady(
+           worklet_info_.trusted_signals_coordinator &&
+           base::FeatureList::IsEnabled(
+               blink::features::kFledgeTrustedSignalsKVv2Support) &&
+-          base::FeatureList::IsEnabled(features::kFledgeUseKVv2SignalsCache)) {
++          base::FeatureList::IsEnabled(::features::kFledgeUseKVv2SignalsCache)) {
+         if (url::Origin::Create(worklet_info_.script_url)
+                 .IsSameOriginWith(*worklet_info_.signals_url)) {
+           // If the script and signals URLs are same-origin, they may always be
+diff --git a/content/browser/interest_group/bidding_and_auction_response.cc b/content/browser/interest_group/bidding_and_auction_response.cc
+index c7510b4439..6f7b3dcc94 100644
+--- a/content/browser/interest_group/bidding_and_auction_response.cc
++++ b/content/browser/interest_group/bidding_and_auction_response.cc
+@@ -113,7 +113,7 @@ std::optional<BiddingAndAuctionResponse> BiddingAndAuctionResponse::TryParse(
+   }
+ 
+   if (base::FeatureList::IsEnabled(
+-          features::kFledgeBiddingAndAuctionNonceSupport)) {
++          ::features::kFledgeBiddingAndAuctionNonceSupport)) {
+     const std::string* nonce = input_dict->FindString("nonce");
+     if (nonce) {
+       base::Uuid nonce_uuid = base::Uuid::ParseCaseInsensitive(*nonce);
+@@ -313,7 +313,7 @@ std::optional<BiddingAndAuctionResponse> BiddingAndAuctionResponse::TryParse(
+     }
+   }
+ 
+-  if (base::FeatureList::IsEnabled(features::kEnableBandAKAnonEnforcement)) {
++  if (base::FeatureList::IsEnabled(::features::kEnableBandAKAnonEnforcement)) {
+     base::DictValue* k_anon_winner_join_candidate =
+         input_dict->FindDict("kAnonWinnerJoinCandidates");
+     if (k_anon_winner_join_candidate) {
+@@ -331,7 +331,7 @@ std::optional<BiddingAndAuctionResponse> BiddingAndAuctionResponse::TryParse(
+ 
+   if (base::FeatureList::IsEnabled(blink::features::kPrivateAggregationApi) &&
+       blink::features::kPrivateAggregationApiEnabledInProtectedAudience.Get() &&
+-      base::FeatureList::IsEnabled(features::kEnableBandAPrivateAggregation)) {
++      base::FeatureList::IsEnabled(::features::kEnableBandAPrivateAggregation)) {
+     const base::ListValue* pagg_response = input_dict->FindList("paggResponse");
+     if (pagg_response) {
+       TryParsePAggResponse(*pagg_response, group_names, group_pagg_coordinators,
+@@ -339,7 +339,7 @@ std::optional<BiddingAndAuctionResponse> BiddingAndAuctionResponse::TryParse(
+     }
+   }
+ 
+-  if (base::FeatureList::IsEnabled(features::kEnableBandASampleDebugReports)) {
++  if (base::FeatureList::IsEnabled(::features::kEnableBandASampleDebugReports)) {
+     base::ListValue* for_debugging_only_reports =
+         input_dict->FindList("debugReports");
+     if (for_debugging_only_reports) {
+@@ -348,7 +348,7 @@ std::optional<BiddingAndAuctionResponse> BiddingAndAuctionResponse::TryParse(
+   }
+ 
+   base::DictValue* triggered_updates = input_dict->FindDict("updateGroups");
+-  if (base::FeatureList::IsEnabled(features::kEnableBandATriggeredUpdates) &&
++  if (base::FeatureList::IsEnabled(::features::kEnableBandATriggeredUpdates) &&
+       triggered_updates) {
+     for (const auto owner_groups : *triggered_updates) {
+       url::Origin owner = url::Origin::Create(GURL(owner_groups.first));

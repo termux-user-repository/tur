@@ -18,6 +18,11 @@ from pathlib import Path
 JUMBO_IMPORT = 'import("//build/config/jumbo.gni")'
 TARGET_RE = re.compile(r'^(\s*)(source_set|static_library|component)(\s*\()')
 TARGET_DEF_RE = re.compile(r'^(\s*)(source_set|static_library|component)\s*\(\s*"([^"]+)"\s*\)')
+JUMBO_TARGET_MAP = {
+    "source_set": "jumbo_source_set",
+    "static_library": "jumbo_static_library",
+    "component": "jumbo_component",
+}
 TOP_LEVEL_TARGET_RE = re.compile(
     r'^\s*(jumbo_source_set|jumbo_static_library|jumbo_component|source_set|static_library|component)\s*\('
 )
@@ -46,6 +51,7 @@ IGNORE_LIST_TEXT = """
 //components/spellcheck/renderer
 //chrome/browser/ui/color
 //chrome/browser/glic:glic
+//chrome/browser/ui/views/tabs/projects
 """
 
 
@@ -376,7 +382,8 @@ def transform_build_gn(text: str, skip_target_names: set[str]) -> tuple[str, boo
 
         match = TARGET_RE.match(line)
         if match:
-            kept_lines.append(f"{match.group(1)}jumbo_source_set{match.group(3)}{line[match.end(3):]}")
+            jumbo_target = JUMBO_TARGET_MAP[match.group(2)]
+            kept_lines.append(f"{match.group(1)}{jumbo_target}{line[match.end(2):]}")
             kept_scopes.append(line_scope)
             changed = True
             had_target = True
