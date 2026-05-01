@@ -1,0 +1,11 @@
+TERMUX_PKG_HOMEPAGE=https://github.com/trehansalil/call-cleaner
+TERMUX_PKG_DESCRIPTION="Sweep old call recordings on /sdcard with trash + restore"
+TERMUX_PKG_LICENSE="MIT"
+TERMUX_PKG_MAINTAINER="@trehansalil"
+TERMUX_PKG_VERSION=0.2.0
+TERMUX_PKG_SRCURL=https://files.pythonhosted.org/packages/ab/65/2e591c67d4411994f079a8675eba0975f3a24ff7985403f93b6015e36b9a/call_cleaner-${TERMUX_PKG_VERSION}.tar.gz
+TERMUX_PKG_SHA256=a1fd5b062566222c723e920f8c83d5dc13a21c30b70448be97cb69bf475cfb8e
+TERMUX_PKG_DEPENDS="python, termux-api"
+TERMUX_PKG_PYTHON_CROSS_BUILD_DEPS="wheel"
+TERMUX_PKG_BUILD_IN_SRC=true
+TERMUX_PKG_PLATFORM_INDEPENDENT=true
