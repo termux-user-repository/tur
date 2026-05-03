@@ -1,0 +1,25 @@
+diff --git i/Makefile w/Makefile
+index a88f57a..733b677 100644
+--- i/Makefile
++++ w/Makefile
+@@ -6,9 +6,9 @@ OptDbg=-ggdb
+ ifndef CWFLAGS
+ CWFLAGS=-Wall -Werror -Wstrict-prototypes -Wextra -Wno-unused-parameter -Wno-missing-field-initializers
+ endif
+-CFLAGS=$(OptDbg) -I. $(CWFLAGS)
++CFLAGS := $(CFLAGS) $(CPPFLAGS) $(LDFLAGS) -I.
+ 
+-PREFIX  = /usr
++PREFIX  ?= /usr
+ # STRIP = -s
+ INSTALL = /usr/bin/install
+ DESTDIR =
+@@ -88,7 +88,7 @@ dirs : targets artifacts
+ 
+ install : $(BIN)/wiggle wiggle.1
+ 	$(INSTALL) -d $(DESTDIR)$(BINDIR) $(DESTDIR)$(MAN1DIR)
+-	$(INSTALL) $(STRIP) -m 755 $(BIN)/wiggle $(DESTDIR)$(BINDIR)
++	$(INSTALL) -m 755 $(BIN)/wiggle $(DESTDIR)$(BINDIR)
+ 	$(INSTALL) -m 644 wiggle.1 $(DESTDIR)$(MAN1DIR)
+ 
+ version : ReadMe.c wiggle.1
