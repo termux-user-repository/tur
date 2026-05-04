@@ -10,3 +10,4 @@ TERMUX_PKG_PLATFORM_INDEPENDENT=true
 termux_step_make_install() {
     install -Dm755 "$TERMUX_PKG_SRCDIR/katifetch.sh" "$TERMUX_PREFIX/bin/katifetch"
 }
+# Final fix
