@@ -658,9 +658,9 @@ index 4464261866..5a7894b230 100644
 --- a/media/capture/BUILD.gn
 +++ b/media/capture/BUILD.gn
 @@ -3,6 +3,7 @@
+ # Use of this source code is governed by a BSD-style license that can be
  # found in the LICENSE file.
  
- import("//build/config/apple/mobile_config.gni")
 +import("//build/config/jumbo.gni")
  import("//build/config/ui.gni")
  import("//media/media_options.gni")
@@ -677,7 +677,7 @@ index 4464261866..5a7894b230 100644
 @@ -54,7 +55,7 @@ component("capture_base") {
  }
  
- # Target which allows breakout of Android BUILD.gn files.
+ # Target which allows breakout of platform-specific BUILD.gn files.
 -source_set("capture_device_specific") {
 +jumbo_source_set("capture_device_specific") {
    visibility = [

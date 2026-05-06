@@ -153,7 +153,7 @@ index d0260eb23d..2ad7fc2c0b 100644
      forward_variables_from(invoker, "*")
  
      check_includes = false
-@@ -766,6 +790,18 @@ skia_source_set("skia_core_and_effects") {
+@@ -917,6 +917,18 @@ skia_source_set("skia_core_and_effects") {
    sources += skia_effects_sources
    sources += skia_effects_imagefilter_sources
    sources += skia_pathops_sources
@@ -164,9 +164,9 @@ index d0260eb23d..2ad7fc2c0b 100644
 +    # TODO: Enable them
 +    "//third_party/skia/src/core/SkBitmapProcState_opts_ssse3.cpp",
 +    "//third_party/skia/src/core/SkBlitMask_opts_ssse3.cpp",
-+    "//third_party/skia/src/core/SkBlitRow_opts_hsw.cpp",
++    "//third_party/skia/src/core/SkBlitRow_opts_ml3.cpp",
 +    "//third_party/skia/src/core/SkMemset_opts_avx.cpp",
-+    "//third_party/skia/src/core/SkSwizzler_opts_hsw.cpp",
++    "//third_party/skia/src/core/SkSwizzler_opts_ml3.cpp",
 +    "//third_party/skia/src/core/SkSwizzler_opts_ssse3.cpp",
 +  ]
    deps = []
@@ -298,17 +298,6 @@ index 6b125ac834..95d27ac49d 100644
 +
 +#undef SK_OPTS_TARGET
 +#undef init
-diff --git a/third_party/skia/src/core/SkBlitRow_opts_hsw.cpp b/third_party/skia/src/core/SkBlitRow_opts_hsw.cpp
-index e110b8c3fa..a51bb5ae74 100644
---- a/third_party/skia/src/core/SkBlitRow_opts_hsw.cpp
-+++ b/third_party/skia/src/core/SkBlitRow_opts_hsw.cpp
-@@ -30,4 +30,6 @@ namespace SkOpts {
-     }
- }  // namespace SkOpts
- 
-+#undef SK_OPTS_TARGET
-+
- #endif // SK_CPU_X86 && !SK_ENABLE_OPTIMIZE_SIZE
 diff --git a/third_party/skia/src/core/SkGeometry.cpp b/third_party/skia/src/core/SkGeometry.cpp
 index 8500efdf2e..e1b3469d0a 100644
 --- a/third_party/skia/src/core/SkGeometry.cpp
@@ -447,17 +436,6 @@ index 0665a19fbb..7a0e7bee9b 100644
 +
 +#undef SK_OPTS_TARGET
 +#undef init
-diff --git a/third_party/skia/src/core/SkSwizzler_opts_hsw.cpp b/third_party/skia/src/core/SkSwizzler_opts_hsw.cpp
-index 68c85d9471..8964fcda72 100644
---- a/third_party/skia/src/core/SkSwizzler_opts_hsw.cpp
-+++ b/third_party/skia/src/core/SkSwizzler_opts_hsw.cpp
-@@ -39,4 +39,6 @@ namespace SkOpts {
-     }
- }  // namespace SkOpts
- 
-+#undef SK_OPTS_TARGET
-+
- #endif // SK_CPU_X86 && !SK_ENABLE_OPTIMIZE_SIZE
 diff --git a/third_party/skia/src/core/SkSwizzler_opts_ssse3.cpp b/third_party/skia/src/core/SkSwizzler_opts_ssse3.cpp
 index 1721e59186..a58556841f 100644
 --- a/third_party/skia/src/core/SkSwizzler_opts_ssse3.cpp
