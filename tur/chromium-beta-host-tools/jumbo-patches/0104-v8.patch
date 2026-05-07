@@ -821,7 +821,7 @@ diff --git a/v8/src/regexp/experimental/experimental-compiler.cc b/v8/src/regexp
 index 7bee9f1179..391dac8cad 100644
 --- a/v8/src/regexp/experimental/experimental-compiler.cc
 +++ b/v8/src/regexp/experimental/experimental-compiler.cc
-@@ -224,7 +224,7 @@ bool ExperimentalRegExpCompiler::CanBeHandled(RegExpTree* tree,
+@@ -219,7 +219,7 @@
    return CanBeHandledVisitor::Check(tree, flags, capture_count);
  }
  
@@ -830,15 +830,15 @@ index 7bee9f1179..391dac8cad 100644
  
  // A label in bytecode which starts with no known address. The address *must*
  // be bound with `Bind` before the label goes out of scope.
-@@ -1226,7 +1226,7 @@ class CompileVisitor : private RegExpVisitor {
+@@ -1218,7 +1218,7 @@
  
- ZoneList<RegExpInstruction> ExperimentalRegExpCompiler::Compile(
-     RegExpTree* tree, RegExpFlags flags, Zone* zone) {
+ ZoneList<Instruction> ExperimentalCompiler::Compile(Tree* tree, Flags flags,
+                                                     Zone* zone) {
 -  return CompileVisitor::Compile(tree, flags, zone);
 +  return experimental::CompileVisitor::Compile(tree, flags, zone);
  }
  
- }  // namespace internal
+ }  // namespace regexp
 diff --git a/v8/src/regexp/regexp-compiler-tonode.cc b/v8/src/regexp/regexp-compiler-tonode.cc
 index fd5589921d..190e9ee025 100644
 --- a/v8/src/regexp/regexp-compiler-tonode.cc
@@ -1004,17 +1004,6 @@ index 24ff99c950..0a3a077905 100644
 +#undef TRACE
 +#undef TRACE_WITH_NODE
  #undef kMaxCodePoint
-diff --git a/v8/src/regexp/regexp-compiler.cc b/v8/src/regexp/regexp-compiler.cc
-index a3e7c170d4..9d511b6972 100644
---- a/v8/src/regexp/regexp-compiler.cc
-+++ b/v8/src/regexp/regexp-compiler.cc
-@@ -4106,3 +4106,6 @@ void RegExpCompiler::set_diagnostics(
- #endif
- 
- }  // namespace v8::internal
-+
-+#undef TRACE
-+#undef TRACE_WITH_NODE
 diff --git a/v8/src/codegen/arm64/instructions-arm64.cc b/v8/src/codegen/arm64/instructions-arm64.cc
 index 4ead67d303..6cad6669c2 100644
 --- a/v8/src/codegen/arm64/instructions-arm64.cc

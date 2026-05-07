@@ -33,7 +33,8 @@ Subject: [PATCH 2/8] chrome
  .../metric_reporting_manager.cc               | 10 +--
  chrome/browser/ash/preferences/preferences.cc | 14 +--
  .../automatic_usb_printer_configurer.h        |  1 +
- .../actor/actor_key_metrics_recorder.cc       |  7 +-
+ .../chrome_autocomplete_provider_client.cc    |  3 +-
+ .../actor/actor_key_metrics_recorder.cc       |  9 +-
  .../actor/actor_key_metrics_recorder.h        |  3 +-
  .../browser/chrome_content_browser_client.cc  |  2 +-
  .../app_mode/kiosk_app_service_launcher.cc    |  5 +-
@@ -58,19 +59,20 @@ Subject: [PATCH 2/8] chrome
  .../language_settings_private_api.cc          | 10 +--
  .../browser/extensions/browser_window_util.cc |  3 +-
  ..._content_browser_client_extensions_part.cc |  3 +-
- chrome/browser/extensions/cws_info_service.cc |  3 +-
  .../extensions/extension_management.cc        | 14 +--
  .../browser/extensions/extension_service.cc   |  3 +-
  .../extensions/external_provider_impl.cc      |  3 +-
  .../mv2_deprecation_impact_checker.cc         |  3 +-
- .../browser/extensions/window_controller.cc   | 20 ++---
+ .../browser/extensions/window_controller.cc   | 22 ++---
  .../extensions/window_controller_list.cc      |  5 +-
  chrome/browser/file_select_helper.cc          |  3 +-
  chrome/browser/glic/glic_pref_names.cc        |  5 +-
  .../glic_zero_state_suggestions_manager.cc    |  6 +-
+ .../context/glic_page_features_manager.cc     |  3 +-
  .../glic/host/context/glic_sharing_utils.cc   |  3 +-
- .../glic_actor_interactive_uitest_common.cc   |  8 +-
+ .../glic_actor_interactive_uitest_common.cc   |  6 +-
  chrome/browser/glic/host/host.cc              |  3 +-
+ .../selection_overlay_untrusted_ui.cc         |  5 +-
  .../browser/glic/test_support/glic_api_test.h |  5 +-
  .../glic/test_support/interactive_glic_test.h | 10 +--
  chrome/browser/google/google_brand.cc         |  3 +-
@@ -159,8 +161,6 @@ Subject: [PATCH 2/8] chrome
  .../ui/startup/startup_browser_creator.cc     |  1 +
  .../chrome_web_contents_view_handle_drop.cc   |  5 +-
  .../tabs/existing_tab_group_sub_menu_model.cc |  1 +
- .../ui/tabs/organization/tab_organization.cc  |  5 +-
- .../organization/tab_organization_service.cc  | 13 +--
  .../saved_tab_group_model_listener.cc         | 13 +--
  .../tab_group_sync_delegate_desktop.cc        |  3 +-
  chrome/browser/ui/tabs/tab_group_model.cc     |  3 +-
@@ -170,7 +170,6 @@ Subject: [PATCH 2/8] chrome
  .../ui/toolbar/toolbar_actions_model.cc       | 13 +--
  chrome/browser/ui/unload_controller.cc        |  3 +-
  .../app_dialog/app_uninstall_dialog_view.cc   |  6 +-
- .../views/autofill/popup/popup_view_views.cc  |  1 +
  .../saved_tab_groups/saved_tab_group_bar.cc   |  2 +-
  ...xtual_tasks_ephemeral_button_controller.cc |  3 +-
  .../desktop_media_picker_views.cc             |  1 +
@@ -185,12 +184,12 @@ Subject: [PATCH 2/8] chrome
  .../media_router/cast_browser_controller.cc   |  3 +-
  .../ui/views/media_router/cast_dialog_view.cc |  7 +-
  .../ui/views/omnibox/omnibox_view_views.cc    |  7 +-
- .../ui/views/page_action/chip_selector.cc     |  3 +-
+ .../ui/views/page_action/chip_selector.cc     |  1 +
  .../page_action_icon_controller.cc            |  5 +-
  .../about_this_site_side_panel_coordinator.cc |  4 +-
  ...ermission_prompt_bubble_one_origin_view.cc |  3 +-
  .../permissions/permission_prompt_chip.cc     |  1 +
- .../ui/views/profiles/profile_picker_view.cc  |  3 +-
+ .../ui/views/profiles/profile_picker_view.cc  |  2 +-
  .../session_restore_infobar_manager.cc        |  2 +-
  ...t_integration_interaction_test_internal.cc |  5 +-
  .../browser/ui/views/status_bubble_views.cc   |  3 +-
@@ -223,20 +222,19 @@ Subject: [PATCH 2/8] chrome
  .../print_preview/pdf_printer_handler.cc      |  3 +-
  .../print_preview/print_preview_handler.cc    | 16 ++--
  .../print_preview/print_preview_utils.cc      |  3 +-
- .../ui/webui/sanitized_image_source.cc        |  1 +
  .../ui/webui/settings/captions_handler.cc     |  3 +-
  .../settings/settings_security_key_handler.cc |  3 +-
  .../webui/settings/site_settings_handler.cc   |  7 +-
  .../ui/webui/settings/site_settings_helper.cc |  1 +
- .../customize_chrome_page_handler.cc          | 31 ++++---
+ .../customize_chrome_page_handler.cc          |  5 +-
  .../wallpaper_search_handler.cc               |  7 +-
  .../read_anything_untrusted_page_handler.cc   |  9 +-
  .../signin/ash/inline_login_handler_impl.cc   |  3 +-
  .../webui/signin/inline_login_handler_impl.cc |  4 +-
  .../ui/webui/signin/signin_ui_error.cc        |  3 +-
  .../support_tool/support_tool_ui_utils.cc     |  4 +-
- .../tab_search/tab_search_page_handler.cc     |  8 +-
- .../ui/webui/tab_search/tab_search_prefs.cc   |  5 +-
+ .../tab_search/tab_search_page_handler.cc     |  5 +-
+ .../ui/webui/tab_search/tab_search_prefs.cc   |  3 +-
  chrome/browser/ui/webui/theme_source.cc       |  3 +-
  .../top_chrome/preload_candidate_selector.cc  |  4 +-
  .../top_chrome/top_chrome_webui_config.cc     |  1 +
@@ -266,7 +264,6 @@ Subject: [PATCH 2/8] chrome
  .../uninstall/remove_install_source_job.cc    |  3 +-
  .../jobs/uninstall/remove_install_url_job.cc  |  5 +-
  .../locks/partitioned_lock_manager.cc         |  6 +-
- .../manifest_update_manager.cc                |  7 +-
  .../protocol_handling_sub_manager.cc          |  5 +-
  .../web_app_file_handler_manager.cc           |  5 +-
  .../web_app_protocol_handler_manager.cc       |  5 +-
@@ -277,7 +274,7 @@ Subject: [PATCH 2/8] chrome
  .../web_applications/test/fake_environment.cc |  3 +-
  .../test/fake_os_integration_manager.cc       |  1 +
  .../test/fake_web_app_ui_manager.cc           |  1 +
- .../test/os_integration_test_override_impl.cc | 18 ++--
+ .../test/os_integration_test_override_impl.cc | 17 ++--
  .../test/test_web_app_url_loader.cc           |  7 +-
  ..._uninstalled_preinstalled_web_app_prefs.cc |  3 +-
  .../visited_manifest_manager.cc               |  1 +
@@ -286,7 +283,7 @@ Subject: [PATCH 2/8] chrome
  .../web_applications/web_app_install_utils.cc |  3 +-
  .../web_applications/web_app_registrar.cc     | 22 ++---
  .../web_app_registry_update.cc                |  5 +-
- .../browser/web_applications/web_app_utils.cc |  5 +-
+ .../browser/web_applications/web_app_utils.cc |  4 +-
  .../web_install_service_impl.cc               |  2 +-
  ...authenticator_request_dialog_controller.cc | 22 +++--
  chrome/browser/webauthn/cablev2_devices.cc    |  1 +
@@ -330,21 +327,20 @@ Subject: [PATCH 2/8] chrome
  ...interactive_feature_promo_test_internal.cc |  3 +-
  chrome/updater/constants.h                    |  3 +-
  chrome/updater/enum_traits.h                  |  7 +-
- .../updater/handle_inconsistent_apps_task.cc  | 26 +++---
+ .../updater/handle_inconsistent_apps_task.cc  | 24 +++---
  chrome/updater/mac/keystone/agent_main.cc     |  6 +-
  chrome/updater/policy/service.cc              | 12 +--
- chrome/updater/tag.cc                         |  6 +-
+ chrome/updater/tag.cc                         |  5 +-
  chrome/updater/test/integration_tests_impl.cc |  9 +-
  chrome/updater/test/request_matcher.cc        |  4 +-
  chrome/updater/tools/updater_util.cc          |  6 +-
- chrome/updater/update_service_impl_impl.cc    |  3 +-
+ chrome/updater/update_service_impl_impl.cc    |  2 +-
  chrome/updater/util/util.h                    |  4 +-
  chrome/updater/win/installer_api.cc           |  3 +-
  chrome/updater/win/setup/uninstall.cc         |  1 +
  .../importer/bookmarks_file_importer.cc       |  3 +-
  chrome/utility/importer/ie_importer_win.cc    |  4 +-
- .../contextual_search/input_state_model.cc    | 15 ++--
- 340 files changed, 1117 insertions(+), 844 deletions(-)
+ 337 files changed, 1075 insertions(+), 824 deletions(-)
 
 diff --git a/chrome/browser/accessibility/live_caption/live_caption_speech_recognition_host.cc b/chrome/browser/accessibility/live_caption/live_caption_speech_recognition_host.cc
 index 839f36c99c..10ee372d30 100644
@@ -420,7 +416,7 @@ index d4bc75210f..65e0fe04a9 100644
            : static_cast<PageColors>(pref_value);
    if (preferred_contrast != ui::NativeTheme::PreferredContrast::kMore &&
 diff --git a/chrome/browser/actor/actor_metrics.cc b/chrome/browser/actor/actor_metrics.cc
-index 60dfcc053e..d17c7cec56 100644
+index bc2743b20b..38c1227ad9 100644
 --- a/chrome/browser/actor/actor_metrics.cc
 +++ b/chrome/browser/actor/actor_metrics.cc
 @@ -4,12 +4,11 @@
@@ -683,7 +679,7 @@ index 4bdfb93100..772cc0b445 100644
        }
      }
 diff --git a/chrome/browser/ash/accessibility/accessibility_manager.cc b/chrome/browser/ash/accessibility/accessibility_manager.cc
-index 3e1760cae5..81b1a83713 100644
+index 9e10ab0caf..f90b3e2865 100644
 --- a/chrome/browser/ash/accessibility/accessibility_manager.cc
 +++ b/chrome/browser/ash/accessibility/accessibility_manager.cc
 @@ -48,6 +48,7 @@
@@ -823,7 +819,7 @@ index f9a2378284..92e4864b40 100644
  
  bool IsAllowedUILanguage(const std::string& language,
 diff --git a/chrome/browser/ash/extensions/file_manager/private_api_file_system.cc b/chrome/browser/ash/extensions/file_manager/private_api_file_system.cc
-index 8deccbbb3a..96033af2fb 100644
+index 2f76579b6a..40fe496e79 100644
 --- a/chrome/browser/ash/extensions/file_manager/private_api_file_system.cc
 +++ b/chrome/browser/ash/extensions/file_manager/private_api_file_system.cc
 @@ -36,6 +36,7 @@
@@ -834,7 +830,7 @@ index 8deccbbb3a..96033af2fb 100644
  #include "base/values.h"
  #include "chrome/browser/ash/app_list/search/local_image_search/local_image_search_service.h"
  #include "chrome/browser/ash/app_list/search/local_image_search/local_image_search_service_factory.h"
-@@ -185,7 +186,7 @@ ash::disks::FormatFileSystemType ApiFormatFileSystemToChromeEnum(
+@@ -184,7 +185,7 @@ ash::disks::FormatFileSystemType ApiFormatFileSystemToChromeEnum(
        return ash::disks::FormatFileSystemType::kNtfs;
    }
    NOTREACHED() << "Unknown format filesystem "
@@ -843,7 +839,7 @@ index 8deccbbb3a..96033af2fb 100644
  }
  
  std::optional<file_manager::io_task::OperationType> IoTaskTypeToChromeEnum(
-@@ -212,7 +213,7 @@ std::optional<file_manager::io_task::OperationType> IoTaskTypeToChromeEnum(
+@@ -211,7 +212,7 @@ std::optional<file_manager::io_task::OperationType> IoTaskTypeToChromeEnum(
      case api::file_manager_private::IoTaskType::kNone:
        return {};
    }
@@ -852,7 +848,7 @@ index 8deccbbb3a..96033af2fb 100644
  }
  
  extensions::api::file_manager_private::DlpLevel DlpRulesManagerLevelToApiEnum(
-@@ -266,7 +267,7 @@ policy::FilesDialogType ApiPolicyDialogTypeToChromeEnum(
+@@ -265,7 +266,7 @@ policy::FilesDialogType ApiPolicyDialogTypeToChromeEnum(
      case api::file_manager_private::PolicyDialogType::kError:
        return policy::FilesDialogType::kError;
    }
@@ -861,7 +857,7 @@ index 8deccbbb3a..96033af2fb 100644
  }
  
  std::optional<policy::Policy> ApiPolicyErrorTypeToChromeEnum(
-@@ -279,9 +280,9 @@ std::optional<policy::Policy> ApiPolicyErrorTypeToChromeEnum(
+@@ -278,9 +279,9 @@ std::optional<policy::Policy> ApiPolicyErrorTypeToChromeEnum(
      case api::file_manager_private::PolicyErrorType::kNone:
        return std::nullopt;
      case api::file_manager_private::PolicyErrorType::kDlpWarningTimeout:
@@ -873,7 +869,7 @@ index 8deccbbb3a..96033af2fb 100644
  }
  
  // Handles a callback from the LocalImageSearchService. The job of this function
-@@ -1171,7 +1172,7 @@ FileManagerPrivateGetDialogCallerFunction::Run() {
+@@ -1170,7 +1171,7 @@ FileManagerPrivateGetDialogCallerFunction::Run() {
      }
      if (caller->component().has_value()) {
        info.Set("component",
@@ -921,10 +917,10 @@ index c7cc2ddcd9..ca09198128 100644
    }
  
 diff --git a/chrome/browser/ash/file_manager/file_manager_browsertest_base.cc b/chrome/browser/ash/file_manager/file_manager_browsertest_base.cc
-index b892d32369..98478637e4 100644
+index bc8f9e45dc..c347b61ab1 100644
 --- a/chrome/browser/ash/file_manager/file_manager_browsertest_base.cc
 +++ b/chrome/browser/ash/file_manager/file_manager_browsertest_base.cc
-@@ -3002,7 +3002,7 @@ void FileManagerBrowserTestBase::OnCommand(const std::string& name,
+@@ -3000,7 +3000,7 @@ void FileManagerBrowserTestBase::OnCommand(const std::string& name,
  
      content::WebContents* web_contents;
      if (app_id && !app_id->empty()) {
@@ -933,7 +929,7 @@ index b892d32369..98478637e4 100644
            << "Couldn't find the SWA WebContents for appId: " << *app_id
            << " command data: " << *data;
        web_contents = swa_web_contents_[*app_id];
-@@ -3696,7 +3696,7 @@ void FileManagerBrowserTestBase::OnCommand(const std::string& name,
+@@ -3694,7 +3694,7 @@ void FileManagerBrowserTestBase::OnCommand(const std::string& name,
      ASSERT_TRUE(app_id);
  
      content::WebContents* web_contents;
@@ -942,7 +938,7 @@ index b892d32369..98478637e4 100644
          << "Couldn't find the SWA WebContents for appId: " << *app_id;
      web_contents = swa_web_contents_[*app_id];
  
-@@ -4055,7 +4055,7 @@ void FileManagerBrowserTestBase::OnCommand(const std::string& name,
+@@ -4053,7 +4053,7 @@ void FileManagerBrowserTestBase::OnCommand(const std::string& name,
      ASSERT_TRUE(app_id);
  
      content::WebContents* web_contents;
@@ -1153,7 +1149,7 @@ index 0b952b2876..4f2128b910 100644
        !user_telemetry_report_queue_) {
      return;
 diff --git a/chrome/browser/ash/preferences/preferences.cc b/chrome/browser/ash/preferences/preferences.cc
-index 418041714b..db60478656 100644
+index a3c8174483..41740a247b 100644
 --- a/chrome/browser/ash/preferences/preferences.cc
 +++ b/chrome/browser/ash/preferences/preferences.cc
 @@ -7,7 +7,6 @@
@@ -1172,7 +1168,7 @@ index 418041714b..db60478656 100644
  #include "chrome/browser/ash/accessibility/magnification_manager.h"
  #include "chrome/browser/ash/base/locale_util.h"
  #include "chrome/browser/ash/child_accounts/parent_access_code/parent_access_service.h"
-@@ -286,15 +286,15 @@ void Preferences::RegisterProfilePrefs(
+@@ -288,15 +288,15 @@ void Preferences::RegisterProfilePrefs(
    registry->RegisterBooleanPref(prefs::kEmojiSuggestionEnterpriseAllowed, true);
    registry->RegisterIntegerPref(
        prefs::kHmwManagedSettings,
@@ -1191,7 +1187,7 @@ index 418041714b..db60478656 100644
            ash::LobsterEnterprisePolicyValue::kAllowedWithModelImprovement));
    registry->RegisterBooleanPref(
        prefs::kManagedPhysicalKeyboardAutocorrectAllowed, true);
-@@ -302,7 +302,7 @@ void Preferences::RegisterProfilePrefs(
+@@ -304,7 +304,7 @@ void Preferences::RegisterProfilePrefs(
        prefs::kManagedPhysicalKeyboardPredictiveWritingAllowed, true);
    registry->RegisterIntegerPref(
        prefs::kOrcaConsentStatus,
@@ -1200,7 +1196,7 @@ index 418041714b..db60478656 100644
    registry->RegisterIntegerPref(prefs::kOrcaConsentWindowDismissCount, 0);
    registry->RegisterBooleanPref(prefs::kEmojiPickerGifSupportEnabled, true);
    registry->RegisterDictionaryPref(prefs::kEmojiPickerHistory);
-@@ -599,7 +599,7 @@ void Preferences::RegisterProfilePrefs(
+@@ -606,7 +606,7 @@ void Preferences::RegisterProfilePrefs(
  
    registry->RegisterIntegerPref(
        prefs::kHMRConsentStatus,
@@ -1209,7 +1205,7 @@ index 418041714b..db60478656 100644
  
    registry->RegisterIntegerPref(prefs::kHMRConsentWindowDismissCount, 0);
  
-@@ -607,7 +607,7 @@ void Preferences::RegisterProfilePrefs(
+@@ -614,7 +614,7 @@ void Preferences::RegisterProfilePrefs(
  
    registry->RegisterIntegerPref(
        prefs::kGenAISmartGroupingSettings,
@@ -1230,8 +1226,29 @@ index e72adca349..c9bf55d418 100644
  #include "base/containers/flat_map.h"
  #include "base/containers/flat_set.h"
  #include "base/functional/callback.h"
+diff --git a/chrome/browser/autocomplete/chrome_autocomplete_provider_client.cc b/chrome/browser/autocomplete/chrome_autocomplete_provider_client.cc
+index 3e59efec51..4e3f7c5333 100644
+--- a/chrome/browser/autocomplete/chrome_autocomplete_provider_client.cc
++++ b/chrome/browser/autocomplete/chrome_autocomplete_provider_client.cc
+@@ -10,6 +10,7 @@
+ #include <string>
+ #include <vector>
+ 
++#include "base/containers/contains.h"
+ #include "base/feature_list.h"
+ #include "base/functional/callback_helpers.h"
+ #include "base/strings/cstring_view.h"
+@@ -200,7 +201,7 @@ bool IsContextualSearchFeatureEnabled(
+     return false;
+   }
+ 
+-  return std::ranges::contains(
++  return base::Contains(
+              kEnglishExpansionCountryCodes,
+              variations_service->GetStoredPermanentCountry()) &&
+          features->application_locale_storage() &&
 diff --git a/chrome/browser/autofill/actor/actor_key_metrics_recorder.cc b/chrome/browser/autofill/actor/actor_key_metrics_recorder.cc
-index cf6d28c7ca..6f758ab98b 100644
+index 0397de50cb..6b34fb20ae 100644
 --- a/chrome/browser/autofill/actor/actor_key_metrics_recorder.cc
 +++ b/chrome/browser/autofill/actor/actor_key_metrics_recorder.cc
 @@ -11,6 +11,7 @@
@@ -1242,7 +1259,7 @@ index cf6d28c7ca..6f758ab98b 100644
  #include "components/autofill/core/browser/data_manager/personal_data_manager.h"
  #include "components/autofill/core/browser/form_structure.h"
  #include "components/autofill/core/browser/foundations/autofill_client.h"
-@@ -55,7 +56,7 @@
+@@ -56,7 +57,7 @@ void ActorKeyMetricsRecorder::OnSuggestionsGenerated(
      FormGlobalId form_id,
      const base::flat_set<FillingProduct>& products) {
    for (FillingProduct product : products) {
@@ -1251,7 +1268,7 @@ index cf6d28c7ca..6f758ab98b 100644
    }
  }
  
-@@ -95,7 +96,7 @@
+@@ -96,7 +97,7 @@ void ActorKeyMetricsRecorder::OnFillOrPreviewForm(
        std::holds_alternative<const CreditCard*>(filling_payload)
            ? FillingProduct::kCreditCard
            : FillingProduct::kAddress;
@@ -1260,7 +1277,7 @@ index cf6d28c7ca..6f758ab98b 100644
        filled_field_ids.begin(), filled_field_ids.end());
  }
  
-@@ -110,7 +111,7 @@
+@@ -110,7 +111,7 @@ void ActorKeyMetricsRecorder::RecordKeyMetrics(AutofillManager& manager,
          product != FillingProduct::kCreditCard) {
        return;
      }
@@ -1269,7 +1286,7 @@ index cf6d28c7ca..6f758ab98b 100644
      if (state.recorded_forms.contains(form.global_id())) {
        return;
      }
-@@ -247,7 +248,7 @@
+@@ -260,7 +261,7 @@ bool ActorKeyMetricsRecorder::WasFieldFilledByActor(
    };
  
    if (product) {
@@ -1279,31 +1296,31 @@ index cf6d28c7ca..6f758ab98b 100644
  
    return std::ranges::any_of(states_, check_state);
 diff --git a/chrome/browser/autofill/actor/actor_key_metrics_recorder.h b/chrome/browser/autofill/actor/actor_key_metrics_recorder.h
-index f1f4cba046..b2ba39f23c 100644
+index 97989c4be8..18ca6ea11d 100644
 --- a/chrome/browser/autofill/actor/actor_key_metrics_recorder.h
 +++ b/chrome/browser/autofill/actor/actor_key_metrics_recorder.h
-@@ -8,6 +8,7 @@
+@@ -10,6 +10,7 @@
  #include "base/containers/flat_map.h"
  #include "base/containers/flat_set.h"
  #include "base/memory/raw_ref.h"
 +#include "base/types/cxx23_to_underlying.h"
  #include "components/autofill/core/browser/filling/filling_product.h"
- #include "components/autofill/core/common/unique_ids.h"
- 
-@@ -81,7 +82,7 @@ class ActorKeyMetricsRecorder {
-                                   const ProductState& state,
-                                   std::string_view product_str);
+ #include "components/autofill/core/browser/foundations/autofill_manager.h"
+ #include "components/autofill/core/browser/foundations/scoped_autofill_managers_observation.h"
+@@ -104,7 +105,7 @@ class ActorKeyMetricsRecorder : public AutofillManager::Observer {
+       FieldGlobalId field_id,
+       std::optional<FillingProduct> product = std::nullopt) const;
  
 -  std::array<ProductState, std::to_underlying(FillingProduct::kMaxValue) + 1>
 +  std::array<ProductState, base::to_underlying(FillingProduct::kMaxValue) + 1>
        states_;
- };
  
+   ScopedAutofillManagersObservation managers_observation_{this};
 diff --git a/chrome/browser/chrome_content_browser_client.cc b/chrome/browser/chrome_content_browser_client.cc
-index 25458578a8..a113d03205 100644
+index f823433796..9c97fac4b6 100644
 --- a/chrome/browser/chrome_content_browser_client.cc
 +++ b/chrome/browser/chrome_content_browser_client.cc
-@@ -8460,7 +8460,7 @@ bool ChromeContentBrowserClient::
+@@ -8488,7 +8488,7 @@ bool ChromeContentBrowserClient::
  #if BUILDFLAG(IS_MAC)
  std::string ChromeContentBrowserClient::GetChildProcessSuffix(int child_flags) {
    if (child_flags ==
@@ -1313,7 +1330,7 @@ index 25458578a8..a113d03205 100644
    }
    NOTREACHED() << "Unsupported child process flags!";
 diff --git a/chrome/browser/chromeos/app_mode/kiosk_app_service_launcher.cc b/chrome/browser/chromeos/app_mode/kiosk_app_service_launcher.cc
-index 1ea464f9a4..0c81a19e35 100644
+index 245a56cb32..e0788f729e 100644
 --- a/chrome/browser/chromeos/app_mode/kiosk_app_service_launcher.cc
 +++ b/chrome/browser/chromeos/app_mode/kiosk_app_service_launcher.cc
 @@ -13,6 +13,7 @@
@@ -1356,7 +1373,7 @@ index 57cdcc97d7..623fa2a356 100644
      }
  
 diff --git a/chrome/browser/chromeos/extensions/vpn_provider/vpn_service.cc b/chrome/browser/chromeos/extensions/vpn_provider/vpn_service.cc
-index 1fe28d3e7c..50eb1c7d27 100644
+index 86258e65e5..37a8712a82 100644
 --- a/chrome/browser/chromeos/extensions/vpn_provider/vpn_service.cc
 +++ b/chrome/browser/chromeos/extensions/vpn_provider/vpn_service.cc
 @@ -13,6 +13,7 @@
@@ -1476,49 +1493,49 @@ index 6aa02c1db0..60ccb7d496 100644
  #include "chrome/browser/profiles/profile.h"
  #include "chrome/browser/site_protection/site_familiarity_utils.h"
 diff --git a/chrome/browser/contextual_tasks/contextual_tasks_context_service.cc b/chrome/browser/contextual_tasks/contextual_tasks_context_service.cc
-index dc33e6cc3d..6b8d778b32 100644
+index 16807b6e98..b828506b90 100644
 --- a/chrome/browser/contextual_tasks/contextual_tasks_context_service.cc
 +++ b/chrome/browser/contextual_tasks/contextual_tasks_context_service.cc
-@@ -7,6 +7,7 @@
- #include <algorithm>
- #include <memory>
+@@ -15,6 +15,7 @@
  
+ #include "base/barrier_closure.h"
+ #include "base/check.h"
 +#include "base/containers/contains.h"
- #include "base/metrics/histogram_functions.h"
- #include "base/stl_util.h"
- #include "base/strings/stringprintf.h"
-@@ -408,7 +409,7 @@ ContextualTasksContextService::SelectRelevantTabs(
-       relevant_tabs.push_back(tab_signals.web_contents);
-     }
+ #include "base/containers/flat_set.h"
+ #include "base/containers/span.h"
+ #include "base/functional/bind.h"
+@@ -194,7 +195,7 @@ void PopulateTabContext(
  
+   tab_context->set_aggregate_tab_score(score);
+   if (tab_signals.web_contents) {
 -    tab_context->set_was_explicitly_chosen(std::ranges::contains(
 +    tab_context->set_was_explicitly_chosen(base::Contains(
-         explicit_urls, web_contents->GetLastCommittedURL()));
- 
-     base::UmaHistogramSparse("ContextualTasks.Context.TabScore",
+         explicit_urls, tab_signals.web_contents->GetLastCommittedURL()));
+   }
+ }
 diff --git a/chrome/browser/contextual_tasks/contextual_tasks_ui_service.cc b/chrome/browser/contextual_tasks/contextual_tasks_ui_service.cc
-index bc3337ab02..fd08cb7c48 100644
+index 4ca37c1327..0afff2721d 100644
 --- a/chrome/browser/contextual_tasks/contextual_tasks_ui_service.cc
 +++ b/chrome/browser/contextual_tasks/contextual_tasks_ui_service.cc
-@@ -7,6 +7,7 @@
- #include <optional>
+@@ -8,6 +8,7 @@
+ #include <string_view>
  
  #include "base/containers/adapters.h"
 +#include "base/containers/contains.h"
  #include "base/feature_list.h"
  #include "base/logging.h"
  #include "base/metrics/histogram_functions.h"
-@@ -847,7 +848,7 @@
-   if (is_nav_to_ai &&
-       net::GetValueForKeyInQuery(url_params.url, kDebugParam,
-                                  &debug_param_value) &&
--      debug_param_value.contains(kDebugNoCobrowseValue)) {
-+      base::Contains(debug_param_value, kDebugNoCobrowseValue)) {
-     if (original_url_is_virtual) {
-       OMNIBOX_LOG("nav_trace")
-           << "ContextualTasks navigation trace: HandleNavigationImpl "
+@@ -967,7 +968,7 @@ bool ContextualTasksUiService::HandleNavigationImpl(
+       bypass_reason = "ncb param";
+     } else if (net::GetValueForKeyInQuery(url_params.url, kDebugParam,
+                                         &debug_param_value) &&
+-               debug_param_value.contains(kDebugNoCobrowseValue)) {
++               base::Contains(debug_param_value, kDebugNoCobrowseValue)) {
+       should_bypass_interception = true;
+       bypass_reason = "debug param";
+     }
 diff --git a/chrome/browser/contextual_tasks/contextual_tasks_url_loader_factory_interceptor.cc b/chrome/browser/contextual_tasks/contextual_tasks_url_loader_factory_interceptor.cc
-index a31144a90e..1875bd5860 100644
+index b8c43e701a..b2b8d813db 100644
 --- a/chrome/browser/contextual_tasks/contextual_tasks_url_loader_factory_interceptor.cc
 +++ b/chrome/browser/contextual_tasks/contextual_tasks_url_loader_factory_interceptor.cc
 @@ -4,6 +4,7 @@
@@ -1528,8 +1545,8 @@ index a31144a90e..1875bd5860 100644
 +#include "base/containers/contains.h"
  #include "base/memory/weak_ptr.h"
  #include "base/task/sequenced_task_runner.h"
- #include "components/omnibox/common/logger.h"
-@@ -51,7 +52,7 @@ const char kOneGoogleIdentifier[] = "onegoogle";
+ #include "chrome/browser/contextual_tasks/contextual_tasks_ui_service.h"
+@@ -59,7 +60,7 @@ const char kOneGoogleIdentifier[] = "onegoogle";
  bool ShouldAddAuthHeader(const GURL& url) {
    // Don't add the Authorization header to OGB URLs, since they don't support
    // OAuth. Attaching an OAuth token can result in 403 errors.
@@ -1539,7 +1556,7 @@ index a31144a90e..1875bd5860 100644
    }
  
 diff --git a/chrome/browser/desktop_to_mobile_promos/promos_utils.cc b/chrome/browser/desktop_to_mobile_promos/promos_utils.cc
-index 8cff2ba8ec..e47115e37c 100644
+index ead0cad086..eb53ea5013 100644
 --- a/chrome/browser/desktop_to_mobile_promos/promos_utils.cc
 +++ b/chrome/browser/desktop_to_mobile_promos/promos_utils.cc
 @@ -8,6 +8,7 @@
@@ -1665,7 +1682,7 @@ index 717f377fc0..a1fb418e06 100644
      return;
    }
 diff --git a/chrome/browser/extensions/api/autofill_private/autofill_ai_util.cc b/chrome/browser/extensions/api/autofill_private/autofill_ai_util.cc
-index 34ed4e392b..649686c865 100644
+index 55115748d6..504c9319a8 100644
 --- a/chrome/browser/extensions/api/autofill_private/autofill_ai_util.cc
 +++ b/chrome/browser/extensions/api/autofill_private/autofill_ai_util.cc
 @@ -7,7 +7,6 @@
@@ -1684,7 +1701,7 @@ index 34ed4e392b..649686c865 100644
  #include "base/values.h"
  #include "chrome/common/extensions/api/autofill_private.h"
  #include "components/autofill/core/browser/autofill_field.h"
-@@ -92,7 +92,7 @@ void EntityInstanceToPrivateApiEntityInstanceWithLabels(
+@@ -93,7 +93,7 @@ void EntityInstanceToPrivateApiEntityInstanceWithLabels(
  
      const EntityType entity_type = entity_instance.type();
      entity_instance_with_labels.type.type_name =
@@ -1693,7 +1710,7 @@ index 34ed4e392b..649686c865 100644
      entity_instance_with_labels.type.type_name_as_string =
          base::UTF16ToUTF8(entity_type.GetNameForI18n());
      entity_instance_with_labels.type.add_entity_type_string =
-@@ -141,7 +141,7 @@ std::optional<EntityInstance> PrivateApiEntityInstanceToEntityInstance(
+@@ -146,7 +146,7 @@ std::optional<EntityInstance> PrivateApiEntityInstanceToEntityInstance(
         private_api_entity_instance.attribute_instances) {
      if (private_api_attribute_instance.type.type_name < 0 ||
          private_api_attribute_instance.type.type_name >
@@ -1702,7 +1719,7 @@ index 34ed4e392b..649686c865 100644
        return std::nullopt;
      }
  
-@@ -227,7 +227,7 @@ autofill_private::EntityInstance EntityInstanceToPrivateApiEntityInstance(
+@@ -232,7 +232,7 @@ autofill_private::EntityInstance EntityInstanceToPrivateApiEntityInstance(
         entity_instance.attributes()) {
      private_api_attribute_instances.emplace_back();
      private_api_attribute_instances.back().type.type_name =
@@ -1711,7 +1728,7 @@ index 34ed4e392b..649686c865 100644
      private_api_attribute_instances.back().type.type_name_as_string =
          base::UTF16ToUTF8(attribute_instance.type().GetNameForI18n());
  
-@@ -271,7 +271,7 @@ autofill_private::EntityInstance EntityInstanceToPrivateApiEntityInstance(
+@@ -277,7 +277,7 @@ autofill_private::EntityInstance EntityInstanceToPrivateApiEntityInstance(
  
    autofill_private::EntityInstance private_api_entity_instance;
    private_api_entity_instance.type.type_name =
@@ -1720,7 +1737,7 @@ index 34ed4e392b..649686c865 100644
    private_api_entity_instance.type.type_name_as_string =
        base::UTF16ToUTF8(entity_instance.type().GetNameForI18n());
    private_api_entity_instance.type.add_entity_type_string =
-@@ -319,7 +319,7 @@ api::autofill_private::EntityType EntityTypeToPrivateApiEntityType(
+@@ -325,7 +325,7 @@ api::autofill_private::EntityType EntityTypeToPrivateApiEntityType(
      EntityType entity_type,
      bool supports_wallet_storage) {
    autofill_private::EntityType api_type;
@@ -1729,7 +1746,7 @@ index 34ed4e392b..649686c865 100644
    api_type.type_name_as_string =
        base::UTF16ToUTF8(entity_type.GetNameForI18n());
    api_type.add_entity_type_string =
-@@ -335,7 +335,7 @@ api::autofill_private::EntityType EntityTypeToPrivateApiEntityType(
+@@ -341,7 +341,7 @@ api::autofill_private::EntityType EntityTypeToPrivateApiEntityType(
  api::autofill_private::AttributeType AttributeTypeToPrivateApiAttributeType(
      autofill::AttributeType attribute_type) {
    api::autofill_private::AttributeType api_attr;
@@ -1739,7 +1756,7 @@ index 34ed4e392b..649686c865 100644
        base::UTF16ToUTF8(attribute_type.GetNameForI18n());
    api_attr.data_type = AttributeTypeDataTypeToPrivateApiAttributeTypeDataType(
 diff --git a/chrome/browser/extensions/api/bookmark_manager_private/bookmark_manager_private_api.cc b/chrome/browser/extensions/api/bookmark_manager_private/bookmark_manager_private_api.cc
-index e544712deb..ba0ab0165a 100644
+index 6648101a0a..98d4398a2b 100644
 --- a/chrome/browser/extensions/api/bookmark_manager_private/bookmark_manager_private_api.cc
 +++ b/chrome/browser/extensions/api/bookmark_manager_private/bookmark_manager_private_api.cc
 @@ -12,6 +12,7 @@
@@ -1760,7 +1777,7 @@ index e544712deb..ba0ab0165a 100644
      }
      UrlAndId url_and_id;
 diff --git a/chrome/browser/extensions/api/developer_private/developer_private_functions.cc b/chrome/browser/extensions/api/developer_private/developer_private_functions.cc
-index 498afd100f..0a25d2884a 100644
+index 483cd26193..fcb0d450ff 100644
 --- a/chrome/browser/extensions/api/developer_private/developer_private_functions.cc
 +++ b/chrome/browser/extensions/api/developer_private/developer_private_functions.cc
 @@ -14,6 +14,7 @@
@@ -1893,7 +1910,7 @@ index 1490e44d3f..5af8b82010 100644
      }
    }
 diff --git a/chrome/browser/extensions/chrome_content_browser_client_extensions_part.cc b/chrome/browser/extensions/chrome_content_browser_client_extensions_part.cc
-index 8566c99c0f..fa4c401212 100644
+index 5e3a12b970..e882d17afa 100644
 --- a/chrome/browser/extensions/chrome_content_browser_client_extensions_part.cc
 +++ b/chrome/browser/extensions/chrome_content_browser_client_extensions_part.cc
 @@ -15,6 +15,7 @@
@@ -1903,8 +1920,8 @@ index 8566c99c0f..fa4c401212 100644
 +#include "base/containers/contains.h"
  #include "base/feature_list.h"
  #include "base/functional/bind.h"
- #include "base/metrics/histogram_macros.h"
-@@ -930,7 +931,7 @@ void ChromeContentBrowserClientExtensionsPart::
+ #include "build/chromeos_buildflags.h"
+@@ -918,7 +919,7 @@ void ChromeContentBrowserClientExtensionsPart::
      // visibility, and benefit from being started in foreground mode. We can
      // safely start those processes in foreground mode, knowing that
      // RenderThreadImpl::OnRendererHidden will be called when appropriate.
@@ -1913,29 +1930,8 @@ index 8566c99c0f..fa4c401212 100644
                                extension->id())) {
        command_line->AppendSwitch(::switches::kInitIsolateAsForeground);
      }
-diff --git a/chrome/browser/extensions/cws_info_service.cc b/chrome/browser/extensions/cws_info_service.cc
-index 5989abdf93..35405c0c77 100644
---- a/chrome/browser/extensions/cws_info_service.cc
-+++ b/chrome/browser/extensions/cws_info_service.cc
-@@ -9,6 +9,7 @@
- #include <string>
- #include <string_view>
- 
-+#include "base/containers/contains.h"
- #include "base/containers/fixed_flat_map.h"
- #include "base/containers/queue.h"
- #include "base/features.h"
-@@ -186,7 +187,7 @@ base::DictValue GetDictFromStoreMetadataProto(const StoreMetadata* metadata) {
- 
-     const auto& proto_labels = metadata->labels();
-     for (const auto* label : kLabels) {
--      dict.Set(label, std::ranges::contains(proto_labels, label));
-+      dict.Set(label, base::Contains(proto_labels, label));
-     }
-   }
- 
 diff --git a/chrome/browser/extensions/extension_management.cc b/chrome/browser/extensions/extension_management.cc
-index 2c809ad239..0ecc0c12ea 100644
+index bea1864156..5190936821 100644
 --- a/chrome/browser/extensions/extension_management.cc
 +++ b/chrome/browser/extensions/extension_management.cc
 @@ -10,6 +10,7 @@
@@ -1946,7 +1942,7 @@ index 2c809ad239..0ecc0c12ea 100644
  #include "base/containers/flat_set.h"
  #include "base/feature_list.h"
  #include "base/functional/bind.h"
-@@ -252,7 +253,7 @@ bool ExtensionManagement::HasAllowlistedExtension() {
+@@ -253,7 +254,7 @@ bool ExtensionManagement::HasAllowlistedExtension() {
      auto extension_id = *deferred_ids_.begin();
      // This will remove the entry from |deferred_ids_|.
      LoadDeferredExtensionSetting(extension_id);
@@ -1955,7 +1951,7 @@ index 2c809ad239..0ecc0c12ea 100644
      if (AccessById(extension_id)->installation_mode ==
          ManagedInstallationMode::kAllowed) {
        NotifyExtensionManagementPrefChanged();
-@@ -359,7 +360,7 @@ bool ExtensionManagement::IsAllowedManifestType(
+@@ -360,7 +361,7 @@ bool ExtensionManagement::IsAllowedManifestType(
      return true;
    const std::vector<Manifest::Type>& allowed_types =
        *global_settings_->allowed_types;
@@ -1964,7 +1960,7 @@ index 2c809ad239..0ecc0c12ea 100644
  }
  
  bool ExtensionManagement::IsAllowedManifestVersion(
-@@ -729,7 +730,8 @@ void ExtensionManagement::Refresh() {
+@@ -730,7 +731,8 @@ void ExtensionManagement::Refresh() {
    default_settings_ = std::make_unique<internal::IndividualSettings>();
  
    // Parse default settings.
@@ -1974,7 +1970,7 @@ index 2c809ad239..0ecc0c12ea 100644
        (extension_request_pref && extension_request_pref->GetBool())) {
      default_settings_->installation_mode = ManagedInstallationMode::kBlocked;
    }
-@@ -928,7 +930,7 @@ bool ExtensionManagement::ParseById(const std::string& extension_id,
+@@ -929,7 +931,7 @@ bool ExtensionManagement::ParseById(const std::string& extension_id,
  
  internal::IndividualSettings* ExtensionManagement::GetSettingsForId(
      const std::string& extension_id) {
@@ -1983,7 +1979,7 @@ index 2c809ad239..0ecc0c12ea 100644
      LoadDeferredExtensionSetting(extension_id);
      NotifyExtensionManagementPrefChanged();
    }
-@@ -942,7 +944,7 @@ internal::IndividualSettings* ExtensionManagement::GetSettingsForId(
+@@ -943,7 +945,7 @@ internal::IndividualSettings* ExtensionManagement::GetSettingsForId(
  
  void ExtensionManagement::LoadDeferredExtensionSetting(
      const std::string& extension_id) {
@@ -1992,7 +1988,7 @@ index 2c809ad239..0ecc0c12ea 100644
  
    // No need to check again later.
    deferred_ids_.erase(extension_id);
-@@ -962,7 +964,7 @@ void ExtensionManagement::LoadDeferredExtensionSetting(
+@@ -963,7 +965,7 @@ void ExtensionManagement::LoadDeferredExtensionSetting(
  
      auto extension_ids = base::SplitStringPiece(
          iter.first, ",", base::TRIM_WHITESPACE, base::SPLIT_WANT_NONEMPTY);
@@ -2002,7 +1998,7 @@ index 2c809ad239..0ecc0c12ea 100644
        ParseById(extension_id, *subdict);
        found = true;
 diff --git a/chrome/browser/extensions/extension_service.cc b/chrome/browser/extensions/extension_service.cc
-index 6698c9f04c..78cb538ecb 100644
+index ac08bbd630..2df45ea929 100644
 --- a/chrome/browser/extensions/extension_service.cc
 +++ b/chrome/browser/extensions/extension_service.cc
 @@ -16,6 +16,7 @@
@@ -2013,7 +2009,7 @@ index 6698c9f04c..78cb538ecb 100644
  #include "base/debug/alias.h"
  #include "base/debug/dump_without_crashing.h"
  #include "base/functional/bind.h"
-@@ -522,7 +523,7 @@ void ExtensionService::DisableUserExtensionsExcept(
+@@ -524,7 +525,7 @@ void ExtensionService::DisableUserExtensionsExcept(
        continue;
      }
      const std::string& id = extension->id();
@@ -2065,7 +2061,7 @@ index d5b1ce407d..2185d67066 100644
    }
  
 diff --git a/chrome/browser/extensions/window_controller.cc b/chrome/browser/extensions/window_controller.cc
-index 363e3fd973..b17a7f46c9 100644
+index 158210d788..f872602be4 100644
 --- a/chrome/browser/extensions/window_controller.cc
 +++ b/chrome/browser/extensions/window_controller.cc
 @@ -7,8 +7,8 @@
@@ -2078,27 +2074,29 @@ index 363e3fd973..b17a7f46c9 100644
  #include "base/values.h"
  #include "chrome/browser/extensions/window_controller_list.h"
  #include "chrome/browser/profiles/profile.h"
-@@ -26,13 +26,13 @@ namespace extensions {
+@@ -26,14 +26,14 @@ namespace extensions {
  WindowController::TypeFilter WindowController::GetAllWindowFilter() {
    // This needs to be updated if there is a change to
    // extensions::api::windows:WindowType.
--  static_assert(std::to_underlying(api::windows::WindowType::kMaxValue) == 5,
-+  static_assert(base::to_underlying(api::windows::WindowType::kMaxValue) == 5,
+-  static_assert(std::to_underlying(api::windows::WindowType::kMaxValue) == 6,
++  static_assert(base::to_underlying(api::windows::WindowType::kMaxValue) == 6,
                  "Update extensions WindowController to match WindowType");
 -  return ((1 << std::to_underlying(api::windows::WindowType::kNormal)) |
 -          (1 << std::to_underlying(api::windows::WindowType::kPanel)) |
 -          (1 << std::to_underlying(api::windows::WindowType::kPopup)) |
 -          (1 << std::to_underlying(api::windows::WindowType::kApp)) |
--          (1 << std::to_underlying(api::windows::WindowType::kDevtools)));
+-          (1 << std::to_underlying(api::windows::WindowType::kDevtools)) |
+-          (1 << std::to_underlying(api::windows::WindowType::kCustomTab)));
 +  return ((1 << base::to_underlying(api::windows::WindowType::kNormal)) |
 +          (1 << base::to_underlying(api::windows::WindowType::kPanel)) |
 +          (1 << base::to_underlying(api::windows::WindowType::kPopup)) |
 +          (1 << base::to_underlying(api::windows::WindowType::kApp)) |
-+          (1 << base::to_underlying(api::windows::WindowType::kDevtools)));
++          (1 << base::to_underlying(api::windows::WindowType::kDevtools)) |
++          (1 << base::to_underlying(api::windows::WindowType::kCustomTab)));
  }
  
  // static
-@@ -40,7 +40,7 @@ WindowController::TypeFilter WindowController::GetFilterFromWindowTypes(
+@@ -41,7 +41,7 @@ WindowController::TypeFilter WindowController::GetFilterFromWindowTypes(
      const std::vector<api::windows::WindowType>& types) {
    WindowController::TypeFilter filter = kNoWindowFilter;
    for (auto& window_type : types)
@@ -2107,7 +2105,7 @@ index 363e3fd973..b17a7f46c9 100644
    return filter;
  }
  
-@@ -55,7 +55,7 @@ WindowController::TypeFilter WindowController::GetFilterFromWindowTypesValues(
+@@ -56,7 +56,7 @@ WindowController::TypeFilter WindowController::GetFilterFromWindowTypesValues(
      if (!type.is_string()) {
        continue;
      }
@@ -2116,7 +2114,7 @@ index 363e3fd973..b17a7f46c9 100644
                    api::windows::ParseWindowType(type.GetString()));
    }
    return filter;
-@@ -78,7 +78,7 @@ Browser* WindowController::GetBrowser() const {
+@@ -79,7 +79,7 @@ Browser* WindowController::GetBrowser() const {
  #endif
  
  bool WindowController::MatchesFilter(TypeFilter filter) const {
@@ -2156,7 +2154,7 @@ index b668ff197d..91c68c128f 100644
        observer.OnWindowFocusChanged(window, has_focus);
      }
 diff --git a/chrome/browser/file_select_helper.cc b/chrome/browser/file_select_helper.cc
-index 70918f07be..93b4154eec 100644
+index 7c8f56c464..83a14b27ec 100644
 --- a/chrome/browser/file_select_helper.cc
 +++ b/chrome/browser/file_select_helper.cc
 @@ -11,6 +11,7 @@
@@ -2177,7 +2175,7 @@ index 70918f07be..93b4154eec 100644
        for (size_t index = 0; index < data.paths.size(); ++index) {
          result.paths_results[index] = false;
 diff --git a/chrome/browser/glic/glic_pref_names.cc b/chrome/browser/glic/glic_pref_names.cc
-index 033076b81e..0046e361dd 100644
+index 1c11834339..0b545280a7 100644
 --- a/chrome/browser/glic/glic_pref_names.cc
 +++ b/chrome/browser/glic/glic_pref_names.cc
 @@ -4,8 +4,7 @@
@@ -2190,7 +2188,7 @@ index 033076b81e..0046e361dd 100644
  #include "chrome/browser/background/glic/glic_launcher_configuration.h"
  #include "chrome/browser/glic/common/local_hotkey_manager.h"
  #include "chrome/common/chrome_features.h"
-@@ -59,7 +58,7 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
+@@ -63,7 +62,7 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
  
    registry->RegisterIntegerPref(
        prefs::kGlicActuationOnWeb,
@@ -2200,7 +2198,7 @@ index 033076b81e..0046e361dd 100644
    registry->RegisterListPref(prefs::kGlicActuationOnWebAllowedForURLs);
    registry->RegisterListPref(prefs::kGlicActuationOnWebBlockedForURLs);
 diff --git a/chrome/browser/glic/glic_zero_state_suggestions_manager.cc b/chrome/browser/glic/glic_zero_state_suggestions_manager.cc
-index 150204975b..857d522588 100644
+index 482451df78..456a9528d4 100644
 --- a/chrome/browser/glic/glic_zero_state_suggestions_manager.cc
 +++ b/chrome/browser/glic/glic_zero_state_suggestions_manager.cc
 @@ -7,8 +7,10 @@
@@ -2213,7 +2211,7 @@ index 150204975b..857d522588 100644
 +#include "base/types/cxx23_to_underlying.h"
  #include "base/types/id_type.h"
  #include "build/build_config.h"
- #include "chrome/browser/contextual_cueing/contextual_cueing_features.h"
+ #include "chrome/browser/glic/host/host.h"
 @@ -65,7 +67,7 @@ bool HasUserNavigationBeyondInitial(content::WebContents& web_contents) {
    // user selected default page.
    while (index > 0) {
@@ -2223,7 +2221,7 @@ index 150204975b..857d522588 100644
      bool automatic = 0 != (transition & (ui::PAGE_TRANSITION_FORWARD_BACK |
                                           ui::PAGE_TRANSITION_HOME_PAGE |
                                           ui::PAGE_TRANSITION_FROM_API |
-@@ -175,7 +177,7 @@ void GlicZeroStateSuggestionsManager::
+@@ -174,7 +176,7 @@ void GlicZeroStateSuggestionsManager::
                                 : nullptr;
    std::vector<content::WebContents*> contents_for_request = pinned_tab_data;
    if (active_web_contents &&
@@ -2232,8 +2230,29 @@ index 150204975b..857d522588 100644
      contents_for_request.push_back(active_web_contents);
    }
    FilterTabs(contents_for_request);
+diff --git a/chrome/browser/glic/host/context/glic_page_features_manager.cc b/chrome/browser/glic/host/context/glic_page_features_manager.cc
+index 53f1ee8215..37f1d5f2e6 100644
+--- a/chrome/browser/glic/host/context/glic_page_features_manager.cc
++++ b/chrome/browser/glic/host/context/glic_page_features_manager.cc
+@@ -6,6 +6,7 @@
+ 
+ #include <algorithm>
+ 
++#include "base/containers/contains.h"
+ #include "base/functional/bind.h"
+ #include "base/metrics/histogram_functions.h"
+ #include "base/strings/utf_string_conversions.h"
+@@ -122,7 +123,7 @@ void GlicPageFeaturesManager::OnCheckResult(base::Value result) {
+         check_count_ == 0
+             ? YoutubeSummarizeVideoZSS::kButtonFoundOnFirstCheck
+             : YoutubeSummarizeVideoZSS::kButtonFoundOnSecondCheck);
+-    if (!std::ranges::contains(
++    if (!base::Contains(
+             cached_features_,
+             mojom::LightweightPageFeature::kYtAskButtonPresent)) {
+       cached_features_.push_back(
 diff --git a/chrome/browser/glic/host/context/glic_sharing_utils.cc b/chrome/browser/glic/host/context/glic_sharing_utils.cc
-index 69161527c6..0f62993805 100644
+index b564115f32..0787c8f489 100644
 --- a/chrome/browser/glic/host/context/glic_sharing_utils.cc
 +++ b/chrome/browser/glic/host/context/glic_sharing_utils.cc
 @@ -7,6 +7,7 @@
@@ -2244,7 +2263,7 @@ index 69161527c6..0f62993805 100644
  #include "base/no_destructor.h"
  #include "build/build_config.h"
  #include "chrome/browser/glic/common/future_browser_features.h"
-@@ -47,7 +48,7 @@ bool IsTabValidForSharing(content::WebContents* web_contents) {
+@@ -50,7 +51,7 @@ bool IsTabValidForSharing(content::WebContents* web_contents) {
    }
    const GURL& url = web_contents->GetLastCommittedURL();
    return url.SchemeIsHTTPOrHTTPS() || url.SchemeIsFile() ||
@@ -2254,7 +2273,7 @@ index 69161527c6..0f62993805 100644
  
  GlicPinEvent GetEmptyPinEvent() {
 diff --git a/chrome/browser/glic/host/glic_actor_interactive_uitest_common.cc b/chrome/browser/glic/host/glic_actor_interactive_uitest_common.cc
-index a9915cb722..10b17dec4b 100644
+index d564aa1aa4..bcd5453d8e 100644
 --- a/chrome/browser/glic/host/glic_actor_interactive_uitest_common.cc
 +++ b/chrome/browser/glic/host/glic_actor_interactive_uitest_common.cc
 @@ -8,7 +8,6 @@
@@ -2273,16 +2292,7 @@ index a9915cb722..10b17dec4b 100644
  #include "build/build_config.h"
  #include "chrome/browser/actor/actor_keyed_service.h"
  #include "chrome/browser/actor/actor_proto_conversion.h"
-@@ -121,7 +121,7 @@ content::WebContents* GlicActorUiTest::GetGlicHost(actor::TaskId& task_id) {
- MultiStep GlicActorUiTest::ExecuteAction(ActionProtoProvider proto_provider,
-                                          ExpectedErrorResult expected_result) {
-   static constexpr int kResultSuccess =
--      std::to_underlying(actor::mojom::ActionResultCode::kOk);
-+      base::to_underlying(actor::mojom::ActionResultCode::kOk);
-   static constexpr std::string_view kSuccessString = "<Success>";
- 
-   const std::string expected_result_string = std::visit(
-@@ -519,7 +519,7 @@ MultiStep GlicActorUiTest::WaitForActorTaskState(
+@@ -537,7 +537,7 @@ MultiStep GlicActorUiTest::WaitForActorTaskState(
                  return state == $2;
                });
                )js",
@@ -2291,7 +2301,7 @@ index a9915cb722..10b17dec4b 100644
      ASSERT_TRUE(content::ExecJs(glic_contents, script));
    }));
  }
-@@ -552,7 +552,7 @@ MultiStep GlicActorUiTest::WaitForActorTaskStateChangeToStopped() {
+@@ -570,7 +570,7 @@ MultiStep GlicActorUiTest::WaitForActorTaskStateChangeToStopped() {
          "window.taskStateObs.waitUntil((state) => { "
          "  return state == $1; "
          "});",
@@ -2301,7 +2311,7 @@ index a9915cb722..10b17dec4b 100644
    }));
  }
 diff --git a/chrome/browser/glic/host/host.cc b/chrome/browser/glic/host/host.cc
-index a0bee7ae90..c00d372b38 100644
+index 98a8507f4e..bd80e29bbf 100644
 --- a/chrome/browser/glic/host/host.cc
 +++ b/chrome/browser/glic/host/host.cc
 @@ -8,6 +8,7 @@
@@ -2312,17 +2322,40 @@ index a0bee7ae90..c00d372b38 100644
  #include "base/containers/to_vector.h"
  #include "base/metrics/histogram_functions.h"
  #include "base/notimplemented.h"
-@@ -929,7 +930,7 @@ void HostManager::WebUIPageHandlerRemoved(GlicPageHandler* page_handler) {
+@@ -962,7 +963,7 @@ void HostManager::WebUIPageHandlerRemoved(GlicPageHandler* page_handler) {
    for (Host* host : GetAllHosts()) {
      if (host->page_handler() == page_handler) {
        host->WebUIPageHandlerRemoved(page_handler);
--      if (std::ranges::contains(instance_hosts, host)) {
-+      if (base::Contains(instance_hosts, host)) {
+-      if (!std::ranges::contains(instance_hosts, host)) {
++      if (!base::Contains(instance_hosts, host)) {
          std::erase_if(tab_hosts_, [host](std::unique_ptr<Host>& h) {
            return h.get() == host;
          });
+diff --git a/chrome/browser/glic/selection/selection_overlay_untrusted_ui.cc b/chrome/browser/glic/selection/selection_overlay_untrusted_ui.cc
+index 026ec6674b..147f9a0e04 100644
+--- a/chrome/browser/glic/selection/selection_overlay_untrusted_ui.cc
++++ b/chrome/browser/glic/selection/selection_overlay_untrusted_ui.cc
+@@ -5,6 +5,7 @@
+ #include "chrome/browser/glic/selection/selection_overlay_untrusted_ui.h"
+ 
+ #include "base/feature_list.h"
++#include "base/containers/contains.h"
+ #include "chrome/browser/glic/public/glic_enabling.h"
+ #include "chrome/browser/glic/resources/grit/glic_browser_resources.h"
+ #include "chrome/browser/glic/selection/selection_overlay_controller.h"
+@@ -98,8 +99,8 @@ SelectionOverlayUntrustedUI::SelectionOverlayUntrustedUI(content::WebUI* web_ui)
+                                  resource.id);
+ 
+     std::string_view path(resource.path);
+-    if (path.contains(".svg") ||
+-        path.contains("post_selection_paint_worklet.js")) {
++    if (base::Contains(path, ".svg") ||
++        base::Contains(path, "post_selection_paint_worklet.js")) {
+       html_source->AddResourcePath(
+           base::StrCat({"selection-overlay/", resource.path}), resource.id);
+     }
 diff --git a/chrome/browser/glic/test_support/glic_api_test.h b/chrome/browser/glic/test_support/glic_api_test.h
-index ee7a385875..8b41ec6032 100644
+index fd3ebef651..d53197619b 100644
 --- a/chrome/browser/glic/test_support/glic_api_test.h
 +++ b/chrome/browser/glic/test_support/glic_api_test.h
 @@ -5,7 +5,6 @@
@@ -2333,7 +2366,7 @@ index ee7a385875..8b41ec6032 100644
  #include <type_traits>
  
  #include "base/json/json_writer.h"
-@@ -326,8 +325,8 @@ class GlicApiTestBase : public T {
+@@ -330,8 +329,8 @@ class GlicApiTestBase : public T {
      }
      for (int i = 0; i < unit_test->total_test_suite_count(); ++i) {
        const auto* test_suite = unit_test->GetTestSuite(i);
@@ -2345,7 +2378,7 @@ index ee7a385875..8b41ec6032 100644
        }
        for (int j = 0; j < test_suite->total_test_count(); ++j) {
 diff --git a/chrome/browser/glic/test_support/interactive_glic_test.h b/chrome/browser/glic/test_support/interactive_glic_test.h
-index e3bbcf0cf1..7ff651d5f2 100644
+index 4f4664da87..363b2649e6 100644
 --- a/chrome/browser/glic/test_support/interactive_glic_test.h
 +++ b/chrome/browser/glic/test_support/interactive_glic_test.h
 @@ -5,7 +5,6 @@
@@ -2356,7 +2389,7 @@ index e3bbcf0cf1..7ff651d5f2 100644
  #include <map>
  #include <sstream>
  #include <string_view>
-@@ -769,11 +768,10 @@ class InteractiveGlicTestMixin : public T {
+@@ -750,11 +749,10 @@ class InteractiveGlicTestMixin : public T {
    auto CheckOcclusionTracked(bool expect_is_tracked) {
      return Api::CheckResult(
          [this]() {
@@ -2515,7 +2548,7 @@ index 88d3d33b17..017fe86dbc 100644
    // Update the device list.
    devices_[device->guid] = device->Clone();
 diff --git a/chrome/browser/history_clusters/history_clusters_tab_helper.cc b/chrome/browser/history_clusters/history_clusters_tab_helper.cc
-index 8c751a6044..11ae1abf81 100644
+index f172ca7a1d..3aead20349 100644
 --- a/chrome/browser/history_clusters/history_clusters_tab_helper.cc
 +++ b/chrome/browser/history_clusters/history_clusters_tab_helper.cc
 @@ -7,6 +7,7 @@
@@ -2526,7 +2559,7 @@ index 8c751a6044..11ae1abf81 100644
  #include "base/time/time.h"
  #include "build/build_config.h"
  #include "chrome/browser/bookmarks/bookmark_model_factory.h"
-@@ -428,7 +429,7 @@ void HistoryClustersTabHelper::RecordPageEndMetricsIfNeeded(
+@@ -430,7 +431,7 @@ void HistoryClustersTabHelper::RecordPageEndMetricsIfNeeded(
            ->GetPrefs();
    ntp_tiles::CustomLinksStore custom_link_store(pref_service);
    incomplete_visit_context_annotations.context_annotations.is_ntp_custom_link =
@@ -2832,7 +2865,7 @@ index 06bf6b7314..6a16b3be87 100644
  }  // namespace
  
 diff --git a/chrome/browser/notifications/scheduler/internal/impression_history_tracker.cc b/chrome/browser/notifications/scheduler/internal/impression_history_tracker.cc
-index 43f7589561..dfd48d7971 100644
+index 903cf6db9e..7b87f13fc2 100644
 --- a/chrome/browser/notifications/scheduler/internal/impression_history_tracker.cc
 +++ b/chrome/browser/notifications/scheduler/internal/impression_history_tracker.cc
 @@ -8,6 +8,7 @@
@@ -2843,7 +2876,7 @@ index 43f7589561..dfd48d7971 100644
  #include "base/functional/bind.h"
  #include "base/functional/callback_helpers.h"
  #include "base/notimplemented.h"
-@@ -207,7 +208,7 @@ void ImpressionHistoryTrackerImpl::SyncRegisteredClients() {
+@@ -209,7 +210,7 @@ void ImpressionHistoryTrackerImpl::SyncRegisteredClients() {
    // Remove deprecated clients.
    for (auto it = client_states_.begin(); it != client_states_.end();) {
      auto client_type = it->first;
@@ -2889,7 +2922,7 @@ index 7bf0d47f24..e8355ca1f3 100644
            optimization_guide::prefs::
                kAutomatedPasswordChangeEnterprisePolicyAllowed) ==
 diff --git a/chrome/browser/pdf/pdf_extension_util.cc b/chrome/browser/pdf/pdf_extension_util.cc
-index 6f0d11aaf5..5c2a2814b3 100644
+index 41ebdb0c0a..5a2f5853a7 100644
 --- a/chrome/browser/pdf/pdf_extension_util.cc
 +++ b/chrome/browser/pdf/pdf_extension_util.cc
 @@ -9,6 +9,7 @@
@@ -2900,7 +2933,7 @@ index 6f0d11aaf5..5c2a2814b3 100644
  #include "base/feature_list.h"
  #include "base/notreached.h"
  #include "base/strings/string_util.h"
-@@ -397,7 +398,7 @@ std::vector<webui::ResourcePath> GetResources(PdfViewerContext context) {
+@@ -398,7 +399,7 @@ std::vector<webui::ResourcePath> GetResources(PdfViewerContext context) {
    std::vector<webui::ResourcePath> resources;
    resources.reserve(std::size(kPdfResources));
    for (const webui::ResourcePath& resource : kPdfResources) {
@@ -3000,7 +3033,7 @@ index c79f534856..33161796a7 100644
    DCHECK_EQ(tabs_scored_, page_nodes_to_load_.size());
  
 diff --git a/chrome/browser/permissions/chrome_permissions_client.cc b/chrome/browser/permissions/chrome_permissions_client.cc
-index 9226297a88..555750b47e 100644
+index 9d5465e166..987720cddf 100644
 --- a/chrome/browser/permissions/chrome_permissions_client.cc
 +++ b/chrome/browser/permissions/chrome_permissions_client.cc
 @@ -8,6 +8,7 @@
@@ -3063,7 +3096,7 @@ index d93f3f02f2..31f4877fdd 100644
          transitional_matches_size_ + size <= kMaximumTransitionalMatchesSize) {
        match_it->urls.push_back(url);
 diff --git a/chrome/browser/preloading/prefetch/search_prefetch/field_trial_settings.cc b/chrome/browser/preloading/prefetch/search_prefetch/field_trial_settings.cc
-index 3909f7c806..c5ffb62acf 100644
+index ab2fb800c7..8fefd55def 100644
 --- a/chrome/browser/preloading/prefetch/search_prefetch/field_trial_settings.cc
 +++ b/chrome/browser/preloading/prefetch/search_prefetch/field_trial_settings.cc
 @@ -6,6 +6,7 @@
@@ -3074,7 +3107,7 @@ index 3909f7c806..c5ffb62acf 100644
  #include "base/feature_list.h"
  #include "base/metrics/field_trial_params.h"
  #include "base/strings/string_split.h"
-@@ -236,7 +237,7 @@ bool ShouldSuppressPrefetchForUnsupportedMode(const GURL& url) {
+@@ -239,7 +240,7 @@ bool ShouldSuppressPrefetchForUnsupportedMode(const GURL& url) {
      }
      base::span<std::string_view> unsupported_values =
          base::span(key_values).subspan(1u);
@@ -3126,7 +3159,7 @@ index 49d77e2ff9..dab105c890 100644
    const syncer::LocalDataDescription& primary_local_data_description =
        local_data_descriptions_map.at(primary_type);
 diff --git a/chrome/browser/profiles/profile_attributes_entry.cc b/chrome/browser/profiles/profile_attributes_entry.cc
-index a02025a7d7..dc29f8867c 100644
+index 87f4db2aa4..e404856fc1 100644
 --- a/chrome/browser/profiles/profile_attributes_entry.cc
 +++ b/chrome/browser/profiles/profile_attributes_entry.cc
 @@ -12,6 +12,7 @@
@@ -3136,8 +3169,8 @@ index a02025a7d7..dc29f8867c 100644
 +#include "base/types/cxx23_to_underlying.h"
  #include "build/build_config.h"
  #include "build/chromeos_buildflags.h"
- #include "chrome/app/vector_icons/vector_icons.h"
-@@ -597,9 +598,9 @@ std::optional<std::string> ProfileAttributesEntry::GetHostedDomain() const {
+ #include "chrome/browser/browser_process.h"
+@@ -595,9 +596,9 @@ std::optional<std::string> ProfileAttributesEntry::GetHostedDomain() const {
  
  signin::Tribool ProfileAttributesEntry::GetIsManaged() const {
    static_assert(kIntegerNotSet ==
@@ -3150,7 +3183,7 @@ index a02025a7d7..dc29f8867c 100644
  
    int value = GetInteger(kIsManaged);
  
-@@ -615,7 +616,7 @@ signin::Tribool ProfileAttributesEntry::GetIsManaged() const {
+@@ -613,7 +614,7 @@ signin::Tribool ProfileAttributesEntry::GetIsManaged() const {
  
    // If the value is invalid, or is not a valid Tribool value, return unknown.
    if (value < kIntegerNotSet ||
@@ -3159,7 +3192,7 @@ index a02025a7d7..dc29f8867c 100644
      return signin::Tribool::kUnknown;
    }
    return static_cast<signin::Tribool>(value);
-@@ -846,7 +847,7 @@ void ProfileAttributesEntry::SetHostedDomain(
+@@ -844,7 +845,7 @@ void ProfileAttributesEntry::SetHostedDomain(
  }
  
  void ProfileAttributesEntry::SetIsManaged(signin::Tribool value) {
@@ -3169,7 +3202,7 @@ index a02025a7d7..dc29f8867c 100644
    }
  }
 diff --git a/chrome/browser/profiles/profile_manager.cc b/chrome/browser/profiles/profile_manager.cc
-index 93ad431c81..de8708d63b 100644
+index b9105214de..116ac3ea6d 100644
 --- a/chrome/browser/profiles/profile_manager.cc
 +++ b/chrome/browser/profiles/profile_manager.cc
 @@ -16,6 +16,7 @@
@@ -3180,7 +3213,7 @@ index 93ad431c81..de8708d63b 100644
  #include "base/debug/crash_logging.h"
  #include "base/debug/dump_without_crashing.h"
  #include "base/debug/stack_trace.h"
-@@ -891,7 +892,7 @@ bool ProfileManager::IsValidProfile(const void* profile) {
+@@ -923,7 +924,7 @@ bool ProfileManager::IsValidProfile(const void* profile) {
        return true;
      std::vector<Profile*> otr_profiles =
          candidate->GetAllOffTheRecordProfiles();
@@ -3189,7 +3222,7 @@ index 93ad431c81..de8708d63b 100644
        return true;
      }
    }
-@@ -1414,7 +1415,7 @@ void ProfileManager::RemoveKeepAlive(Profile* profile,
+@@ -1446,7 +1447,7 @@ void ProfileManager::RemoveKeepAlive(Profile* profile,
      return;
    }
  
@@ -3198,7 +3231,7 @@ index 93ad431c81..de8708d63b 100644
  
  #if !BUILDFLAG(IS_ANDROID)
    // When removing the last keep alive of an ephemeral profile, schedule the
-@@ -1744,7 +1745,7 @@ Profile* ProfileManager::GetActiveUserOrOffTheRecordProfile() {
+@@ -1781,7 +1782,7 @@ Profile* ProfileManager::GetActiveUserOrOffTheRecordProfile() {
  void ProfileManager::UnloadProfile(const base::FilePath& profile_dir) {
    TRACE_EVENT0("browser", "ProfileManager::UnloadProfile");
  
@@ -3208,7 +3241,7 @@ index 93ad431c81..de8708d63b 100644
    bool ephemeral =
        IsRegisteredAsEphemeral(&GetProfileAttributesStorage(), profile_dir);
 diff --git a/chrome/browser/safe_browsing/chrome_password_protection_service.cc b/chrome/browser/safe_browsing/chrome_password_protection_service.cc
-index 68afcf3c3a..81c72d4a46 100644
+index 97b1e2f018..ef2b613710 100644
 --- a/chrome/browser/safe_browsing/chrome_password_protection_service.cc
 +++ b/chrome/browser/safe_browsing/chrome_password_protection_service.cc
 @@ -8,6 +8,7 @@
@@ -3229,7 +3262,7 @@ index 68afcf3c3a..81c72d4a46 100644
  }
  
 diff --git a/chrome/browser/safe_browsing/extension_telemetry/potential_password_theft_signal_processor.cc b/chrome/browser/safe_browsing/extension_telemetry/potential_password_theft_signal_processor.cc
-index f650b44118..e3dffce29d 100644
+index 7a2f9e4176..46073b29dc 100644
 --- a/chrome/browser/safe_browsing/extension_telemetry/potential_password_theft_signal_processor.cc
 +++ b/chrome/browser/safe_browsing/extension_telemetry/potential_password_theft_signal_processor.cc
 @@ -7,6 +7,7 @@
@@ -3240,7 +3273,7 @@ index f650b44118..e3dffce29d 100644
  #include "chrome/browser/safe_browsing/extension_telemetry/extension_telemetry_service.h"
  #include "chrome/browser/safe_browsing/extension_telemetry/password_reuse_signal.h"
  #include "chrome/browser/safe_browsing/extension_telemetry/remote_host_contacted_signal.h"
-@@ -112,7 +113,7 @@ void PotentialPasswordTheftSignalProcessor::UpdateDataStores(
+@@ -127,7 +128,7 @@ void PotentialPasswordTheftSignalProcessor::UpdateDataStores(
        // Each password reuse event has a reputable domain list, aka
        // matching_domains. Remote host urls that are in the reputable domain
        // lists associated with the password reuse events will not be added.
@@ -3249,7 +3282,7 @@ index f650b44118..e3dffce29d 100644
          temp_remote_host_url_queue.push_back(host_url);
        }
      }
-@@ -158,7 +159,7 @@ void PotentialPasswordTheftSignalProcessor::UpdatePasswordReuseInfo(
+@@ -175,7 +176,7 @@ void PotentialPasswordTheftSignalProcessor::UpdatePasswordReuseInfo(
    reuse_info.count += 1;
    for (auto& domain : incoming_reuse_info.matching_domains) {
      // Update the matching domain list once we find new domains.
@@ -3415,7 +3448,7 @@ index f6f00ab936..bdf65dc170 100644
  
  }  // namespace
 diff --git a/chrome/browser/speech/on_device_speech_recognition_impl.cc b/chrome/browser/speech/on_device_speech_recognition_impl.cc
-index 180326ea7b..9eb09e2e18 100644
+index a5825dc73f..899cf39ed7 100644
 --- a/chrome/browser/speech/on_device_speech_recognition_impl.cc
 +++ b/chrome/browser/speech/on_device_speech_recognition_impl.cc
 @@ -6,6 +6,7 @@
@@ -3425,7 +3458,7 @@ index 180326ea7b..9eb09e2e18 100644
 +#include "base/containers/contains.h"
  #include "base/strings/string_util.h"
  #include "chrome/browser/browser_process.h"
- #include "chrome/browser/content_settings/host_content_settings_map_factory.h"
+ #include "chrome/browser/profiles/profile.h"
 @@ -40,7 +41,7 @@ const char kEnglishLanguageCodeKey[] = "en-US";
  // Returns a boolean indicating whether the language is enabled.
  bool IsLanguageInstallable(std::string_view language_code,
@@ -4208,7 +4241,7 @@ index d3357675c4..3e41b991f6 100644
    }
  }
 diff --git a/chrome/browser/themes/browser_theme_pack.cc b/chrome/browser/themes/browser_theme_pack.cc
-index ec356f8f7b..dd275e1bdc 100644
+index 94815316b3..db7ee4a9a6 100644
 --- a/chrome/browser/themes/browser_theme_pack.cc
 +++ b/chrome/browser/themes/browser_theme_pack.cc
 @@ -16,6 +16,7 @@
@@ -4238,10 +4271,10 @@ index ec356f8f7b..dd275e1bdc 100644
      for (int pass = 0; pass < 2; ++pass) {
        // Two passes: In the first pass, we process only scale factor
 diff --git a/chrome/browser/themes/theme_service.cc b/chrome/browser/themes/theme_service.cc
-index 9b3a596e9a..a797775a9a 100644
+index 17bdadbb26..8d829f6fc4 100644
 --- a/chrome/browser/themes/theme_service.cc
 +++ b/chrome/browser/themes/theme_service.cc
-@@ -30,6 +30,7 @@
+@@ -29,6 +29,7 @@
  #include "base/task/single_thread_task_runner.h"
  #include "base/task/thread_pool.h"
  #include "base/trace_event/trace_event.h"
@@ -4264,7 +4297,7 @@ index 9b3a596e9a..a797775a9a 100644
        prefs::kDeprecatedUserColorDoNotUse, SK_ColorTRANSPARENT,
        user_prefs::PrefRegistrySyncable::SYNCABLE_PREF);
 diff --git a/chrome/browser/touch_to_fill/autofill/android/touch_to_fill_delegate_android_impl.cc b/chrome/browser/touch_to_fill/autofill/android/touch_to_fill_delegate_android_impl.cc
-index 9b0b283567..58db4a975f 100644
+index ea9abcc887..8db9ed81b8 100644
 --- a/chrome/browser/touch_to_fill/autofill/android/touch_to_fill_delegate_android_impl.cc
 +++ b/chrome/browser/touch_to_fill/autofill/android/touch_to_fill_delegate_android_impl.cc
 @@ -5,7 +5,6 @@
@@ -4336,7 +4369,7 @@ index defded3b87..e45e88d547 100644
    // Register the mapping so that it can be used if deferred callbacks are added
    // later.
 diff --git a/chrome/browser/ui/accelerator_table.cc b/chrome/browser/ui/accelerator_table.cc
-index 20a937a432..6cfb2d5667 100644
+index 06e3a9b5e0..89dbafe3d5 100644
 --- a/chrome/browser/ui/accelerator_table.cc
 +++ b/chrome/browser/ui/accelerator_table.cc
 @@ -9,6 +9,7 @@
@@ -4347,7 +4380,7 @@ index 20a937a432..6cfb2d5667 100644
  #include "base/feature_list.h"
  #include "base/no_destructor.h"
  #include "base/notreached.h"
-@@ -380,5 +381,5 @@ bool GetStandardAcceleratorForCommandId(int command_id,
+@@ -382,5 +383,5 @@ bool GetStandardAcceleratorForCommandId(int command_id,
  }
  
  bool IsCommandRepeatable(int command_id) {
@@ -4355,7 +4388,7 @@ index 20a937a432..6cfb2d5667 100644
 +  return base::Contains(kRepeatableCommandIds, command_id);
  }
 diff --git a/chrome/browser/ui/android/autofill/autofill_keyboard_accessory_view_impl.cc b/chrome/browser/ui/android/autofill/autofill_keyboard_accessory_view_impl.cc
-index 32ebfde9df..6d4071c3a7 100644
+index 34dd80d672..b11d2d0773 100644
 --- a/chrome/browser/ui/android/autofill/autofill_keyboard_accessory_view_impl.cc
 +++ b/chrome/browser/ui/android/autofill/autofill_keyboard_accessory_view_impl.cc
 @@ -18,6 +18,7 @@
@@ -4366,7 +4399,7 @@ index 32ebfde9df..6d4071c3a7 100644
  #include "chrome/browser/android/resource_mapper.h"
  #include "chrome/browser/ui/autofill/autofill_keyboard_accessory_controller.h"
  #include "components/autofill/core/browser/suggestions/suggestion.h"
-@@ -126,7 +127,7 @@ void AutofillKeyboardAccessoryViewImpl::Show() {
+@@ -132,7 +133,7 @@ void AutofillKeyboardAccessoryViewImpl::Show() {
      java_suggestions.push_back(
          Java_AutofillKeyboardAccessoryViewBridge_createAutofillSuggestion(
              env, label, sublabel, suggestion.voice_over.value_or(u""),
@@ -4376,7 +4409,7 @@ index 32ebfde9df..6d4071c3a7 100644
              suggestion.iph_metadata.feature
                  ? suggestion.iph_metadata.feature->name
 diff --git a/chrome/browser/ui/bookmarks/bookmark_utils_desktop.cc b/chrome/browser/ui/bookmarks/bookmark_utils_desktop.cc
-index bbf99cd6da..83ffae1142 100644
+index 8a1554665d..f085aac8f4 100644
 --- a/chrome/browser/ui/bookmarks/bookmark_utils_desktop.cc
 +++ b/chrome/browser/ui/bookmarks/bookmark_utils_desktop.cc
 @@ -7,6 +7,7 @@
@@ -4387,7 +4420,7 @@ index bbf99cd6da..83ffae1142 100644
  #include "base/containers/flat_set.h"
  #include "base/functional/bind.h"
  #include "base/functional/callback.h"
-@@ -363,7 +364,7 @@ void DoOpen(Browser* browser,
+@@ -364,7 +365,7 @@ void DoOpen(Browser* browser,
      // aren't already in groups.
      std::vector<int> tab_indices;
      for (int i = 0; i < model->count(); ++i) {
@@ -4396,7 +4429,7 @@ index bbf99cd6da..83ffae1142 100644
            !model->GetTabGroupForTab(i).has_value()) {
          tab_indices.push_back(i);
        }
-@@ -805,7 +806,7 @@ std::u16string SuggestUniqueTabGroupName(
+@@ -806,7 +807,7 @@ std::u16string SuggestUniqueTabGroupName(
      existing_titles.insert(group.title());
    }
  
@@ -4405,7 +4438,7 @@ index bbf99cd6da..83ffae1142 100644
      return folder_title;
    }
  
-@@ -813,7 +814,7 @@ std::u16string SuggestUniqueTabGroupName(
+@@ -814,7 +815,7 @@ std::u16string SuggestUniqueTabGroupName(
    for (int i = 1; i < kMaxAttempts; ++i) {
      std::u16string new_title =
          folder_title + u" (" + base::NumberToString16(i) + u")";
@@ -4415,7 +4448,7 @@ index bbf99cd6da..83ffae1142 100644
      }
    }
 diff --git a/chrome/browser/ui/browser_actions.cc b/chrome/browser/ui/browser_actions.cc
-index 045b8f110a..02300944a7 100644
+index 8a43e7c2fc..4394238a9a 100644
 --- a/chrome/browser/ui/browser_actions.cc
 +++ b/chrome/browser/ui/browser_actions.cc
 @@ -15,6 +15,7 @@
@@ -4426,7 +4459,7 @@ index 045b8f110a..02300944a7 100644
  #include "build/branding_buildflags.h"
  #include "chrome/app/chrome_command_ids.h"
  #include "chrome/app/vector_icons/vector_icons.h"
-@@ -1179,7 +1180,7 @@ void BrowserActions::InitializeBrowserActions() {
+@@ -1340,7 +1341,7 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
                  if ((page_action_trigger !=
                       page_actions::kInvalidPageActionTrigger) &&
                      page_action_trigger ==
@@ -4570,7 +4603,7 @@ index 8801ac34a4..abdcc48484 100644
    });
  
 diff --git a/chrome/browser/ui/hats/hats_service_desktop.cc b/chrome/browser/ui/hats/hats_service_desktop.cc
-index cc320cb4a7..31740b7c46 100644
+index fca9c9a584..4c70c26e4a 100644
 --- a/chrome/browser/ui/hats/hats_service_desktop.cc
 +++ b/chrome/browser/ui/hats/hats_service_desktop.cc
 @@ -8,6 +8,7 @@
@@ -4581,7 +4614,7 @@ index cc320cb4a7..31740b7c46 100644
  #include "base/feature_list.h"
  #include "base/functional/bind.h"
  #include "base/functional/callback_helpers.h"
-@@ -743,7 +744,7 @@ void HatsServiceDesktop::CheckSurveyStatusAndMaybeShow(
+@@ -750,7 +751,7 @@ void HatsServiceDesktop::CheckSurveyStatusAndMaybeShow(
    CHECK_EQ(product_specific_bits_data.size(),
             survey_config.product_specific_bits_data_fields.size());
    for (const auto& field_value : product_specific_bits_data) {
@@ -4590,7 +4623,7 @@ index cc320cb4a7..31740b7c46 100644
                                  field_value.first));
    }
  
-@@ -752,7 +753,7 @@ void HatsServiceDesktop::CheckSurveyStatusAndMaybeShow(
+@@ -759,7 +760,7 @@ void HatsServiceDesktop::CheckSurveyStatusAndMaybeShow(
    CHECK_EQ(product_specific_string_data.size(),
             survey_config.product_specific_string_data_fields.size());
    for (const auto& field_value : product_specific_string_data) {
@@ -4666,7 +4699,7 @@ index 3ed18c0098..c24efcab61 100644
    if (has_fido_collection) {
      if (base::CommandLine::ForCurrentProcess()->HasSwitch(
 diff --git a/chrome/browser/ui/lens/lens_overlay_controller.cc b/chrome/browser/ui/lens/lens_overlay_controller.cc
-index 67397e86bd..07cb0bebb4 100644
+index 186f9553a6..b2c7b38b38 100644
 --- a/chrome/browser/ui/lens/lens_overlay_controller.cc
 +++ b/chrome/browser/ui/lens/lens_overlay_controller.cc
 @@ -11,6 +11,7 @@
@@ -4677,7 +4710,7 @@ index 67397e86bd..07cb0bebb4 100644
  #include "base/functional/bind.h"
  #include "base/json/json_reader.h"
  #include "base/metrics/histogram_functions.h"
-@@ -339,7 +340,7 @@ void LensOverlayController::SendRegionText(lens::mojom::TextPtr text,
+@@ -341,7 +342,7 @@ void LensOverlayController::SendRegionText(lens::mojom::TextPtr text,
  
  lens::mojom::OverlayThemePtr LensOverlayController::CreateTheme(
      lens::PaletteId palette_id) {
@@ -4687,7 +4720,7 @@ index 67397e86bd..07cb0bebb4 100644
    auto theme = lens::mojom::OverlayTheme::New();
    theme->primary = palette.at(lens::ColorId::kPrimary);
 diff --git a/chrome/browser/ui/lens/lens_search_feature_flag_utils.cc b/chrome/browser/ui/lens/lens_search_feature_flag_utils.cc
-index 3bf2cf14b0..b8fb9ede7e 100644
+index 8c853bca26..6350fdb84e 100644
 --- a/chrome/browser/ui/lens/lens_search_feature_flag_utils.cc
 +++ b/chrome/browser/ui/lens/lens_search_feature_flag_utils.cc
 @@ -4,6 +4,7 @@
@@ -4785,7 +4818,7 @@ index c98a2216a4..ff4725acc4 100644
      terminating_route_id_.reset();
    }
 diff --git a/chrome/browser/ui/media_router/query_result_manager.cc b/chrome/browser/ui/media_router/query_result_manager.cc
-index 7be675759a..684ef704fd 100644
+index d327a3bf58..aace2c3c20 100644
 --- a/chrome/browser/ui/media_router/query_result_manager.cc
 +++ b/chrome/browser/ui/media_router/query_result_manager.cc
 @@ -8,6 +8,7 @@
@@ -4793,10 +4826,10 @@ index 7be675759a..684ef704fd 100644
  #include <utility>
  
 +#include "base/containers/contains.h"
+ #include "base/logging.h"
  #include "base/memory/raw_ptr.h"
  #include "base/observer_list.h"
- #include "components/media_router/browser/media_router.h"
-@@ -172,7 +173,7 @@ std::vector<MediaSinkWithCastModes> QueryResultManager::GetSinksWithCastModes()
+@@ -173,7 +174,7 @@ std::vector<MediaSinkWithCastModes> QueryResultManager::GetSinksWithCastModes()
      sinks.push_back(sink_with_cast_modes);
    }
    for (const auto& sink : all_sinks_) {
@@ -4805,7 +4838,7 @@ index 7be675759a..684ef704fd 100644
        sinks.emplace_back(sink);
      }
    }
-@@ -189,7 +190,7 @@ void QueryResultManager::RemoveOldSourcesForCastMode(
+@@ -190,7 +191,7 @@ void QueryResultManager::RemoveOldSourcesForCastMode(
    }
  
    for (const MediaSource& source : cast_mode_it->second) {
@@ -4814,7 +4847,7 @@ index 7be675759a..684ef704fd 100644
        sinks_observers_.erase(source);
        SetSinksCompatibleWithSource(cast_mode, source, std::vector<MediaSink>());
      }
-@@ -201,7 +202,7 @@ void QueryResultManager::AddObserversForCastMode(
+@@ -202,7 +203,7 @@ void QueryResultManager::AddObserversForCastMode(
      const std::vector<MediaSource>& sources,
      const url::Origin& origin) {
    for (const MediaSource& source : sources) {
@@ -4823,7 +4856,7 @@ index 7be675759a..684ef704fd 100644
        auto observer = std::make_unique<MediaSourceMediaSinksObserver>(
            cast_mode, source, origin, router_, this);
        observer->Init();
-@@ -225,7 +226,7 @@ void QueryResultManager::SetSinksCompatibleWithSource(
+@@ -226,7 +227,7 @@ void QueryResultManager::SetSinksCompatibleWithSource(
         /* no-op */) {
      const MediaSink::Id& sink_id = it->first;
      CastModesWithMediaSources& sources_for_sink = it->second;
@@ -4832,7 +4865,7 @@ index 7be675759a..684ef704fd 100644
        sources_for_sink.RemoveSource(cast_mode, source);
      }
      if (sources_for_sink.IsEmpty()) {
-@@ -280,7 +281,7 @@ bool QueryResultManager::AreSourcesValidForCastMode(
+@@ -281,7 +282,7 @@ bool QueryResultManager::AreSourcesValidForCastMode(
    return std::ranges::none_of(sources, [=, this](const MediaSource& source) {
      return sinks_observers_.contains(source) &&
             (!has_cast_mode ||
@@ -4842,7 +4875,7 @@ index 7be675759a..684ef704fd 100644
  }
  
 diff --git a/chrome/browser/ui/passwords/bubble_controllers/save_update_bubble_controller.cc b/chrome/browser/ui/passwords/bubble_controllers/save_update_bubble_controller.cc
-index 41b9241477..3b1c11a810 100644
+index 9b2492f72f..362b53b0c3 100644
 --- a/chrome/browser/ui/passwords/bubble_controllers/save_update_bubble_controller.cc
 +++ b/chrome/browser/ui/passwords/bubble_controllers/save_update_bubble_controller.cc
 @@ -6,6 +6,7 @@
@@ -4938,7 +4971,7 @@ index 20ebfb257f..3bd1f4aa4e 100644
      }
  
 diff --git a/chrome/browser/ui/search_engines/template_url_table_model.cc b/chrome/browser/ui/search_engines/template_url_table_model.cc
-index cbd95cd431..df296ab052 100644
+index e977dd8cba..0fbdb1dcb0 100644
 --- a/chrome/browser/ui/search_engines/template_url_table_model.cc
 +++ b/chrome/browser/ui/search_engines/template_url_table_model.cc
 @@ -7,6 +7,7 @@
@@ -4949,7 +4982,7 @@ index cbd95cd431..df296ab052 100644
  #include "base/i18n/rtl.h"
  #include "base/strings/string_util.h"
  #include "chrome/grit/generated_resources.h"
-@@ -168,7 +169,7 @@ void TemplateURLTableModel::ModifyTemplateURL(size_t index,
+@@ -134,7 +135,7 @@ void TemplateURLTableModel::ModifyTemplateURL(size_t index,
  TemplateURL* TemplateURLTableModel::GetTemplateURL(size_t index) {
    // Sanity checks for https://crbug.com/781703.
    CHECK_LT(index, entries_.size());
@@ -4980,7 +5013,7 @@ index 467a005dbf..ae367435ad 100644
  }
  
 diff --git a/chrome/browser/ui/settings_window_manager_chromeos.cc b/chrome/browser/ui/settings_window_manager_chromeos.cc
-index ae8a5738dc..6262a28671 100644
+index 93da21693c..b464f77a1d 100644
 --- a/chrome/browser/ui/settings_window_manager_chromeos.cc
 +++ b/chrome/browser/ui/settings_window_manager_chromeos.cc
 @@ -4,8 +4,6 @@
@@ -4992,15 +5025,15 @@ index ae8a5738dc..6262a28671 100644
  #include "ash/public/cpp/app_list/internal_app_id_constants.h"
  #include "ash/public/cpp/resources/grit/ash_public_unscaled_resources.h"
  #include "ash/public/cpp/shelf_item.h"
-@@ -15,6 +13,7 @@
- #include "ash/wm/window_properties.h"
+@@ -16,6 +14,7 @@
+ #include "base/metrics/histogram_functions.h"
  #include "base/strings/strcat.h"
  #include "base/strings/string_number_conversions.h"
 +#include "base/types/cxx23_to_underlying.h"
  #include "chrome/browser/app_mode/app_mode_utils.h"
  #include "chrome/browser/apps/app_service/launch_utils.h"
  #include "chrome/browser/profiles/profile.h"
-@@ -229,7 +228,7 @@ void SettingsWindowManager::ShowOSSettings(
+@@ -235,7 +234,7 @@ void SettingsWindowManager::ShowOSSettings(
      int64_t display_id) {
    std::string path_with_setting_id =
        base::StrCat({sub_page, std::string("?settingId="),
@@ -5043,7 +5076,7 @@ index 597bd5bfdc..ba9073f3dd 100644
  #include "base/feature_list.h"
  #include "base/files/file_path.h"
 diff --git a/chrome/browser/ui/tab_contents/chrome_web_contents_view_handle_drop.cc b/chrome/browser/ui/tab_contents/chrome_web_contents_view_handle_drop.cc
-index a394b1be32..63081def9f 100644
+index 344e10433d..dc047ad7bc 100644
 --- a/chrome/browser/ui/tab_contents/chrome_web_contents_view_handle_drop.cc
 +++ b/chrome/browser/ui/tab_contents/chrome_web_contents_view_handle_drop.cc
 @@ -7,6 +7,7 @@
@@ -5054,7 +5087,7 @@ index a394b1be32..63081def9f 100644
  #include "base/files/file_enumerator.h"
  #include "base/memory/weak_ptr.h"
  #include "base/strings/utf_string_conversions.h"
-@@ -39,9 +40,9 @@ void CompletionCallback(
+@@ -42,9 +43,9 @@ void CompletionCallback(
      enterprise_connectors::ContentAnalysisDelegate::Result& result) {
    // If there are no negative results, proceed with just `drop_data`.
    bool all_text_results_allowed =
@@ -5067,7 +5100,7 @@ index a394b1be32..63081def9f 100644
      std::move(callback).Run(std::move(drop_data));
      return;
 diff --git a/chrome/browser/ui/tabs/existing_tab_group_sub_menu_model.cc b/chrome/browser/ui/tabs/existing_tab_group_sub_menu_model.cc
-index 5ad1166a45..5efe6d3ecd 100644
+index 9a022b4c29..85cb279aa7 100644
 --- a/chrome/browser/ui/tabs/existing_tab_group_sub_menu_model.cc
 +++ b/chrome/browser/ui/tabs/existing_tab_group_sub_menu_model.cc
 @@ -7,6 +7,7 @@
@@ -5078,102 +5111,6 @@ index 5ad1166a45..5efe6d3ecd 100644
  #include "base/metrics/user_metrics.h"
  #include "base/metrics/user_metrics_action.h"
  #include "base/notreached.h"
-diff --git a/chrome/browser/ui/tabs/organization/tab_organization.cc b/chrome/browser/ui/tabs/organization/tab_organization.cc
-index 679f188d6d..d961334d21 100644
---- a/chrome/browser/ui/tabs/organization/tab_organization.cc
-+++ b/chrome/browser/ui/tabs/organization/tab_organization.cc
-@@ -10,6 +10,7 @@
- #include <unordered_set>
- #include <variant>
- 
-+#include "base/containers/contains.h"
- #include "base/debug/dump_without_crashing.h"
- #include "chrome/browser/ui/tabs/organization/tab_data.h"
- #include "chrome/browser/ui/tabs/tab_group_model.h"
-@@ -42,7 +43,7 @@ TabOrganization::TabOrganization(
-   // TabDatas must not be duplicates, immediately destroy TabDatas that are.
-   std::vector<const tabs::TabInterface*> existing_tabs;
-   for (auto& tab_data : tab_datas) {
--    if (!std::ranges::contains(existing_tabs, tab_data->tab())) {
-+    if (!base::Contains(existing_tabs, tab_data->tab())) {
-       existing_tabs.emplace_back(tab_data->tab());
-       tab_data->AddObserver(this);
-       tab_datas_.emplace_back(std::move(tab_data));
-@@ -161,7 +162,7 @@ void TabOrganization::Accept() {
-     tab_data_tabs.insert(tab);
-     const int index = tab_strip_model->GetIndexOfTab(tab);
-     if (tab_data->IsValidForOrganizing() &&
--        !std::ranges::contains(valid_indices, index)) {
-+        !base::Contains(valid_indices, index)) {
-       valid_indices.emplace_back(index);
-     }
-   }
-diff --git a/chrome/browser/ui/tabs/organization/tab_organization_service.cc b/chrome/browser/ui/tabs/organization/tab_organization_service.cc
-index 963e5d8e06..5b0c6bc3b1 100644
---- a/chrome/browser/ui/tabs/organization/tab_organization_service.cc
-+++ b/chrome/browser/ui/tabs/organization/tab_organization_service.cc
-@@ -6,6 +6,7 @@
- 
- #include <memory>
- 
-+#include "base/containers/contains.h"
- #include "chrome/browser/about_flags.h"
- #include "chrome/browser/browser_process.h"
- #include "chrome/browser/flag_descriptions.h"
-@@ -47,7 +48,7 @@ TabOrganizationService::TabOrganizationService(
- TabOrganizationService::~TabOrganizationService() = default;
- 
- void TabOrganizationService::OnTriggerOccured(const Browser* browser) {
--  if (browser_session_map_.contains(browser)) {
-+  if (base::Contains(browser_session_map_, browser)) {
-     // If the organizations havent been fully accepted or rejected, then it does
-     // not need to be reset.
-     if (!GetSessionForBrowser(browser)->IsComplete()) {
-@@ -64,7 +65,7 @@ void TabOrganizationService::OnTriggerOccured(const Browser* browser) {
- 
- const TabOrganizationSession* TabOrganizationService::GetSessionForBrowser(
-     const Browser* browser) const {
--  if (browser_session_map_.contains(browser)) {
-+  if (base::Contains(browser_session_map_, browser)) {
-     return browser_session_map_.at(browser).get();
-   }
-   return nullptr;
-@@ -72,7 +73,7 @@ const TabOrganizationSession* TabOrganizationService::GetSessionForBrowser(
- 
- TabOrganizationSession* TabOrganizationService::GetSessionForBrowser(
-     const Browser* browser) {
--  if (browser_session_map_.contains(browser)) {
-+  if (base::Contains(browser_session_map_, browser)) {
-     return browser_session_map_.at(browser).get();
-   }
-   return nullptr;
-@@ -81,7 +82,7 @@ TabOrganizationSession* TabOrganizationService::GetSessionForBrowser(
- TabOrganizationSession* TabOrganizationService::CreateSessionForBrowser(
-     const Browser* browser,
-     const tabs::TabInterface* base_session_tab) {
--  CHECK(!browser_session_map_.contains(browser));
-+  CHECK(!base::Contains(browser_session_map_, browser));
-   CHECK(browser->tab_strip_model()->SupportsTabGroups());
-   std::pair<BrowserSessionMap::iterator, bool> pair =
-       browser_session_map_.emplace(
-@@ -100,7 +101,7 @@ TabOrganizationSession* TabOrganizationService::ResetSessionForBrowser(
-     const Browser* browser,
-     const tabs::TabInterface* base_session_tab) {
-   browser->tab_strip_model()->RemoveObserver(this);
--  if (browser_session_map_.contains(browser)) {
-+  if (base::Contains(browser_session_map_, browser)) {
-     RemoveBrowserFromSessionMap(browser);
-   }
- 
-@@ -293,7 +294,7 @@ void TabOrganizationService::OnActionUIDismissed(const Browser* browser) {
- 
- void TabOrganizationService::RemoveBrowserFromSessionMap(
-     const Browser* browser) {
--  CHECK(browser_session_map_.contains(browser));
-+  CHECK(base::Contains(browser_session_map_, browser));
-   browser->tab_strip_model()->RemoveObserver(this);
-   browser_session_map_.erase(browser);
- }
 diff --git a/chrome/browser/ui/tabs/saved_tab_groups/saved_tab_group_model_listener.cc b/chrome/browser/ui/tabs/saved_tab_groups/saved_tab_group_model_listener.cc
 index cdd4a4be2b..026e31b178 100644
 --- a/chrome/browser/ui/tabs/saved_tab_groups/saved_tab_group_model_listener.cc
@@ -5422,7 +5359,7 @@ index cbb1624059..ca702e966a 100644
        tabs_needing_beforeunload.insert(contents);
      }
 diff --git a/chrome/browser/ui/views/apps/app_dialog/app_uninstall_dialog_view.cc b/chrome/browser/ui/views/apps/app_dialog/app_uninstall_dialog_view.cc
-index 1ae69e3063..7015886974 100644
+index 01ac27b908..0d1be7ae44 100644
 --- a/chrome/browser/ui/views/apps/app_dialog/app_uninstall_dialog_view.cc
 +++ b/chrome/browser/ui/views/apps/app_dialog/app_uninstall_dialog_view.cc
 @@ -5,7 +5,6 @@
@@ -5441,7 +5378,7 @@ index 1ae69e3063..7015886974 100644
  #include "base/values.h"
  #include "chrome/browser/apps/app_service/app_service_proxy.h"
  #include "chrome/browser/apps/app_service/app_service_proxy_factory.h"
-@@ -424,7 +424,7 @@ void AppUninstallDialogView::InitializeSubAppList(
+@@ -415,7 +415,7 @@ void AppUninstallDialogView::InitializeSubAppList(
      auto* sub_app_label =
          box->AddChildView(std::make_unique<views::Label>(sub_app.app_name));
  
@@ -5450,7 +5387,7 @@ index 1ae69e3063..7015886974 100644
  
      sub_app_label->SetHorizontalAlignment(gfx::ALIGN_LEFT);
      sub_app_label->SetMultiLine(true);
-@@ -433,7 +433,7 @@ void AppUninstallDialogView::InitializeSubAppList(
+@@ -424,7 +424,7 @@ void AppUninstallDialogView::InitializeSubAppList(
          box->AddChildView(std::make_unique<views::ImageView>());
      sub_app_icon->SetImage(
          ui::ImageModel::FromImageSkia(sub_app.icon->uncompressed));
@@ -5459,23 +5396,11 @@ index 1ae69e3063..7015886974 100644
  
      box->SetBetweenChildSpacing(
          provider->GetDistanceMetric(views::DISTANCE_RELATED_LABEL_HORIZONTAL));
-diff --git a/chrome/browser/ui/views/autofill/popup/popup_view_views.cc b/chrome/browser/ui/views/autofill/popup/popup_view_views.cc
-index 025ecb01b2..65327bdbcb 100644
---- a/chrome/browser/ui/views/autofill/popup/popup_view_views.cc
-+++ b/chrome/browser/ui/views/autofill/popup/popup_view_views.cc
-@@ -16,6 +16,7 @@
- #include <vector>
- 
- #include "base/auto_reset.h"
-+#include "base/containers/contains.h"
- #include "base/containers/to_vector.h"
- #include "base/feature_list.h"
- #include "base/functional/bind.h"
 diff --git a/chrome/browser/ui/views/bookmarks/saved_tab_groups/saved_tab_group_bar.cc b/chrome/browser/ui/views/bookmarks/saved_tab_groups/saved_tab_group_bar.cc
-index 3ec45f7b20..36111e6630 100644
+index 9cf9632796..d09df8026c 100644
 --- a/chrome/browser/ui/views/bookmarks/saved_tab_groups/saved_tab_group_bar.cc
 +++ b/chrome/browser/ui/views/bookmarks/saved_tab_groups/saved_tab_group_bar.cc
-@@ -475,7 +475,7 @@ void SavedTabGroupBar::SavedTabGroupReordered() {
+@@ -551,7 +551,7 @@ void SavedTabGroupBar::SavedTabGroupReordered() {
    for (size_t i = 0; i < groups.size(); ++i) {
      const base::Uuid& guid = groups[i]->saved_guid();
  
@@ -5539,7 +5464,7 @@ index 1c42d01429..6a7ab3088f 100644
        row_info, bubble_controller_, navigation_handler_, browser_,
        fixed_width_));
 diff --git a/chrome/browser/ui/views/extensions/extensions_menu_view.cc b/chrome/browser/ui/views/extensions/extensions_menu_view.cc
-index 58c8896f08..52f5245487 100644
+index cf50f9ca90..afd31007ab 100644
 --- a/chrome/browser/ui/views/extensions/extensions_menu_view.cc
 +++ b/chrome/browser/ui/views/extensions/extensions_menu_view.cc
 @@ -8,6 +8,7 @@
@@ -5560,7 +5485,7 @@ index 58c8896f08..52f5245487 100644
  #endif
  }
 diff --git a/chrome/browser/ui/views/file_system_access/file_system_access_usage_bubble_view.cc b/chrome/browser/ui/views/file_system_access/file_system_access_usage_bubble_view.cc
-index e7b48cc6ef..7753242315 100644
+index 706181f44b..05d847a955 100644
 --- a/chrome/browser/ui/views/file_system_access/file_system_access_usage_bubble_view.cc
 +++ b/chrome/browser/ui/views/file_system_access/file_system_access_usage_bubble_view.cc
 @@ -6,6 +6,7 @@
@@ -5571,7 +5496,7 @@ index e7b48cc6ef..7753242315 100644
  #include "base/i18n/message_formatter.h"
  #include "base/i18n/unicodestring.h"
  #include "base/memory/raw_ptr.h"
-@@ -331,12 +332,12 @@ void FileSystemAccessUsageBubbleView::ShowBubble(
+@@ -332,12 +333,12 @@ void FileSystemAccessUsageBubbleView::ShowBubble(
    std::set<base::FilePath> writable_directories(
        usage.writable_directories.begin(), usage.writable_directories.end());
    std::erase_if(usage.readable_directories, [&](const base::FilePath& path) {
@@ -5587,7 +5512,7 @@ index e7b48cc6ef..7753242315 100644
  
    // TODO(crbug.com/376282751): An action ID should be created and used here
 diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
-index f97fa82af1..d7ed2fcfd6 100644
+index 987c59be28..570dd292d5 100644
 --- a/chrome/browser/ui/views/frame/browser_view.cc
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
 @@ -18,6 +18,7 @@
@@ -5718,7 +5643,7 @@ index 7f3bf36bc0..d711cdbdc7 100644
  #include "chrome/browser/ash/boca/on_task/on_task_locked_controller.h"
  #include "chrome/browser/ash/login/login_manager_test.h"
 diff --git a/chrome/browser/ui/views/global_media_controls/media_item_ui_device_selector_view.cc b/chrome/browser/ui/views/global_media_controls/media_item_ui_device_selector_view.cc
-index b9321832d6..1b0df12a6d 100644
+index 7147ac6e27..ea034073d1 100644
 --- a/chrome/browser/ui/views/global_media_controls/media_item_ui_device_selector_view.cc
 +++ b/chrome/browser/ui/views/global_media_controls/media_item_ui_device_selector_view.cc
 @@ -7,6 +7,7 @@
@@ -5782,7 +5707,7 @@ index 8139ae2e93..c7fa31110a 100644
        }
        break;
 diff --git a/chrome/browser/ui/views/omnibox/omnibox_view_views.cc b/chrome/browser/ui/views/omnibox/omnibox_view_views.cc
-index b362cb7225..48bd115c5d 100644
+index 7cbcb9b783..89f9da4c51 100644
 --- a/chrome/browser/ui/views/omnibox/omnibox_view_views.cc
 +++ b/chrome/browser/ui/views/omnibox/omnibox_view_views.cc
 @@ -31,6 +31,7 @@
@@ -5793,7 +5718,7 @@ index b362cb7225..48bd115c5d 100644
  #include "build/build_config.h"
  #include "chrome/app/chrome_command_ids.h"
  #include "chrome/browser/autocomplete/aim_eligibility_service_factory.h"
-@@ -746,7 +747,7 @@ void OmniboxViewViews::ExecuteCommand(int command_id, int event_flags) {
+@@ -750,7 +751,7 @@ void OmniboxViewViews::ExecuteCommand(int command_id, int event_flags) {
        return;
  
      // These commands do invoke the popup.
@@ -5802,16 +5727,16 @@ index b362cb7225..48bd115c5d 100644
        ExecuteTextEditCommand(ui::TextEditCommand::PASTE);
        return;
      default:
-@@ -1813,7 +1814,7 @@ void OmniboxViewViews::OnBlur() {
+@@ -1814,7 +1815,7 @@ void OmniboxViewViews::OnBlur() {
  
  bool OmniboxViewViews::IsCommandIdEnabled(int command_id) const {
    if (command_id ==
 -      std::to_underlying(ui::TouchEditable::MenuCommands::kPaste)) {
 +      base::to_underlying(ui::TouchEditable::MenuCommands::kPaste)) {
-     return !GetReadOnly() && CanGetClipboardText();
+     return !GetReadOnly() && !clipboard_text_for_menu_.empty();
    }
    if (command_id == IDC_PASTE_AND_GO) {
-@@ -2361,7 +2362,7 @@ void OmniboxViewViews::UpdateContextMenu(ui::SimpleMenuModel* menu_contents) {
+@@ -2375,7 +2376,7 @@ void OmniboxViewViews::UpdateContextMenu(ui::SimpleMenuModel* menu_contents) {
  
    const std::optional<size_t> paste_position =
        menu_contents->GetIndexOfCommandId(
@@ -5821,7 +5746,7 @@ index b362cb7225..48bd115c5d 100644
    menu_contents->InsertItemWithStringIdAt(paste_position.value() + 1,
                                            IDC_PASTE_AND_GO, IDS_PASTE_AND_GO);
 diff --git a/chrome/browser/ui/views/page_action/chip_selector.cc b/chrome/browser/ui/views/page_action/chip_selector.cc
-index 2149b833a5..4e730fd997 100644
+index f9c402ab3c..c7f9f1d0ac 100644
 --- a/chrome/browser/ui/views/page_action/chip_selector.cc
 +++ b/chrome/browser/ui/views/page_action/chip_selector.cc
 @@ -8,6 +8,7 @@
@@ -5832,17 +5757,8 @@ index 2149b833a5..4e730fd997 100644
  #include "base/functional/callback.h"
  #include "base/metrics/histogram_functions.h"
  #include "chrome/browser/ui/views/page_action/page_action_controller.h"
-@@ -49,7 +50,7 @@ void DefaultChipSelector::RequestChipHide(actions::ActionId page_action_id) {
- 
- void DefaultChipSelector::RequestAnchoredMessageShow(
-     actions::ActionId page_action_id) {
--  if (std::ranges::contains(anchored_message_queue_, page_action_id)) {
-+  if (base::Contains(anchored_message_queue_, page_action_id)) {
-     // This page action's anchored message is already queued. Nothing to do.
-     return;
-   }
 diff --git a/chrome/browser/ui/views/page_action/page_action_icon_controller.cc b/chrome/browser/ui/views/page_action/page_action_icon_controller.cc
-index 4bf996ee32..1246925b82 100644
+index 7f176a5a9a..fb00736bd5 100644
 --- a/chrome/browser/ui/views/page_action/page_action_icon_controller.cc
 +++ b/chrome/browser/ui/views/page_action/page_action_icon_controller.cc
 @@ -6,6 +6,7 @@
@@ -5853,7 +5769,7 @@ index 4bf996ee32..1246925b82 100644
  #include "base/feature_list.h"
  #include "base/functional/bind.h"
  #include "base/immediate_crash.h"
-@@ -303,7 +304,7 @@ void PageActionIconController::OnPageActionIconViewShown(
+@@ -274,7 +275,7 @@ void PageActionIconController::OnPageActionIconViewShown(
    std::vector<raw_ptr<PageActionIconView, VectorExperimental>>
        excluded_actions_on_page = page_actions_excluded_from_logging_[url];
    if (!view->ephemeral() ||
@@ -5862,7 +5778,7 @@ index 4bf996ee32..1246925b82 100644
      return;
    }
    RecordOverallMetrics();
-@@ -376,7 +377,7 @@ void PageActionIconController::RecordMetricsOnURLChange(GURL url) {
+@@ -347,7 +348,7 @@ void PageActionIconController::RecordMetricsOnURLChange(GURL url) {
    RecordOverallMetrics();
    for (auto icon_item : page_action_icon_views_) {
      if (!icon_item.second->ephemeral() || !icon_item.second->GetVisible() ||
@@ -5887,7 +5803,7 @@ index 42977ce425..a293d8420c 100644
  }
  
 diff --git a/chrome/browser/ui/views/permissions/permission_prompt_bubble_one_origin_view.cc b/chrome/browser/ui/views/permissions/permission_prompt_bubble_one_origin_view.cc
-index cec679747b..44f2a6e253 100644
+index 68253551d0..e80b090f72 100644
 --- a/chrome/browser/ui/views/permissions/permission_prompt_bubble_one_origin_view.cc
 +++ b/chrome/browser/ui/views/permissions/permission_prompt_bubble_one_origin_view.cc
 @@ -7,6 +7,7 @@
@@ -5898,7 +5814,7 @@ index cec679747b..44f2a6e253 100644
  #include "base/memory/weak_ptr.h"
  #include "base/metrics/histogram_functions.h"
  #include "base/strings/string_number_conversions.h"
-@@ -99,7 +100,7 @@ bool ShouldShowRequest(permissions::PermissionPrompt::Delegate& delegate,
+@@ -98,7 +99,7 @@ bool ShouldShowRequest(permissions::PermissionPrompt::Delegate& delegate,
                         permissions::RequestType type) {
    if (type == permissions::RequestType::kCameraStream) {
      // Hide camera request if camera PTZ request is present as well.
@@ -5920,18 +5836,10 @@ index c153acf04e..8c008cc003 100644
  #include "base/metrics/histogram_functions.h"
  #include "chrome/browser/ui/views/location_bar/location_bar_view.h"
 diff --git a/chrome/browser/ui/views/profiles/profile_picker_view.cc b/chrome/browser/ui/views/profiles/profile_picker_view.cc
-index 017d98260e..41f110ce1f 100644
+index a6a323eedc..d01ac2a21b 100644
 --- a/chrome/browser/ui/views/profiles/profile_picker_view.cc
 +++ b/chrome/browser/ui/views/profiles/profile_picker_view.cc
-@@ -6,6 +6,7 @@
- 
- #include <algorithm>
- 
-+#include "base/containers/contains.h"
- #include "base/debug/dump_without_crashing.h"
- #include "base/feature_list.h"
- #include "base/files/file_path.h"
-@@ -871,7 +872,7 @@ void ProfilePickerView::NavigateBack() {
+@@ -918,7 +918,7 @@ void ProfilePickerView::NavigateBack() {
  void ProfilePickerView::ConfigureAccelerators() {
    const std::vector<AcceleratorMapping> accelerator_list(GetAcceleratorList());
    for (const auto& entry : accelerator_list) {
@@ -6005,7 +5913,7 @@ index 01a7b1aca2..c976bd1c86 100644
    };
  
 diff --git a/chrome/browser/ui/views/tab_sharing/tab_capture_contents_border_helper.cc b/chrome/browser/ui/views/tab_sharing/tab_capture_contents_border_helper.cc
-index 5cf2ae0f4d..fa56f94cac 100644
+index f024b29256..9c702a47b4 100644
 --- a/chrome/browser/ui/views/tab_sharing/tab_capture_contents_border_helper.cc
 +++ b/chrome/browser/ui/views/tab_sharing/tab_capture_contents_border_helper.cc
 @@ -5,6 +5,7 @@
@@ -6015,8 +5923,8 @@ index 5cf2ae0f4d..fa56f94cac 100644
 +#include "base/containers/contains.h"
  #include "base/feature_list.h"
  #include "build/build_config.h"
- #include "chrome/browser/browser_features.h"
-@@ -29,7 +30,7 @@ TabCaptureContentsBorderHelper::~TabCaptureContentsBorderHelper() = default;
+ #include "chrome/browser/ui/browser.h"
+@@ -28,7 +29,7 @@ TabCaptureContentsBorderHelper::~TabCaptureContentsBorderHelper() = default;
  void TabCaptureContentsBorderHelper::OnCapturerAdded(
      CaptureSessionId capture_session_id) {
    DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
@@ -6025,7 +5933,7 @@ index 5cf2ae0f4d..fa56f94cac 100644
  
    session_to_bounds_[capture_session_id] = std::nullopt;
  
-@@ -57,7 +58,7 @@ void TabCaptureContentsBorderHelper::OnRegionCaptureRectChanged(
+@@ -56,7 +57,7 @@ void TabCaptureContentsBorderHelper::OnRegionCaptureRectChanged(
      CaptureSessionId capture_session_id,
      const std::optional<gfx::Rect>& region_capture_rect) {
    DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
@@ -6056,7 +5964,7 @@ index 50e246fefe..360b9aa6d6 100644
      // destruction, so base::Unretained is safe here.
      same_origin_observers_[contents] = std::make_unique<SameOriginObserver>(
 diff --git a/chrome/browser/ui/views/tabs/dragging/tab_drag_controller.cc b/chrome/browser/ui/views/tabs/dragging/tab_drag_controller.cc
-index 6963b4314a..7aeadd467a 100644
+index 16ad5e072f..0b3445cc19 100644
 --- a/chrome/browser/ui/views/tabs/dragging/tab_drag_controller.cc
 +++ b/chrome/browser/ui/views/tabs/dragging/tab_drag_controller.cc
 @@ -14,6 +14,7 @@
@@ -6067,7 +5975,7 @@ index 6963b4314a..7aeadd467a 100644
  #include "base/feature_list.h"
  #include "base/functional/bind.h"
  #include "base/functional/callback.h"
-@@ -377,7 +378,7 @@ TabDragController::Liveness TabDragController::Init(
+@@ -404,7 +405,7 @@ TabDragController::Liveness TabDragController::Init(
      ui::ListSelectionModel initial_selection_model,
      ui::mojom::DragEventSource event_source) {
    DCHECK(!dragging_views.empty());
@@ -6077,7 +5985,7 @@ index 6963b4314a..7aeadd467a 100644
    // There's some rare condition on Windows where we are destroying ourselves
    // during Init() at some point. It's unclear how this happens, so we'll take
 diff --git a/chrome/browser/ui/views/tabs/fake_base_tab_strip_controller.cc b/chrome/browser/ui/views/tabs/fake_base_tab_strip_controller.cc
-index 4d153be97a..3d2d9e8893 100644
+index c5212f877c..75858cbc5d 100644
 --- a/chrome/browser/ui/views/tabs/fake_base_tab_strip_controller.cc
 +++ b/chrome/browser/ui/views/tabs/fake_base_tab_strip_controller.cc
 @@ -7,6 +7,7 @@
@@ -6088,7 +5996,7 @@ index 4d153be97a..3d2d9e8893 100644
  #include "chrome/browser/ui/tabs/tab_data.h"
  #include "chrome/browser/ui/views/tabs/tab_strip.h"
  #include "components/tab_groups/tab_group_color.h"
-@@ -80,14 +81,14 @@ void FakeBaseTabStripController::RemoveTab(int index) {
+@@ -79,14 +80,14 @@ void FakeBaseTabStripController::RemoveTab(int index) {
  void FakeBaseTabStripController::MoveTabIntoGroup(
      int index,
      std::optional<tab_groups::TabGroupId> new_group) {
@@ -6106,7 +6014,7 @@ index 4d153be97a..3d2d9e8893 100644
      } else {
        tab_strip_->OnGroupContentsChanged(old_group.value());
 diff --git a/chrome/browser/ui/views/tabs/tab_strip.cc b/chrome/browser/ui/views/tabs/tab_strip.cc
-index 27e1c554de..de58ec9a71 100644
+index 2959f99e55..103ad27a25 100644
 --- a/chrome/browser/ui/views/tabs/tab_strip.cc
 +++ b/chrome/browser/ui/views/tabs/tab_strip.cc
 @@ -20,6 +20,7 @@
@@ -6117,7 +6025,7 @@ index 27e1c554de..de58ec9a71 100644
  #include "base/containers/flat_map.h"
  #include "base/feature_list.h"
  #include "base/functional/bind.h"
-@@ -337,7 +338,7 @@ class TabStrip::TabDragContextImpl : public TabDragContext,
+@@ -339,7 +340,7 @@ class TabStrip::TabDragContextImpl : public TabDragContext,
  
      CHECK(!dragging_views.empty())
          << "Dragging views cannot be empty during drag initialization.";
@@ -6127,10 +6035,10 @@ index 27e1c554de..de58ec9a71 100644
  
      // Delete the existing DragController before creating a new one. We do this
 diff --git a/chrome/browser/ui/views/tabs/vertical/tab_collection_animating_layout_manager.cc b/chrome/browser/ui/views/tabs/vertical/tab_collection_animating_layout_manager.cc
-index 5a1aa60e1f..471a27e463 100644
+index e5a4eab698..9e3f05936e 100644
 --- a/chrome/browser/ui/views/tabs/vertical/tab_collection_animating_layout_manager.cc
 +++ b/chrome/browser/ui/views/tabs/vertical/tab_collection_animating_layout_manager.cc
-@@ -322,7 +322,7 @@ void TabCollectionAnimatingLayoutManager::ResetViewsToTargetLayout(
+@@ -358,7 +358,7 @@ void TabCollectionAnimatingLayoutManager::ResetViewsToTargetLayout(
  
  void TabCollectionAnimatingLayoutManager::AnimateAndDestroyChildView(
      views::View* child_view) {
@@ -6140,7 +6048,7 @@ index 5a1aa60e1f..471a27e463 100644
    child_view->SetFocusBehavior(views::View::FocusBehavior::NEVER);
    child_view->SetProperty(kPendingDeletion, true);
 diff --git a/chrome/browser/ui/views/tabs/vertical/vertical_split_tab_view.cc b/chrome/browser/ui/views/tabs/vertical/vertical_split_tab_view.cc
-index ab68d066b5..f6636fb006 100644
+index 063ab0718b..6b24ce4e09 100644
 --- a/chrome/browser/ui/views/tabs/vertical/vertical_split_tab_view.cc
 +++ b/chrome/browser/ui/views/tabs/vertical/vertical_split_tab_view.cc
 @@ -7,6 +7,7 @@
@@ -6151,7 +6059,7 @@ index ab68d066b5..f6636fb006 100644
  #include "chrome/browser/ui/color/chrome_color_id.h"
  #include "chrome/browser/ui/layout_constants.h"
  #include "chrome/browser/ui/tabs/tab_style.h"
-@@ -259,7 +260,7 @@ void VerticalSplitTabView::UpdateHovered(bool hovered) {
+@@ -286,7 +287,7 @@ void VerticalSplitTabView::OnCollapseStateChanged(
  
  std::unique_ptr<views::View>
  VerticalSplitTabView::RemoveChildViewForReparenting(views::View* child_view) {
@@ -6182,7 +6090,7 @@ index 5061fde12c..fadbefbc5e 100644
      }
    }
 diff --git a/chrome/browser/ui/views/toolbar/pinned_toolbar_actions_container.cc b/chrome/browser/ui/views/toolbar/pinned_toolbar_actions_container.cc
-index fd83680e97..3e1ff04ad9 100644
+index 644ad6ad58..84e6fbad5e 100644
 --- a/chrome/browser/ui/views/toolbar/pinned_toolbar_actions_container.cc
 +++ b/chrome/browser/ui/views/toolbar/pinned_toolbar_actions_container.cc
 @@ -10,6 +10,7 @@
@@ -6319,7 +6227,7 @@ index 094783c893..60b0ec8d9f 100644
  
        icon_index++;
 diff --git a/chrome/browser/ui/web_applications/app_browser_controller.cc b/chrome/browser/ui/web_applications/app_browser_controller.cc
-index ef41ab6fd8..eb6dceec79 100644
+index 8ac42bc4e3..72208a0b06 100644
 --- a/chrome/browser/ui/web_applications/app_browser_controller.cc
 +++ b/chrome/browser/ui/web_applications/app_browser_controller.cc
 @@ -4,9 +4,9 @@
@@ -6333,7 +6241,7 @@ index ef41ab6fd8..eb6dceec79 100644
  #include "base/feature_list.h"
  #include "base/functional/bind.h"
  #include "base/memory/values_equivalent.h"
-@@ -418,7 +418,7 @@ std::vector<actions::ActionId> AppBrowserController::GetTitleBarPageActions()
+@@ -419,7 +419,7 @@ std::vector<actions::ActionId> AppBrowserController::GetTitleBarPageActions()
  
  #if DCHECK_IS_ON()
    for (auto action_id : types_enabled) {
@@ -6343,7 +6251,7 @@ index ef41ab6fd8..eb6dceec79 100644
  #endif
  
 diff --git a/chrome/browser/ui/web_applications/navigation_capturing_process.cc b/chrome/browser/ui/web_applications/navigation_capturing_process.cc
-index e6dcd67e18..92210a5d12 100644
+index 80261dabaf..3bdad5306d 100644
 --- a/chrome/browser/ui/web_applications/navigation_capturing_process.cc
 +++ b/chrome/browser/ui/web_applications/navigation_capturing_process.cc
 @@ -16,6 +16,7 @@
@@ -6354,7 +6262,7 @@ index e6dcd67e18..92210a5d12 100644
  #include "base/types/optional_util.h"
  #include "base/types/pass_key.h"
  #include "chrome/browser/profiles/profile.h"
-@@ -103,7 +104,7 @@ bool IsPageTransitionValidForNavigationCapturing(
+@@ -104,7 +105,7 @@ bool IsPageTransitionValidForNavigationCapturing(
      default:
        NOTREACHED();
    }
@@ -6396,7 +6304,7 @@ index beb593370a..eae1177cd3 100644
  
  void AccessCodeCastHandler::SetIdentityManagerForTesting(
 diff --git a/chrome/browser/ui/webui/browser_command/browser_command_handler.cc b/chrome/browser/ui/webui/browser_command/browser_command_handler.cc
-index 23ba83c718..4729d2b7f5 100644
+index f64b635cee..41cec15fbf 100644
 --- a/chrome/browser/ui/webui/browser_command/browser_command_handler.cc
 +++ b/chrome/browser/ui/webui/browser_command/browser_command_handler.cc
 @@ -4,9 +4,8 @@
@@ -6410,7 +6318,7 @@ index 23ba83c718..4729d2b7f5 100644
  #include "base/metrics/histogram_functions.h"
  #include "base/metrics/user_metrics.h"
  #include "chrome/app/chrome_command_ids.h"
-@@ -82,7 +81,7 @@ BrowserCommandHandler::~BrowserCommandHandler() = default;
+@@ -90,7 +89,7 @@ BrowserCommandHandler::~BrowserCommandHandler() = default;
  void BrowserCommandHandler::CanExecuteCommand(
      browser_command::mojom::Command command_id,
      CanExecuteCommandCallback callback) {
@@ -6419,7 +6327,7 @@ index 23ba83c718..4729d2b7f5 100644
      std::move(callback).Run(false);
      return;
    }
-@@ -158,7 +157,7 @@ void BrowserCommandHandler::CanExecuteCommand(
+@@ -172,7 +171,7 @@ void BrowserCommandHandler::CanExecuteCommand(
  void BrowserCommandHandler::ExecuteCommand(Command command_id,
                                             ClickInfoPtr click_info,
                                             ExecuteCommandCallback callback) {
@@ -6429,7 +6337,7 @@ index 23ba83c718..4729d2b7f5 100644
      return;
    }
 diff --git a/chrome/browser/ui/webui/cr_components/searchbox/searchbox_handler.cc b/chrome/browser/ui/webui/cr_components/searchbox/searchbox_handler.cc
-index 4c489821a2..24ec335197 100644
+index 18f2a5a27b..4043f6a8c6 100644
 --- a/chrome/browser/ui/webui/cr_components/searchbox/searchbox_handler.cc
 +++ b/chrome/browser/ui/webui/cr_components/searchbox/searchbox_handler.cc
 @@ -6,6 +6,7 @@
@@ -6440,7 +6348,7 @@ index 4c489821a2..24ec335197 100644
  #include "base/containers/fixed_flat_map.h"
  #include "base/feature_list.h"
  #include "base/metrics/histogram_functions.h"
-@@ -268,7 +269,7 @@
+@@ -267,7 +268,7 @@ bool MatchHasSideTypeAndRenderType(
      const omnibox::GroupConfigMap& suggestion_groups_map) {
    omnibox::GroupId group_id =
        match.suggestion_group_id.value_or(omnibox::GROUP_INVALID);
@@ -6462,7 +6370,7 @@ index 70b66bc744..e46db5fcf6 100644
  #include "base/functional/bind.h"
  #include "base/memory/weak_ptr.h"
 diff --git a/chrome/browser/ui/webui/management/management_ui_handler.cc b/chrome/browser/ui/webui/management/management_ui_handler.cc
-index 7ac7042951..1860b53d37 100644
+index 9a8e238ca8..c8f429e46e 100644
 --- a/chrome/browser/ui/webui/management/management_ui_handler.cc
 +++ b/chrome/browser/ui/webui/management/management_ui_handler.cc
 @@ -13,6 +13,7 @@
@@ -6511,7 +6419,7 @@ index 7017fd4644..27d6c0af0c 100644
          << __func__ << ": Received endpoint_id for device no longer in map.";
      return;
 diff --git a/chrome/browser/ui/webui/new_tab_page/new_tab_page_handler.cc b/chrome/browser/ui/webui/new_tab_page/new_tab_page_handler.cc
-index 8fe0dbe107..dbf2e25a63 100644
+index 7656fc4407..fd8562400d 100644
 --- a/chrome/browser/ui/webui/new_tab_page/new_tab_page_handler.cc
 +++ b/chrome/browser/ui/webui/new_tab_page/new_tab_page_handler.cc
 @@ -15,6 +15,7 @@
@@ -6522,7 +6430,7 @@ index 8fe0dbe107..dbf2e25a63 100644
  #include "base/containers/fixed_flat_map.h"
  #include "base/containers/fixed_flat_set.h"
  #include "base/containers/flat_map.h"
-@@ -155,7 +156,7 @@ bool ShouldForceDarkForegroundColorsForLogo(const ThemeService* theme_service) {
+@@ -158,7 +159,7 @@ bool ShouldForceDarkForegroundColorsForLogo(const ThemeService* theme_service) {
        });
  
    const std::string& extension_id = theme_supplier->extension_id();
@@ -6531,7 +6439,7 @@ index 8fe0dbe107..dbf2e25a63 100644
  }
  
  new_tab_page::mojom::ThemePtr MakeTheme(
-@@ -691,12 +692,13 @@ void NewTabPageHandler::SetModulesDisabled(
+@@ -698,12 +699,13 @@ void NewTabPageHandler::SetModulesDisabled(
    ScopedListPrefUpdate update(profile_->GetPrefs(), prefs::kNtpDisabledModules);
    base::ListValue& list = update.Get();
    for (const auto& module_id : module_ids) {
@@ -6548,7 +6456,7 @@ index 8fe0dbe107..dbf2e25a63 100644
      }
    }
  
-@@ -753,7 +755,7 @@ void NewTabPageHandler::OnModulesLoadedWithData(
+@@ -760,7 +762,7 @@ void NewTabPageHandler::OnModulesLoadedWithData(
        GetSurveyEligibleModuleIds();
    if (std::any_of(module_ids.begin(), module_ids.end(),
                    [&survey_eligible_module_ids](std::string id) {
@@ -6557,7 +6465,7 @@ index 8fe0dbe107..dbf2e25a63 100644
                                                   id);
                    })) {
      HatsService* hats_service = HatsServiceFactory::GetForProfile(
-@@ -886,7 +888,7 @@ void NewTabPageHandler::GetModulesOrder(GetModulesOrderCallback callback) {
+@@ -893,7 +895,7 @@ void NewTabPageHandler::GetModulesOrder(GetModulesOrderCallback callback) {
    std::ranges::copy_if(ntp_features::GetModulesOrder(),
                         std::back_inserter(module_ids),
                         [&module_ids](const std::string& id) {
@@ -6566,7 +6474,7 @@ index 8fe0dbe107..dbf2e25a63 100644
                         });
  
    // Third, append default module order for any modules not ordered by
-@@ -894,7 +896,7 @@ void NewTabPageHandler::GetModulesOrder(GetModulesOrderCallback callback) {
+@@ -901,7 +903,7 @@ void NewTabPageHandler::GetModulesOrder(GetModulesOrderCallback callback) {
    std::ranges::copy_if(ntp_modules::kOrderedModuleIds,
                         std::back_inserter(module_ids),
                         [&module_ids](const std::string& id) {
@@ -6576,10 +6484,10 @@ index 8fe0dbe107..dbf2e25a63 100644
  
    std::move(callback).Run(std::move(module_ids));
 diff --git a/chrome/browser/ui/webui/new_tab_page/new_tab_page_ui.cc b/chrome/browser/ui/webui/new_tab_page/new_tab_page_ui.cc
-index a4b99dc114..95fa7a7fb9 100644
+index fefcdbdeb7..c17f558910 100644
 --- a/chrome/browser/ui/webui/new_tab_page/new_tab_page_ui.cc
 +++ b/chrome/browser/ui/webui/new_tab_page/new_tab_page_ui.cc
-@@ -1390,11 +1390,11 @@ void NewTabPageUI::UpdateMostVisitedTileTypes() {
+@@ -1385,11 +1385,11 @@ void NewTabPageUI::UpdateMostVisitedTileTypes() {
      most_visited_page_handler_->EnableTileTypes(
          ntp_tiles::MostVisitedSites::EnableTileTypesOptions()
              .with_top_sites(
@@ -6597,7 +6505,7 @@ index a4b99dc114..95fa7a7fb9 100644
  }
  
 diff --git a/chrome/browser/ui/webui/new_tab_page/untrusted_source.cc b/chrome/browser/ui/webui/new_tab_page/untrusted_source.cc
-index 2f85322afb..39924d7c63 100644
+index 346ae19e34..39edc384cf 100644
 --- a/chrome/browser/ui/webui/new_tab_page/untrusted_source.cc
 +++ b/chrome/browser/ui/webui/new_tab_page/untrusted_source.cc
 @@ -11,6 +11,7 @@
@@ -6608,7 +6516,7 @@ index 2f85322afb..39924d7c63 100644
  #include "base/files/file_util.h"
  #include "base/i18n/rtl.h"
  #include "base/memory/ref_counted_memory.h"
-@@ -297,7 +298,8 @@ bool UntrustedSource::ShouldServiceRequest(
+@@ -305,7 +306,8 @@ bool UntrustedSource::ShouldServiceRequest(
    return path == "one-google-bar" || path == "one_google_bar.js" ||
           path == "one_google_bar_api.js" || path == "image" ||
           path == "background_image" || path == "custom_background_image" ||
@@ -6639,7 +6547,7 @@ index 7dfea178f9..c1d4ada1a2 100644
    return most_visited_sites;
  }
 diff --git a/chrome/browser/ui/webui/print_preview/pdf_printer_handler.cc b/chrome/browser/ui/webui/print_preview/pdf_printer_handler.cc
-index b5e5f8bc2a..884aaab796 100644
+index 0f4889a421..7230ca9880 100644
 --- a/chrome/browser/ui/webui/print_preview/pdf_printer_handler.cc
 +++ b/chrome/browser/ui/webui/print_preview/pdf_printer_handler.cc
 @@ -8,6 +8,7 @@
@@ -6792,7 +6700,7 @@ index 22d412cd44..b5c911d5e0 100644
      return;
    }
 diff --git a/chrome/browser/ui/webui/settings/site_settings_handler.cc b/chrome/browser/ui/webui/settings/site_settings_handler.cc
-index d0cd2c75ca..03a00c78d2 100644
+index 5162dd611d..0d55c82738 100644
 --- a/chrome/browser/ui/webui/settings/site_settings_handler.cc
 +++ b/chrome/browser/ui/webui/settings/site_settings_handler.cc
 @@ -15,6 +15,7 @@
@@ -6803,7 +6711,7 @@ index d0cd2c75ca..03a00c78d2 100644
  #include "base/containers/flat_set.h"
  #include "base/containers/to_value_list.h"
  #include "base/debug/crash_logging.h"
-@@ -556,7 +557,7 @@ void ConvertSiteGroupMapToList(
+@@ -559,7 +560,7 @@ void ConvertSiteGroupMapToList(
        origin_object.Set(kIsInstalled, is_installed);
  
        origin_object.Set(kHasPermissionSettings,
@@ -6812,7 +6720,7 @@ index d0cd2c75ca..03a00c78d2 100644
        origin_list.Append(std::move(origin_object));
      }
      site_group.Set(kHasInstalledPWA, has_installed_pwa);
-@@ -2702,7 +2703,7 @@ base::ListValue SiteSettingsHandler::PopulateFileSystemGrantData() {
+@@ -2768,7 +2769,7 @@ base::ListValue SiteSettingsHandler::PopulateFileSystemGrantData() {
      for (auto& path_info : grantObj.directory_read_grants) {
        const std::string file_path_string =
            FilePathToValue(path_info.path).GetString();
@@ -6821,7 +6729,7 @@ index d0cd2c75ca..03a00c78d2 100644
                                  file_path_string)) {
          continue;
        }
-@@ -2731,7 +2732,7 @@ base::ListValue SiteSettingsHandler::PopulateFileSystemGrantData() {
+@@ -2797,7 +2798,7 @@ base::ListValue SiteSettingsHandler::PopulateFileSystemGrantData() {
      for (auto& path_info : grantObj.file_read_grants) {
        const std::string file_path_string =
            FilePathToValue(path_info.path).GetString();
@@ -6831,19 +6739,19 @@ index d0cd2c75ca..03a00c78d2 100644
          continue;
        }
 diff --git a/chrome/browser/ui/webui/settings/site_settings_helper.cc b/chrome/browser/ui/webui/settings/site_settings_helper.cc
-index a37a4d23d7..061350d7d4 100644
+index 42d603bb9d..c619c03d1c 100644
 --- a/chrome/browser/ui/webui/settings/site_settings_helper.cc
 +++ b/chrome/browser/ui/webui/settings/site_settings_helper.cc
-@@ -15,6 +15,7 @@
- 
+@@ -17,6 +17,7 @@
+ #include "base/check_op.h"
  #include "base/command_line.h"
  #include "base/containers/adapters.h"
 +#include "base/containers/contains.h"
  #include "base/feature_list.h"
  #include "base/json/values_util.h"
- #include "base/no_destructor.h"
+ #include "base/logging.h"
 diff --git a/chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome_page_handler.cc b/chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome_page_handler.cc
-index 858fb561bf..47c2eeea14 100644
+index 82590dfa2f..bcb75b4616 100644
 --- a/chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome_page_handler.cc
 +++ b/chrome/browser/ui/webui/side_panel/customize_chrome/customize_chrome_page_handler.cc
 @@ -8,6 +8,7 @@
@@ -6854,46 +6762,7 @@ index 858fb561bf..47c2eeea14 100644
  #include "base/metrics/field_trial_params.h"
  #include "base/metrics/histogram_functions.h"
  #include "base/metrics/histogram_macros.h"
-@@ -481,24 +482,26 @@ void CustomizeChromePageHandler::SetMostVisitedSettings(
- 
-   // Disable shortcuts auto-removal upon user interaction.
-   DisableShortcutsAutoRemoval(profile_);
--  if ((current_tile_types.contains(ntp_tiles::TileType::kCustomLinks) !=
--           types_set.contains(ntp_tiles::TileType::kCustomLinks) ||
--       (current_tile_types.contains(ntp_tiles::TileType::kTopSites) !=
--        types_set.contains(ntp_tiles::TileType::kTopSites)))) {
--    UpdatePrefAndLogEvent(ntp_prefs::kNtpCustomLinksVisible,
--                          types_set.contains(ntp_tiles::TileType::kCustomLinks),
--                          NTP_CUSTOMIZE_SHORTCUT_TOGGLE_TYPE);
--  }
--
--  if (current_tile_types.contains(ntp_tiles::TileType::kEnterpriseShortcuts) !=
--      types_set.contains(ntp_tiles::TileType::kEnterpriseShortcuts)) {
-+  if ((base::Contains(current_tile_types, ntp_tiles::TileType::kCustomLinks) !=
-+           base::Contains(types_set, ntp_tiles::TileType::kCustomLinks) ||
-+       (base::Contains(current_tile_types, ntp_tiles::TileType::kTopSites) !=
-+        base::Contains(types_set, ntp_tiles::TileType::kTopSites)))) {
-+    UpdatePrefAndLogEvent(
-+        ntp_prefs::kNtpCustomLinksVisible,
-+        base::Contains(types_set, ntp_tiles::TileType::kCustomLinks),
-+        NTP_CUSTOMIZE_SHORTCUT_TOGGLE_TYPE);
-+  }
-+
-+  if (base::Contains(current_tile_types,
-+                     ntp_tiles::TileType::kEnterpriseShortcuts) !=
-+      base::Contains(types_set, ntp_tiles::TileType::kEnterpriseShortcuts)) {
-     // If enterprise shortcuts are disabled or the policy is not set, skip this
-     // update.
-     if (base::FeatureList::IsEnabled(ntp_tiles::kNtpEnterpriseShortcuts) &&
-         !IsEnterpriseShortcutsEmpty()) {
-       UpdatePrefAndLogEvent(
-           ntp_prefs::kNtpEnterpriseShortcutsVisible,
--          types_set.contains(ntp_tiles::TileType::kEnterpriseShortcuts),
-+          base::Contains(types_set, ntp_tiles::TileType::kEnterpriseShortcuts),
-           NTP_CUSTOMIZE_ENTERPRISE_SHORTCUT_TOGGLE_VISIBILITY);
-     }
-   }
-@@ -641,9 +644,9 @@ void CustomizeChromePageHandler::UpdateModulesSettings() {
+@@ -637,9 +638,9 @@ void CustomizeChromePageHandler::UpdateModulesSettings() {
            l10n_util::GetStringUTF8(description_message_id.value());
      }
      module_settings->enabled =
@@ -6906,7 +6775,7 @@ index 858fb561bf..47c2eeea14 100644
    }
    page_->SetModulesSettings(
 diff --git a/chrome/browser/ui/webui/side_panel/customize_chrome/wallpaper_search/wallpaper_search_handler.cc b/chrome/browser/ui/webui/side_panel/customize_chrome/wallpaper_search/wallpaper_search_handler.cc
-index ac82ce65f9..71702d32c8 100644
+index dc37207dc5..188a69c894 100644
 --- a/chrome/browser/ui/webui/side_panel/customize_chrome/wallpaper_search/wallpaper_search_handler.cc
 +++ b/chrome/browser/ui/webui/side_panel/customize_chrome/wallpaper_search/wallpaper_search_handler.cc
 @@ -13,6 +13,7 @@
@@ -6917,7 +6786,7 @@ index ac82ce65f9..71702d32c8 100644
  #include "base/files/file_path.h"
  #include "base/files/file_util.h"
  #include "base/metrics/histogram_functions.h"
-@@ -166,7 +167,7 @@ WallpaperSearchHandler::~WallpaperSearchHandler() {
+@@ -167,7 +168,7 @@ WallpaperSearchHandler::~WallpaperSearchHandler() {
  
    bool is_result = false;
    if (background_id) {
@@ -6926,7 +6795,7 @@ index ac82ce65f9..71702d32c8 100644
        base::UmaHistogramEnumeration(
            "NewTabPage.WallpaperSearch.SessionSetTheme",
            NtpWallpaperSearchThemeType::kResult);
-@@ -419,7 +420,7 @@ void WallpaperSearchHandler::SetBackgroundToWallpaperSearchResult(
+@@ -420,7 +421,7 @@ void WallpaperSearchHandler::SetBackgroundToWallpaperSearchResult(
      const base::Token& result_id,
      double time,
      side_panel::customize_chrome::mojom::ResultDescriptorsPtr descriptors) {
@@ -6935,7 +6804,7 @@ index ac82ce65f9..71702d32c8 100644
    auto& [image_quality, render_time, bitmap] =
        wallpaper_search_results_[result_id];
    if (image_quality) {
-@@ -1067,7 +1068,7 @@ void WallpaperSearchHandler::SetResultRenderTime(
+@@ -1069,7 +1070,7 @@ void WallpaperSearchHandler::SetResultRenderTime(
      const std::vector<base::Token>& result_ids,
      double time) {
    for (const auto& id : result_ids) {
@@ -6945,18 +6814,18 @@ index ac82ce65f9..71702d32c8 100644
      std::get<1>(tuple) =
          std::make_optional(base::Time::FromMillisecondsSinceUnixEpoch(time));
 diff --git a/chrome/browser/ui/webui/side_panel/read_anything/read_anything_untrusted_page_handler.cc b/chrome/browser/ui/webui/side_panel/read_anything/read_anything_untrusted_page_handler.cc
-index 1938b8733a..9682a89d45 100644
+index 42dba4d0ea..36403047f5 100644
 --- a/chrome/browser/ui/webui/side_panel/read_anything/read_anything_untrusted_page_handler.cc
 +++ b/chrome/browser/ui/webui/side_panel/read_anything/read_anything_untrusted_page_handler.cc
-@@ -15,6 +15,7 @@
- #include "base/containers/flat_map.h"
+@@ -17,6 +17,7 @@
  #include "base/functional/bind.h"
+ #include "base/logging.h"
  #include "base/metrics/histogram_functions.h"
 +#include "base/types/cxx23_to_underlying.h"
  #include "base/values.h"
  #include "chrome/browser/accessibility/phrase_segmentation/dependency_parser_model_loader.h"
  #include "chrome/browser/accessibility/phrase_segmentation/dependency_parser_model_loader_factory.h"
-@@ -817,14 +818,14 @@ void ReadAnythingUntrustedPageHandler::OnCopy() {
+@@ -867,14 +868,14 @@ bool ReadAnythingUntrustedPageHandler::IsObservingTree(
  void ReadAnythingUntrustedPageHandler::OnLineSpaceChange(
      read_anything::mojom::LineSpacing line_spacing) {
    profile_->GetPrefs()->SetInteger(prefs::kAccessibilityReadAnythingLineSpacing,
@@ -6973,7 +6842,7 @@ index 1938b8733a..9682a89d45 100644
  }
  void ReadAnythingUntrustedPageHandler::OnFontChange(const std::string& font) {
    profile_->GetPrefs()->SetString(prefs::kAccessibilityReadAnythingFontName,
-@@ -849,7 +850,7 @@ void ReadAnythingUntrustedPageHandler::OnImagesEnabledChanged(bool enabled) {
+@@ -899,7 +900,7 @@ void ReadAnythingUntrustedPageHandler::OnImagesEnabledChanged(bool enabled) {
  void ReadAnythingUntrustedPageHandler::OnColorChange(
      read_anything::mojom::Colors color) {
    profile_->GetPrefs()->SetInteger(prefs::kAccessibilityReadAnythingColorInfo,
@@ -6982,7 +6851,7 @@ index 1938b8733a..9682a89d45 100644
  }
  
  void ReadAnythingUntrustedPageHandler::OnSpeechRateChange(double rate) {
-@@ -871,7 +872,7 @@ void ReadAnythingUntrustedPageHandler::OnLanguagePrefChange(
+@@ -921,7 +922,7 @@ void ReadAnythingUntrustedPageHandler::OnLanguagePrefChange(
    ScopedListPrefUpdate update(
        prefs, prefs::kAccessibilityReadAnythingLanguagesEnabled);
    if (enabled) {
@@ -6992,7 +6861,7 @@ index 1938b8733a..9682a89d45 100644
      }
    } else {
 diff --git a/chrome/browser/ui/webui/signin/ash/inline_login_handler_impl.cc b/chrome/browser/ui/webui/signin/ash/inline_login_handler_impl.cc
-index b556f53311..71d0f1dce2 100644
+index 386443bb69..4b98d016ab 100644
 --- a/chrome/browser/ui/webui/signin/ash/inline_login_handler_impl.cc
 +++ b/chrome/browser/ui/webui/signin/ash/inline_login_handler_impl.cc
 @@ -4,7 +4,6 @@
@@ -7003,7 +6872,7 @@ index b556f53311..71d0f1dce2 100644
  #include <memory>
  #include <optional>
  #include <string>
-@@ -351,7 +350,7 @@ void InlineLoginHandlerImpl::HandleDialogClose(const base::ListValue& args) {
+@@ -350,7 +349,7 @@ void InlineLoginHandlerImpl::HandleDialogClose(const base::ListValue& args) {
  void InlineLoginHandlerImpl::OnGetAccountsToCompleteLogin(
      const CompleteLoginParams& params,
      const std::vector<::account_manager::Account>& accounts) {
@@ -7039,7 +6908,7 @@ index 2635ac15dc..bf9eedea0b 100644
               : credential_provider::kUiecInvalidEmailDomain;
  }
 diff --git a/chrome/browser/ui/webui/signin/signin_ui_error.cc b/chrome/browser/ui/webui/signin/signin_ui_error.cc
-index 8f287e9979..da15dcccdc 100644
+index 6645f708d8..c5ae999a6a 100644
 --- a/chrome/browser/ui/webui/signin/signin_ui_error.cc
 +++ b/chrome/browser/ui/webui/signin/signin_ui_error.cc
 @@ -13,6 +13,7 @@
@@ -7089,18 +6958,10 @@ index 32fc11e433..631687d2f9 100644
  }
  
 diff --git a/chrome/browser/ui/webui/tab_search/tab_search_page_handler.cc b/chrome/browser/ui/webui/tab_search/tab_search_page_handler.cc
-index 804970f53f..6fe628a91e 100644
+index 2fe758c095..2435540b40 100644
 --- a/chrome/browser/ui/webui/tab_search/tab_search_page_handler.cc
 +++ b/chrome/browser/ui/webui/tab_search/tab_search_page_handler.cc
-@@ -14,6 +14,7 @@
- #include <utility>
- #include <vector>
- 
-+#include "base/containers/contains.h"
- #include "base/functional/bind.h"
- #include "base/metrics/histogram_functions.h"
- #include "base/strings/utf_string_conversions.h"
-@@ -102,7 +103,8 @@ void CreateTabGroupIfNotPresent(
+@@ -110,7 +110,8 @@ void CreateTabGroupIfNotPresent(
      sessions::tab_restore::Tab* tab,
      std::set<tab_groups::TabGroupId>& tab_group_ids,
      std::vector<tab_search::mojom::TabGroupPtr>& tab_groups) {
@@ -7110,7 +6971,7 @@ index 804970f53f..6fe628a91e 100644
      tab_groups::TabGroupId tab_group_id = tab->group.value();
      const tab_groups::TabGroupVisualData* tab_group_visual_data =
          &tab->group_visual_data.value();
-@@ -583,7 +585,7 @@ bool TabSearchPageHandler::AddRecentlyClosedTab(
+@@ -588,7 +589,7 @@ bool TabSearchPageHandler::AddRecentlyClosedTab(
    DedupKey dedup_id(recently_closed_tab->url, recently_closed_tab->group_id);
    // Ignore NTP entries, duplicate entries and tabs with invalid URLs such as
    // empty URLs.
@@ -7119,17 +6980,8 @@ index 804970f53f..6fe628a91e 100644
        recently_closed_tab->url == GURL(chrome::kChromeUINewTabPageURL) ||
        !recently_closed_tab->url.is_valid()) {
      return false;
-@@ -748,7 +750,7 @@ void TabSearchPageHandler::OnTabStripModelChanged(
-       // Recently closed entries appear first in the list.
-       for (auto& entry : tab_restore_service->entries()) {
-         if (entry->type == sessions::tab_restore::Type::TAB &&
--            tab_restore_ids.contains(entry->id)) {
-+            base::Contains(tab_restore_ids, entry->id)) {
-           // The associated tab group visual data for the recently closed tab is
-           // already present at the client side from the initial GetProfileData
-           // call.
 diff --git a/chrome/browser/ui/webui/tab_search/tab_search_prefs.cc b/chrome/browser/ui/webui/tab_search/tab_search_prefs.cc
-index 6e2281d68f..c6ceb5dea4 100644
+index 18c141a988..3fa3108353 100644
 --- a/chrome/browser/ui/webui/tab_search/tab_search_prefs.cc
 +++ b/chrome/browser/ui/webui/tab_search/tab_search_prefs.cc
 @@ -4,8 +4,7 @@
@@ -7142,17 +6994,8 @@ index 6e2281d68f..c6ceb5dea4 100644
  #include "chrome/browser/ui/webui/tab_search/tab_search.mojom.h"
  #include "components/pref_registry/pref_registry_syncable.h"
  #include "components/prefs/pref_registry_simple.h"
-@@ -51,7 +50,7 @@ tab_search::mojom::TabSearchSection GetTabSearchSectionFromInt(
- 
- int GetIntFromTabSearchSection(
-     const tab_search::mojom::TabSearchSection section) {
--  return std::to_underlying(section);
-+  return base::to_underlying(section);
- }
- 
- }  // namespace tab_search_prefs
 diff --git a/chrome/browser/ui/webui/theme_source.cc b/chrome/browser/ui/webui/theme_source.cc
-index 585833c193..e0b5760bb8 100644
+index d259b3ef85..c3eb3c5a6d 100644
 --- a/chrome/browser/ui/webui/theme_source.cc
 +++ b/chrome/browser/ui/webui/theme_source.cc
 @@ -7,6 +7,7 @@
@@ -7161,9 +7004,9 @@ index 585833c193..e0b5760bb8 100644
  
 +#include "base/containers/contains.h"
  #include "base/functional/bind.h"
+ #include "base/logging.h"
  #include "base/memory/ref_counted_memory.h"
- #include "base/metrics/histogram_functions.h"
-@@ -320,7 +321,7 @@ std::optional<std::string> ThemeSource::GenerateColorsCss(
+@@ -321,7 +322,7 @@ std::optional<std::string> ThemeSource::GenerateColorsCss(
    css_string.append(css_header);
  
    for (const auto& def : definitions) {
@@ -7210,7 +7053,7 @@ index 86ed48a256..bb3d831678 100644
  #include "base/memory/raw_ptr.h"
  #include "base/no_destructor.h"
 diff --git a/chrome/browser/ui/webui/top_chrome/webui_contents_preload_manager.cc b/chrome/browser/ui/webui/top_chrome/webui_contents_preload_manager.cc
-index 59b558a413..a7ef4e5392 100644
+index 3c7f0ccfb2..a70c3d0451 100644
 --- a/chrome/browser/ui/webui/top_chrome/webui_contents_preload_manager.cc
 +++ b/chrome/browser/ui/webui/top_chrome/webui_contents_preload_manager.cc
 @@ -4,12 +4,12 @@
@@ -7227,7 +7070,7 @@ index 59b558a413..a7ef4e5392 100644
  #include "base/feature_list.h"
  #include "base/memory/weak_ptr.h"
  #include "base/memory_coordinator/utils.h"
-@@ -71,7 +71,7 @@ class FixedCandidateSelector : public webui::PreloadCandidateSelector {
+@@ -73,7 +73,7 @@ class FixedCandidateSelector : public webui::PreloadCandidateSelector {
  
    // webui::PreloadCandidateSelector:
    void Init(const std::vector<GURL>& preloadable_urls) override {
@@ -7473,7 +7316,7 @@ index 40c2f8e44d..652c918a50 100644
    DesktopMediaPickerManager::Get()->AddObserver(this);
  
 diff --git a/chrome/browser/web_applications/app_service/web_app_publisher_helper.cc b/chrome/browser/web_applications/app_service/web_app_publisher_helper.cc
-index 2bc846849d..1de7b80947 100644
+index af797c1968..755a070bb9 100644
 --- a/chrome/browser/web_applications/app_service/web_app_publisher_helper.cc
 +++ b/chrome/browser/web_applications/app_service/web_app_publisher_helper.cc
 @@ -21,6 +21,7 @@
@@ -7484,7 +7327,7 @@ index 2bc846849d..1de7b80947 100644
  #include "base/containers/extend.h"
  #include "base/containers/flat_map.h"
  #include "base/containers/flat_set.h"
-@@ -580,7 +581,7 @@ WebAppPublisherHelper::~WebAppPublisherHelper() = default;
+@@ -582,7 +583,7 @@ WebAppPublisherHelper::~WebAppPublisherHelper() = default;
  // static
  bool WebAppPublisherHelper::IsSupportedWebAppPermissionType(
      ContentSettingsType permission_type) {
@@ -7494,7 +7337,7 @@ index 2bc846849d..1de7b80947 100644
  
  void WebAppPublisherHelper::Shutdown() {
 diff --git a/chrome/browser/web_applications/commands/fetch_manifest_and_install_command.cc b/chrome/browser/web_applications/commands/fetch_manifest_and_install_command.cc
-index edd0fc17c9..88f7546b09 100644
+index c56da847b6..df43120265 100644
 --- a/chrome/browser/web_applications/commands/fetch_manifest_and_install_command.cc
 +++ b/chrome/browser/web_applications/commands/fetch_manifest_and_install_command.cc
 @@ -219,7 +219,7 @@ void FetchManifestAndInstallCommand::GetScreenshot(
@@ -7746,7 +7589,7 @@ index 47a7ca8a49..81dcd46a0c 100644
      return;
    }
 diff --git a/chrome/browser/web_applications/jobs/manifest_to_web_app_install_info_job.cc b/chrome/browser/web_applications/jobs/manifest_to_web_app_install_info_job.cc
-index 2cda08446b..0e3e82f2b4 100644
+index 704b266b9c..5c90c9940b 100644
 --- a/chrome/browser/web_applications/jobs/manifest_to_web_app_install_info_job.cc
 +++ b/chrome/browser/web_applications/jobs/manifest_to_web_app_install_info_job.cc
 @@ -13,6 +13,7 @@
@@ -7757,7 +7600,7 @@ index 2cda08446b..0e3e82f2b4 100644
  #include "base/containers/flat_map.h"
  #include "base/feature_list.h"
  #include "base/functional/bind.h"
-@@ -227,7 +228,7 @@ void UpdateWebAppInstallInfoIconsFromManifestIfNeeded(
+@@ -228,7 +229,7 @@ void UpdateWebAppInstallInfoIconsFromManifestIfNeeded(
        apps::IconInfo info;
  
        if (!icon.sizes.empty()) {
@@ -7766,7 +7609,7 @@ index 2cda08446b..0e3e82f2b4 100644
              icon.src.spec().find(".svg") != std::string::npos) {
            web_app_info->icons_with_size_any.manifest_icons[purpose] = icon.src;
          }
-@@ -317,13 +318,13 @@ void PopulateWebAppShortcutsMenuItemInfos(
+@@ -318,13 +319,13 @@ void PopulateWebAppShortcutsMenuItemInfos(
        std::vector<WebAppShortcutsMenuItemInfo::Icon> shortcut_icons;
        for (const auto& icon : shortcut_icons_list) {
          CHECK(!icon.purpose.empty());
@@ -7782,7 +7625,7 @@ index 2cda08446b..0e3e82f2b4 100644
              icon.src.spec().find(".svg") != std::string::npos) {
            web_app_info->icons_with_size_any.shortcut_menu_icons[purpose] =
                icon.src;
-@@ -501,7 +502,7 @@ void PopulateHomeTabIconsFromHomeTabManifestParams(
+@@ -502,7 +503,7 @@ void PopulateHomeTabIconsFromHomeTabManifestParams(
      CHECK(!icon.purpose.empty());
  
      if (!icon.sizes.empty()) {
@@ -7873,45 +7716,6 @@ index cc35af147e..7dd00a5488 100644
  
    if (lock.lock_mode == LockType::kExclusive) {
      // Exit early, as it's already exclusive.
-diff --git a/chrome/browser/web_applications/manifest_update_manager.cc b/chrome/browser/web_applications/manifest_update_manager.cc
-index 555efa38f1..ce369112f2 100644
---- a/chrome/browser/web_applications/manifest_update_manager.cc
-+++ b/chrome/browser/web_applications/manifest_update_manager.cc
-@@ -11,6 +11,7 @@
- 
- #include "base/check_is_test.h"
- #include "base/command_line.h"
-+#include "base/containers/contains.h"
- #include "base/containers/flat_map.h"
- #include "base/containers/flat_set.h"
- #include "base/containers/map_util.h"
-@@ -343,7 +344,7 @@ void ManifestUpdateManager::MaybeUpdate(
-     return;
-   }
- 
--  if (update_stages_.contains(*app_id)) {
-+  if (base::Contains(update_stages_, *app_id)) {
-     return;
-   }
- 
-@@ -545,7 +546,7 @@ bool ManifestUpdateManager::IsUpdateConsumed(const webapps::AppId& app_id,
- 
- bool ManifestUpdateManager::IsUpdateCommandPending(
-     const webapps::AppId& app_id) {
--  return update_stages_.contains(app_id);
-+  return base::Contains(update_stages_, app_id);
- }
- 
- // WebAppInstallManager:
-@@ -558,7 +559,7 @@ void ManifestUpdateManager::OnWebAppWillBeUninstalled(
-                  ManifestUpdateResult::kAppUninstalling);
-     update_stages_.erase(it);
-   }
--  CHECK(!update_stages_.contains(app_id));
-+  CHECK(!base::Contains(update_stages_, app_id));
- 
-   // Clear any data necessary for throttling updates for the current web app.
-   last_update_check_.erase(app_id);
 diff --git a/chrome/browser/web_applications/os_integration/protocol_handling_sub_manager.cc b/chrome/browser/web_applications/os_integration/protocol_handling_sub_manager.cc
 index a2a9b8d292..d00ade1e98 100644
 --- a/chrome/browser/web_applications/os_integration/protocol_handling_sub_manager.cc
@@ -8085,7 +7889,7 @@ index 3e3624e507..cf3143fe6a 100644
    }
  }
 diff --git a/chrome/browser/web_applications/preinstalled_web_app_manager.cc b/chrome/browser/web_applications/preinstalled_web_app_manager.cc
-index 379a0fe897..36d62c743f 100644
+index 5caefe687d..f58515fdc6 100644
 --- a/chrome/browser/web_applications/preinstalled_web_app_manager.cc
 +++ b/chrome/browser/web_applications/preinstalled_web_app_manager.cc
 @@ -15,6 +15,7 @@
@@ -8169,7 +7973,7 @@ index b7d368a5c9..89480db3b6 100644
  #include "base/test/bind.h"
  #include "chrome/browser/web_applications/os_integration/os_integration_manager.h"
 diff --git a/chrome/browser/web_applications/test/fake_web_app_ui_manager.cc b/chrome/browser/web_applications/test/fake_web_app_ui_manager.cc
-index c81ed5ab9b..b491716ba5 100644
+index 18e0b1fa7d..2c8ec3bcb1 100644
 --- a/chrome/browser/web_applications/test/fake_web_app_ui_manager.cc
 +++ b/chrome/browser/web_applications/test/fake_web_app_ui_manager.cc
 @@ -7,6 +7,7 @@
@@ -8181,7 +7985,7 @@ index c81ed5ab9b..b491716ba5 100644
  #include "base/functional/callback.h"
  #include "base/functional/callback_helpers.h"
 diff --git a/chrome/browser/web_applications/test/os_integration_test_override_impl.cc b/chrome/browser/web_applications/test/os_integration_test_override_impl.cc
-index 28c69cd27a..442695758d 100644
+index 775048e985..8b195f33d3 100644
 --- a/chrome/browser/web_applications/test/os_integration_test_override_impl.cc
 +++ b/chrome/browser/web_applications/test/os_integration_test_override_impl.cc
 @@ -4,7 +4,6 @@
@@ -8192,15 +7996,7 @@ index 28c69cd27a..442695758d 100644
  #include <map>
  #include <memory>
  #include <optional>
-@@ -15,6 +14,7 @@
- 
- #include "base/base_paths.h"
- #include "base/check_is_test.h"
-+#include "base/containers/contains.h"
- #include "base/containers/span.h"
- #include "base/files/file_enumerator.h"
- #include "base/files/file_path.h"
-@@ -70,6 +70,7 @@
+@@ -74,6 +73,7 @@
  #include <shellapi.h>
  
  #include "base/command_line.h"
@@ -8208,7 +8004,7 @@ index 28c69cd27a..442695758d 100644
  #include "base/containers/flat_map.h"
  #include "base/containers/flat_set.h"
  #include "base/strings/strcat.h"
-@@ -136,7 +137,7 @@ std::optional<SkBitmap> IconManagerReadIconForSize(
+@@ -140,7 +140,7 @@ std::optional<SkBitmap> IconManagerReadIconForSize(
        app_id, {size_px}, IconPurpose::ANY,
        base::BindLambdaForTesting([&](IconMetadataFromDisk icon_metadata) {
          SizeToBitmap icon_bitmaps = std::move(icon_metadata.icons_map);
@@ -8217,7 +8013,7 @@ index 28c69cd27a..442695758d 100644
          result = icon_bitmaps[size_px];
          run_loop.Quit();
        }));
-@@ -403,7 +404,7 @@ bool OsIntegrationTestOverrideImpl::IsFileExtensionHandled(
+@@ -407,7 +407,7 @@ bool OsIntegrationTestOverrideImpl::IsFileExtensionHandled(
    for (const auto& file_handler_prog_id : file_handler_prog_ids) {
      const std::vector<std::wstring> supported_file_extensions =
          GetFileExtensionsForProgId(file_handler_prog_id);
@@ -8226,7 +8022,7 @@ index 28c69cd27a..442695758d 100644
        const std::wstring reg_key = std::wstring(ShellUtil::kRegClasses) +
                                     base::FilePath::kSeparators[0] + extension +
                                     base::FilePath::kSeparators[0] +
-@@ -428,11 +429,12 @@ bool OsIntegrationTestOverrideImpl::IsFileExtensionHandled(
+@@ -432,11 +432,12 @@ bool OsIntegrationTestOverrideImpl::IsFileExtensionHandled(
    base::FilePath user_applications_dir = applications();
    bool database_update_called = false;
    for (const LinuxFileRegistration& command : linux_file_registration_) {
@@ -8243,7 +8039,7 @@ index 28c69cd27a..442695758d 100644
        } else {
          CHECK(base::StartsWith(command.xdg_command, "xdg-mime uninstall"))
              << command.xdg_command;
-@@ -444,7 +446,7 @@ bool OsIntegrationTestOverrideImpl::IsFileExtensionHandled(
+@@ -448,7 +449,7 @@ bool OsIntegrationTestOverrideImpl::IsFileExtensionHandled(
      // web_app_file_handler_registration_linux.cc for more information.
      if (base::StartsWith(command.xdg_command, "update-desktop-database")) {
        database_update_called =
@@ -8346,7 +8142,7 @@ index e8a5a3a2db..8f8799e381 100644
    if (!started_) {
      commands_waiting_for_start_.emplace_back(std::move(command), location);
 diff --git a/chrome/browser/web_applications/web_app_database_serialization.cc b/chrome/browser/web_applications/web_app_database_serialization.cc
-index 1dda13266e..8dbf1c311f 100644
+index 3a23c41438..dad87eb81c 100644
 --- a/chrome/browser/web_applications/web_app_database_serialization.cc
 +++ b/chrome/browser/web_applications/web_app_database_serialization.cc
 @@ -17,6 +17,7 @@
@@ -8522,18 +8318,10 @@ index 406f7d76df..9ad9fe6850 100644
    update_data_->apps_to_delete.push_back(app_id);
  }
 diff --git a/chrome/browser/web_applications/web_app_utils.cc b/chrome/browser/web_applications/web_app_utils.cc
-index e70f3cc6c6..ec2982efe1 100644
+index 55d7ecf70d..9f43e0df2a 100644
 --- a/chrome/browser/web_applications/web_app_utils.cc
 +++ b/chrome/browser/web_applications/web_app_utils.cc
-@@ -19,6 +19,7 @@
- #include "base/base64.h"
- #include "base/check.h"
- #include "base/check_op.h"
-+#include "base/containers/contains.h"
- #include "base/containers/enum_set.h"
- #include "base/containers/extend.h"
- #include "base/containers/map_util.h"
-@@ -386,12 +387,12 @@ bool AreNewFileHandlersASubsetOfOld(const apps::FileHandlers& old_handlers,
+@@ -385,12 +385,12 @@ bool AreNewFileHandlersASubsetOfOld(const apps::FileHandlers& old_handlers,
  
    for (const apps::FileHandler& new_handler : new_handlers) {
      for (const auto& new_handler_accept : new_handler.accept) {
@@ -8549,10 +8337,10 @@ index e70f3cc6c6..ec2982efe1 100644
          }
        }
 diff --git a/chrome/browser/web_applications/web_install_service_impl.cc b/chrome/browser/web_applications/web_install_service_impl.cc
-index faadccb3cf..59e1faac81 100644
+index 30474f4bbb..63d0240636 100644
 --- a/chrome/browser/web_applications/web_install_service_impl.cc
 +++ b/chrome/browser/web_applications/web_install_service_impl.cc
-@@ -693,7 +693,7 @@ void WebInstallServiceImpl::OnInstallInfoFromInstallUrlFetched(
+@@ -694,7 +694,7 @@ void WebInstallServiceImpl::OnInstallInfoFromInstallUrlFetched(
    // crbug.com/423906188 for more information. Regardless of OS, we expect an
    // icon of size 32x32 to be available.
    DialogImageInfo dialog_info = install_info->GetIconBitmapsForSecureSurfaces();
@@ -8562,7 +8350,7 @@ index faadccb3cf..59e1faac81 100644
  
    // Name to display in the dialog.
 diff --git a/chrome/browser/webauthn/authenticator_request_dialog_controller.cc b/chrome/browser/webauthn/authenticator_request_dialog_controller.cc
-index 1dd13b0e0e..72c6339e0c 100644
+index 6a2e164cd0..847dd5266d 100644
 --- a/chrome/browser/webauthn/authenticator_request_dialog_controller.cc
 +++ b/chrome/browser/webauthn/authenticator_request_dialog_controller.cc
 @@ -20,6 +20,7 @@
@@ -8648,7 +8436,7 @@ index dfba1ca94a..e45e51e17e 100644
  #include "base/strings/string_number_conversions.h"
  #include "base/strings/string_util.h"
 diff --git a/chrome/browser/webauthn/chrome_authenticator_request_delegate.cc b/chrome/browser/webauthn/chrome_authenticator_request_delegate.cc
-index c5a073c152..9f8c2179a5 100644
+index ce52b43f69..94e6bfdfff 100644
 --- a/chrome/browser/webauthn/chrome_authenticator_request_delegate.cc
 +++ b/chrome/browser/webauthn/chrome_authenticator_request_delegate.cc
 @@ -17,6 +17,7 @@
@@ -8659,7 +8447,7 @@ index c5a073c152..9f8c2179a5 100644
  #include "base/containers/span.h"
  #include "base/feature_list.h"
  #include "base/functional/bind.h"
-@@ -545,9 +546,9 @@ void ChromeAuthenticatorRequestDelegate::ConfigureDiscoveries(
+@@ -544,9 +545,9 @@ void ChromeAuthenticatorRequestDelegate::ConfigureDiscoveries(
  
  #if BUILDFLAG(IS_LINUX)
    // No caBLEv1 on Linux. It tends to crash bluez.
@@ -8672,7 +8460,7 @@ index c5a073c152..9f8c2179a5 100644
      pairings_from_extension = base::span<const device::CableDiscoveryData>();
    }
  #endif
-@@ -559,8 +560,8 @@ void ChromeAuthenticatorRequestDelegate::ConfigureDiscoveries(
+@@ -558,8 +559,8 @@ void ChromeAuthenticatorRequestDelegate::ConfigureDiscoveries(
    }
    const bool cable_extension_accepted = !pairings.empty();
    const bool cablev2_extension_provided =
@@ -8695,7 +8483,7 @@ index c5a073c152..9f8c2179a5 100644
    dialog_model_->platform_has_biometrics = tai.platform_has_biometrics;
  }
 diff --git a/chrome/browser/webauthn/chrome_web_authentication_delegate.cc b/chrome/browser/webauthn/chrome_web_authentication_delegate.cc
-index 5cd26596de..c47319ff19 100644
+index 85f02e7563..dae7662b47 100644
 --- a/chrome/browser/webauthn/chrome_web_authentication_delegate.cc
 +++ b/chrome/browser/webauthn/chrome_web_authentication_delegate.cc
 @@ -15,6 +15,7 @@
@@ -8706,7 +8494,7 @@ index 5cd26596de..c47319ff19 100644
  #include "base/containers/span.h"
  #include "base/feature_list.h"
  #include "base/functional/bind.h"
-@@ -108,7 +109,7 @@ bool IsWebAuthnRPIDListedInSecurityKeyPermitAttestationPolicy(
+@@ -111,7 +112,7 @@ bool IsWebAuthnRPIDListedInSecurityKeyPermitAttestationPolicy(
    const PrefService* prefs = profile->GetPrefs();
    const base::ListValue& permit_attestation =
        prefs->GetList(prefs::kSecurityKeyPermitAttestation);
@@ -8715,7 +8503,7 @@ index 5cd26596de..c47319ff19 100644
  }
  
  bool IsOriginListedInEnterpriseAttestationSwitch(
-@@ -199,10 +200,9 @@ void DeleteUnacceptedPasskeys(
+@@ -191,10 +192,9 @@ void DeleteUnacceptedPasskeys(
             webauthn::PasskeyModel::ShadowedCredentials::kExclude)) {
      if (std::vector<uint8_t>(passkey.user_id().begin(),
                               passkey.user_id().end()) == user_id &&
@@ -8729,7 +8517,7 @@ index 5cd26596de..c47319ff19 100644
        passkey_store->DeletePasskey(passkey.credential_id(), FROM_HERE);
        is_passkey_deleted = true;
      }
-@@ -256,10 +256,10 @@ void HideAndRestorePasskeys(
+@@ -248,10 +248,10 @@ void HideAndRestorePasskeys(
              kNoPasskeyChanged);
      return;
    }
@@ -8745,7 +8533,7 @@ index 5cd26596de..c47319ff19 100644
        (!passkey_in_list && passkey_it->hidden())) {
      LogSignalAllAcceptedCredentials(
 diff --git a/chrome/common/actor/action_result.cc b/chrome/common/actor/action_result.cc
-index 812f67d946..3e3aa90a76 100644
+index 8ab5a78cc3..8810b2d9ed 100644
 --- a/chrome/common/actor/action_result.cc
 +++ b/chrome/common/actor/action_result.cc
 @@ -7,6 +7,7 @@
@@ -8832,7 +8620,7 @@ index 4b9cf0160e..62585b39c9 100644
  #include "base/i18n/number_formatting.h"
  #include "base/i18n/string_compare.h"
 diff --git a/chrome/common/printing/printer_capabilities.cc b/chrome/common/printing/printer_capabilities.cc
-index 6c79fbdf50..7c4c11535d 100644
+index 2f8be2469c..86eb3d3adf 100644
 --- a/chrome/common/printing/printer_capabilities.cc
 +++ b/chrome/common/printing/printer_capabilities.cc
 @@ -9,6 +9,7 @@
@@ -8841,9 +8629,9 @@ index 6c79fbdf50..7c4c11535d 100644
  
 +#include "base/containers/contains.h"
  #include "base/logging.h"
- #include "base/metrics/histogram_macros.h"
  #include "base/strings/strcat.h"
-@@ -177,7 +178,7 @@ base::DictValue AssemblePrinterSettings(const std::string& device_name,
+ #include "base/strings/string_util.h"
+@@ -176,7 +177,7 @@ base::DictValue AssemblePrinterSettings(const std::string& device_name,
  #if BUILDFLAG(IS_CHROMEOS)
    printer_info.Set(
        kCUPSEnterprisePrinter,
@@ -8853,10 +8641,10 @@ index 6c79fbdf50..7c4c11535d 100644
  #endif  // BUILDFLAG(IS_CHROMEOS)
  
 diff --git a/chrome/credential_provider/gaiacp/gaia_credential_base.cc b/chrome/credential_provider/gaiacp/gaia_credential_base.cc
-index 225b62d2c0..b4aeed9817 100644
+index 5b284420c9..179015c5dd 100644
 --- a/chrome/credential_provider/gaiacp/gaia_credential_base.cc
 +++ b/chrome/credential_provider/gaiacp/gaia_credential_base.cc
-@@ -2416,7 +2416,7 @@ HRESULT CGaiaCredentialBase::OnUserAuthenticated(BSTR authentication_info,
+@@ -2502,7 +2502,7 @@ HRESULT CGaiaCredentialBase::OnUserAuthenticated(BSTR authentication_info,
      const std::wstring email_domain = email.substr(email.find(L"@") + 1);
      const std::vector<std::wstring> allowed_domains = GetEmailDomainsList();
  
@@ -8865,7 +8653,7 @@ index 225b62d2c0..b4aeed9817 100644
        LOGFN(ERROR) << "Account " << email
                     << " isn't in a domain from allowed domains."
                     << "Allowed Domains: "
-@@ -2429,7 +2429,7 @@ HRESULT CGaiaCredentialBase::OnUserAuthenticated(BSTR authentication_info,
+@@ -2515,7 +2515,7 @@ HRESULT CGaiaCredentialBase::OnUserAuthenticated(BSTR authentication_info,
  
      std::vector<std::wstring> permitted_accounts = GetPermittedAccounts();
      if (!permitted_accounts.empty() &&
@@ -8978,7 +8766,7 @@ index f5b423a58c..ec6e7968d0 100644
          break;
        }
 diff --git a/chrome/renderer/accessibility/read_anything/read_aloud_app_model.cc b/chrome/renderer/accessibility/read_anything/read_aloud_app_model.cc
-index d7c361c3e9..7e91ed52b1 100644
+index 559fc2dfa6..f6756e7f69 100644
 --- a/chrome/renderer/accessibility/read_anything/read_aloud_app_model.cc
 +++ b/chrome/renderer/accessibility/read_anything/read_aloud_app_model.cc
 @@ -638,11 +638,11 @@ int ReadAloudAppModel::GetCurrentTextEndIndex(const ui::AXNodeID& node_id) {
@@ -9005,7 +8793,7 @@ index d7c361c3e9..7e91ed52b1 100644
  
    return !is_ignored && !was_previously_spoken && is_text_node &&
 diff --git a/chrome/renderer/accessibility/read_anything/read_anything_app_controller.cc b/chrome/renderer/accessibility/read_anything/read_anything_app_controller.cc
-index 6bd305511f..95149433c5 100644
+index b7138772d2..377280a274 100644
 --- a/chrome/renderer/accessibility/read_anything/read_anything_app_controller.cc
 +++ b/chrome/renderer/accessibility/read_anything/read_anything_app_controller.cc
 @@ -15,6 +15,7 @@
@@ -9035,7 +8823,7 @@ index 6bd305511f..95149433c5 100644
      return static_cast<T>(value);
    }
    return std::nullopt;
-@@ -1523,15 +1525,15 @@ void ReadAnythingAppController::OnPinStatusReceived(bool pin_state) {
+@@ -1535,15 +1537,15 @@ void ReadAnythingAppController::OnPinStatusReceived(bool pin_state) {
  }
  
  int ReadAnythingAppController::LetterSpacing() const {
@@ -9054,7 +8842,7 @@ index 6bd305511f..95149433c5 100644
  }
  
  double ReadAnythingAppController::SpeechRate() const {
-@@ -1560,8 +1562,8 @@ int ReadAnythingAppController::HighlightGranularity() const {
+@@ -1572,8 +1574,8 @@ int ReadAnythingAppController::HighlightGranularity() const {
  
  int ReadAnythingAppController::LastNonDisabledLineFocus() const {
    return IsLineFocusEnabled()
@@ -9065,7 +8853,7 @@ index 6bd305511f..95149433c5 100644
  }
  
  bool ReadAnythingAppController::IsLineFocusOn() const {
-@@ -1569,59 +1571,59 @@ bool ReadAnythingAppController::IsLineFocusOn() const {
+@@ -1581,59 +1583,59 @@ bool ReadAnythingAppController::IsLineFocusOn() const {
  }
  
  int ReadAnythingAppController::StandardLineSpacing() const {
@@ -9139,7 +8927,7 @@ index 6bd305511f..95149433c5 100644
  }
  
  bool ReadAnythingAppController::IsHighlightOn() {
-@@ -1650,74 +1652,74 @@ int ReadAnythingAppController::NoHighlighting() const {
+@@ -1662,74 +1664,74 @@ int ReadAnythingAppController::NoHighlighting() const {
  }
  
  int ReadAnythingAppController::PauseButtonStopSource() const {
@@ -9229,7 +9017,7 @@ index 6bd305511f..95149433c5 100644
  }
  
  int ReadAnythingAppController::MaxLineWidth() const {
-@@ -1725,17 +1727,17 @@ int ReadAnythingAppController::MaxLineWidth() const {
+@@ -1737,17 +1739,17 @@ int ReadAnythingAppController::MaxLineWidth() const {
  }
  
  int ReadAnythingAppController::InHiddenPresentationState() const {
@@ -9250,7 +9038,7 @@ index 6bd305511f..95149433c5 100644
        read_anything::mojom::ReadAnythingPresentationState::kInImmersiveOverlay);
  }
  
-@@ -1756,7 +1758,7 @@ std::vector<ui::AXNodeID> ReadAnythingAppController::GetChildren(
+@@ -1768,7 +1770,7 @@ std::vector<ui::AXNodeID> ReadAnythingAppController::GetChildren(
    const std::set<ui::AXNodeID>* node_ids = model_.GetCurrentlyVisibleNodes();
    for (auto it = ax_node->UnignoredChildrenBegin();
         it != ax_node->UnignoredChildrenEnd(); ++it) {
@@ -9259,7 +9047,7 @@ index 6bd305511f..95149433c5 100644
        child_ids.push_back(it->id());
      }
    }
-@@ -1972,13 +1974,13 @@ std::vector<std::string> ReadAnythingAppController::GetSupportedFonts() {
+@@ -1981,13 +1983,13 @@ std::vector<std::string> ReadAnythingAppController::GetSupportedFonts() {
  std::string ReadAnythingAppController::GetValidatedFontName(
      const std::string& font) const {
    std::string validated_font = font;
@@ -9276,7 +9064,7 @@ index 6bd305511f..95149433c5 100644
               : validated_font;
  }
 diff --git a/chrome/renderer/accessibility/read_anything/read_anything_app_model.cc b/chrome/renderer/accessibility/read_anything/read_anything_app_model.cc
-index 6bd8b169d1..c56dfbae93 100644
+index ef9a5fd6c3..fae05b77bc 100644
 --- a/chrome/renderer/accessibility/read_anything/read_anything_app_model.cc
 +++ b/chrome/renderer/accessibility/read_anything/read_anything_app_model.cc
 @@ -10,6 +10,7 @@
@@ -9287,7 +9075,7 @@ index 6bd8b169d1..c56dfbae93 100644
  #include "base/logging.h"
  #include "base/metrics/histogram_functions.h"
  #include "base/strings/stringprintf.h"
-@@ -54,7 +55,8 @@ const ui::AXNode* GetUnignoredParentForSelection(const ui::AXNode* node) {
+@@ -58,7 +59,8 @@ const ui::AXNode* GetUnignoredParentForSelection(const ui::AXNode* node) {
        // displayed as siblings, to avoid misnumbering.
        const std::string_view display =
            node->GetStringAttribute(ax::mojom::StringAttribute::kDisplay);
@@ -9297,7 +9085,7 @@ index 6bd8b169d1..c56dfbae93 100644
      };
      if (!should_skip(ancestor)) {
        return ancestor;
-@@ -363,7 +365,7 @@ void ReadAnythingAppModel::ComputeDisplayNodeIdsForDistilledTree() {
+@@ -367,7 +369,7 @@ void ReadAnythingAppModel::ComputeDisplayNodeIdsForDistilledTree() {
          content_node->GetAncestorsCrossingTreeBoundaryAsQueue();
      while (!ancestors.empty()) {
        ui::AXNodeID ancestor_id = ancestors.front()->id();
@@ -9306,7 +9094,7 @@ index 6bd8b169d1..c56dfbae93 100644
          break;
        }
        ancestors.pop();
-@@ -409,7 +411,7 @@ ui::AXSerializableTree* ReadAnythingAppModel::GetTreeFromId(
+@@ -413,7 +415,7 @@ ui::AXSerializableTree* ReadAnythingAppModel::GetTreeFromId(
  }
  
  bool ReadAnythingAppModel::ContainsTree(const ui::AXTreeID& tree_id) const {
@@ -9315,7 +9103,7 @@ index 6bd8b169d1..c56dfbae93 100644
  }
  
  bool ReadAnythingAppModel::ContainsActiveTree() const {
-@@ -710,7 +712,7 @@ void ReadAnythingAppModel::OnAXTreeDestroyed(const ui::AXTreeID& tree_id) {
+@@ -734,7 +736,7 @@ void ReadAnythingAppModel::OnAXTreeDestroyed(const ui::AXTreeID& tree_id) {
  }
  
  ukm::SourceId ReadAnythingAppModel::GetUkmSourceId() const {
@@ -9324,7 +9112,7 @@ index 6bd8b169d1..c56dfbae93 100644
      ReadAnythingAppModel::AXTreeInfo* tree_info =
          tree_infos_.at(active_tree_id_).get();
      if (tree_info) {
-@@ -727,7 +729,7 @@ void ReadAnythingAppModel::SetUkmSourceIdForTree(const ui::AXTreeID& tree,
+@@ -751,7 +753,7 @@ void ReadAnythingAppModel::SetUkmSourceIdForTree(const ui::AXTreeID& tree,
    // tree_infos_. When this happens, we should keep track of the ukm_source_id,
    // and later, if the tree is added to tree_infos_ while it's still active,
    // we can try again to set the ukm source.
@@ -9333,7 +9121,7 @@ index 6bd8b169d1..c56dfbae93 100644
      pending_ukm_sources_[tree] = ukm_source_id;
      return;
    }
-@@ -736,7 +738,7 @@ void ReadAnythingAppModel::SetUkmSourceIdForTree(const ui::AXTreeID& tree,
+@@ -760,7 +762,7 @@ void ReadAnythingAppModel::SetUkmSourceIdForTree(const ui::AXTreeID& tree,
  }
  
  void ReadAnythingAppModel::SetUkmSourceId(ukm::SourceId ukm_source_id) {
@@ -9342,7 +9130,7 @@ index 6bd8b169d1..c56dfbae93 100644
      return;
    }
    ReadAnythingAppModel::AXTreeInfo* tree_info =
-@@ -752,7 +754,7 @@ void ReadAnythingAppModel::SetUkmSourceId(ukm::SourceId ukm_source_id) {
+@@ -776,7 +778,7 @@ void ReadAnythingAppModel::SetUkmSourceId(ukm::SourceId ukm_source_id) {
  }
  
  int ReadAnythingAppModel::GetNumSelections() const {
@@ -9351,7 +9139,7 @@ index 6bd8b169d1..c56dfbae93 100644
      ReadAnythingAppModel::AXTreeInfo* tree_info =
          tree_infos_.at(active_tree_id_).get();
      if (tree_info) {
-@@ -763,7 +765,7 @@ int ReadAnythingAppModel::GetNumSelections() const {
+@@ -787,7 +789,7 @@ int ReadAnythingAppModel::GetNumSelections() const {
  }
  
  void ReadAnythingAppModel::SetNumSelections(int num_selections) {
@@ -9360,7 +9148,7 @@ index 6bd8b169d1..c56dfbae93 100644
      return;
    }
    ReadAnythingAppModel::AXTreeInfo* tree_info =
-@@ -784,7 +786,7 @@ ui::AXNode* ReadAnythingAppModel::GetAXNode(
+@@ -817,7 +819,7 @@ ui::AXNode* ReadAnythingAppModel::GetAXNodeFromRoot(
  }
  
  bool ReadAnythingAppModel::NodeIsContentNode(ui::AXNodeID ax_node_id) const {
@@ -9369,7 +9157,7 @@ index 6bd8b169d1..c56dfbae93 100644
  }
  
  void ReadAnythingAppModel::AdjustTextSize(int increment) {
-@@ -1064,7 +1066,7 @@ void ReadAnythingAppModel::ProcessGeneratedEvents(
+@@ -1108,7 +1110,7 @@ void ReadAnythingAppModel::ProcessGeneratedEvents(
            redraw_required_ = true;
          break;
        case ui::AXEventGenerator::Event::EXPANDED:
@@ -9703,7 +9491,7 @@ index 3734ac9d85..f61dd50409 100644
  
  void DevToolsAgentCoverageObserver::DevToolsAgentHostDestroyed(
 diff --git a/chrome/test/base/testing_profile.cc b/chrome/test/base/testing_profile.cc
-index d964b56173..710ce599ed 100644
+index 95e3845b06..befbb4aa5d 100644
 --- a/chrome/test/base/testing_profile.cc
 +++ b/chrome/test/base/testing_profile.cc
 @@ -12,6 +12,7 @@
@@ -9714,7 +9502,7 @@ index d964b56173..710ce599ed 100644
  #include "base/files/file_util.h"
  #include "base/functional/bind.h"
  #include "base/location.h"
-@@ -676,7 +677,7 @@ void TestingProfile::DestroyOffTheRecordProfile(Profile* otr_profile) {
+@@ -674,7 +675,7 @@ void TestingProfile::DestroyOffTheRecordProfile(Profile* otr_profile) {
  
  bool TestingProfile::HasOffTheRecordProfile(
      const OTRProfileID& otr_profile_id) {
@@ -9724,7 +9512,7 @@ index d964b56173..710ce599ed 100644
  
  bool TestingProfile::HasAnyOffTheRecordProfile() {
 diff --git a/chrome/test/base/ui_test_utils.cc b/chrome/test/base/ui_test_utils.cc
-index 9aa39dc6f5..98986b5765 100644
+index 9877c26419..0ae10651bb 100644
 --- a/chrome/test/base/ui_test_utils.cc
 +++ b/chrome/test/base/ui_test_utils.cc
 @@ -14,6 +14,7 @@
@@ -9735,7 +9523,7 @@ index 9aa39dc6f5..98986b5765 100644
  #include "base/files/file_path.h"
  #include "base/files/file_util.h"
  #include "base/functional/bind.h"
-@@ -122,7 +123,7 @@ BrowserWindowInterface* WaitForBrowserNotInSet(
+@@ -132,7 +133,7 @@ BrowserWindowInterface* WaitForBrowserNotInSet(
    if (!new_browser) {
      new_browser = WaitForBrowserToOpen();
      // The new browser should never be in |excluded_browsers|.
@@ -9745,7 +9533,7 @@ index 9aa39dc6f5..98986b5765 100644
    return new_browser;
  }
 diff --git a/chrome/test/chromedriver/capabilities.cc b/chrome/test/chromedriver/capabilities.cc
-index 40d3391516..d432922e24 100644
+index 4f78ceaa14..2f5d0efda4 100644
 --- a/chrome/test/chromedriver/capabilities.cc
 +++ b/chrome/test/chromedriver/capabilities.cc
 @@ -10,6 +10,7 @@
@@ -9921,12 +9709,12 @@ index 2a06e2039b..708a0a892e 100644
  // Running the application installer failed.
  inline constexpr int kErrorApplicationInstallerFailed =
 diff --git a/chrome/updater/enum_traits.h b/chrome/updater/enum_traits.h
-index 86fff03751..f37df04edd 100644
+index d777df8fe5..6ef1ed03fd 100644
 --- a/chrome/updater/enum_traits.h
 +++ b/chrome/updater/enum_traits.h
-@@ -9,7 +9,8 @@
+@@ -8,7 +8,8 @@
+ #include <concepts>
  #include <optional>
- #include <ostream>
  #include <type_traits>
 -#include <utility>
 +
@@ -9934,7 +9722,7 @@ index 86fff03751..f37df04edd 100644
  
  namespace updater {
  
-@@ -46,8 +47,8 @@ struct EnumTraits {};
+@@ -45,8 +46,8 @@ struct EnumTraits {};
  template <typename T>
    requires(std::is_enum_v<T>)
  constexpr std::optional<T> CheckedCastToEnum(std::underlying_type_t<T> v) {
@@ -9946,23 +9734,10 @@ index 86fff03751..f37df04edd 100644
               : std::nullopt;
  }
 diff --git a/chrome/updater/handle_inconsistent_apps_task.cc b/chrome/updater/handle_inconsistent_apps_task.cc
-index 8c36c57201..a6dc60c143 100644
+index bfed79b712..bac1b8705e 100644
 --- a/chrome/updater/handle_inconsistent_apps_task.cc
 +++ b/chrome/updater/handle_inconsistent_apps_task.cc
-@@ -4,11 +4,11 @@
- 
- #include "chrome/updater/handle_inconsistent_apps_task.h"
- 
--#include <algorithm>
- #include <string>
- #include <utility>
- #include <vector>
- 
-+#include "base/containers/contains.h"
- #include "base/functional/bind.h"
- #include "base/functional/callback.h"
- #include "base/functional/callback_helpers.h"
-@@ -96,18 +96,18 @@ void HandleInconsistentAppsTask::FindUnregisteredApps(
+@@ -97,18 +97,18 @@ void HandleInconsistentAppsTask::FindUnregisteredApps(
      base::OnceClosure callback) {
    DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
    MigrateLegacyUpdaters(
@@ -10025,7 +9800,7 @@ index fb86f8ca1d..410547351b 100644
                  : UpdaterScope::kUser);
        },
 diff --git a/chrome/updater/policy/service.cc b/chrome/updater/policy/service.cc
-index a7fb3843f1..dfbcae28a5 100644
+index 298041e6ef..ad5638d94d 100644
 --- a/chrome/updater/policy/service.cc
 +++ b/chrome/updater/policy/service.cc
 @@ -15,6 +15,7 @@
@@ -10036,7 +9811,7 @@ index a7fb3843f1..dfbcae28a5 100644
  #include "base/containers/flat_map.h"
  #include "base/functional/bind.h"
  #include "base/functional/callback.h"
-@@ -335,12 +336,11 @@ PolicyStatus<std::string> PolicyService::GetProxyMode() const {
+@@ -334,12 +335,11 @@ PolicyStatus<std::string> PolicyService::GetProxyMode() const {
        &PolicyManagerInterface::GetProxyMode,
        base::BindRepeating([](std::optional<std::string> proxy_mode) {
          return (proxy_mode.has_value() &&
@@ -10055,18 +9830,10 @@ index a7fb3843f1..dfbcae28a5 100644
                     : std::nullopt;
        }));
 diff --git a/chrome/updater/tag.cc b/chrome/updater/tag.cc
-index fb521a61a6..d8eafeb660 100644
+index 025727bb19..ece75027a3 100644
 --- a/chrome/updater/tag.cc
 +++ b/chrome/updater/tag.cc
-@@ -15,6 +15,7 @@
- #include <utility>
- #include <vector>
- 
-+#include "base/containers/contains.h"
- #include "base/containers/span.h"
- #include "base/files/file.h"
- #include "base/files/file_path.h"
-@@ -27,6 +28,7 @@
+@@ -28,6 +28,7 @@
  #include "base/strings/string_split.h"
  #include "base/strings/string_util.h"
  #include "base/strings/utf_string_conversions.h"
@@ -10074,7 +9841,7 @@ index fb521a61a6..d8eafeb660 100644
  #include "base/types/expected.h"
  #include "base/uuid.h"
  #include "build/build_config.h"
-@@ -231,7 +233,7 @@ ErrorCode ParseBrowserType(std::string_view value, TagArgs& args) {
+@@ -232,7 +233,7 @@ ErrorCode ParseBrowserType(std::string_view value, TagArgs& args) {
    }
  
    args.browser_type =
@@ -10083,7 +9850,7 @@ index fb521a61a6..d8eafeb660 100644
            ? TagArgs::BrowserType(browser_type)
            : TagArgs::BrowserType::kUnknown;
  
-@@ -627,7 +629,7 @@ ErrorCode ParseAppInstallerDataArgs(std::string_view app_installer_data_args,
+@@ -628,7 +629,7 @@ ErrorCode ParseAppInstallerDataArgs(std::string_view app_installer_data_args,
  
  // Checks that |args| does not contain |kDisallowedCharInTag|.
  bool IsValidArgs(std::string_view args) {
@@ -10093,7 +9860,7 @@ index fb521a61a6..d8eafeb660 100644
  
  // Returns a `uint16_t` value as big-endian bytes.
 diff --git a/chrome/updater/test/integration_tests_impl.cc b/chrome/updater/test/integration_tests_impl.cc
-index c59934df5c..17c0e22146 100644
+index 5844e8b041..93b044a237 100644
 --- a/chrome/updater/test/integration_tests_impl.cc
 +++ b/chrome/updater/test/integration_tests_impl.cc
 @@ -17,6 +17,7 @@
@@ -10170,10 +9937,10 @@ index 998520afb5..ef1696be07 100644
              }
            }
 diff --git a/chrome/updater/tools/updater_util.cc b/chrome/updater/tools/updater_util.cc
-index 3d678a2ec7..d038b47a9e 100644
+index 1b60fc62d0..4b8c805aa0 100644
 --- a/chrome/updater/tools/updater_util.cc
 +++ b/chrome/updater/tools/updater_util.cc
-@@ -76,7 +76,7 @@ namespace updater_policy {
+@@ -77,7 +77,7 @@ namespace updater_policy {
  namespace edm = ::wireless_android_enterprise_devicemanagement;
  
  std::ostream& operator<<(std::ostream& os, edm::UpdateValue value) {
@@ -10182,7 +9949,7 @@ index 3d678a2ec7..d038b47a9e 100644
    switch (value) {
      case edm::UPDATES_DISABLED:
        return os << "(Disabled)";
-@@ -91,7 +91,7 @@ std::ostream& operator<<(std::ostream& os, edm::UpdateValue value) {
+@@ -92,7 +92,7 @@ std::ostream& operator<<(std::ostream& os, edm::UpdateValue value) {
  }
  
  std::ostream& operator<<(std::ostream& os, edm::InstallDefaultValue value) {
@@ -10191,7 +9958,7 @@ index 3d678a2ec7..d038b47a9e 100644
    switch (value) {
      case edm::INSTALL_DEFAULT_DISABLED:
        return os << "(Disabled)";
-@@ -104,7 +104,7 @@ std::ostream& operator<<(std::ostream& os, edm::InstallDefaultValue value) {
+@@ -105,7 +105,7 @@ std::ostream& operator<<(std::ostream& os, edm::InstallDefaultValue value) {
  }
  
  std::ostream& operator<<(std::ostream& os, edm::InstallValue value) {
@@ -10201,18 +9968,10 @@ index 3d678a2ec7..d038b47a9e 100644
      case edm::INSTALL_DISABLED:
        return os << "(Disabled)";
 diff --git a/chrome/updater/update_service_impl_impl.cc b/chrome/updater/update_service_impl_impl.cc
-index 61ce5f135f..b6b3c141ef 100644
+index c5235db97b..84e73ea791 100644
 --- a/chrome/updater/update_service_impl_impl.cc
 +++ b/chrome/updater/update_service_impl_impl.cc
-@@ -17,6 +17,7 @@
- #include "base/barrier_callback.h"
- #include "base/barrier_closure.h"
- #include "base/check_op.h"
-+#include "base/containers/contains.h"
- #include "base/containers/flat_map.h"
- #include "base/containers/queue.h"
- #include "base/files/file_path.h"
-@@ -1142,7 +1143,7 @@ void UpdateServiceImplImpl::UpdateAll(
+@@ -1144,7 +1144,7 @@ void UpdateServiceImplImpl::UpdateAll(
  
    auto app_ids = config_->GetUpdaterPersistedData()->GetAppIds();
  
@@ -10222,7 +9981,7 @@ index 61ce5f135f..b6b3c141ef 100644
        static_cast<std::string (*)(std::string_view)>(&base::ToLowerASCII)));
  
 diff --git a/chrome/updater/util/util.h b/chrome/updater/util/util.h
-index 953e77e846..e7cb07bfca 100644
+index 82253d2fe0..a8ddfd18d9 100644
 --- a/chrome/updater/util/util.h
 +++ b/chrome/updater/util/util.h
 @@ -12,11 +12,11 @@
@@ -10238,7 +9997,7 @@ index 953e77e846..e7cb07bfca 100644
  #include "base/version.h"
  #include "build/build_config.h"
  #include "chrome/updater/registration_data.h"
-@@ -59,7 +59,7 @@ template <std::unsigned_integral T>
+@@ -60,7 +60,7 @@ template <std::unsigned_integral T>
  template <typename T>
    requires(std::is_enum_v<T>)
  inline std::ostream& operator<<(std::ostream& os, const T& e) {
@@ -10248,10 +10007,10 @@ index 953e77e846..e7cb07bfca 100644
  
  // Returns the versioned install directory under which the program stores its
 diff --git a/chrome/updater/win/installer_api.cc b/chrome/updater/win/installer_api.cc
-index bf319fd9ad..21fe6d3e68 100644
+index c8107f9db3..563c2f4edf 100644
 --- a/chrome/updater/win/installer_api.cc
 +++ b/chrome/updater/win/installer_api.cc
-@@ -14,6 +14,7 @@
+@@ -15,6 +15,7 @@
  
  #include "base/check_op.h"
  #include "base/command_line.h"
@@ -10259,7 +10018,7 @@ index bf319fd9ad..21fe6d3e68 100644
  #include "base/files/file_path.h"
  #include "base/functional/bind.h"
  #include "base/functional/callback.h"
-@@ -274,7 +275,7 @@ bool DeleteInstallerOutput(UpdaterScope updater_scope,
+@@ -275,7 +276,7 @@ bool DeleteInstallerOutput(UpdaterScope updater_scope,
        delete_value(kRegValueInstallerResultUIString),
        delete_value(kRegValueInstallerSuccessLaunchCmdLine),
    };
@@ -10323,68 +10082,119 @@ index 0d7cb23de4..153f462564 100644
          continue;
        }
  
-diff --git a/chrome/browser/glic/selection/selection_overlay_untrusted_ui.cc b/chrome/browser/glic/selection/selection_overlay_untrusted_ui.cc
-index 150b3d5214..14d08c4e62 100644
---- a/chrome/browser/glic/selection/selection_overlay_untrusted_ui.cc
-+++ b/chrome/browser/glic/selection/selection_overlay_untrusted_ui.cc
-@@ -5,6 +5,7 @@
- #include "chrome/browser/glic/selection/selection_overlay_untrusted_ui.h"
+diff --git a/chrome/browser/actor/ui/ui_event_debugstring.cc b/chrome/browser/actor/ui/ui_event_debugstring.cc
+index 81319610ee..17dce04ed7 100644
+--- a/chrome/browser/actor/ui/ui_event_debugstring.cc
++++ b/chrome/browser/actor/ui/ui_event_debugstring.cc
+@@ -44,9 +44,15 @@ constexpr absl::Overload UiEventToDebugStringFn{
+                              absl::FormatStreamed(e.click_count));
+     },
+     [](const MouseMove& e) -> std::string {
++      auto target_str = [](const MouseMove& e) {
++        if (e.target.has_value()) {
++          return e.target.value().ToString();
++        }
++        return std::string("null");
++      }(e);
+       return absl::StrFormat(
+           "MouseMove[target=%s target_source=%s]",
+-          e.target.transform(&gfx::Point::ToString).value_or("null"),
++          target_str,
+           DebugString(e.target_source));
+     },
+ };
+diff --git a/chrome/browser/web_applications/isolated_web_apps/iwa_permissions_policy_cache.cc b/chrome/browser/web_applications/isolated_web_apps/iwa_permissions_policy_cache.cc
+index cadf066893..3137c93386 100644
+--- a/chrome/browser/web_applications/isolated_web_apps/iwa_permissions_policy_cache.cc
++++ b/chrome/browser/web_applications/isolated_web_apps/iwa_permissions_policy_cache.cc
+@@ -4,6 +4,7 @@
  
- #include "base/feature_list.h"
+ #include "chrome/browser/web_applications/isolated_web_apps/iwa_permissions_policy_cache.h"
+ 
 +#include "base/containers/contains.h"
- #include "chrome/browser/glic/public/glic_enabling.h"
- #include "chrome/browser/glic/resources/grit/glic_browser_resources.h"
- #include "chrome/browser/glic/selection/selection_overlay_controller.h"
-@@ -98,8 +99,8 @@ SelectionOverlayUntrustedUI::SelectionOverlayUntrustedUI(content::WebUI* web_ui)
-                                  resource.id);
- 
-     std::string_view path(resource.path);
--    if (path.contains(".svg") ||
--        path.contains("post_selection_paint_worklet.js")) {
-+    if (base::Contains(path, ".svg") ||
-+        base::Contains(path, "post_selection_paint_worklet.js")) {
-       html_source->AddResourcePath(
-           base::StrCat({"selection-overlay/", resource.path}), resource.id);
+ #include "base/containers/map_util.h"
+ #include "base/containers/to_vector.h"
+ #include "base/functional/bind.h"
+@@ -262,7 +263,7 @@ bool IsEntitlementGranted(const IwaRuntimeAllowlistData& allowlist_data,
+                           const IwaVersion& app_version,
+                           IwaEntitlement entitlement) {
+   for (const auto& entitlement_set : allowlist_data.entitlements) {
+-    if (!std::ranges::contains(entitlement_set.entitlements, entitlement)) {
++    if (!base::Contains(entitlement_set.entitlements, entitlement)) {
+       continue;
      }
-diff --git a/chrome/browser/autocomplete/chrome_autocomplete_provider_client.cc b/chrome/browser/autocomplete/chrome_autocomplete_provider_client.cc
-index 16a9ede9ae..77e0c2b723 100644
---- a/chrome/browser/autocomplete/chrome_autocomplete_provider_client.cc
-+++ b/chrome/browser/autocomplete/chrome_autocomplete_provider_client.cc
-@@ -10,6 +10,7 @@
- #include <string>
+ 
+diff --git a/chrome/browser/ui/views/page_action/chip_selector.cc b/chrome/browser/ui/views/page_action/chip_selector.cc
+index c7f9f1d0ac..0fe0ba075c 100644
+--- a/chrome/browser/ui/views/page_action/chip_selector.cc
++++ b/chrome/browser/ui/views/page_action/chip_selector.cc
+@@ -52,7 +52,7 @@ void DefaultChipSelector::RequestChipHide(actions::ActionId page_action_id) {
+ void DefaultChipSelector::RequestAnchoredMessageShow(
+     actions::ActionId page_action_id,
+     const AnchoredMessageConfig& config) {
+-  if (std::ranges::contains(anchored_message_queue_, page_action_id)) {
++  if (base::Contains(anchored_message_queue_, page_action_id)) {
+     // This page action's anchored message is already queued. Nothing to do.
+     return;
+   }
+diff --git a/chrome/browser/ui/views/toolbar/webui_pinned_toolbar_actions.cc b/chrome/browser/ui/views/toolbar/webui_pinned_toolbar_actions.cc
+index db2f9f0f8f..2271199950 100644
+--- a/chrome/browser/ui/views/toolbar/webui_pinned_toolbar_actions.cc
++++ b/chrome/browser/ui/views/toolbar/webui_pinned_toolbar_actions.cc
+@@ -7,6 +7,7 @@
+ #include <algorithm>
  #include <vector>
  
 +#include "base/containers/contains.h"
- #include "base/feature_list.h"
- #include "base/functional/callback_helpers.h"
- #include "base/strings/cstring_view.h"
-@@ -204,7 +205,7 @@ bool IsContextualSearchFeatureEnabled(
-     return false;
+ #include "base/containers/flat_set.h"
+ #include "base/notimplemented.h"
+ #include "chrome/browser/ui/actions/chrome_action_id.h"
+@@ -227,7 +228,7 @@ void WebUIPinnedToolbarActions::OnActionsChanged() {
+ 
+   for (actions::ActionId id : model_->PinnedActionIds()) {
+     add_state(id,
+-              /*highlighted=*/std::ranges::contains(popped_out_actions_, id));
++              /*highlighted=*/base::Contains(popped_out_actions_, id));
    }
  
--  return std::ranges::contains(
-+  return base::Contains(
-              kEnglishExpansionCountryCodes,
-              variations_service->GetStoredPermanentCountry()) &&
-          features->application_locale_storage() &&
-diff --git a/chrome/browser/glic/host/context/glic_page_features_manager.cc b/chrome/browser/glic/host/context/glic_page_features_manager.cc
-index 53f1ee8215..37f1d5f2e6 100644
---- a/chrome/browser/glic/host/context/glic_page_features_manager.cc
-+++ b/chrome/browser/glic/host/context/glic_page_features_manager.cc
-@@ -6,6 +6,7 @@
+   if (!states.empty()) {
+@@ -300,7 +301,7 @@ bool WebUIPinnedToolbarActions::IsActionPinned(actions::ActionId id) {
+ }
  
- #include <algorithm>
+ bool WebUIPinnedToolbarActions::IsActionPoppedOut(actions::ActionId id) {
+-  return std::ranges::contains(popped_out_actions_, id) && !IsActionPinned(id);
++  return base::Contains(popped_out_actions_, id) && !IsActionPinned(id);
+ }
  
+ bool WebUIPinnedToolbarActions::IsActionPinnedOrPoppedOut(
+diff --git a/chrome/updater/tag.cc b/chrome/updater/tag.cc
+index ece75027a3..d33527be1e 100644
+--- a/chrome/updater/tag.cc
++++ b/chrome/updater/tag.cc
+@@ -16,6 +16,7 @@
+ #include <vector>
+ 
+ #include "base/check.h"
 +#include "base/containers/contains.h"
- #include "base/functional/bind.h"
- #include "base/metrics/histogram_functions.h"
- #include "base/strings/utf_string_conversions.h"
-@@ -122,7 +123,7 @@ void GlicPageFeaturesManager::OnCheckResult(base::Value result) {
-         check_count_ == 0
-             ? YoutubeSummarizeVideoZSS::kButtonFoundOnFirstCheck
-             : YoutubeSummarizeVideoZSS::kButtonFoundOnSecondCheck);
--    if (!std::ranges::contains(
-+    if (!base::Contains(
-             cached_features_,
-             mojom::LightweightPageFeature::kYtAskButtonPresent)) {
-       cached_features_.push_back(
+ #include "base/containers/span.h"
+ #include "base/files/file.h"
+ #include "base/files/file_path.h"
+diff --git a/chrome/updater/util/path_util.cc b/chrome/updater/util/path_util.cc
+index 8c339b6be6..03d00c94e1 100644
+--- a/chrome/updater/util/path_util.cc
++++ b/chrome/updater/util/path_util.cc
+@@ -19,9 +19,11 @@ std::optional<base::FilePath> GetLogFilePath(UpdaterScope scope) {
+ }
+ 
+ std::optional<base::FilePath> GetHistoryLogFilePath(UpdaterScope scope) {
+-  return GetInstallDirectory(scope).transform([](const base::FilePath& path) {
+-    return path.Append(FILE_PATH_LITERAL("updater_history.jsonl"));
+-  });
++  auto path = GetInstallDirectory(scope);
++  if (path.has_value()) {
++    return path->Append(FILE_PATH_LITERAL("updater_history.jsonl"));
++  }
++  return std::nullopt;
+ }
+ 
+ }  // namespace updater

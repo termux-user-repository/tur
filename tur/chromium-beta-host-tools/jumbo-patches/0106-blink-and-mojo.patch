@@ -1421,48 +1421,6 @@ index 3a1da2ef67..8b4b48e393 100644
 +#undef SourceFrameForOptionalToken
 +#undef kFireInterval
 +#undef kLargeAdSizeToViewportSizeThreshold
-diff --git a/third_party/blink/renderer/core/frame/overlay_interstitial_ad_detector.cc b/third_party/blink/renderer/core/frame/overlay_interstitial_ad_detector.cc
-index 49ed8f6dcb..0a71a64cec 100644
---- a/third_party/blink/renderer/core/frame/overlay_interstitial_ad_detector.cc
-+++ b/third_party/blink/renderer/core/frame/overlay_interstitial_ad_detector.cc
-@@ -18,6 +18,9 @@
- #include "third_party/blink/renderer/core/paint/timing/paint_timing.h"
- #include "third_party/blink/renderer/core/scroll/scrollable_area.h"
- 
-+#define kFireInterval                       kFireInterval_OverlayInterstitialAdDetector
-+#define kLargeAdSizeToViewportSizeThreshold kLargeAdSizeToViewportSizeThreshold_OverlayInterstitialAdDetector
-+
- namespace blink {
- 
- namespace {
-@@ -234,3 +237,6 @@ void OverlayInterstitialAdDetector::OnPopupDetected(
- }
- 
- }  // namespace blink
-+
-+#undef kFireInterval
-+#undef kLargeAdSizeToViewportSizeThreshold
-diff --git a/third_party/blink/renderer/core/frame/sticky_ad_detector.cc b/third_party/blink/renderer/core/frame/sticky_ad_detector.cc
-index 8dd8e2c1e9..8eaa9917ae 100644
---- a/third_party/blink/renderer/core/frame/sticky_ad_detector.cc
-+++ b/third_party/blink/renderer/core/frame/sticky_ad_detector.cc
-@@ -20,6 +20,9 @@
- 
- #include <cstdlib>
- 
-+#define kFireInterval                       kFireInterval_StickyAdDetector
-+#define kLargeAdSizeToViewportSizeThreshold kLargeAdSizeToViewportSizeThreshold_StickyAdDetector
-+
- namespace blink {
- 
- namespace {
-@@ -151,3 +154,6 @@ void StickyAdDetector::OnLargeStickyAdDetected(
- }
- 
- }  // namespace blink
-+
-+#undef kFireInterval
-+#undef kLargeAdSizeToViewportSizeThreshold
 diff --git a/third_party/blink/renderer/core/html/anchor_element_metrics_sender.cc b/third_party/blink/renderer/core/html/anchor_element_metrics_sender.cc
 index 29bb02707f..b9685f1c1b 100644
 --- a/third_party/blink/renderer/core/html/anchor_element_metrics_sender.cc
@@ -4821,3 +4779,43 @@ index bb862c3284..a5039ffbfd 100644
  }  // namespace blink
 +
 +#undef ToIntegerMilliseconds
+diff --git a/third_party/blink/renderer/core/ad_tracker/sticky_ad_detector.cc b/third_party/blink/renderer/core/ad_tracker/sticky_ad_detector.cc
+index 96d1bfc991..eeae19041e 100644
+--- a/third_party/blink/renderer/core/ad_tracker/sticky_ad_detector.cc
++++ b/third_party/blink/renderer/core/ad_tracker/sticky_ad_detector.cc
+@@ -20,6 +20,9 @@
+ #include "third_party/blink/renderer/core/paint/timing/paint_timing.h"
+ #include "third_party/blink/renderer/core/scroll/scrollable_area.h"
+ 
++#define kFireInterval kFireInterval_sticky_ad_detector
++#define kLargeAdSizeToViewportSizeThreshold kLargeAdSizeToViewportSizeThreshold_sticky_ad_detector
++
+ namespace blink {
+ 
+ namespace {
+@@ -155,3 +158,6 @@ void StickyAdDetector::OnLargeStickyAdDetected(
+ }
+ 
+ }  // namespace blink
++
++#undef kFireInterval
++#undef kLargeAdSizeToViewportSizeThreshold
+diff --git a/third_party/blink/renderer/modules/mediastream/user_media_request_provider_impl.cc b/third_party/blink/renderer/modules/mediastream/user_media_request_provider_impl.cc
+index 247fc491ae..269fe797d7 100644
+--- a/third_party/blink/renderer/modules/mediastream/user_media_request_provider_impl.cc
++++ b/third_party/blink/renderer/modules/mediastream/user_media_request_provider_impl.cc
+@@ -21,6 +21,8 @@
+ #include "third_party/blink/renderer/platform/bindings/v8_throw_exception.h"
+ #include "third_party/blink/renderer/platform/mediastream/media_stream_descriptor.h"
+ 
++#define IsConstraintEnabled IsConstraintEnabled_user_media_request_provider_impl
++
+ namespace blink {
+ 
+ namespace {
+@@ -197,3 +199,5 @@ void UserMediaRequestProviderImpl::StartRequest(
+ }
+ 
+ }  // namespace blink
++
++#undef IsConstraintEnabled

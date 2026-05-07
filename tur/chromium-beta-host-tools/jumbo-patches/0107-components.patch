@@ -239,14 +239,14 @@ diff --git a/components/autofill/core/browser/data_model/addresses/autofill_stru
 index 5ca75c5f55..cbed7ffb6b 100644
 --- a/components/autofill/core/browser/data_model/addresses/autofill_structured_address_name.cc
 +++ b/components/autofill/core/browser/data_model/addresses/autofill_structured_address_name.cc
-@@ -32,8 +32,9 @@ std::u16string ReduceToInitials(const std::u16string& value) {
+@@ -32,8 +32,9 @@
      return std::u16string();
    }
  
-+  const char *name_seperators = kNameSeparators;
++  const char16_t *name_seperators = kNameSeparators;
    std::vector<std::u16string> middle_name_tokens =
--      base::SplitString(value, base::ASCIIToUTF16(kNameSeparators),
-+      base::SplitString(value, base::ASCIIToUTF16(name_seperators),
+-      base::SplitString(value, kNameSeparators,
++      base::SplitString(value, name_seperators,
                          base::WhitespaceHandling::TRIM_WHITESPACE,
                          base::SplitResult::SPLIT_WANT_NONEMPTY);
  
@@ -2484,3 +2484,60 @@ index c6a07cdf91..c6bdfb59ae 100644
 +
 +#undef kMaxPageTitleLength
 +#undef TruncateUTF16
+diff --git a/components/bookmarks/browser/bookmark_storage.cc b/components/bookmarks/browser/bookmark_storage.cc
+index 9b3cfc1dbc..8283c9bcf0 100644
+--- a/components/bookmarks/browser/bookmark_storage.cc
++++ b/components/bookmarks/browser/bookmark_storage.cc
+@@ -30,6 +30,8 @@
+ #include "components/bookmarks/common/storage_file_encryption_type.h"
+ #include "components/os_crypt/async/common/encryptor.h"
+ 
++#define kBackupExtension kBackupExtension_bookmark_storage
++
+ namespace bookmarks {
+ 
+ namespace {
+@@ -362,3 +364,5 @@ base::FilePath BookmarkStorage::GetSecondaryFilePath() const {
+ }
+ 
+ }  // namespace bookmarks
++
++#undef kBackupExtension
+diff --git a/components/autofill/core/browser/data_model/payments/credit_card.cc b/components/autofill/core/browser/data_model/payments/credit_card.cc
+index 945168d4fc..2cadcba209 100644
+--- a/components/autofill/core/browser/data_model/payments/credit_card.cc
++++ b/components/autofill/core/browser/data_model/payments/credit_card.cc
+@@ -46,6 +46,8 @@
+ #include "components/strings/grit/components_strings.h"
+ #include "ui/base/l10n/l10n_util.h"
+ 
++#define ShouldUseNewFopDisplay ShouldUseNewFopDisplay_credit_card
++
+ namespace autofill {
+ 
+ namespace {
+@@ -1354,3 +1356,5 @@ const UsageHistoryInformation& CreditCard::usage_history() const {
+ }
+ 
+ }  // namespace autofill
++
++#undef ShouldUseNewFopDisplay
+diff --git a/components/webcrypto/algorithms/ml_dsa.cc b/components/webcrypto/algorithms/ml_dsa.cc
+index a7b1875915..c84c06c5e8 100644
+--- a/components/webcrypto/algorithms/ml_dsa.cc
++++ b/components/webcrypto/algorithms/ml_dsa.cc
+@@ -17,6 +17,8 @@
+ #include "third_party/boringssl/src/include/openssl/evp.h"
+ #include "third_party/boringssl/src/include/openssl/mldsa.h"
+ 
++#define SynthesizeImportAlgorithmForClone SynthesizeImportAlgorithmForClone_MlDsa
++
+ namespace webcrypto {
+ 
+ namespace {
+@@ -544,3 +546,5 @@ std::unique_ptr<AlgorithmImplementation> CreateMlDsaImplementation() {
+ }
+ 
+ }  // namespace webcrypto
++
++#undef SynthesizeImportAlgorithmForClone
