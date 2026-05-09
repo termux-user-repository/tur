@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Stirling PDF
+GenericName=Launch StirlingPDF and open its WebGUI
+Categories=Office;
+Exec=stirling-pdf-webui
+Keywords=pdf
+Icon=stirling-pdf
+Type=Application
+NoDisplay=false
+Terminal=true
