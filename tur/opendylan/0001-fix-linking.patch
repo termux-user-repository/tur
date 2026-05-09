@@ -1,0 +1,50 @@
+diff --git a/sources/jamfiles/aarch64-linux-build.jam b/sources/jamfiles/aarch64-linux-build.jam
+index 50c5eea38..fe1dad42f 100644
+--- a/sources/jamfiles/aarch64-linux-build.jam
++++ b/sources/jamfiles/aarch64-linux-build.jam
+@@ -23,4 +23,4 @@ include $(SYSTEM_BUILD_SCRIPTS)/posix-build.jam ;
+ #
+ # Overrides/redefinitions
+ #
+-rtclibs += -lpthread -ldl -lrt ;
++rtclibs +=  -ldl ;
+diff --git a/sources/jamfiles/arm-linux-build.jam b/sources/jamfiles/arm-linux-build.jam
+index 7d07ffec8..0d5319a85 100644
+--- a/sources/jamfiles/arm-linux-build.jam
++++ b/sources/jamfiles/arm-linux-build.jam
+@@ -23,4 +23,4 @@ include $(SYSTEM_BUILD_SCRIPTS)/posix-build.jam ;
+ #
+ # Overrides/redefinitions
+ #
+-rtclibs += -lpthread -ldl -lrt ;
++rtclibs +=  -ldl ;
+diff --git a/sources/jamfiles/riscv64-linux-build.jam b/sources/jamfiles/riscv64-linux-build.jam
+index 4c70f2835..8c95d3589 100644
+--- a/sources/jamfiles/riscv64-linux-build.jam
++++ b/sources/jamfiles/riscv64-linux-build.jam
+@@ -23,4 +23,4 @@ include $(SYSTEM_BUILD_SCRIPTS)/posix-build.jam ;
+ #
+ # Overrides/redefinitions
+ #
+-rtclibs += -lpthread -ldl -lrt ;
++rtclibs +=  -ldl -lrt ;
+diff --git a/sources/jamfiles/x86-linux-build.jam b/sources/jamfiles/x86-linux-build.jam
+index b811fc404..6acc56114 100644
+--- a/sources/jamfiles/x86-linux-build.jam
++++ b/sources/jamfiles/x86-linux-build.jam
+@@ -24,4 +24,4 @@ include $(SYSTEM_BUILD_SCRIPTS)/posix-build.jam ;
+ #
+ # Overrides/redefinitions
+ #
+-rtclibs += -lpthread -ldl -lrt ;
++rtclibs +=  -ldl ;
+diff --git a/sources/jamfiles/x86_64-linux-build.jam b/sources/jamfiles/x86_64-linux-build.jam
+index ea88e95ab..8e125bde3 100644
+--- a/sources/jamfiles/x86_64-linux-build.jam
++++ b/sources/jamfiles/x86_64-linux-build.jam
+@@ -24,4 +24,4 @@ include $(SYSTEM_BUILD_SCRIPTS)/posix-build.jam ;
+ #
+ # Overrides/redefinitions
+ #
+-rtclibs += -lpthread -ldl -lrt ;
++rtclibs +=  -ldl ;
