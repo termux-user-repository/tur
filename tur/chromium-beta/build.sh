@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://www.chromium.org/Home
 TERMUX_PKG_DESCRIPTION="Chromium web browser"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="@licy183"
-TERMUX_PKG_VERSION=147.0.7727.116
+TERMUX_PKG_VERSION=148.0.7778.96
 TERMUX_PKG_SRCURL=https://commondatastorage.googleapis.com/chromium-browser-official/chromium-$TERMUX_PKG_VERSION-lite.tar.xz
-TERMUX_PKG_SHA256=44be73f82b1b670255b3c58676be08844ddf1bf5727d5fcdf430d214aa8d15bb
+TERMUX_PKG_SHA256=694d4e0269e11056c6dff748da7e8354bfbf90da7ce8f7467a0acfe2994a8688
 TERMUX_PKG_DEPENDS="atk, cups, dbus, fontconfig, gtk3, krb5, libc++, libevdev, libxkbcommon, libminizip, libnss, libx11, mesa, openssl, pango, pulseaudio, zlib"
 TERMUX_PKG_BUILD_DEPENDS="chromium-beta-host-tools, libffi-static"
 # TODO: Split chromium-common and chromium-headless
@@ -394,8 +394,6 @@ termux_step_make_install() {
 
 		# Scripts
 		chrome-wrapper
-		xdg-mime
-		xdg-settings
 
 		# Angle
 		libEGL.so
