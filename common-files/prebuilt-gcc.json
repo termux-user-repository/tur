@@ -1,4 +1,14 @@
 {
+  "16": {
+    "version": "16.1.0",
+    "revision": "0",
+    "checksums": {
+      "aarch64": "21efd7dccd230c9c919f7bb1b69e3236b29827fbda4fff161672397fff61546f",
+      "arm": "95ed12fc305c596cc345e85ecb299265ccd3d19e2a9403241d6e50fdc70bdbc5",
+      "i686": "10d54dafa62e086bea2afe252430349a5a46ba0378a94c39dc0e017d0055f547",
+      "x86_64": "5de8dac6849c25cdf73e51fa341d3a56de08208c8a93421b6012c1bb7b55e944"
+    }
+  },
   "15": {
     "version": "15.2.0",
     "revision": "0",
