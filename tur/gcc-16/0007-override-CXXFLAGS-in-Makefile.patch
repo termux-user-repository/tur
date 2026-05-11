@@ -1,0 +1,25 @@
+The Makefile of `libcpp` passes BASE_FLAGS_TO_PASS to `make` and thus
+some build flags, such as CXXFLAGS/CPPFLAGS, are passed as well when
+compiling libcpp for the build machine. It should not be passed and
+should be overrided because these flags are for the host machine.
+This seems a bug from upstream.
+
+```
+g++  -I/home/builder/.termux-build/gcc-11/src/libcpp -I. -I/home/builder/.termux-build/gcc-11/src/libcpp/../include -I/home/builder/.termux-build/gcc-11/src/libcpp/include -I/data/data/com.termux/files/usr/include -D__BIONIC__ -D__ANDROID_API__=24 -march=armv7-a -mfpu=neon -mfloat-abi=softfp -mthumb -fstack-protector-strong -O3 -D__BIONIC__ -D__ANDROID_API__=24 -W -Wall -Wno-narrowing -Wwrite-strings -Wmissing-format-attribute -pedantic -Wno-long-long  -fno-exceptions -fno-rtti -I/home/builder/.termux-build/gcc-11/src/libcpp -I. -I/home/builder/.termux-build/gcc-11/src/libcpp/../include -I/home/builder/.termux-build/gcc-11/src/libcpp/include -I/data/data/com.termux/files/usr/include -D__BIONIC__ -D__ANDROID_API__=24 -fPIC  -c -o charset.o -MT charset.o -MMD -MP -MF .deps/charset.Tpo /home/builder/.termux-build/gcc-11/src/libcpp/charset.c
+g++: error: unrecognized command-line option '-mfpu=neon'
+g++: error: unrecognized command-line option '-mfloat-abi=softfp'
+g++: error: unrecognized command-line option '-mthumb'
+```
+--- a/Makefile.in
++++ b/Makefile.in
+@@ -170,7 +170,9 @@
+ # built for the build system to override those in BASE_FLAGS_TO_PASS.
+ EXTRA_BUILD_FLAGS = \
+ 	CFLAGS="$(CFLAGS_FOR_BUILD)" \
+-	LDFLAGS="$(LDFLAGS_FOR_BUILD)"
++	LDFLAGS="$(LDFLAGS_FOR_BUILD)" \
++	CXXFLAGS="$(CXXFLAGS_FOR_BUILD)" \
++	CPPFLAGS="$(CPPFLAGS_FOR_BUILD)"
+ 
+ # This is the list of directories to built for the host system.
+ SUBDIRS = @configdirs@
