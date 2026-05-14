@@ -1,146 +1,175 @@
-#!/usr/bin/env python3
-# main.py — minimal terminal IDE run loop
-import curses
+# editor.py — text buffer + cursor management
 import os
-import sys
-import subprocess
+import re
+import copy
 
-import config as cfg
-from browser import FileBrowser
-from editor import Buffer
-from ui import draw_browser, draw_cmdbar, draw_editor, draw_statusbar, setup_colors
+class Buffer:
+    def __init__(self, path=None):
+        self.path = path
+        self.lines = [""]        
+        self.cx = 0              
+        self.cy = 0              
+        self.scroll_x = 0
+        self.scroll_y = 0
+        self.modified = False
+        self.encoding = "utf-8"
+        self._undo_stack = []
+        self._redo_stack = []
 
-CTRL = lambda c: ord(c.upper()) - 64
-ESC  = 27
+        if path and os.path.isfile(path):
+            self._load(path)
 
-class LiteIDE:
-    def __init__(self, stdscr, target_path):
-        self.stdscr = stdscr
-        self.buffers = []
-        self.buf_idx = 0
-        self.show_browser = True
-        self.focus_editor = True
-        self.status_message = "Welcome! Tab: Switch Panel | Ctrl+Q: Quit"
+    @property
+    def name(self):
+        return os.path.basename(self.path) if self.path else "[No Name]"
 
-        target = target_path if target_path else "."
-        if os.path.isdir(target):
-            self.browser = FileBrowser(target)
-            self.buffers.append(Buffer())
+    def _load(self, path):
+        content = ""
+        for enc in ("utf-8", "latin-1", "cp1252"):
+            try:
+                with open(path, "r", encoding=enc) as fh:
+                    content = fh.read()
+                self.encoding = enc
+                break
+            except (UnicodeDecodeError, PermissionError):
+                continue
+
+        self.lines = content.splitlines()
+        if not self.lines:
+            self.lines = [""]
+        if content.endswith("\n") and self.lines[-1] == "":
+            self.lines.pop()
+        if not self.lines:
+            self.lines = [""]
+        self.modified = False
+
+    def save(self, path=None):
+        path = path or self.path
+        if not path:
+            return False
+        try:
+            content = "\n".join(self.lines) + "\n"
+            with open(path, "w", encoding=self.encoding) as fh:
+                fh.write(content)
+            self.path = path
+            self.modified = False
+            return True
+        except OSError:
+            return False
+
+    def current_line(self):
+        return self.lines[self.cy]
+
+    def move(self, dy=0, dx=0):
+        self.cy = max(0, min(self.cy + dy, len(self.lines) - 1))
+        self.cx = max(0, min(self.cx + dx, len(self.current_line())))
+
+    def move_to(self, row, col=0):
+        self.cy = max(0, min(row, len(self.lines) - 1))
+        self.cx = max(0, min(col, len(self.current_line())))
+
+    def move_home(self):
+        line = self.current_line()
+        first_nonws = len(line) - len(line.lstrip())
+        self.cx = 0 if self.cx == first_nonws else first_nonws
+
+    def move_end(self):
+        self.cx = len(self.current_line())
+
+    def _push_undo(self):
+        self._undo_stack.append((copy.copy(self.lines), self.cy, self.cx))
+        self._redo_stack.clear()
+        if len(self._undo_stack) > 300:
+            self._undo_stack.pop(0)
+
+    def undo(self):
+        if not self._undo_stack:
+            return
+        self._redo_stack.append((list(self.lines), self.cy, self.cx))
+        lines, cy, cx = self._undo_stack.pop()
+        self.lines = lines
+        self.cy, self.cx = cy, cx
+        self.modified = True
+
+    def redo(self):
+        if not self._redo_stack:
+            return
+        self._undo_stack.append((list(self.lines), self.cy, self.cx))
+        lines, cy, cx = self._redo_stack.pop()
+        self.lines = lines
+        self.cy, self.cx = cy, cx
+        self.modified = True
+
+    def insert_char(self, ch):
+        self._push_undo()
+        line = self.lines[self.cy]
+        self.lines[self.cy] = line[: self.cx] + ch + line[self.cx :]
+        self.cx += 1
+        self.modified = True
+
+    def insert_newline(self, tab_size=4, auto_indent=True):
+        self._push_undo()
+        line = self.lines[self.cy]
+        indent = ""
+        if auto_indent:
+            indent = re.match(r"^(\s*)", line).group(1)
+            if line.rstrip().endswith((":", "{", "[")):
+                indent += " " * tab_size
+
+        rest = line[self.cx :]
+        self.lines[self.cy] = line[: self.cx]
+        self.cy += 1
+        self.lines.insert(self.cy, indent + rest)
+        self.cx = len(indent)
+        self.modified = True
+
+    def backspace(self):
+        if self.cx > 0:
+            self._push_undo()
+            line = self.lines[self.cy]
+            self.lines[self.cy] = line[: self.cx - 1] + line[self.cx :]
+            self.cx -= 1
+            self.modified = True
+        elif self.cy > 0:
+            self._push_undo()
+            prev = self.lines[self.cy - 1]
+            self.cx = len(prev)
+            self.lines[self.cy - 1] = prev + self.lines[self.cy]
+            self.lines.pop(self.cy)
+            self.cy -= 1
+            self.modified = True
+
+    def delete_line(self):
+        self._push_undo()
+        if len(self.lines) > 1:
+            self.lines.pop(self.cy)
+            self.cy = min(self.cy, len(self.lines) - 1)
         else:
-            self.browser = FileBrowser(os.path.dirname(os.path.abspath(target)) or ".")
-            self.buffers.append(Buffer(target))
+            self.lines = ""
+        self.cx = 0
+        self.modified = True
 
-        setup_colors()
-        curses.curs_set(1)
-        self.stdscr.keypad(True)
-        self.resize_windows()
+    def clamp_scroll(self, view_rows, view_cols, gutter_width=0):
+        if self.cy < self.scroll_y:
+            self.scroll_y = self.cy
+        elif self.cy >= self.scroll_y + view_rows:
+            self.scroll_y = self.cy - view_rows + 1
 
-    def resize_windows(self):
-        self.stdscr.erase()
-        h, w = self.stdscr.getmaxyx()
-        b_width = cfg.DEFAULTS.get("browser_width", 22) if self.show_browser else 0
-        e_width = w - b_width
+        effective_cx = self.cx + gutter_width
+        if effective_cx < self.scroll_x:
+            self.scroll_x = effective_cx
+        elif effective_cx >= self.scroll_x + view_cols:
+            self.scroll_x = effective_cx - view_cols + 1
 
-        if h < 4 or e_width < 5: return
+    def find(self, query, wrap=True):
+        if not query:
+            return None
+        total = len(self.lines)
+        for i in range(total):
+            row = (self.cy + i) % total
+            start_col = (self.cx + 1) if i == 0 else 0
+            idx = self.lines[row].find(query, start_col)
+            if idx != -1:
+                return row, idx
+        return None
 
-        self.win_browser = curses.newwin(h - 2, b_width, 0, 0) if self.show_browser else None
-        self.win_editor  = curses.newwin(h - 2, e_width, 0, b_width)
-        self.win_status  = curses.newwin(1, w, h - 2, 0)
-        self.win_cmdbar  = curses.newwin(1, w, h - 1, 0)
-
-    def current_buf(self):
-        return self.buffers[self.buf_idx]
-
-    def input_prompt(self, prompt):
-        curses.curs_set(1)
-        val = ""
-        while True:
-            draw_cmdbar(self.win_cmdbar, self.stdscr.getmaxyx(), prompt, val)
-            self.win_cmdbar.refresh()
-            ch = self.win_cmdbar.getch()
-            if ch in (10, 13, curses.KEY_ENTER): return val
-            elif ch == ESC: return None
-            elif ch in (curses.KEY_BACKSPACE, 127, 8): val = val[:-1]
-            elif 32 <= ch <= 126: val += chr(ch)
-
-    def run_file(self):
-        buf = self.current_buf()
-        if not buf.path or not buf.path.endswith(".py"):
-            self.status_message = "Error: F5 only runs Python (.py) files."
-            return
-        if buf.modified: buf.save()
-        curses.def_shell_mode()
-        self.stdscr.clear()
-        self.stdscr.refresh()
-        print(f"\n--- Running {os.path.basename(buf.path)} ---")
-        subprocess.run([sys.executable, buf.path])
-        input("\nPress [Enter] to return...")
-        curses.reset_shell_mode()
-        self.resize_windows()
-
-    def handle_key(self, ch):
-        buf = self.current_buf()
-        if ch == 9:
-            self.focus_editor = not self.focus_editor
-            return
-        elif ch == CTRL('t'):
-            self.show_browser = not self.show_browser
-            self.resize_windows()
-            return
-
-        if self.focus_editor:
-            if ch == curses.KEY_UP:    buf.move(dy=-1)
-            elif ch == curses.KEY_DOWN:  buf.move(dy=1)
-            elif ch == curses.KEY_LEFT:  buf.move(dx=-1)
-            elif ch == curses.KEY_RIGHT: buf.move(dx=1)
-            elif ch in (curses.KEY_BACKSPACE, 127, 8): buf.backspace()
-            elif ch in (10, 13, curses.KEY_ENTER): buf.insert_newline()
-            elif ch == CTRL('d'): buf.delete_line()
-            elif ch == CTRL('z'): buf.undo()
-            elif ch == CTRL('s'): buf.save()
-            elif ch == CTRL('w'):
-                p = self.input_prompt("Save As: ")
-                if p: buf.save(p)
-            elif ch == curses.KEY_F5: self.run_file()
-            elif 32 <= ch <= 126: buf.insert_char(chr(ch))
-        else:
-            if ch == curses.KEY_UP: self.browser.move_up()
-            elif ch == curses.KEY_DOWN: self.browser.move_down()
-            elif ch in (10, 13, curses.KEY_ENTER, 32):
-                p = self.browser.toggle_selected()
-                if p:
-                    self.buffers.append(Buffer(p))
-                    self.buf_idx = len(self.buffers) - 1
-                    self.focus_editor = True
-
-    def loop(self):
-        while True:
-            h, w = self.stdscr.getmaxyx()
-            buf = self.current_buf()
-
-            if self.show_browser and self.win_browser:
-                bh, bw = self.win_browser.getmaxyx()
-                draw_browser(self.win_browser, self.browser, bh, bw)
-                self.win_browser.refresh()
-
-            eh, ew = self.win_editor.getmaxyx()
-            draw_editor(self.win_editor, buf, eh, ew, show_line_nums=cfg.DEFAULTS["show_line_numbers"])
-            
-            if self.focus_editor:
-                lnw = len(str(len(buf.lines))) + 2 if cfg.DEFAULTS["show_line_numbers"] else 0
-                cy_s, cx_s = buf.cy - buf.scroll_y, lnw + (buf.cx - buf.scroll_x)
-                if 0 <= cy_s < eh and lnw <= cx_s < ew: self.win_editor.move(cy_s, cx_s)
-
-            self.win_editor.refresh()
-            draw_statusbar(self.win_status, buf, w, self.status_message)
-            self.win_status.refresh()
-            draw_cmdbar(self.win_cmdbar, w, hint="Tab: Focus | Ctrl+Q: Quit")
-            self.win_cmdbar.refresh()
-
-            ch = self.win_editor.getch() if self.focus_editor else self.win_browser.getch()
-            if ch == CTRL('q'): break
-            self.handle_key(ch)
-
-if __name__ == "__main__":
-    target_arg = sys.argv if len(sys.argv) > 1 else None
-    curses.wrapper(lambda stdscr: LiteIDE(stdscr, target_arg).loop())
