@@ -1,7 +1,7 @@
 TERMUX_PKG_HOMEPAGE=https://wiki.debian.org/Aptitude
 TERMUX_PKG_DESCRIPTION="terminal-based package manager"
 TERMUX_PKG_LICENSE="GPL-2.0"
-TERMUX_PKG_MAINTAINER="@termux"
+TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="0.8.13"
 TERMUX_PKG_REVISION=4
 TERMUX_PKG_SRCURL="http://deb.debian.org/debian/pool/main/a/aptitude/aptitude_$TERMUX_PKG_VERSION.orig.tar.xz"

@@ -1,7 +1,7 @@
 TERMUX_PKG_HOMEPAGE=https://supertuxkart.net
 TERMUX_PKG_DESCRIPTION="Kart racing game featuring Tux and his friends"
 TERMUX_PKG_LICENSE="GPL-3.0"
-TERMUX_PKG_MAINTAINER="@termux"
+TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="1.5"
 TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL="https://github.com/supertuxkart/stk-code/releases/download/${TERMUX_PKG_VERSION}/SuperTuxKart-${TERMUX_PKG_VERSION}-src.tar.gz"
