@@ -3,7 +3,7 @@ TERMUX_PKG_DESCRIPTION="Creates virtual Ethernet networks of almost unlimited si
 # LICENSE: MPL-2.0, ZeroTier SOURCE-AVAILABLE LICENSE
 TERMUX_PKG_LICENSE="non-free"
 TERMUX_PKG_LICENSE_FILE="LICENSE.txt, LICENSE-MPL.txt, nonfree/LICENSE.md"
-TERMUX_PKG_MAINTAINER="@termux"
+TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="1.16.0"
 TERMUX_PKG_SRCURL=https://github.com/zerotier/ZeroTierOne/archive/refs/tags/${TERMUX_PKG_VERSION}.tar.gz
 TERMUX_PKG_SHA256=aa9de313d365bf0efb3871aaa56f2d323a08f46df47b627c4eff4f4203fa7fc5

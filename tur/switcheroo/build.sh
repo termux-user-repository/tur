@@ -1,7 +1,7 @@
 TERMUX_PKG_HOMEPAGE=https://apps.gnome.org/Converter/
 TERMUX_PKG_DESCRIPTION="Convert and manipulate images easily (GTK4/libadwaita frontend to ImageMagick)"
 TERMUX_PKG_LICENSE="GPL-3.0"
-TERMUX_PKG_MAINTAINER="@termux"
+TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="2.6.0"
 TERMUX_PKG_SRCURL="https://gitlab.com/adhami3310/Switcheroo/-/archive/v${TERMUX_PKG_VERSION}/Switcheroo-v${TERMUX_PKG_VERSION}.tar.gz"
 TERMUX_PKG_SHA256="237a7f37df7143961abdf47cdbe8586bcaa0ca8e885073617a2e20488256dbd1"
