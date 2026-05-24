@@ -1,0 +1,38 @@
+diff -ur orig/simgear/scene/util/SGImageUtils.cxx mod/simgear/scene/util/SGImageUtils.cxx
+--- orig/simgear/scene/util/SGImageUtils.cxx	2024-12-02 22:40:19.000000000 +0100
++++ mod/simgear/scene/util/SGImageUtils.cxx	2024-12-03 22:34:42.074628057 +0100
+@@ -1077,21 +1077,21 @@
+ 
+ #else // OSG_GLES2_AVAILABLE
+ 
+-    if (caps.supportsTextureCompression(osg::Texture::USE_PVRTC_4BPP_COMPRESSION))
+-    {
+-        out_mode = osg::Texture::USE_PVRTC_4BPP_COMPRESSION;
+-        return true;
+-    }
+-    else if (caps.supportsTextureCompression(osg::Texture::USE_PVRTC_2BPP_COMPRESSION))
+-    {
+-        out_mode = osg::Texture::USE_PVRTC_2BPP_COMPRESSION;
+-        return true;
+-    }
+-    else if (caps.supportsTextureCompression(osg::Texture::USE_ETC_COMPRESSION))
+-    {
++//    if (caps.supportsTextureCompression(osg::Texture::USE_PVRTC_4BPP_COMPRESSION))
++//    {
++//        out_mode = osg::Texture::USE_PVRTC_4BPP_COMPRESSION;
++//        return true;
++//    }
++//    else if (caps.supportsTextureCompression(osg::Texture::USE_PVRTC_2BPP_COMPRESSION))
++//    {
++//        out_mode = osg::Texture::USE_PVRTC_2BPP_COMPRESSION;
++//        return true;
++//    }
++//    else if (caps.supportsTextureCompression(osg::Texture::USE_ETC_COMPRESSION))
++//    {
+         out_mode = osg::Texture::USE_ETC_COMPRESSION;
+         return true;
+-    }
++//    }
+ 
+ #endif
+ 
