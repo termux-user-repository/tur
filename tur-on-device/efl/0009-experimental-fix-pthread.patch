@@ -1,0 +1,111 @@
+diff -ur orig/src/lib/eina/eina_debug_timer.c mod/src/lib/eina/eina_debug_timer.c
+--- orig/src/lib/eina/eina_debug_timer.c	2025-01-11 21:08:11.000000000 +0100
++++ mod/src/lib/eina/eina_debug_timer.c	2025-01-21 21:18:36.155542280 +0100
+@@ -105,7 +105,7 @@
+    while (1)
+      {
+         int timeout = -1; //in milliseconds
+-        pthread_testcancel();
++        //pthread_testcancel();
+         eina_spinlock_take(&_lock);
+         if (_timers)
+           {
+@@ -115,7 +115,7 @@
+         eina_spinlock_release(&_lock);
+ 
+         ret = epoll_wait(epfd, events, MAX_EVENTS, timeout);
+-        pthread_testcancel();
++        //pthread_testcancel();
+ 
+         /* Some timer has been add/removed or we need to exit */
+         if (ret)
+@@ -228,7 +228,7 @@
+    close(pipeToThread[0]);
+    close(pipeToThread[1]);
+    if (_thread_runs)
+-     pthread_cancel(_thread);
++     pthread_kill(_thread, SIGUSR2);
+    _thread_runs = 0;
+    eina_spinlock_release(&_lock);
+    eina_spinlock_free(&_lock);
+diff -ur orig/src/lib/eina/eina_thread_posix.c mod/src/lib/eina/eina_thread_posix.c
+--- orig/src/lib/eina/eina_thread_posix.c	2025-01-11 21:08:11.000000000 +0100
++++ mod/src/lib/eina/eina_thread_posix.c	2025-01-21 21:19:56.666136007 +0100
+@@ -56,7 +56,16 @@
+ 
+ #define RTNICENESS 1
+ #define NICENESS 5
++#define PTHREAD_CANCELED ((void *)-1)
++#define true 1
++#define false 0
+ 
++#ifdef __ANDROID__
++static void thread_signal_handler(int signum)
++{
++	pthread_exit(0);
++}
++#endif
+ 
+ static inline void *
+ _eina_thread_join(Eina_Thread t)
+@@ -278,15 +287,16 @@
+ eina_thread_cancel(Eina_Thread t)
+ {
+    if (!t) return EINA_FALSE;
+-   return pthread_cancel((pthread_t)t) == 0;
++   return pthread_kill((pthread_t)t, SIGTERM) == 0;
+ }
+ 
+-EINA_API Eina_Bool
+-eina_thread_cancellable_set(Eina_Bool cancellable, Eina_Bool *was_cancellable)
++//EINA_API Eina_Bool
++Eina_Bool eina_thread_cancellable_set(Eina_Bool cancellable, Eina_Bool *was_cancellable)
+ {
+-   int state = cancellable ? PTHREAD_CANCEL_ENABLE : PTHREAD_CANCEL_DISABLE;
+-   int old = 0;
+-   int r;
++#ifndef __ANDROID__
++    int state = cancellable ? PTHREAD_CANCEL_ENABLE : PTHREAD_CANCEL_DISABLE;
++    int old = 0;
++    int r;
+ 
+    /* enforce deferred in case users changed to asynchronous themselves */
+    pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, &old);
+@@ -296,12 +306,36 @@
+      *was_cancellable = (old == PTHREAD_CANCEL_ENABLE);
+ 
+    return r == 0;
++#else
++    static int old_cancellable = 0;
++    struct sigaction actions;
++
++    if (was_cancellable)
++        *was_cancellable = old_cancellable;
++
++    if (cancellable) {
++        memset(&actions, 0, sizeof(actions));
++        sigemptyset(&actions.sa_mask);
++        actions.sa_flags = 0;
++        actions.sa_handler = thread_signal_handler;
++        sigaction(SIGUSR2, &actions, NULL);
++        old_cancellable = 1;
++    } else {
++        memset(&actions, 0, sizeof(actions));
++        sigemptyset(&actions.sa_mask);
++        actions.sa_handler = SIG_IGN;
++        sigaction(SIGUSR2, &actions, NULL);
++        old_cancellable = 0;
++    }
++
++    return true;
++#endif
+ }
+ 
+ EINA_API void
+ eina_thread_cancel_checkpoint(void)
+ {
+-   pthread_testcancel();
++   //pthread_testcancel();
+ }
+ 
+ EINA_API const void *EINA_THREAD_JOIN_CANCELED = PTHREAD_CANCELED;

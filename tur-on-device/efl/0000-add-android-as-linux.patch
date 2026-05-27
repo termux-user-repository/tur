@@ -1,0 +1,12 @@
+diff -ur orig/meson.build mod/meson.build
+--- orig/meson.build	2023-12-23 16:56:36.000000000 +0100
++++ mod/meson.build	2024-12-03 14:28:29.271142623 +0100
+@@ -39,7 +39,7 @@
+ windows = ['windows', 'cygwin']
+ #bsd for meson 0.46 and 0.47
+ bsd = ['bsd', 'freebsd', 'dragonfly', 'netbsd', 'openbsd']
+-linux = ['linux']
++linux = ['linux', 'android']
+ osx = ['darwin']
+ sun = ['sunos']
+ 
