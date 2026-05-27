@@ -5957,15 +5957,15 @@ diff --git a/chrome/browser/ui/views/tabs/vertical/vertical_split_tab_view.cc b/
 index 063ab0718b..6b24ce4e09 100644
 --- a/chrome/browser/ui/views/tabs/vertical/vertical_split_tab_view.cc
 +++ b/chrome/browser/ui/views/tabs/vertical/vertical_split_tab_view.cc
-@@ -7,6 +7,7 @@
- #include <numeric>
+@@ -8,6 +8,7 @@
  #include <vector>
  
+ #include "base/time/time.h"
 +#include "base/containers/contains.h"
  #include "chrome/browser/ui/color/chrome_color_id.h"
  #include "chrome/browser/ui/layout_constants.h"
  #include "chrome/browser/ui/tabs/tab_style.h"
-@@ -286,7 +287,7 @@ void VerticalSplitTabView::OnCollapseStateChanged(
+@@ -289,7 +290,7 @@
  
  std::unique_ptr<views::View>
  VerticalSplitTabView::RemoveChildViewForReparenting(views::View* child_view) {
@@ -10077,3 +10077,28 @@ index 84b9088a05..a8427a1ae6 100644
    }
    image_replacement.ReplacementFrameAttached(frame_tree_node_id,
                                               std::move(image_bytes_copy));
+diff --git a/chrome/browser/actor/actor_container_config.cc b/chrome/browser/actor/actor_container_config.cc
+index 8b7a90b2cc..0cf03e4c39 100644
+--- a/chrome/browser/actor/actor_container_config.cc
++++ b/chrome/browser/actor/actor_container_config.cc
+@@ -9,6 +9,7 @@
+ #include <variant>
+ 
+ #include "base/check.h"
++#include "base/containers/contains.h"
+ #include "base/containers/map_util.h"
+ #include "base/logging.h"
+ #include "base/notreached.h"
+@@ -209,10 +210,10 @@ bool ActorContainerConfig::Rule::MatchesNavigationSource(
+ }
+ 
+ bool ActorContainerConfig::Rule::CanNavigate() const {
+-  return std::ranges::contains(
++  return base::Contains(
+              metadata_.capabilities(),
+              optimization_guide::proto::RuleMetadata::CAPABILITY_ALL) &&
+-         std::ranges::contains(
++         base::Contains(
+              metadata_.accessible_resources(),
+              optimization_guide::proto::RuleMetadata::RESOURCE_SESSION);
+ }
