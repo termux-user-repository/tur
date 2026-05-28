@@ -1,0 +1,20 @@
+--- a/packages/playit-ipc/src/paths.rs
++++ b/packages/playit-ipc/src/paths.rs
+@@ -11,7 +11,7 @@ pub fn playit_config_dir() -> PathBuf {
+ pub fn default_socket_path_string() -> String {
+     #[cfg(target_os = "linux")]
+     {
+-        "/var/run/playitd.sock".to_string()
++        "@TERMUX_PREFIX@/var/run/playitd.sock".to_string()
+     }
+ 
+     #[cfg(target_os = "macos")]
+@@ -33,7 +33,7 @@ pub fn default_socket_path_string() -> String {
+ pub(crate) fn default_socket_path_static() -> &'static str {
+     #[cfg(target_os = "linux")]
+     {
+-        "/var/run/playitd.sock"
++        "@TERMUX_PREFIX@/var/run/playitd.sock"
+     }
+ 
+     #[cfg(target_os = "macos")]
