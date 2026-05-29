@@ -1,0 +1,11 @@
+--- a/src/third_party/boost/boost/container_hash/hash.hpp
++++ b/src/third_party/boost/boost/container_hash/hash.hpp
+@@ -120,7 +120,7 @@
+ {
+     namespace hash_detail
+     {
+-#if defined(BOOST_NO_CXX98_FUNCTION_BASE)
++#if defined(BOOST_NO_CXX98_FUNCTION_BASE) || __cplusplus >= 201703L
+         template <typename T>
+         struct hash_base
+         {

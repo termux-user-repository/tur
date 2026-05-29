@@ -1,0 +1,17 @@
+--- a/SConstruct
++++ b/SConstruct
+@@ -1862,7 +1862,13 @@
+ if env.TargetOSIs('posix'):
+     if env.ToolchainIs('gcc', 'clang'):
+         env.Append(
+-            CCFLAGS_WERROR=["-Werror"],
++            CCFLAGS_WERROR=[
++                "-Wno-deprecated-builtins",
++                "-Wno-deprecated-literal-operator",
++                "-Wno-unknown-warning-option",
++                "-Wno-nontrivial-memcall",
++                "-Wno-non-virtual-dtor",
++            ],
+             CXXFLAGS_WERROR=['-Werror=unused-result'] if env.ToolchainIs('clang') else [],
+             LINKFLAGS_WERROR=[
+                 '-Wl,-fatal_warnings' if env.TargetOSIs('darwin') else "-Wl,--fatal-warnings"
