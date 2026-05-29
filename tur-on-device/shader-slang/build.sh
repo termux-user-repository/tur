@@ -2,8 +2,7 @@ TERMUX_PKG_HOMEPAGE="https://github.com/shader-slang/slang"
 TERMUX_PKG_DESCRIPTION="Shading language that makes it easier to build and maintain large shader codebases in a modular and extensible fashion"
 TERMUX_PKG_LICENSE="Apache-2.0"
 TERMUX_PKG_MAINTAINER="@otreblan"
-TERMUX_PKG_VERSION="2026.9.1"
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_VERSION="2026.10"
 _SLANG_LUA_VERSION="5.5.0"
 _SLANG_CMARK_VERSION="0.8.0"
 _SLANG_MINIZ_VERSION="3.1.1"
@@ -16,7 +15,7 @@ TERMUX_PKG_SRCURL=(
 	"https://github.com/martinus/unordered_dense/archive/refs/tags/v$_SLANG_UNORDERED_DENSE_VERSION.tar.gz"
 )
 TERMUX_PKG_SHA256=(
-	"53c0bf21eff7ba8e3825395ee3a4d7564c2a330fa32e47e165926527c7994303"
+	"7fc1a33cb37382676f26c729859097e68ed937d4c2323b77ac7387a43600a711"
 	"a33484f7ce4c14e12ea4d51cc5a7353bff2796a8074004b96ae2dc246f33f16e"
 	"bb755e2a28fac2eb6b02981fbc72cc11e225a726d71ddffd0091055984261a16"
 	"8bb29c7bd6f22356e5583e794bed4a0b3e6dfcbcadb49974fc9270ccca1e5557"
