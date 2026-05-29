@@ -7,10 +7,10 @@ build/install/MPL-2
 build/install/THIRD-PARTY-NOTICES"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION=6.1.0
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_REVISION=2
 TERMUX_PKG_SRCURL=https://github.com/mongodb/mongo/archive/refs/tags/r$TERMUX_PKG_VERSION.tar.gz
 TERMUX_PKG_SHA256=f9aa08d43b87694085b06744025702f80acf0efd373b77704a7fd32a7f54eca5
-TERMUX_PKG_DEPENDS="libcurl, libstemmer, liblzma, libyaml-cpp, openssl, pcre2, zlib, zstd"
+TERMUX_PKG_DEPENDS="libcurl, libstemmer, liblzma, libyaml-cpp, openssl, zlib, zstd"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_HOSTBUILD=true
 TERMUX_PKG_EXCLUDED_ARCHES="arm, i686"
@@ -21,6 +21,8 @@ termux_step_host_build() {
 	mkdir -p $TERMUX_PKG_HOSTBUILD_DIR/venv-dir
 	python3 -m venv $TERMUX_PKG_HOSTBUILD_DIR/venv-dir
 	(. $TERMUX_PKG_HOSTBUILD_DIR/venv-dir/bin/activate
+	python3 -m pip install "setuptools<82" "cython<3.0.0"
+	python3 -m pip install --no-build-isolation "pyyaml==5.4.1"
 	python3 -m pip install -r $TERMUX_PKG_SRCDIR/buildscripts/requirements.txt
 	python3 -m pip install -r $TERMUX_PKG_SRCDIR/etc/pip/compile-requirements.txt
 	python3 -m pip install jsonschema memory_profiler puremagic networkx cxxfilt)
@@ -44,7 +46,6 @@ termux_step_make() {
 				--libc++=libc++_shared \
 				--linker=lld \
 				--use-libunwind=off \
-				--use-system-pcre2 \
 				--use-system-stemmer \
 				--use-system-yaml \
 				--use-system-zlib \
