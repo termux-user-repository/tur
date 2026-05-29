@@ -21,6 +21,9 @@ TERMUX_PKG_SHA256=(
 	"8bb29c7bd6f22356e5583e794bed4a0b3e6dfcbcadb49974fc9270ccca1e5557"
 	"9f7202ec6d8353932ef865d33f5872e4b7a1356e9032da7cd09c3a0c5bb2b7de"
 )
+TERMUX_PKG_DEPENDS="glslang, libandroid-spawn, libc++, lz4, spirv-tools"
+TERMUX_PKG_BUILD_DEPENDS="clang, cmake, git, glm, python, spirv-headers, stb, vulkan-headers, vulkan-loader"
+TERMUX_PKG_CMAKE_BUILD="Unix Makefiles"
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 -DCMAKE_BUILD_TYPE=None
 -DSLANG_VERSION_NUMERIC=$TERMUX_PKG_VERSION
@@ -41,9 +44,10 @@ TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 -DSLANG_OVERRIDE_MINIZ_PATH=$TERMUX_PKG_BUILDDIR
 -DSLANG_OVERRIDE_UNORDERED_DENSE_PATH=$TERMUX_PKG_BUILDDIR
 "
-TERMUX_PKG_CMAKE_BUILD="Unix Makefiles"
-TERMUX_PKG_BUILD_DEPENDS="cmake,git,glm,python,spirv-headers,stb,vulkan-headers,vulkan-loader,clang"
-TERMUX_PKG_DEPENDS="spirv-tools,lz4,glslang,libandroid-spawn"
+# Delete Unix backward compatibility symlink (libslang -> libslang-compiler)
+TERMUX_PKG_RM_AFTER_INSTALL="
+lib/libslang.so
+"
 
 termux_step_post_get_source() {
 	ln -s "$TERMUX_PKG_SRCDIR/lua-$_SLANG_LUA_VERSION"                         "$TERMUX_PKG_BUILDDIR/lua"
@@ -82,10 +86,4 @@ termux_step_post_get_source() {
 	sed -e 's/LINK_WITH_PRIVATE/& android-spawn/' -i source/{core,slang-rt}/CMakeLists.txt
 
 	# TODO cross-compilation: https://github.com/shader-slang/slang/blob/master/docs/building.md
-
-}
-
-termux_step_post_make_install() {
-	# Delete Unix backward compatibility symlink (libslang -> libslang-compiler)
-	rm -f "$TERMUX_PKG_PACKAGEDIR/usr/lib/libslang.so"
 }
