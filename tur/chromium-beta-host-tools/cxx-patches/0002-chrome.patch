@@ -1547,7 +1547,7 @@ index 6eb457cf25..219b353ff3 100644
 @@ -1010,7 +1011,7 @@ bool ContextualTasksUiService::HandleNavigationImpl(
        bypass_reason = "ncb param";
      } else if (net::GetValueForKeyInQuery(url_params.url, kDebugParam,
-                                         &debug_param_value) &&
+                                           &debug_param_value) &&
 -               debug_param_value.contains(kDebugNoCobrowseValue)) {
 +               base::Contains(debug_param_value, kDebugNoCobrowseValue)) {
        should_bypass_interception = true;
@@ -3900,16 +3900,16 @@ index 630cd06714..3b21f31817 100644
  #include "base/containers/queue.h"
  #include "base/location.h"
  #include "base/logging.h"
-@@ -93,7 +94,7 @@ LocalFileChangeTracker::~LocalFileChangeTracker() {
- 
- void LocalFileChangeTracker::OnStartUpdate(const FileSystemURL& url) {
-   DCHECK(file_task_runner_->RunsTasksInCurrentSequence());
+@@ -112,7 +113,7 @@
+   if (is_disabled_) {
+     return;
+   }
 -  if (changes_.contains(url) || demoted_changes_.contains(url)) {
 +  if (base::Contains(changes_, url) || base::Contains(demoted_changes_, url)) {
      return;
    }
    // TODO(nhiroki): propagate the error code (see http://crbug.com/40950150).
-@@ -187,7 +188,7 @@ void LocalFileChangeTracker::ClearChangesForURL(const FileSystemURL& url) {
+@@ -237,7 +238,7 @@
  void LocalFileChangeTracker::CreateFreshMirrorForURL(
      const storage::FileSystemURL& url) {
    DCHECK(file_task_runner_->RunsTasksInCurrentSequence());
@@ -3918,7 +3918,7 @@ index 630cd06714..3b21f31817 100644
    mirror_changes_[url] = ChangeInfo();
  }
  
-@@ -199,7 +200,7 @@ void LocalFileChangeTracker::RemoveMirrorAndCommitChangesForURL(
+@@ -249,7 +250,7 @@
      return;
    mirror_changes_.erase(found);
  
@@ -3927,7 +3927,7 @@ index 630cd06714..3b21f31817 100644
      MarkDirtyOnDatabase(url);
    } else {
      ClearDirtyOnDatabase(url);
-@@ -216,11 +217,11 @@ void LocalFileChangeTracker::ResetToMirrorAndCommitChangesForURL(
+@@ -266,11 +267,11 @@
      return;
    }
    const ChangeInfo& info = found->second;
@@ -3942,7 +3942,7 @@ index 630cd06714..3b21f31817 100644
      change_seqs_[info.change_seq] = url;
      changes_[url] = info;
    }
-@@ -234,7 +235,7 @@ void LocalFileChangeTracker::DemoteChangesForURL(
+@@ -284,7 +285,7 @@
    auto found = changes_.find(url);
    if (found == changes_.end())
      return;
@@ -3951,7 +3951,7 @@ index 630cd06714..3b21f31817 100644
    change_seqs_.erase(found->second.change_seq);
    demoted_changes_.insert(*found);
    changes_.erase(found);
-@@ -251,8 +252,8 @@ void LocalFileChangeTracker::PromoteDemotedChangesForURL(
+@@ -301,8 +302,8 @@
  
    FileChangeList::List change_list = iter->second.change_list.list();
    // Make sure that this URL is in no queues.
@@ -3962,7 +3962,7 @@ index 630cd06714..3b21f31817 100644
  
    change_seqs_[iter->second.change_seq] = url;
    changes_.insert(*iter);
-@@ -425,13 +426,13 @@ void LocalFileChangeTracker::RecordChange(
+@@ -475,13 +476,13 @@
      const FileSystemURL& url, const FileChange& change) {
    DCHECK(file_task_runner_->RunsTasksInCurrentSequence());
    int change_seq = current_change_seq_number_++;
@@ -8973,14 +8973,14 @@ diff --git a/chrome/renderer/accessibility/read_anything/read_anything_app_model
 index b3b368e6c0..3ab768141d 100644
 --- a/chrome/renderer/accessibility/read_anything/read_anything_app_model.cc
 +++ b/chrome/renderer/accessibility/read_anything/read_anything_app_model.cc
-@@ -11,6 +11,7 @@
+@@ -13,6 +13,7 @@
  #include <utility>
  
  #include "base/check.h"
 +#include "base/containers/contains.h"
+ #include "base/containers/flat_map.h"
  #include "base/logging.h"
  #include "base/metrics/histogram_functions.h"
- #include "base/strings/stringprintf.h"
 @@ -53,7 +54,8 @@ const ui::AXNode* GetUnignoredParentForSelection(const ui::AXNode* node) {
        // displayed as siblings, to avoid misnumbering.
        const std::string_view display =

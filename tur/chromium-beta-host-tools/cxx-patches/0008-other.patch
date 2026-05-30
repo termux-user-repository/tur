@@ -4895,16 +4895,25 @@ index 318a34cdab..8d07e17114 100644
  #include "base/debug/crash_logging.h"
  #include "base/feature_list.h"
  #include "base/functional/bind.h"
-@@ -217,7 +218,7 @@ void EventRouter::RouteDispatchEvent(
+@@ -160,7 +161,7 @@
+ bool IsSubEventName(std::string_view event) {
+   return (event.starts_with("webRequest.") ||
+           event.starts_with("webViewInternal.")) &&
+-         event.contains("/");
++         base::Contains(event, "/");
+ }
+ 
+ }  // namespace
+@@ -218,7 +219,7 @@
      mojom::DispatchEventParamsPtr params,
      base::ListValue event_args,
      mojom::EventDispatcher::DispatchEventCallback callback) {
 -  CHECK(observed_process_set_.contains(rph));
 +  CHECK(base::Contains(observed_process_set_, rph));
-   int worker_thread_id = params->worker_thread_id;
-   mojo::AssociatedRemote<mojom::EventDispatcher>& dispatcher =
-       rph_dispatcher_map_[rph][worker_thread_id];
-@@ -887,7 +888,7 @@ void EventRouter::AddEventListener(const std::string& event_name,
+ 
+   if (params->is_user_gesture &&
+       params->host_id->type == mojom::HostID::HostType::kExtensions) {
+@@ -894,7 +895,7 @@
                                     const ExtensionId& extension_id) {
    listeners_.AddListener(EventListener::ForExtension(event_name, extension_id,
                                                       process, std::nullopt));
@@ -4913,7 +4922,7 @@ index 318a34cdab..8d07e17114 100644
  }
  
  void EventRouter::AddServiceWorkerEventListener(
-@@ -900,7 +901,7 @@ void EventRouter::AddServiceWorkerEventListener(
+@@ -907,7 +908,7 @@
        event_listener->listener_owner->get_extension_id(), process,
        process->GetBrowserContext(), service_worker.scope_url,
        service_worker.version_id, service_worker.thread_id, std::nullopt));
@@ -4922,7 +4931,7 @@ index 318a34cdab..8d07e17114 100644
  }
  
  void EventRouter::RemoveEventListener(const std::string& event_name,
-@@ -930,7 +931,7 @@ void EventRouter::AddEventListenerForURL(const std::string& event_name,
+@@ -937,7 +938,7 @@
                                           const GURL& listener_url) {
    listeners_.AddListener(
        EventListener::ForURL(event_name, listener_url, process, std::nullopt));
@@ -4931,7 +4940,7 @@ index 318a34cdab..8d07e17114 100644
  }
  
  void EventRouter::RemoveEventListenerForURL(const std::string& event_name,
-@@ -944,7 +945,7 @@ void EventRouter::RemoveEventListenerForURL(const std::string& event_name,
+@@ -951,7 +952,7 @@
  void EventRouter::RegisterObserver(Observer* observer,
                                     const std::string& event_name) {
    // Observing sub-event names like "foo.onBar/123" is not allowed.
@@ -12419,19 +12428,6 @@ index 61ef43ce95..32bf545ad3 100644
      return false;
    }
  
-diff --git a/extensions/browser/event_router.cc b/extensions/browser/event_router.cc
-index 8d07e17114..96324848cc 100644
---- a/extensions/browser/event_router.cc
-+++ b/extensions/browser/event_router.cc
-@@ -160,7 +160,7 @@ base::debug::CrashKeyString* GetEventNameCrashKey() {
- bool IsSubEventName(std::string_view event) {
-   return (event.starts_with("webRequest.") ||
-           event.starts_with("webViewInternal.")) &&
--         event.contains("/");
-+         base::Contains(event, "/");
- }
- 
- }  // namespace
 diff --git a/extensions/browser/mv2_deprecation_impact_checker.cc b/extensions/browser/mv2_deprecation_impact_checker.cc
 index 4b7d9ec82b..9351e10c47 100644
 --- a/extensions/browser/mv2_deprecation_impact_checker.cc
