@@ -3528,27 +3528,6 @@ index 8ab42a4cec..14a2edaa72 100644
        });
      }
    } else if (command_line->HasSwitch(kEnableExamples)) {
-diff --git a/ui/views/touchui/touch_selection_controller_impl.cc b/ui/views/touchui/touch_selection_controller_impl.cc
-index 800cac3516..70e728954b 100644
---- a/ui/views/touchui/touch_selection_controller_impl.cc
-+++ b/ui/views/touchui/touch_selection_controller_impl.cc
-@@ -12,6 +12,7 @@
- #include "base/memory/raw_ptr_exclusion.h"
- #include "base/notreached.h"
- #include "base/time/time.h"
-+#include "base/types/cxx23_to_underlying.h"
- #include "ui/aura/client/cursor_client.h"
- #include "ui/aura/env.h"
- #include "ui/aura/window.h"
-@@ -602,7 +603,7 @@ bool TouchSelectionControllerImpl::ShouldShowHandleFor(
- bool TouchSelectionControllerImpl::IsCommandIdEnabled(int command_id,
-                                                       bool can_paste) const {
-   if (command_id ==
--      std::to_underlying(ui::TouchEditable::MenuCommands::kPaste)) {
-+      base::to_underlying(ui::TouchEditable::MenuCommands::kPaste)) {
-     return can_paste && client_view_->IsCommandIdEnabled(command_id);
-   }
-   return client_view_->IsCommandIdEnabled(command_id);
 diff --git a/ui/views/touchui/touch_selection_menu_views.cc b/ui/views/touchui/touch_selection_menu_views.cc
 index 85fc2767da..49ba85a3f8 100644
 --- a/ui/views/touchui/touch_selection_menu_views.cc
@@ -3834,3 +3813,14 @@ index 7cf0960524..57e1d9ddda 100644
        }
        if (topmost_transient_child) {
          window_->parent()->layer()->StackAbove(
+--- a/ui/views/controls/textfield/textfield.cc
++++ b/ui/views/controls/textfield/textfield.cc
+@@ -1582,7 +1582,7 @@
+ 
+ bool Textfield::IsCommandIdEnabled(int command_id, bool can_paste) const {
+   if (command_id ==
+-      std::to_underlying(ui::TouchEditable::MenuCommands::kPaste)) {
++      base::to_underlying(ui::TouchEditable::MenuCommands::kPaste)) {
+     return !GetReadOnly() && can_paste;
+   }
+   return IsCommandIdEnabled(command_id);

@@ -2398,28 +2398,6 @@ index f6ed40ba9a..37690396d0 100644
        (change.cause == net::CookieChangeCause::OVERWRITE ||
         change.cause == net::CookieChangeCause::INSERTED_NO_CHANGE_OVERWRITE ||
         change.cause ==
-diff --git a/content/browser/renderer_host/render_process_host_impl.cc b/content/browser/renderer_host/render_process_host_impl.cc
-index 1a542a36af..e5cb179e00 100644
---- a/content/browser/renderer_host/render_process_host_impl.cc
-+++ b/content/browser/renderer_host/render_process_host_impl.cc
-@@ -1848,7 +1848,7 @@ bool RenderProcessHostImpl::Init() {
-     InitializeChannelProxy();
-   }
- 
--  if (base::FeatureList::IsEnabled(features::kSendGPUChannelEarly)) {
-+  if (base::FeatureList::IsEnabled(::features::kSendGPUChannelEarly)) {
-     // Pre-establish the GPU channel and send the renderer pipe at renderer
-     // launch time.
-     gpu_client_->InitializeGpuChannelForNewRenderer(
-@@ -3609,7 +3609,7 @@ void RenderProcessHostImpl::AppendRendererCommandLine(
-     command_line->AppendSwitch(switches::kTopChromeWebUI);
-   }
- 
--  if (base::FeatureList::IsEnabled(features::kSendGPUChannelEarly)) {
-+  if (base::FeatureList::IsEnabled(::features::kSendGPUChannelEarly)) {
-     command_line->AppendSwitchASCII(
-         switches::kGpuClientId, base::NumberToString(gpu_client_->client_id()));
-   }
 diff --git a/content/browser/renderer_host/render_frame_host_manager.cc b/content/browser/renderer_host/render_frame_host_manager.cc
 index b1b189c5cd..c645eaa00c 100644
 --- a/content/browser/renderer_host/render_frame_host_manager.cc
@@ -2698,3 +2676,15 @@ index db280b0576..66fd0c8244 100644
      if (auto font_data_receiver =
              receiver.As<font_data_service::mojom::FontDataService>()) {
        font_data_service::FontDataServiceImpl::ConnectToFontService(
+--- a/content/browser/renderer_host/render_process_host_impl.cc
++++ b/content/browser/renderer_host/render_process_host_impl.cc
+@@ -3608,8 +3608,8 @@
+ }
+ 
+ bool RenderProcessHostImpl::ShouldSendGpuChannelEarly() const {
+-  return base::FeatureList::IsEnabled(features::kSendGPUChannelEarly) &&
+-         (!features::kSendGPUChannelEarlyTopChromeOnly.Get() ||
++  return base::FeatureList::IsEnabled(::features::kSendGPUChannelEarly) &&
++         (!::features::kSendGPUChannelEarlyTopChromeOnly.Get() ||
+           IsForTopChromeWebUI());
+ }
