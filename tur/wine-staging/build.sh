@@ -3,7 +3,7 @@ TERMUX_PKG_DESCRIPTION="A compatibility layer for running Windows programs"
 TERMUX_PKG_LICENSE="LGPL-2.1"
 TERMUX_PKG_LICENSE_FILE="LICENSE, LICENSE.OLD, COPYING.LIB"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="11.9"
+TERMUX_PKG_VERSION="11.10"
 _REAL_VERSION="${TERMUX_PKG_VERSION/\~/-}"
 _VERSION_FOLDER="$(test "${_REAL_VERSION:3:1}" = 0 && echo ${_REAL_VERSION:0:4} || echo ${_REAL_VERSION:0:3}x)"
 TERMUX_PKG_SRCURL=(
@@ -11,8 +11,8 @@ TERMUX_PKG_SRCURL=(
 	https://github.com/wine-staging/wine-staging/archive/v$_REAL_VERSION.tar.gz
 )
 TERMUX_PKG_SHA256=(
-	e39cc18db287358a2436f8af498bedc7e444d55eb99ef545b60e778bb4ea0f6f
-	fd953f5d78473a58f77140912b57bcdd60a78a7982cac919bf62988be8d514fa
+	e4c35ebe26f4f8eef5f2143e24a1fb9fd103f1d46132ad4755479227d086b8e7
+	102b9d401d9286a654eb437fdd68b02bd4c007532a203dea66367e55e7287e89
 )
 TERMUX_PKG_DEPENDS="fontconfig, freetype, krb5, libandroid-spawn, libc++, libgmp, libgnutls, libxcb, libxcomposite, libxcursor, libxfixes, libxrender, opengl, pulseaudio, sdl2 | sdl2-compat, vulkan-loader, xorg-xrandr"
 TERMUX_PKG_ANTI_BUILD_DEPENDS="sdl2-compat, vulkan-loader"
@@ -128,11 +128,11 @@ termux_step_post_get_source() {
 
 _setup_llvm_mingw_toolchain() {
 	# LLVM-mingw's version number must not be the same as the NDK's.
-	local _llvm_mingw_version=16
-	local _version="20230614"
-	local _url="https://github.com/mstorsjo/llvm-mingw/releases/download/$_version/llvm-mingw-$_version-ucrt-ubuntu-20.04-x86_64.tar.xz"
+	local _llvm_mingw_version=22
+	local _version="20260519"
+	local _url="https://github.com/mstorsjo/llvm-mingw/releases/download/$_version/llvm-mingw-$_version-ucrt-ubuntu-22.04-x86_64.tar.xz"
 	local _path="$TERMUX_PKG_CACHEDIR/$(basename $_url)"
-	local _sha256sum=9ae925f9b205a92318010a396170e69f74be179ff549200e8122d3845ca243b8
+	local _sha256sum=a48f8c2801508272ccde64d87a26747ecc5306623d9a080a42ed80dc61f79fa2
 	termux_download $_url $_path $_sha256sum
 	local _extract_path="$TERMUX_PKG_CACHEDIR/llvm-mingw-toolchain-$_llvm_mingw_version"
 	if [ ! -d "$_extract_path" ]; then
