@@ -1,0 +1,19 @@
+--- a/src/game/settings.rs
++++ b/src/game/settings.rs
+@@ -27,6 +27,7 @@ pub struct Settings {
+     pub subpixel_coords: bool,
+     #[serde(default = "default_true")]
+     pub motion_interpolation: bool,
++    #[serde(default = "default_true")]
+     pub touch_controls: bool,
+     #[serde(default = "default_true")]
+     pub display_touch_controls: bool,
+@@ -445,7 +445,7 @@ impl Default for Settings {
+             light_cone: true,
+             subpixel_coords: true,
+             motion_interpolation: true,
+-            touch_controls: cfg!(target_os = "android"),
++            touch_controls: true,
+             display_touch_controls: true,
+             soundtrack: "Organya".to_string(),
+             bgm_volume: 1.0,
