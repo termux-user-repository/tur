@@ -12,11 +12,11 @@ TERMUX_PKG_BUILD_DEPENDS="golang zig"
 TERMUX_PKG_AUTO_UPDATE=true
 
 termux_step_make() {
-    cd "$TERMUX_PKG_SRCDIR"
+    cd "$TERMUX_PKG_SRCDIR" || return 1
     chmod +x build-termux.sh
     ./build-termux.sh build
 }
 
 termux_step_make_install() {
-    install -Dm755 lunex "$TERMUX_PREFIX/bin/lunex"
+    install -Dm755 "$TERMUX_PKG_SRCDIR/lunex" "$TERMUX_PREFIX/bin/lunex"
 }
