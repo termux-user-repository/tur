@@ -1,0 +1,11 @@
+--- a/cmd/service_ui_termux.go
++++ b/cmd/service_ui_termux.go
+@@ -19,7 +19,7 @@
+ 	svcDir := termuxServiceDir()
+ 	if info, err := os.Stat(svcDir); err == nil && info.IsDir() {
+ 		_, downErr := os.Stat(filepath.Join(svcDir, "down"))
+-		m.Settings.General.AutoStart = os.IsNotExist(downErr)
++		m.Settings.General.AutoStart.Value = os.IsNotExist(downErr)
+ 	}
+ 
+ 	m.ToggleServiceFunc = func(enable bool) error {
