@@ -98,12 +98,14 @@
  # audit-console [yes|no]: output audit log to console.
  # audit-syslog [yes|no]: output audit log to syslog.
  # audit-file-mode [mode]: file mode of audit file.
-@@ -195,15 +195,15 @@
+@@ -197,16 +197,16 @@
  # audit-num 2
  
- # Support reading dnsmasq dhcp file to resolve local hostname
+ # Support reading dnsmasq/odhcpd lease files to resolve local hostname
 -# dnsmasq-lease-file /var/lib/misc/dnsmasq.leases
+-# odhcpd-lease-file /tmp/odhcpd.leases
 +# dnsmasq-lease-file @TERMUX_PREFIX@/var/lib/misc/dnsmasq.leases
++# odhcpd-lease-file @TERMUX_PREFIX@/tmp/odhcpd.leases
  
  # certificate file
  # ca-file [file]
