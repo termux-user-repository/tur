@@ -1,0 +1,35 @@
+diff --git a/src/hotspot/os/linux/os_linux.cpp b/src/hotspot/os/linux/os_linux.cpp
+index 927cfd441..7f2a300a7 100644
+--- a/src/hotspot/os/linux/os_linux.cpp
++++ b/src/hotspot/os/linux/os_linux.cpp
+@@ -209,7 +209,7 @@ static malloc_info_func_t g_malloc_info = nullptr;
+ // avoid this
+ static bool suppress_primordial_thread_resolution = false;
+ 
+-static bool read_so_path_from_maps(const char* so_name, char* buf, int buflen);
++bool read_so_path_from_maps(const char* so_name, char* buf, int buflen);
+ 
+ // utility functions
+ 
+@@ -1573,7 +1573,7 @@ bool os::dll_address_to_library_name(address addr, char* buf,
+   return false;
+ }
+ 
+-static bool read_so_path_from_maps(const char* so_name, char* buf, int buflen) {
++bool read_so_path_from_maps(const char* so_name, char* buf, int buflen) {
+   FILE *fp = fopen("/proc/self/maps", "r");
+   assert(fp, "Failed to open /proc/self/maps");
+   if (!fp) {
+diff --git a/src/hotspot/os/posix/os_posix.cpp b/src/hotspot/os/posix/os_posix.cpp
+index aefac61bb..ada65f934 100644
+--- a/src/hotspot/os/posix/os_posix.cpp
++++ b/src/hotspot/os/posix/os_posix.cpp
+@@ -1093,6 +1093,8 @@ bool os::same_files(const char* file1, const char* file2) {
+ 
+ static char saved_jvm_path[MAXPATHLEN] = {0};
+ 
++bool read_so_path_from_maps(const char* so_name, char* buf, int buflen);
++
+ // Find the full path to the current module, libjvm.so
+ void os::jvm_path(char *buf, jint buflen) {
+   // Error checking.
