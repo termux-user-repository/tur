@@ -9,14 +9,14 @@
              debug!("successfully copied data from: {}", source_directory.display());
  
 -            if !allows_links {
--                sess.dcx().emit_warn(errors::HardLinkFailed { path: &session_dir });
+-                sess.dcx().emit_warn(diagnostics::HardLinkFailed { path: &session_dir });
 -            }
 -
              sess.init_incr_comp_session(session_dir, directory_lock);
              return;
          } else {
---- a/compiler/rustc_incremental/src/errors.rs
-+++ b/compiler/rustc_incremental/src/errors.rs
+--- a/compiler/rustc_incremental/src/diagnostics.rs
++++ b/compiler/rustc_incremental/src/diagnostics.rs
 @@ -207,14 +207,6 @@
  }
  
