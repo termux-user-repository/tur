@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://github.com/alexpasmantier/television
 TERMUX_PKG_DESCRIPTION="A very fast, portable and hackable fuzzy finder"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@everywhereless"
-TERMUX_PKG_VERSION="0.15.8"
+TERMUX_PKG_VERSION="0.15.9"
 TERMUX_PKG_SRCURL="https://github.com/alexpasmantier/television/archive/refs/tags/${TERMUX_PKG_VERSION}.tar.gz"
-TERMUX_PKG_SHA256=7c433b57287deba6c02b7722a363b854f1882439628567fa9adcae84fa95e62c
+TERMUX_PKG_SHA256=5f46cbe7b14e1d6e3958f436b1d6ed8af86e9914d7d2aee5a9379e8e1772072d
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_AUTO_UPDATE=true
 
