@@ -2,7 +2,7 @@ TERMUX_PKG_HOMEPAGE=https://github.com/coder/code-server
 TERMUX_PKG_DESCRIPTION="Run VS Code on any machine anywhere and access it in the browser"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="4.112.0"
+TERMUX_PKG_VERSION="4.122.1"
 TERMUX_PKG_SRCURL=git+https://github.com/coder/code-server
 TERMUX_PKG_DEPENDS="libandroid-spawn, libsecret, krb5, nodejs-22, ripgrep"
 TERMUX_PKG_BUILD_IN_SRC=true
@@ -34,7 +34,7 @@ termux_step_post_get_source() {
 }
 
 _setup_nodejs_22() {
-	local NODEJS_VERSION=22.22.0
+	local NODEJS_VERSION=22.22.1
 	local NODEJS_FOLDER=${TERMUX_PKG_CACHEDIR}/build-tools/nodejs-${NODEJS_VERSION}
 
 	if [ ! -x "$NODEJS_FOLDER/bin/node" ]; then
@@ -42,7 +42,7 @@ _setup_nodejs_22() {
 		local NODEJS_TAR_FILE=$TERMUX_PKG_TMPDIR/nodejs-$NODEJS_VERSION.tar.xz
 		termux_download https://nodejs.org/dist/v${NODEJS_VERSION}/node-v${NODEJS_VERSION}-linux-x64.tar.xz \
 			"$NODEJS_TAR_FILE" \
-			9aa8e9d2298ab68c600bd6fb86a6c13bce11a4eca1ba9b39d79fa021755d7c37
+			9a6bc82f9b491279147219f6a18add1e18424dce90d41d2a5fcd69d4924ba3aa
 		tar -xf "$NODEJS_TAR_FILE" -C "$NODEJS_FOLDER" --strip-components=1
 	fi
 	export PATH="$NODEJS_FOLDER/bin:$PATH"
@@ -90,13 +90,28 @@ termux_step_make() {
 	rm -f $TERMUX_PREFIX/lib/librt.{so,a}
 	echo "INPUT(-landroid-spawn)" >> $TERMUX_PREFIX/lib/librt.so
 
-	npm run release:standalone
+	# Upstream removed the `release:standalone` npm script in v4.122.x. Replicate
+	# the old ci/build/build-standalone-release.sh here so native modules are
+	# (re)built for the target arch via `npm install`, which the new KEEP_MODULES
+	# path in `npm run release` does not do.
+	rsync -a release/ release-standalone
+	mkdir -p release-standalone/bin release-standalone/lib
+	rsync ci/build/code-server.sh release-standalone/bin/code-server
+	chmod 755 release-standalone/bin/code-server
+	rsync "$(node -p process.execPath)" release-standalone/lib/node
+	chmod 755 release-standalone/lib/node
+	pushd release-standalone
+	npm install --unsafe-perm --omit=dev
+	rm -fr ./lib/vscode/extensions/node_modules/.bin
+	popd
+
 	mv $TERMUX_PREFIX/bin.bp $TERMUX_PREFIX/bin
 }
 
 termux_step_make_install() {
-	# Replace version
-	npm version --prefix release-standalone "$VERSION"
+	# Replace version. Upstream's build-release.sh already writes the correct
+	# version into package.json, so allow the same value instead of erroring out.
+	npm version --prefix release-standalone --allow-same-version "$VERSION"
 
 	# Remove some pre-built binaries (currently nodejs and ripgrep) whose target is not Android
 	rm ./release-standalone/lib/node
