@@ -1,9 +1,9 @@
 --- a/scripts/build/termux_step_create_debian_package.sh
 +++ b/scripts/build/termux_step_create_debian_package.sh
-@@ -3,6 +3,11 @@
- 		# Metapackage doesn't have data inside.
- 		rm -rf data
+@@ -5,6 +5,11 @@
  	fi
+ 	# Clean up DEBIAN metadata directory from previous runs to prevent bundling it in data.tar.xz on continued builds.
+ 	rm -rf DEBIAN
 +	local xz_opt=""
 +	if [ "$TERMUX_DEBUG_BUILD" = "true" ]; then
 +		xz_opt="-0"
@@ -14,10 +14,10 @@
  		--owner=0 --group=0 --numeric-owner \
 --- a/scripts/build/termux_create_debian_subpackages.sh
 +++ b/scripts/build/termux_create_debian_subpackages.sh
-@@ -84,6 +84,11 @@
- 		fi
- 		local SUB_PKG_INSTALLSIZE
+@@ -87,6 +87,11 @@
  		SUB_PKG_INSTALLSIZE=$(du -sk . | cut -f 1)
+ 		# Clean up DEBIAN metadata directory from previous runs to prevent bundling it in data.tar.xz on continued builds.
+ 		rm -rf DEBIAN
 +		local xz_opt=""
 +		if [ "$TERMUX_DEBUG_BUILD" = "true" ]; then
 +			xz_opt="-0"
