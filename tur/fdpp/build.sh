@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="64-bit DOS core"
 TERMUX_PKG_LICENSE="GPL-3.0"
 TERMUX_PKG_MAINTAINER="@stsp"
 TERMUX_PKG_VERSION=1.10
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://github.com/dosemu2/fdpp/archive/refs/tags/${TERMUX_PKG_VERSION}.tar.gz
 TERMUX_PKG_SHA256=fd6e4332ab3756acff10511d7a97af8c6eb231861341f8b4194b22011a8dc749
 TERMUX_PKG_BUILD_DEPENDS="nasm-segelf-cross, libelf, thunk-gen-cross"
@@ -12,7 +13,7 @@ termux_step_configure() {
 	local _PREFIX_FOR_SEGELF=${TERMUX_PREFIX}/opt/nasm-segelf/cross
 	local _PREFIX_FOR_THUNK_GEN=${TERMUX_PREFIX}/opt/thunk-gen/cross
 	export PATH="$PATH:$_PREFIX_FOR_SEGELF/bin"
-	export PKG_CONFIG_PATH="${_PREFIX_FOR_THUNK_GEN}/share/pkgconfig"
+	export PKG_CONFIG_PATH="${_PREFIX_FOR_THUNK_GEN}/lib/$TERMUX_HOST_PLATFORM/pkgconfig"
 	cd $TERMUX_PKG_BUILDDIR
 	$TERMUX_PKG_SRCDIR/configure
 }

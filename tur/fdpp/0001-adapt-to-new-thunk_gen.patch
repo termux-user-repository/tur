@@ -1,0 +1,64 @@
+From 06284729e97564f8ffad6dd4fd495a442204f1a9 Mon Sep 17 00:00:00 2001
+From: Stas Sergeev <stsp2@yandex.ru>
+Date: Sun, 14 Jun 2026 02:33:43 +0300
+Subject: [PATCH] adapt to new thunk_gen
+
+---
+ fdpp/kernel/makefile        | 4 ++--
+ fdpp/makefile               | 2 +-
+ fdpp/parsers/parse_decls.sh | 4 ++--
+ 3 files changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/fdpp/kernel/makefile b/fdpp/kernel/makefile
+index 2509a82..6f127ac 100644
+--- a/fdpp/kernel/makefile
++++ b/fdpp/kernel/makefile
+@@ -109,8 +109,8 @@ cdata.asm: $(srcdir)/cdata.S $(HDR)/version.h $(GIT_REV) $(srcdir)/makefile
+ 
+ thunk_calls.tmp: $(SRC)/proto.h
+ 	srcdir=$(srcdir)/$(T)/parsers CPP="$(CPP)" \
+-	$(srcdir)/$(T)/parsers/parse_decls.sh 1 $< >$@ || \
+-	($(RM) $@ ; false)
++	$(srcdir)/$(T)/parsers/parse_decls.sh 1 $< | \
++		nl -v 0 | sed -E 's/^ *//' >$@ || ($(RM) $@ ; false)
+ plt.inc: thunk_calls.tmp
+ 	$(srcdir)/$(T)/parsers/parse_decls.sh 3 $< >$@ || \
+ 	($(RM) $@ ; false)
+diff --git a/fdpp/makefile b/fdpp/makefile
+index b27e07c..61107ce 100644
+--- a/fdpp/makefile
++++ b/fdpp/makefile
+@@ -73,7 +73,7 @@ endif
+ clean:
+ 	$(MAKE) -C kernel clean
+ 	$(MAKE) -C loader clean
+-	-$(RM) .tstamp *.map $(TARGET).elf *.inc \
++	-$(RM) .tstamp *.map $(TARGET).elf *.inc thunk_c.h thunk_p.h \
+ 		*.o $(GEN_CC) $(FDPPDEVL) $(FDPPLIB) *.tmp $(GEN_HEADERS) \
+ 		$(LDRDEVL) $(LDRLIB) $(GEN_HEADERS_FD) \
+ 		*.pc *.so *.elf
+diff --git a/fdpp/parsers/parse_decls.sh b/fdpp/parsers/parse_decls.sh
+index 55d9050..f851e9b 100755
+--- a/fdpp/parsers/parse_decls.sh
++++ b/fdpp/parsers/parse_decls.sh
+@@ -4,7 +4,7 @@ set -e
+ set -o pipefail
+ 
+ gen_calls_tmp() {
+-	grep ASMCFUNC $1 | $CPP -P -I $srcdir -include unfar.h - | nl -n ln -v 0
++	grep ASMCFUNC $1 | $CPP -P -I $srcdir -include unfar.h -
+ }
+ 
+ gen_plt_inc() {
+@@ -14,7 +14,7 @@ gen_plt_inc() {
+ 
+ gen_asms_tmp() {
+ 	grep 'ASMFUNC\|ASMPASCAL' $1 | grep -v "//" | \
+-		$CPP -P -I $srcdir -include unfar.h - | nl -n ln -v 0
++		$CPP -P -I $srcdir -include unfar.h -
+ }
+ 
+ gen_plt_asmc() {
+-- 
+2.53.0
+
