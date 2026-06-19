@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="thunk generator for C and assembler"
 TERMUX_PKG_LICENSE="GPL-3.0"
 TERMUX_PKG_MAINTAINER="@stsp"
 TERMUX_PKG_VERSION="1.10"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://github.com/stsp/thunk_gen/archive/refs/tags/${TERMUX_PKG_VERSION}.tar.gz
 TERMUX_PKG_SHA256=42ef5151bf0dd74a6afbf5a55b1df6d9ac6c289cdd1362dc4aaec69440605656
 TERMUX_PKG_AUTO_UPDATE=true
@@ -36,6 +37,7 @@ termux_step_host_build() {
 	STRIP=$(command -v llvm-strip)
 	termux_setup_meson
 	$TERMUX_MESON setup --prefix $_INSTALL_PREFIX \
+		-Dlibdir=lib/$TERMUX_HOST_PLATFORM \
 		$TERMUX_PKG_HOSTBUILD_DIR $TERMUX_PKG_SRCDIR
 	$TERMUX_MESON compile --verbose -C $TERMUX_PKG_HOSTBUILD_DIR
 	$TERMUX_MESON install -C $TERMUX_PKG_HOSTBUILD_DIR
