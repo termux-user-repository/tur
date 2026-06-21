@@ -4,7 +4,7 @@ TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="4.125.0"
 TERMUX_PKG_SRCURL=git+https://github.com/coder/code-server
-TERMUX_PKG_DEPENDS="libandroid-spawn, libsecret, krb5, nodejs-lts, ripgrep"
+TERMUX_PKG_DEPENDS="libandroid-spawn, libsecret, krb5, nodejs-24, ripgrep"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_HOSTBUILD=true
 TERMUX_PKG_NO_STATICSPLIT=true
@@ -137,7 +137,7 @@ termux_step_make_install() {
 	cp -Rf ./release-standalone/* $TERMUX_PREFIX/lib/code-server/
 
 	# Replace nodejs
-	ln -sf $TERMUX_PREFIX/bin/node $TERMUX_PREFIX/lib/code-server/lib/node
+	ln -sf $TERMUX_PREFIX/opt/nodejs-24/bin/node $TERMUX_PREFIX/lib/code-server/lib/node
 
 	# Replace ripgrep. Upstream switched from @vscode/ripgrep (single bin/rg) to
 	# @vscode/ripgrep-universal (per-platform bin/<platform>-<arch>/rg) in 4.122.x.
