@@ -1,0 +1,13 @@
+diff --git a/source/blender/gpu/shader_tool/intermediate.cc b/source/blender/gpu/shader_tool/intermediate.cc
+index 31364dd7..eaf412c3 100644
+--- a/source/blender/gpu/shader_tool/intermediate.cc
++++ b/source/blender/gpu/shader_tool/intermediate.cc
+@@ -130,7 +130,7 @@ void LexerBase::ensure_memory()
+     memory = static_cast<char *>(_aligned_malloc(needed_size, 128));
+ #else
+     std::free(memory);
+-    memory = static_cast<char *>(std::aligned_alloc(128, needed_size));
++    memory = static_cast<char *>(memalign(128, needed_size));
+ #endif
+     alloc_size = needed_size;
+   }
