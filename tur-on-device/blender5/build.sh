@@ -4,13 +4,12 @@ TERMUX_PKG_DESCRIPTION="A fully integrated 3D graphics creation suite"
 # https://www.blender.org/about/license/
 TERMUX_PKG_LICENSE="GPL-3.0-or-later"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="5.1.0+really5.0.1"
-TERMUX_PKG_REVISION=4
+TERMUX_PKG_VERSION="5.1.2"
 TERMUX_PKG_SRCURL=git+https://projects.blender.org/blender/blender
 # Blender does not support 32-bit
 TERMUX_PKG_EXCLUDED_ARCHES="arm, i686"
-TERMUX_PKG_DEPENDS="alembic, boost, brotli, desktop-file-utils, draco, ffmpeg, fftw, freetype, glew, hicolor-icon-theme, imath, libandroid-execinfo, libandroid-posix-semaphore, libblosc, libc++, libepoxy, libharu, libpng, libpugixml, libraw, libsndfile, libspnav, libtbb, libtiff, libwebp, libx11, libxfixes, libxi, libxkbcommon, libyaml-cpp, oidn, openal-soft, opencolorio, openexr, openimageio, openjpeg, openpgl, openshadinglanguage, opensubdiv, openvdb, openxr, potrace, ptex, python, python-numpy, python-pip, shaderc, shared-mime-info, usd, zlib, zstd"
-TERMUX_PKG_BUILD_DEPENDS="boost-headers, git-lfs, mold, sse2neon, vulkan-headers, vulkan-loader-generic"
+TERMUX_PKG_DEPENDS="alembic, boost, brotli, desktop-file-utils, draco, ffmpeg, fftw, freetype, glew, hicolor-icon-theme, imath, libandroid-execinfo, libandroid-posix-semaphore, libblosc, libc++, libceres-solver, libepoxy, libharu, libpng, libpugixml, libraw, libsndfile, libspnav, libtbb, libtiff, libwebp, libx11, libxfixes, libxi, libxkbcommon, libyaml-cpp, oidn, openal-soft, opencolorio, openexr, openimageio, openjpeg, openpgl, openshadinglanguage, opensubdiv, openvdb, openxr, potrace, ptex, python, python-numpy, python-pip, shaderc, shared-mime-info, usd, zlib, zstd"
+TERMUX_PKG_BUILD_DEPENDS="boost-headers, eigen5, git-lfs, mold, sse2neon, vulkan-headers, vulkan-loader-generic"
 TERMUX_PKG_PYTHON_COMMON_BUILD_DEPS="requests"
 # do not enable WITH_CYCLES_NATIVE_ONLY - results in crashing when opening the Edit->Preferences->System menu on some devices
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
@@ -19,6 +18,7 @@ TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 -DPYTHON_VERSION=$TERMUX_PYTHON_VERSION
 -DPYTHON_SITE_PACKAGES=$TERMUX_PREFIX/lib/python$TERMUX_PYTHON_VERSION/site-packages
 -DPYTHON_EXECUTABLE=$TERMUX_PREFIX/bin/python$TERMUX_PYTHON_VERSION
+-DCMAKE_PREFIX_PATH=$TERMUX_PREFIX/opt/eigen5
 -DWITH_PYTHON_INSTALL=OFF
 -DWITH_CYCLES_NATIVE_ONLY=OFF
 -DWITH_INSTALL_PORTABLE=OFF
@@ -26,6 +26,7 @@ TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 -DWITH_PIPEWIRE=OFF
 -DWITH_JACK=OFF
 -DWITH_LINKER_MOLD=ON
+-DWITH_TBB_MALLOC_PROXY=OFF
 "
 TERMUX_PKG_RM_AFTER_INSTALL="
 lib/python*
@@ -44,11 +45,10 @@ termux_step_get_source() {
 
 	local TMP_CHECKOUT=$TERMUX_PKG_CACHEDIR/tmp-checkout
 	local TMP_CHECKOUT_VERSION=$TERMUX_PKG_CACHEDIR/tmp-checkout-version
-	local REAL_VERSION="${TERMUX_PKG_VERSION#*really}"
-	if [ ! -f $TMP_CHECKOUT_VERSION ] || [ "$(cat $TMP_CHECKOUT_VERSION)" != "$REAL_VERSION" ]; then
+	if [ ! -f $TMP_CHECKOUT_VERSION ] || [ "$(cat $TMP_CHECKOUT_VERSION)" != "$TERMUX_PKG_VERSION" ]; then
 		rm -rf $TMP_CHECKOUT
 		git clone --depth 1 \
-			--branch "v${REAL_VERSION#*:}" \
+			--branch "v${TERMUX_PKG_VERSION#*:}" \
 			"${TERMUX_PKG_SRCURL:4}" \
 			$TMP_CHECKOUT
 		pushd "$TMP_CHECKOUT"
@@ -58,7 +58,7 @@ termux_step_get_source() {
 		git lfs fetch network-origin
 		git lfs checkout
 		popd
-		echo "$REAL_VERSION" > $TMP_CHECKOUT_VERSION
+		echo "$TERMUX_PKG_VERSION" > $TMP_CHECKOUT_VERSION
 	fi
 	rm -rf $TERMUX_PKG_SRCDIR
 	cp -Rf $TMP_CHECKOUT $TERMUX_PKG_SRCDIR
@@ -78,8 +78,7 @@ termux_step_pre_configure() {
 	# https://github.com/gentoo/gentoo/blob/89bae30fab90f218bd7a1d56e825819e4576a4c4/media-gfx/blender/blender-4.4.3.ebuild#L312
 	# This is a bit different from how Gentoo does it - rewritten,
 	# and adapted to Termux by keeping non-versioned files out of $TERMUX_PREFIX during termux_step_make_install()
-	BV="${TERMUX_PKG_VERSION#*really}"
-	BV="${BV%.*}"
+	BV="${TERMUX_PKG_VERSION%.*}"
 	BV="${BV#*:}"
 	sed \
 		-e "s|blender-thumbnailer|blender-${BV}-thumbnailer|g" \
