@@ -119,16 +119,6 @@ termux_step_make_install() {
 	# version into package.json, so allow the same value instead of erroring out.
 	npm version --prefix release-standalone --allow-same-version "$VERSION"
 
-	# Map Termux arch to the Node `process.arch` directory name that
-	# @vscode/ripgrep-universal resolves at runtime (bin/<platform>-<arch>/rg).
-	local _node_arch
-	case $TERMUX_ARCH in
-		aarch64) _node_arch=arm64 ;;
-		arm) _node_arch=arm ;;
-		x86_64) _node_arch=x64 ;;
-		*) termux_error_exit "Unsupported arch: $TERMUX_ARCH" ;;
-	esac
-
 	# Remove the pre-built node binary; replaced with the Termux one below.
 	rm ./release-standalone/lib/node
 
@@ -138,6 +128,16 @@ termux_step_make_install() {
 
 	# Replace nodejs
 	ln -sf $TERMUX_PREFIX/opt/nodejs-24/bin/node $TERMUX_PREFIX/lib/code-server/lib/node
+
+	# Map Termux arch to the Node `process.arch` directory name that
+	# @vscode/ripgrep-universal resolves at runtime (bin/<platform>-<arch>/rg).
+	local _node_arch
+	case $TERMUX_ARCH in
+		aarch64) _node_arch=arm64 ;;
+		arm) _node_arch=arm ;;
+		x86_64) _node_arch=x64 ;;
+		*) termux_error_exit "Unsupported arch: $TERMUX_ARCH" ;;
+	esac
 
 	# Replace ripgrep. Upstream switched from @vscode/ripgrep (single bin/rg) to
 	# @vscode/ripgrep-universal (per-platform bin/<platform>-<arch>/rg) in 4.122.x.
