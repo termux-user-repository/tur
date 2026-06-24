@@ -1,0 +1,26 @@
+From 1663d99935f8494f764b1fce46e41b30d5ad1567 Mon Sep 17 00:00:00 2001
+From: Stas Sergeev <stsp@users.sourceforge.net>
+Date: Wed, 24 Jun 2026 21:00:14 +0300
+Subject: [PATCH] stub: fix horrible memory corruption in elf loader
+
+Forgot to subtract va...
+---
+ src/djdev64/stub/elf.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/djdev64/stub/elf.c b/src/djdev64/stub/elf.c
+index 5d7855a7..84a13cdd 100644
+--- a/src/djdev64/stub/elf.c
++++ b/src/djdev64/stub/elf.c
+@@ -141,7 +141,7 @@ static void read_elf_sections(void *handle, char *ptr, uint32_t va, int ifile,
+         if (phdr->p_memsz > phdr->p_filesz) {
+             uint32_t len = phdr->p_memsz - phdr->p_filesz;
+             len += len & 1;  // word-align
+-            memset(ptr + phdr->p_vaddr + phdr->p_filesz, 0, len);
++            memset(ptr + phdr->p_vaddr - va + phdr->p_filesz, 0, len);
+         }
+     }
+ fr:;
+-- 
+2.53.0
+
