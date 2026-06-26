@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="Java development kit and runtime"
 TERMUX_PKG_LICENSE="GPL-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="11.0.31"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://github.com/openjdk/jdk11u/archive/refs/tags/jdk-${TERMUX_PKG_VERSION}-ga.tar.gz
 TERMUX_PKG_SHA256=11c04910fb30a26a807b0847c9cccb8fc72e0b4d0e9db54e31957f27c7f03fd9
 TERMUX_PKG_AUTO_UPDATE=true
