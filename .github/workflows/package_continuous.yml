@@ -35,7 +35,7 @@ on:
 
 jobs:
   prepare:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     env:
       ANDROID_HOME: "/opt/termux/android-sdk"
       NDK: "/opt/termux/android-ndk"
@@ -215,7 +215,7 @@ jobs:
         compression-level: 0
 
   build-1:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs: prepare
     env:
       ANDROID_HOME: "/opt/termux/android-sdk"
@@ -282,7 +282,7 @@ jobs:
         compression-level: 0
 
   build-2:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs: build-1
     env:
       ANDROID_HOME: "/opt/termux/android-sdk"
@@ -349,7 +349,7 @@ jobs:
         compression-level: 0
 
   build-3:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs: build-2
     env:
       ANDROID_HOME: "/opt/termux/android-sdk"
@@ -416,7 +416,7 @@ jobs:
         compression-level: 0
 
   build-4:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs: build-3
     env:
       ANDROID_HOME: "/opt/termux/android-sdk"
@@ -483,7 +483,7 @@ jobs:
         compression-level: 0
 
   build-5:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs: build-4
     env:
       ANDROID_HOME: "/opt/termux/android-sdk"
@@ -550,7 +550,7 @@ jobs:
         compression-level: 0
 
   build-6:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs: build-5
     env:
       ANDROID_HOME: "/opt/termux/android-sdk"
@@ -617,7 +617,7 @@ jobs:
         compression-level: 0
 
   build-7:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs: build-6
     env:
       ANDROID_HOME: "/opt/termux/android-sdk"
@@ -684,7 +684,7 @@ jobs:
         compression-level: 0
 
   build-8:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs: build-7
     env:
       ANDROID_HOME: "/opt/termux/android-sdk"
@@ -751,7 +751,7 @@ jobs:
         compression-level: 0
 
   build-9:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs: build-8
     env:
       ANDROID_HOME: "/opt/termux/android-sdk"
@@ -818,7 +818,7 @@ jobs:
         compression-level: 0
 
   finished-build:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs: build-9
     env:
       ANDROID_HOME: "/opt/termux/android-sdk"
@@ -900,7 +900,7 @@ jobs:
           done
 
   trigeer:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     if: github.event_name != 'pull_request' && github.ref != 'refs/heads/dev' && !startsWith(github.ref, 'refs/heads/dev/')
     needs: finished-build
     steps:
