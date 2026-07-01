@@ -1,0 +1,51 @@
+diff --git a/src/backends/x11.rs b/src/backends/x11.rs
+index b01fb5f..2a30172 100644
+--- a/src/backends/x11.rs
++++ b/src/backends/x11.rs
+@@ -14,7 +14,7 @@ use raw_window_handle::{
+ };
+ use rustix::{
+     fd::{AsFd, BorrowedFd, OwnedFd},
+-    mm, shm as posix_shm,
++    mm,
+ };
+ 
+ use std::{
+@@ -827,37 +827,6 @@ impl<D: ?Sized, W: ?Sized> Drop for X11Impl<D, W> {
+ 
+ /// Create a shared memory identifier.
+ fn create_shm_id() -> io::Result<OwnedFd> {
+-    use posix_shm::{Mode, OFlags};
+-
+-    let mut rng = fastrand::Rng::new();
+-    let mut name = String::with_capacity(23);
+-
+-    // Only try four times; the chances of a collision on this space is astronomically low, so if
+-    // we miss four times in a row we're probably under attack.
+-    for i in 0..4 {
+-        name.clear();
+-        name.push_str("softbuffer-x11-");
+-        name.extend(std::iter::repeat_with(|| rng.alphanumeric()).take(7));
+-
+-        // Try to create the shared memory segment.
+-        match posix_shm::open(
+-            &name,
+-            OFlags::RDWR | OFlags::CREATE | OFlags::EXCL,
+-            Mode::RWXU,
+-        ) {
+-            Ok(id) => {
+-                posix_shm::unlink(&name).ok();
+-                return Ok(id);
+-            }
+-
+-            Err(rustix::io::Errno::EXIST) => {
+-                tracing::warn!("x11: SHM ID collision at {} on try number {}", name, i);
+-            }
+-
+-            Err(e) => return Err(e.into()),
+-        };
+-    }
+-
+     Err(io::Error::new(
+         io::ErrorKind::Other,
+         "failed to generate a non-existent SHM name",
