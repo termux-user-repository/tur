@@ -1,0 +1,306 @@
+Loading custom levels from ~/.freegish/level/
+Index: freegish-1.53+git20101011+dfsg/src/game/editor.c
+===================================================================
+--- freegish-1.53+git20101011+dfsg.orig/src/game/editor.c	2014-02-23 23:06:53.000000000 +0100
++++ freegish-1.53+git20101011+dfsg/src/game/editor.c	2014-02-23 23:19:52.000000000 +0100
+@@ -420,7 +420,7 @@
+       {
+       if (keyboard[SCAN_F7] && !prevkeyboard[SCAN_F7])
+         {
+-        loadlevel(editor.filename);
++        loadlevelcustom(editor.filename);
+         setuplevel();
+         setupgame();
+         }
+Index: freegish-1.53+git20101011+dfsg/src/game/level.c
+===================================================================
+--- freegish-1.53+git20101011+dfsg.orig/src/game/level.c	2014-02-23 23:06:53.000000000 +0100
++++ freegish-1.53+git20101011+dfsg/src/game/level.c	2014-02-23 23:19:52.000000000 +0100
+@@ -286,7 +286,51 @@
+     }
+   }
+ 
++/*
++void printcwd(void)
++{
++    char path [PATH_MAX];
++    getcwd(path,PATH_MAX);
++    printf ("cwd: %s\n", path);
++}
++*/
++
+ void loadlevel(char *filename)
++{
++  int changeddir;
++  int retval;
++
++//  printcwd();
++
++  changeddir=chdir("level");
++  retval = loadlevelprivate(filename, NULL, NULL);
++//  if (changeddir==0)
++//    chdir("..");
++
++//  printf ("loadlevelprivate: %d\n", retval);
++
++  return;
++}
++
++void loadlevelcustom(char *filename)
++{
++  char levelpath [PATH_MAX];
++#ifdef DATAPATH
++  char *datapath=DATAPATH;
++#else
++  char datapath[PATH_MAX];
++
++  getcwd(datapath,PATH_MAX);
++#endif
++
++  chdir(userpath(levelpath,"level",NULL));
++  loadlevelprivate(filename, levelpath, datapath);
++//  chdir(datapath);
++
++  return;
++}
++
++int loadlevelprivate(char *filename, char *levelpath, char *datapath)
+   {
+   int count,count2;
+   int changeddir;
+@@ -296,11 +340,10 @@
+ 
+   x=0x17AF2E03;
+ 
+-  changeddir=chdir("level");
+-
+   if ((fp=fopen(filename,"rb"))!=NULL)
+     {
+     fread2(&version,4,1,fp);
++    printf ( "ver: %i - %s\n", version, filename );
+ 
+     if (version==9)
+       {
+@@ -334,9 +377,7 @@
+       if (level.numofobjects<0 || level.numofobjects>=256)
+         {
+         fclose(fp);
+-        if (changeddir==0)
+-          chdir("..");
+-        return;
++        return 1;
+         }
+       for (count=0;count<level.numofobjects;count++)
+         {
+@@ -357,9 +398,7 @@
+       if (level.numofropes<0 || level.numofropes>=1024)
+         {
+         fclose(fp);
+-        if (changeddir==0)
+-          chdir("..");
+-        return;
++        return 2;
+         }
+       for (count=0;count<level.numofropes;count++)
+         {
+@@ -376,9 +415,7 @@
+         if (texture[count].sizex<0 || texture[count].sizex>=1024)
+           {
+           fclose(fp);
+-          if (changeddir==0)
+-            chdir("..");
+-          return;
++          return 3;
+           }
+         if (texture[count].sizex!=0)
+           {
+@@ -411,9 +448,7 @@
+         if (block[count].numoflines<0 || block[count].numoflines>=64)
+           {
+           fclose(fp);
+-          if (changeddir==0)
+-            chdir("..");
+-          return;
++          return 4;
+           }
+         for (count2=0;count2<block[count].numoflines;count2++)
+           fread2(block[count].line[count2],4,8,fp);
+@@ -450,9 +485,7 @@
+       if (level.numofobjects<0 || level.numofobjects>=256)
+         {
+         fclose(fp);
+-        if (changeddir==0)
+-          chdir("..");
+-        return;
++        return 5;
+         }
+       for (count=0;count<level.numofobjects;count++)
+         {
+@@ -473,9 +506,7 @@
+       if (level.numofropes<0 || level.numofropes>=1024)
+         {
+         fclose(fp);
+-        if (changeddir==0)
+-          chdir("..");
+-        return;
++        return 6;
+         }
+       for (count=0;count<level.numofropes;count++)
+         {
+@@ -492,9 +523,7 @@
+         if (texture[count].sizex<0 || texture[count].sizex>=1024)
+           {
+           fclose(fp);
+-          if (changeddir==0)
+-            chdir("..");
+-          return;
++          return 7;
+           }
+         if (texture[count].sizex!=0)
+           {
+@@ -524,9 +553,7 @@
+         if (block[count].numoflines<0 || block[count].numoflines>=64)
+           {
+           fclose(fp);
+-          if (changeddir==0)
+-            chdir("..");
+-          return;
++          return 8;
+           }
+         for (count2=0;count2<block[count].numoflines;count2++)
+           fread2(block[count].line[count2],4,8,fp);
+@@ -563,9 +590,7 @@
+ 		  if (level.numofobjects<0 || level.numofobjects>=256)
+ 		  {
+ 			  fclose(fp);
+-			  if (changeddir==0)
+-				  chdir("..");
+-			  return;
++			  return 9;
+ 		  }
+ 		  for (count=0;count<level.numofobjects;count++)
+ 		  {
+@@ -586,9 +611,7 @@
+ 		  if (level.numofropes<0 || level.numofropes>=1024)
+ 		  {
+ 			  fclose(fp);
+-			  if (changeddir==0)
+-				  chdir("..");
+-			  return;
++			  return 10;
+ 		  }
+ 		  for (count=0;count<level.numofropes;count++)
+ 		  {
+@@ -611,11 +634,16 @@
+ 				  fread2(filename, 1, filenameLength, fp);
+ 
+ 				  if (debug_level_saveload) printf("\"%s\"...\n", filename);
+-				  if (changeddir==0)
+-					chdir("..");
++//TODO: correct?
++				  if (levelpath == NULL)
++				    chdir("..");
++				  else
++				    chdir (datapath);
+ 				  loadtexture(count, filename,0,GL_CLAMP_TO_EDGE,GL_CLAMP_TO_EDGE,GL_LINEAR,GL_LINEAR);
+-				  if (changeddir==0)
+-					changeddir = chdir("level");
++				  if (levelpath == NULL)
++				    chdir("level");
++				  else
++				    chdir(levelpath);
+ 			  }
+ 			  else
+ 			  {
+@@ -625,9 +653,7 @@
+ 				  {
+ 					  if (debug_level_saveload) printf("Invalid blob!\n");
+ 					  fclose(fp);
+-					  if (changeddir==0)
+-						  chdir("..");
+-					  return;
++					  return 12;
+ 				  }
+ 				  if (texture[count].sizex==0)
+ 				  {
+@@ -664,9 +690,7 @@
+ 			  if (block[count].numoflines<0 || block[count].numoflines>=64)
+ 			  {
+ 				  fclose(fp);
+-				  if (changeddir==0)
+-					  chdir("..");
+-				  return;
++				  return 13;
+ 			  }
+ 			  for (count2=0;count2<block[count].numoflines;count2++)
+ 				  fread2(block[count].line[count2],4,8,fp);
+@@ -681,10 +705,12 @@
+ 		  }
+ 	  }
+ 
+-    fclose(fp);
++	fclose(fp);
+ 
+-	if (changeddir==0)
++	if (levelpath == NULL)
+ 		chdir("..");
++	else
++		chdir(datapath);
+ 
+ 	if (version<7)
+ 		loadleveltextures();
+@@ -700,6 +726,10 @@
+ 	loadtexture(254,"amber2.png",0,GL_CLAMP_TO_EDGE,GL_CLAMP_TO_EDGE,GL_LINEAR,GL_LINEAR);
+ 	loadtexture(255,"amber3.png",0,GL_CLAMP_TO_EDGE,GL_CLAMP_TO_EDGE,GL_LINEAR,GL_LINEAR);
+     }
++    else
++	printf ("can't open %s\n", filename);
++
++    return 0;
+   }
+ 
+ void createlevel(void)
+Index: freegish-1.53+git20101011+dfsg/src/game/level.h
+===================================================================
+--- freegish-1.53+git20101011+dfsg.orig/src/game/level.h	2014-02-23 23:06:53.000000000 +0100
++++ freegish-1.53+git20101011+dfsg/src/game/level.h	2014-02-23 23:19:52.000000000 +0100
+@@ -21,9 +21,13 @@
+ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+ */
+ 
++//void pintcwd (void);
++
+ int lineintersectlevel(float *intersectpoint,float *normal,float *scale,float *startpoint,float *endpoint);
+ void savelevel(char *filename);
+ void loadlevel(char *filename);
++int loadlevelprivate(char *filename, char *levelpath, char *datapath);
++void loadlevelcustom(char *filename);
+ void createlevel(void);
+ void getlevellines(int objectnum);
+ void setuplevellines(int xstart,int ystart,int xend,int yend);
+Index: freegish-1.53+git20101011+dfsg/src/game/mappack.c
+===================================================================
+--- freegish-1.53+git20101011+dfsg.orig/src/game/mappack.c	2014-02-23 23:06:53.000000000 +0100
++++ freegish-1.53+git20101011+dfsg/src/game/mappack.c	2014-02-23 23:19:52.000000000 +0100
+@@ -211,7 +211,7 @@
+ 
+       game.editing=0;
+       game.levelnum=0;
+-      loadlevel(mappack.level[playermappack[playernum].levelnum-1]);
++      loadlevelcustom(mappack.level[playermappack[playernum].levelnum-1]);
+ 
+       mappack.active=1;
+ 
+Index: freegish-1.53+git20101011+dfsg/src/game/custom.c
+===================================================================
+--- freegish-1.53+git20101011+dfsg.orig/src/game/custom.c	2014-02-23 23:23:23.000000000 +0100
++++ freegish-1.53+git20101011+dfsg/src/game/custom.c	2014-02-23 23:24:34.000000000 +0100
+@@ -234,7 +234,7 @@
+       {
+       game.editing=0;
+       game.levelnum=0;
+-      loadlevel(levellist[pagenum+count-1]);
++      loadlevelcustom(levellist[pagenum+count-1]);
+       gameloop();
+ 
+       joymenunum=count;
