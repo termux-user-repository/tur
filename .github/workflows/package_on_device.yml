@@ -273,11 +273,7 @@ jobs:
       env:
         ARCH: ${{ matrix.target_arch }}
       run: |
-        ./common-files/build-termux-docker.sh login -c "ln -sf \${PREFIX}/etc/termux/mirrors/default \${PREFIX}/etc/termux/chosen_mirrors"
-        ./common-files/build-termux-docker.sh login -c "sed -i 's/stable/staging/g' \${PREFIX}/etc/apt/sources.list"
         ./common-files/build-termux-docker.sh login ./scripts/setup-termux.sh
-        ./common-files/build-termux-docker.sh login -c "sed -i 's/stable/staging/g' \${PREFIX}/etc/apt/sources.list"
-        ./common-files/build-termux-docker.sh login -c "apt update"
         declare -a packages=()
         for repo_path in $(jq --raw-output 'del(.pkg_format) | keys | .[]' repo.json); do
           repo=$(jq --raw-output '.["'${repo_path}'"].name' repo.json)
