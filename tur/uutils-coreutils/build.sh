@@ -3,11 +3,30 @@ TERMUX_PKG_DESCRIPTION="Cross-platform Rust rewrite of the GNU coreutils"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="0.9.0"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://github.com/uutils/coreutils/archive/refs/tags/$TERMUX_PKG_VERSION.tar.gz
 TERMUX_PKG_SHA256=dafe0126ee4ed55c7cd60c6b559f43724a74751deed3c1b078f4f510311acab2
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_UPDATE_TAG_TYPE="latest-release-tag"
+
+termux_step_pre_configure() {
+	termux_setup_rust
+
+	cargo vendor
+	find ./vendor \
+		-mindepth 1 -maxdepth 1 -type d \
+		! -wholename ./vendor/rustix \
+		-exec rm -rf '{}' \;
+
+	patch --silent -p1 \
+		-d ./vendor/rustix/ \
+		< "$TERMUX_PKG_BUILDER_DIR"/rustix-auxv-32bit.diff
+
+	echo "" >> Cargo.toml
+	echo '[patch.crates-io]' >> Cargo.toml
+	echo "rustix = { path = \"./vendor/rustix\" }" >> Cargo.toml
+}
 
 termux_step_make() {
 	termux_setup_rust
