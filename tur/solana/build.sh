@@ -4,6 +4,7 @@ TERMUX_PKG_LICENSE="Apache-2.0"
 TERMUX_PKG_LICENSE_FILE="LICENSE"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="3.1.14"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL="https://github.com/anza-xyz/agave/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz"
 TERMUX_PKG_SHA256=b7e84caad554388a04e64c40f535b787fea3d1d24ead1ced4748294e8ed0214d
 TERMUX_PKG_DEPENDS="libandroid-shmem, openssl, protobuf, zlib"
