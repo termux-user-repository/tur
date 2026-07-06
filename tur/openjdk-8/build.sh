@@ -3,8 +3,14 @@ TERMUX_PKG_DESCRIPTION="Java development kit and runtime"
 TERMUX_PKG_LICENSE="GPL-2.0"
 TERMUX_PKG_MAINTAINER="@SrErikCoderx"
 TERMUX_PKG_VERSION="8.0.502"
-TERMUX_PKG_SRCURL=https://github.com/SrErikCoderx/android-openjdk_8-build/archive/refs/tags/v8u502-build5.tar.gz
-TERMUX_PKG_SHA256="8599038a96344f02dc0a365e5d166acdae0113f9b1ed24cc53ca317a30853212"
+TERMUX_PKG_SRCURL=(
+    https://github.com/openjdk/jdk8u/archive/40657cfd8c0ba65a3402b27dab49cca1dbc3696f.tar.gz
+    https://github.com/openjdk/aarch32-port-jdk8u/archive/15ef9f9fc3e1ef61d253fe87500223e240be2052.tar.gz
+)
+TERMUX_PKG_SHA256=(
+    a15f4485a044c6d9cabb2d4f650cd9a2b5f910c4e99ab5351b198978d20e2e4c
+    08aeae2a70f450c3c848ba897bd3d8957ebc188165a0c051f873d4e8f946d515
+)
 TERMUX_PKG_DEPENDS="freetype"
 TERMUX_PKG_RECOMMENDS="fontconfig, ca-certificates-java, resolv-conf"
 TERMUX_PKG_SUGGESTS="cups"
@@ -13,6 +19,17 @@ TERMUX_PKG_HAS_DEBUG=false
 TERMUX_PKG_NO_STATICSPLIT=true
 TERMUX_PKG_HOSTBUILD=true
 TERMUX_PKG_UNDEF_SYMBOLS_FILES="all"
+
+# Override: download tarballs but don't auto-extract.
+# clonejdk.sh handles selective extraction based on TARGET_JDK.
+termux_step_get_source() {
+	if [ -z "${TERMUX_PKG_SRCURL}" ] || [ "${TERMUX_PKG_SKIP_SRC_EXTRACT:-false}" = "true" ] || [ "${TERMUX_PKG_METAPACKAGE:-false}" = "true" ]; then
+		mkdir -p "$TERMUX_PKG_SRCDIR"
+		return
+	fi
+	termux_download_src_archive
+	mkdir -p "$TERMUX_PKG_SRCDIR"
+}
 
 _ensure_patchelf() {
 	[ -x "$TERMUX_PKG_CACHEDIR/patchelf-0.18.0/bin/patchelf" ] && return
@@ -64,8 +81,9 @@ termux_step_pre_configure() {
 		i686)    _arch="x86" ;;
 	esac
 	export TARGET_JDK="$_arch"
+	export TERMUX_PKG_CACHEDIR
 	cd "$TERMUX_PKG_SRCDIR"
-	bash "ci_build_arch_${_arch}.sh"
+	bash "$TERMUX_PKG_BUILDER_DIR/ci_build_arch_${_arch}.sh"
 }
 
 termux_step_configure() {
@@ -106,8 +124,8 @@ termux_step_make_install() {
 	mkdir -p "$jdk_home"
 	cp -r "$TERMUX_PKG_SRCDIR/jdkout/$_jdkout_dir/"* "$jdk_home/"
 
-	if [ -d "$TERMUX_PKG_SRCDIR/jre_override" ]; then
-		cp -Rf "$TERMUX_PKG_SRCDIR/jre_override/lib/"* "$jdk_home/jre/lib/" 2>/dev/null || true
+	if [ -d "$TERMUX_PKG_BUILDER_DIR/jre_override" ]; then
+		cp -Rf "$TERMUX_PKG_BUILDER_DIR/jre_override/lib/"* "$jdk_home/jre/lib/" 2>/dev/null || true
 	fi
 
 	local jdk_lib_arch
