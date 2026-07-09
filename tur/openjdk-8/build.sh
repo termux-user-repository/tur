@@ -250,7 +250,3 @@ termux_pkg_auto_update() {
 
 	termux_pkg_upgrade_version "${new_version}" --skip-version-check
 }
-
-termux_step_create_debscripts() {
-	return 0
-}
