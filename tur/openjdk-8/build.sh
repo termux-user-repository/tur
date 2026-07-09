@@ -2,14 +2,14 @@ TERMUX_PKG_HOMEPAGE=https://openjdk.java.net
 TERMUX_PKG_DESCRIPTION="Java development kit and runtime"
 TERMUX_PKG_LICENSE="GPL-2.0"
 TERMUX_PKG_MAINTAINER="@SrErikCoderx"
-TERMUX_PKG_VERSION="8.0.502"
+TERMUX_PKG_VERSION="8.0.492"
 TERMUX_PKG_SRCURL=(
-    https://github.com/openjdk/jdk8u/archive/40657cfd8c0ba65a3402b27dab49cca1dbc3696f.tar.gz
-    https://github.com/openjdk/aarch32-port-jdk8u/archive/15ef9f9fc3e1ef61d253fe87500223e240be2052.tar.gz
+    https://github.com/openjdk/jdk8u/archive/9cecb1477fff90f2d367a4df0a94cb44510d1ba9.tar.gz
+    https://github.com/openjdk/aarch32-port-jdk8u/archive/5007d4efb98eef1ac2507a9580d7a1754c6797d3.tar.gz
 )
 TERMUX_PKG_SHA256=(
-    a15f4485a044c6d9cabb2d4f650cd9a2b5f910c4e99ab5351b198978d20e2e4c
-    08aeae2a70f450c3c848ba897bd3d8957ebc188165a0c051f873d4e8f946d515
+    8e44d6a9c04f590f3f0c6a6b95a74733ba8c347f4c50993dea7d68e06861ff1e
+    395e1cec295d3b885a65efe75d59d231946b91d885052c52602f96c5c3f0cba5
 )
 TERMUX_PKG_DEPENDS="freetype"
 TERMUX_PKG_RECOMMENDS="fontconfig, ca-certificates-java, resolv-conf"
@@ -19,6 +19,7 @@ TERMUX_PKG_HAS_DEBUG=false
 TERMUX_PKG_NO_STATICSPLIT=true
 TERMUX_PKG_HOSTBUILD=true
 TERMUX_PKG_UNDEF_SYMBOLS_FILES="all"
+TERMUX_PKG_AUTO_UPDATE=true
 
 # Override: download tarballs but don't auto-extract.
 # clonejdk.sh handles selective extraction based on TARGET_JDK.
@@ -27,7 +28,12 @@ termux_step_get_source() {
 		mkdir -p "$TERMUX_PKG_SRCDIR"
 		return
 	fi
-	termux_download_src_archive
+	termux_download "${TERMUX_PKG_SRCURL[0]}" \
+		"$TERMUX_PKG_CACHEDIR/jdk8u.tar.gz" \
+		"${TERMUX_PKG_SHA256[0]}"
+	termux_download "${TERMUX_PKG_SRCURL[1]}" \
+		"$TERMUX_PKG_CACHEDIR/aarch32.tar.gz" \
+		"${TERMUX_PKG_SHA256[1]}"
 	mkdir -p "$TERMUX_PKG_SRCDIR"
 }
 
@@ -194,6 +200,55 @@ termux_step_post_make_install() {
 	if [[ "$failure" = true ]]; then
 		termux_error_exit "openjdk-8.alternatives is not up to date, please update it."
 	fi
+}
+
+termux_pkg_auto_update() {
+	local main_tag arm_tag hash1 hash2 ver_raw new_version
+
+	main_tag=$(git ls-remote --tags https://github.com/openjdk/jdk8u.git \
+		| awk -F/ '{print $NF}' \
+		| grep -E '^jdk8u[0-9]+-ga$' \
+		| sort -t u -k2 -V \
+		| tail -1)
+	[[ -z "$main_tag" ]] && termux_error_exit "no GA tag found for jdk8u"
+
+	ver_raw="${main_tag#jdk8u}"
+	ver_raw="${ver_raw%-ga}"
+
+	arm_tag=$(git ls-remote --tags https://github.com/openjdk/aarch32-port-jdk8u.git \
+		| awk -F/ '{print $NF}' \
+		| grep -E "^jdk8u${ver_raw}-ga-aarch32-[0-9]+\$")
+	[[ -z "$arm_tag" ]] && termux_error_exit "no aarch32-specific tag found for version ${ver_raw}"
+
+	hash1=$(git ls-remote https://github.com/openjdk/jdk8u.git "refs/tags/$main_tag" \
+		| awk '{print $1}' | head -1)
+	hash2=$(git ls-remote https://github.com/openjdk/aarch32-port-jdk8u.git "refs/tags/$arm_tag" \
+		| awk '{print $1}' | head -1)
+	[[ -z "$hash1" ]] && termux_error_exit "no commit for tag in jdk8u"
+	[[ -z "$hash2" ]] && termux_error_exit "no commit for tag in aarch32-port"
+
+	new_version="8.0.${ver_raw}"
+
+	if ! termux_pkg_is_update_needed "${TERMUX_PKG_VERSION#*:}" "${new_version}"; then
+		echo "INFO: No update needed. Already at version '${TERMUX_PKG_VERSION}'."
+		return 0
+	fi
+
+	# Solo tocar SRCURL si realmente vamos a completar el update
+	# (mismo gate que usa termux_pkg_upgrade_version internamente)
+	if [ "${BUILD_PACKAGES:-true}" != "true" ]; then
+		echo "INFO: [dry-run] Would update openjdk-8 to ${new_version} (SRCURL not modified)."
+		return 0
+	fi
+
+	sed -i \
+		"s|https://github.com/openjdk/jdk8u/archive/[a-f0-9]*\.tar\.gz|https://github.com/openjdk/jdk8u/archive/${hash1}.tar.gz|g" \
+		"${TERMUX_PKG_BUILDER_DIR}/build.sh"
+	sed -i \
+		"s|https://github.com/openjdk/aarch32-port-jdk8u/archive/[a-f0-9]*\.tar\.gz|https://github.com/openjdk/aarch32-port-jdk8u/archive/${hash2}.tar.gz|g" \
+		"${TERMUX_PKG_BUILDER_DIR}/build.sh"
+
+	termux_pkg_upgrade_version "${new_version}" --skip-version-check
 }
 
 termux_step_create_debscripts() {

@@ -8,9 +8,9 @@ rm -rf openjdk
 mkdir -p openjdk
 
 if [[ "$TARGET_JDK" == "arm" ]]; then
-  tar xf "$TERMUX_PKG_CACHEDIR"/15ef9f9fc3e1ef61d253fe87500223e240be2052.tar.gz \
+  tar xf "$TERMUX_PKG_CACHEDIR"/aarch32.tar.gz \
     -C openjdk --strip-components=1
 else
-  tar xf "$TERMUX_PKG_CACHEDIR"/40657cfd8c0ba65a3402b27dab49cca1dbc3696f.tar.gz \
+  tar xf "$TERMUX_PKG_CACHEDIR"/jdk8u.tar.gz \
     -C openjdk --strip-components=1
 fi
