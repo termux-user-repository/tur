@@ -2,7 +2,7 @@ TERMUX_PKG_HOMEPAGE=https://github.com/coder/code-server
 TERMUX_PKG_DESCRIPTION="Run VS Code on any machine anywhere and access it in the browser"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="4.126.0"
+TERMUX_PKG_VERSION="4.127.0"
 TERMUX_PKG_SRCURL=git+https://github.com/coder/code-server
 TERMUX_PKG_DEPENDS="libandroid-spawn, libsecret, krb5, nodejs-24, ripgrep"
 TERMUX_PKG_BUILD_IN_SRC=true
@@ -12,11 +12,11 @@ TERMUX_PKG_EXCLUDED_ARCHES="i686"
 TERMUX_PKG_ON_DEVICE_BUILD_NOT_SUPPORTED=true
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_UPDATE_TAG_TYPE="latest-release-tag"
-# The bundled GitHub Copilot extension ships prebuilt binaries for other
-# platforms (x86_64/musl voice, clipboard, ripgrep, etc.) that are never loaded
+# The bundled extensions ship prebuilt binaries for other platforms
+# (x86_64/musl voice, clipboard, ripgrep, etc.) that are never loaded
 # on Android. They reference symbols Termux's ELF check flags as undefined, so
 # acknowledge them instead of failing the build.
-TERMUX_PKG_UNDEF_SYMBOLS_FILES="*/@github/copilot/*"
+TERMUX_PKG_UNDEF_SYMBOLS_FILES=all
 
 termux_step_post_get_source() {
 	local f
