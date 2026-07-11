@@ -88,6 +88,9 @@ termux_step_pre_configure() {
 		CPPFLAGS+=" -D__ANDROID_API__=$(getprop ro.build.version.sdk)"
 	else
 		TERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" --with-build-python=python$_MAJOR_VERSION"
+		# https://github.com/termux-user-repository/tur/pull/2442#issuecomment-4945448006
+		export CPPFLAGS="-I$TERMUX_PREFIX/include $CPPFLAGS"
+		export LDFLAGS="-L$TERMUX_PREFIX/lib $LDFLAGS"
 	fi
 
 	export LIBCRYPT_LIBS="-lcrypt"
