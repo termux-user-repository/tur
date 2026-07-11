@@ -8,6 +8,5 @@ TERMUX_PKG_SHA256=57018797a61ab6befb80a0b76cdf7ca457421ef8cfc030fe41d77a78b017fd
 TERMUX_PKG_PLATFORM_INDEPENDENT=true
 
 termux_step_make_install() {
-    install -Dm755 "$TERMUX_PKG_SRCDIR/katifetch.sh" "$TERMUX_PREFIX/bin/katifetch"
+	install -Dm755 "$TERMUX_PKG_SRCDIR/katifetch.sh" "$TERMUX_PREFIX/bin/katifetch"
 }
-# Final fix
