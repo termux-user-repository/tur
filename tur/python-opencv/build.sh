@@ -1,7 +1,7 @@
 #!/bin/bash
 
 TERMUX_PKG_NAME="python-opencv"
-TERMUX_PKG_VERSION="5.0.0"  
+TERMUX_PKG_VERSION="5.0.0"
 TERMUX_PKG_REVISION=0
 TERMUX_PKG_DESCRIPTION="Open Source Computer Vision Library"
 TERMUX_PKG_HOMEPAGE="https://opencv.org/"
