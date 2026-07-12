@@ -2,10 +2,10 @@ TERMUX_PKG_HOMEPAGE=https://github.com/sentinel-cli/sentinel
 TERMUX_PKG_DESCRIPTION="Statically compiled, zero-dependency Git pre-commit secret detector"
 TERMUX_PKG_LICENSE="AGPL-V3"
 TERMUX_PKG_MAINTAINER="@KhaledHani"
-TERMUX_PKG_VERSION="2.0.4"
+TERMUX_PKG_VERSION="2.0.6"
 TERMUX_PKG_SRCURL=https://github.com/sentinel-cli/sentinel/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz
 # sentinel:ignore
-TERMUX_PKG_SHA256=c824aa65e5dfad88e6898cb9faa630a2d3cd970c49126a6b62af6e70ce87ed30
+TERMUX_PKG_SHA256=afbef5b7f497bfbe8e913f7675f613294f7e9074fa5a9dba8c7da7729476ac8b
 TERMUX_PKG_AUTO_UPDATE=true
 
 termux_step_make() {
