@@ -1,0 +1,3 @@
+TERMUX_SUBPKG_DESCRIPTION="Python $_MAJOR_VERSION for cross build on the host (NOT for Termux)"
+TERMUX_SUBPKG_INCLUDE="opt/python$_MAJOR_VERSION/cross/"
+TERMUX_SUBPKG_DEPEND_ON_PARENT=no
