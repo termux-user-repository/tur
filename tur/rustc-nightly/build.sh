@@ -2,11 +2,11 @@ TERMUX_PKG_HOMEPAGE=https://www.rust-lang.org/
 TERMUX_PKG_DESCRIPTION="Rust compiler and utilities (nightly version)"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="1.98.0-2026.06.24-nightly"
+TERMUX_PKG_VERSION="1.99.0-2026.07.11-nightly"
 _RUST_VERSION=$(echo $TERMUX_PKG_VERSION | cut -d- -f1)
 _DATE="$(echo $TERMUX_PKG_VERSION | cut -d- -f2 | sed 's|\.|-|g')"
 TERMUX_PKG_SRCURL=https://static.rust-lang.org/dist/$_DATE/rustc-nightly-src.tar.xz
-TERMUX_PKG_SHA256=2694d554dfb07af652bae0ec2f2d0cf56ee88beaadeda1dd978f0b06c1919f36
+TERMUX_PKG_SHA256=4ad16c3cb8a8d27813e235caf38ec7154c6df5250cf801aa5c43e4433dab1674
 TERMUX_PKG_DEPENDS="clang, libandroid-execinfo, libc++, libllvm (<< ${TERMUX_LLVM_NEXT_MAJOR_VERSION}), lld, openssl, zlib"
 TERMUX_PKG_BUILD_DEPENDS="wasi-libc"
 TERMUX_PKG_NO_REPLACE_GUESS_SCRIPTS=true
@@ -126,14 +126,6 @@ termux_step_pre_configure() {
 }
 
 termux_step_configure() {
-	# Install llvm-21
-	local _line="deb [arch=amd64] http://apt.llvm.org/noble/ llvm-toolchain-noble-21 main"
-	local _file="/etc/apt/sources.list.d/apt-llvm-org-rustc-nightly.list"
-	__sudo grep -qF -- "$_line" "$_file" || \
-		echo "$_line" | __sudo tee -a "$_file"
-	__sudo apt update
-	__sudo apt install -y llvm-21-dev llvm-21-tools
-
 	# Use nightly toolchain to build nightly toolchain
 	if [[ "${TERMUX_ON_DEVICE_BUILD}" == "false" ]]; then
 		rustup install nightly-$_DATE-x86_64-unknown-linux-gnu
