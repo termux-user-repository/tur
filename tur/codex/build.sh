@@ -3,9 +3,9 @@ TERMUX_PKG_DESCRIPTION="Lightweight coding agent that runs in your terminal"
 TERMUX_PKG_LICENSE="Apache-2.0, MIT"
 TERMUX_PKG_LICENSE_FILE="../LICENSE, ../NOTICE"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="0.122.0"
+TERMUX_PKG_VERSION="0.144.4"
 TERMUX_PKG_SRCURL="https://github.com/openai/codex/archive/refs/tags/rust-v$TERMUX_PKG_VERSION.tar.gz"
-TERMUX_PKG_SHA256=b012a31ce96076dd2a71a3b9606c8a598952140d896a7b12ec07b1471ed130da
+TERMUX_PKG_SHA256=14c173d78f0c22da73e4ca1a205836b525e1dd9fe7db9b4ddea62214b2cc5009
 TERMUX_PKG_DEPENDS="libc++, openssl"
 TERMUX_PKG_BUILD_IN_SRC=true
 # rusty-v8 doesn't support them
