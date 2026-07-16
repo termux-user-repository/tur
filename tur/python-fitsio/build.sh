@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://github.com/esheldon/fitsio
 TERMUX_PKG_DESCRIPTION="A python package for FITS input/output wrapping cfitsio"
 TERMUX_PKG_LICENSE="GPL-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="1.4.1"
+TERMUX_PKG_VERSION="1.4.2"
 TERMUX_PKG_SRCURL="https://github.com/esheldon/fitsio/archive/refs/tags/${TERMUX_PKG_VERSION}.tar.gz"
-TERMUX_PKG_SHA256=cccee0203425d30dac1287c58998f8bb49aea205eb45d4dab338f974bce79084
+TERMUX_PKG_SHA256=3c786902958e3d130d49300f1ac61071e0e66fe1aba91cf19134369efde3c50c
 TERMUX_PKG_DEPENDS="cfitsio, python, python-pip, python-numpy"
 _NUMPY_VERSION=$(. "$TERMUX_SCRIPTDIR/packages/python-numpy/build.sh"; echo "$TERMUX_PKG_VERSION")
 TERMUX_PKG_PYTHON_COMMON_BUILD_DEPS="wheel, 'numpy==$_NUMPY_VERSION'"
