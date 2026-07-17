@@ -1,0 +1,70 @@
+From f6abd9e0ec067cf8a35baf4a33d5bdb74ef70644 Mon Sep 17 00:00:00 2001
+From: Md Arif <111168803+sabamdarif@users.noreply.github.com>
+Date: Fri, 17 Jul 2026 21:27:43 +0530
+Subject: [PATCH] fix UNO bridge RTTI lookup scope on Bionic (aarch64)
+
+The aarch64 UNO C++ bridge resolves exception type_info via a handle
+from dlopen(nullptr). On glibc that handle's dlsym searches the global
+scope and finds the weak _ZTIN3com3sun4star... exception type_info
+symbols exported by dynamically-loaded UNO component libraries. On
+Bionic that handle only searches the main executable's local group, so
+the lookup fails and getRtti() fabricates a fresh type_info at a new
+address.
+
+Because libc++abi matches catch clauses by type_info pointer identity,
+a fabricated type_info matches neither the typed catch (e.g.
+io::IOException) nor its base uno::Exception: this patch uses
+RTLD_DEFAULT (global-scope search) on Android for the lookup, otherwise
+UNO exceptions raised through the bridge escape every typed handler and
+reach std::terminate -> abort.
+
+Still required with the package-wide -Wl,-z,global linking: DF_1_GLOBAL
+puts each library in the global group, which RTLD_DEFAULT searches, but
+the dlopen(nullptr) handle's search set on Bionic never includes
+libraries dlopen'd after startup.
+
+The x86_64 and arm bridges already use RTLD_DEFAULT in their Android
+branches (activated by the __ANDROID__ fixes in 0004); this brings
+aarch64 in line. (Former patch 0040, minus the fabrication-path
+diagnostic fprintf.)
+
+---
+ .../source/cpp_uno/gcc3_linux_aarch64/abi.cxx | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+
+diff --git a/bridges/source/cpp_uno/gcc3_linux_aarch64/abi.cxx b/bridges/source/cpp_uno/gcc3_linux_aarch64/abi.cxx
+index dcd27e95a..d3c7d3783 100644
+--- a/bridges/source/cpp_uno/gcc3_linux_aarch64/abi.cxx
++++ b/bridges/source/cpp_uno/gcc3_linux_aarch64/abi.cxx
+@@ -75,9 +75,28 @@ OUString toUnoName(char const * name) {
+ 
+ class Rtti {
+ public:
++#if defined(__ANDROID__)
++    // On Bionic, the handle returned by dlopen(nullptr) has a dlsym search
++    // scope limited to the main executable's local group (soffice.bin plus its
++    // DT_NEEDED). It does NOT see the weak _ZTIN3com3sun4star... exception
++    // type_info symbols exported by the dynamically-loaded UNO component
++    // libraries, so getRtti() below would fail its dlsym and fabricate a fresh
++    // type_info at a new address. Because libc++abi matches catch clauses by
++    // type_info pointer identity, a fabricated type_info matches neither the
++    // typed catch (e.g. css::io::IOException) nor its base css::uno::Exception,
++    // so UNO exceptions escape every typed handler and reach std::terminate.
++    //
++    // RTLD_DEFAULT performs a global-scope search (main exe + all RTLD_GLOBAL
++    // objects); combined with forcing RTLD_GLOBAL on component loads, this
++    // resolves the *real* type_info and restores correct catch matching.
++    Rtti(): app_(RTLD_DEFAULT) {}
++
++    ~Rtti() {}
++#else
+     Rtti(): app_(dlopen(nullptr, RTLD_LAZY)) {}
+ 
+     ~Rtti() { dlclose(app_); }
++#endif
+ 
+     std::type_info * getRtti(typelib_TypeDescription const & type);
+ 
+-- 
+2.55.0
+

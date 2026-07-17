@@ -1,0 +1,42 @@
+diff --git a/sal/osl/unx/security.cxx b/sal/osl/unx/security.cxx
+index 733aa0dfc..f83b09794 100644
+--- a/sal/osl/unx/security.cxx
++++ b/sal/osl/unx/security.cxx
+@@ -168,8 +168,37 @@ oslSecurity SAL_CALL osl_getCurrentSecurity()
+             }
+             [[fallthrough]];
+         default:
++#if defined(__ANDROID__)
++        {
++            // using environment variables (Termux sets $HOME and $USER)
++            char * buffer = p->m_buffer;
++            assert(n >= 256);
++            const char* user = getenv("USER");
++            if (!user) user = "termux";
++            const char* home = getenv("HOME");
++            if (!home) home = "@TERMUX_HOME@";
++            strcpy(buffer, user);
++            p->m_pPasswd.pw_name = buffer;
++            buffer += strlen(buffer) + 1;
++            strcpy(buffer, "*");
++            p->m_pPasswd.pw_passwd = buffer;
++            buffer += strlen(buffer) + 1;
++            p->m_pPasswd.pw_uid = getuid();
++            p->m_pPasswd.pw_gid = getgid();
++            strcpy(buffer, "Termux User");
++            p->m_pPasswd.pw_gecos = buffer;
++            buffer += strlen(buffer) + 1;
++            strcpy(buffer, home);
++            p->m_pPasswd.pw_dir = buffer;
++            buffer += strlen(buffer) + 1;
++            strcpy(buffer, "");
++            p->m_pPasswd.pw_shell = buffer;
++            return p;
++        }
++#else
+             deleteSecurityImpl(p);
+             return nullptr;
++#endif
+         }
+ #endif
+     }

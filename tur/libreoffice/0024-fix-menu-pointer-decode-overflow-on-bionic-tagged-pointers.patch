@@ -1,0 +1,45 @@
+From 4597e0337824a24103a20efd2d12920af36c4faf Mon Sep 17 00:00:00 2001
+From: Md Arif <111168803+sabamdarif@users.noreply.github.com>
+Date: Fri, 17 Jul 2026 13:35:51 +0530
+Subject: [PATCH] 
+ 0046-fix-menu-pointer-decode-overflow-on-bionic-tagged-pointers
+
+GetCommandForItem encodes the GtkSalMenu* into the GAction name as an
+unsigned decimal (OString::number(sal_uIntPtr)), but decode_command
+parsed it back with o3tl::toInt64, whose rtl_str_toInt64_WithLength
+clamps any value above INT64_MAX to 0. Bionic heap pointers carry the
+memory tag in the top byte (0xb400...), so bit 63 is always set, the
+parse returned 0, and the first click on any menubar entry dereferenced
+a null GtkSalMenu in GtkSalMenu::Activate -> SIGSEGV at offset 0xa8
+(ldr x20, [x0, #168], the mpVCLMenu load).
+
+Parse the pointer back with toUInt64 instead. Root cause verified on
+device by LD_PRELOADing a shim rtl_str_toInt64_WithLength that keeps
+the wrapped unsigned bit pattern: File menu opens and dispatches with
+the shim, crashes without it. Never triggers on glibc/Linux only
+because untagged userspace pointers stay below 2^63.
+---
+ vcl/unx/gtk3/gtksalmenu.cxx | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/vcl/unx/gtk3/gtksalmenu.cxx b/vcl/unx/gtk3/gtksalmenu.cxx
+index 56774b6ad..edc4dc20a 100644
+--- a/vcl/unx/gtk3/gtksalmenu.cxx
++++ b/vcl/unx/gtk3/gtksalmenu.cxx
+@@ -81,7 +81,12 @@ namespace
+         std::string_view sGtkSalMenu = o3tl::getToken(sCommand, 0, '-', nIndex);
+         std::string_view sItemId = o3tl::getToken(sCommand, 0, '-', nIndex);
+ 
+-        GtkSalMenu* pSalSubMenu = reinterpret_cast<GtkSalMenu*>(o3tl::toInt64(sGtkSalMenu));
++        // The pointer is encoded unsigned (OString::number(sal_uIntPtr) in
++        // GetCommandForItem). o3tl::toInt64 returns 0 on values > INT64_MAX,
++        // which Bionic's tagged heap pointers (0xb4...) always are, so parse
++        // it back unsigned or every menu activation dereferences null.
++        GtkSalMenu* pSalSubMenu = reinterpret_cast<GtkSalMenu*>(
++            static_cast<sal_uIntPtr>(OString(sGtkSalMenu).toUInt64()));
+ 
+         assert(sWindow == "window" && pSalSubMenu);
+         (void) sWindow;
+-- 
+2.55.0
+

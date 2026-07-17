@@ -1,0 +1,12 @@
+diff --git a/external/libeot/ExternalProject_libeot.mk b/external/libeot/ExternalProject_libeot.mk
+index b60ac86d5..006abec1e 100644
+--- a/external/libeot/ExternalProject_libeot.mk
++++ b/external/libeot/ExternalProject_libeot.mk
+@@ -19,6 +19,7 @@ $(call gb_ExternalProject_get_state_target,libeot,build) :
+ 		touch Makefile.in \
+ 		&& export PKG_CONFIG="" \
+ 		&& $(gb_RUN_CONFIGURE) ./configure \
++			cross_compiling=yes \
+ 			--with-pic \
+ 			--enable-static \
+ 			--disable-shared \
