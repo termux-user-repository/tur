@@ -2,10 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://nodejs.org/
 TERMUX_PKG_DESCRIPTION="Open Source, cross-platform JavaScript runtime environment"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION=24.17.0
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_VERSION=24.18.0
 TERMUX_PKG_SRCURL=https://nodejs.org/dist/v${TERMUX_PKG_VERSION}/node-v${TERMUX_PKG_VERSION}.tar.xz
-TERMUX_PKG_SHA256=a7ab562ed2369a29c68b72fa00e3103bcdfe37063dff799c6acc8e404e275fcd
+TERMUX_PKG_SHA256=e94afde24db08e0c564ee7110a2d5aab51ee0059382c9fd8233c54eec47b28f9
 # Note that we do not use a shared libuv to avoid an issue with the Android
 # linker, which does not use symbols of linked shared libraries when resolving
 # symbols on dlopen(). See https://github.com/termux/termux-packages/issues/462.
@@ -34,35 +33,17 @@ termux_step_host_build() {
 	# stable releases. Also Ubuntu's LLVM toolchain is too old in comparison to
 	# what Google uses.
 	######
-
-	# The LLVM_COMMIT, as well as the tarball of the LLVM build by Google in use
-	# can be found in deps/v8/DEPS file,
-	#
-	# For instance, if the deps/v8/DEPS file contains:
-	#
-	#   'third_party/llvm-build/Release+Asserts': {
-	#  'dep_type': 'gcs',
-	#  'bucket': 'chromium-browser-clang',
-	#  'objects': [
-	#    {
-	#      'object_name': 'Linux_x64/clang-llvmorg-21-init-5118-g52cd27e6-5.tar.xz',
-	#      'sha256sum': '790fcc5b04e96882e8227ba7994161ab945c0e096057fc165a0f71e32a7cb061',
-	#      'size_bytes': 54517328,
-	#      'generation': 1742541959624765,
-	#      'condition': 'host_os == "linux"',
-	#    },
-	#
-	# then the LLVM_COMMIT is 52cd27e6. The g before the hash is not part of the
-	# hash, weird that they decided to include a 'g' for no reason, but 'g' isn't
-	# a part of the hexadecimal characters so anyways.. Also v8 project only
-	# stores the short-hash in the DEPS file, but we are using full hash here for
-	# clarity. The full hash can be obtained by having a full checkout of the
-	# llvm-project locally and then running `git log --format=%H -n 1` in the
-	# llvm-project directory.
-	#
-	# Also the sha256sum is the hash of the tarball, which we can directly use
-	local LLVM_TAR="clang-llvmorg-21-init-5118-g52cd27e6-5.tar.xz"
-	local LLVM_TAR_HASH=790fcc5b04e96882e8227ba7994161ab945c0e096057fc165a0f71e32a7cb061
+	local LLVM_TAR=$(python -c "Var = str
+Str = str
+exec(open('$TERMUX_PKG_SRCDIR/deps/v8/DEPS').read())
+print(deps['third_party/llvm-build/Release+Asserts']['objects'][0]['object_name'])
+")
+	LLVM_TAR=$(basename $LLVM_TAR)
+	local LLVM_TAR_HASH=$(python -c "Var = str
+Str = str
+exec(open('$TERMUX_PKG_SRCDIR/deps/v8//DEPS').read())
+print(deps['third_party/llvm-build/Release+Asserts']['objects'][0]['sha256sum'])
+")
 	cd $TERMUX_PKG_HOSTBUILD_DIR
 	mkdir llvm-project-build
 	termux_download \
@@ -88,6 +69,12 @@ termux_step_configure() {
 		DEST_CPU="x64"
 	else
 		termux_error_exit "Unsupported arch '$TERMUX_ARCH'"
+	fi
+
+	# aligned_alloc is used in cctest binary
+	if [[ "$TERMUX_PKG_API_LEVEL" -lt 28 ]]; then
+		CFLAGS+=" -Daligned_alloc=memalign"
+		CXXFLAGS+=" -Daligned_alloc=memalign"
 	fi
 
 	export GYP_DEFINES="host_os=linux"
