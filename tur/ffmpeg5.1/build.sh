@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://ffmpeg.org
 TERMUX_PKG_DESCRIPTION="Tools and libraries to manipulate a wide range of multimedia formats and protocols"
 TERMUX_PKG_LICENSE="GPL-3.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="5.1.9"
+TERMUX_PKG_VERSION="5.1.10"
 TERMUX_PKG_SRCURL="https://www.ffmpeg.org/releases/ffmpeg-${TERMUX_PKG_VERSION}.tar.xz"
-TERMUX_PKG_SHA256=d9b593bb2ba93d4b50f74177e0cdcd41747e708596367deed0c30348a71dd176
+TERMUX_PKG_SHA256=392306d6fc45dab0e9e0ea55381e071842e83a2fb31d320aeda40477a7766293
 TERMUX_PKG_DEPENDS="freetype, game-music-emu, libaom, libandroid-glob, libass, libbluray, libbz2, libdav1d, libgnutls, libiconv, liblzma, libmp3lame, libopus, librav1e, libsoxr, libtheora, libvorbis, libvpx, libvidstab, libwebp, libx264, libx265, libxml2, xvidcore, zlib"
 TERMUX_PKG_CONFLICTS="libav"
 TERMUX_PKG_BREAKS="ffmpeg-dev"
@@ -76,6 +76,7 @@ termux_step_configure() {
 		--target-os=android \
 		--extra-libs="-landroid-glob" \
 		--disable-vulkan \
+		--disable-doc \
 		$_EXTRA_CONFIGURE_FLAGS
 }
 
