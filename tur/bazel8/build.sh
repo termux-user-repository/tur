@@ -1,5 +1,5 @@
 TERMUX_PKG_HOMEPAGE=https://bazel.build/
-TERMUX_PKG_DESCRIPTION="Correct, reproducible, and fast builds for everyone"
+TERMUX_PKG_DESCRIPTION="Correct, reproducible, and fast builds for everyone (Version 8)"
 TERMUX_PKG_LICENSE="Apache-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="8.7.0"
@@ -185,7 +185,5 @@ termux_step_make() {
 }
 
 termux_step_make_install() {
-	install -Dm700 ./scripts/packages/bazel.sh $TERMUX_PREFIX/bin/bazel
-	install -Dm700 ./bazel-bin/src/bazel_nojdk $TERMUX_PREFIX/bin/bazel-real
 	install -Dm700 ./bazel-bin/src/bazel_nojdk $TERMUX_PREFIX/bin/bazel-$TERMUX_PKG_VERSION
 }
