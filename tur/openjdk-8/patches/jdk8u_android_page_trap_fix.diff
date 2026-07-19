@@ -1,0 +1,17 @@
+diff --git a/hotspot/src/share/vm/runtime/os.cpp b/hotspot/src/share/vm/runtime/os.cpp
+index 96eed036..49a2ee1f 100644
+--- a/hotspot/src/share/vm/runtime/os.cpp
++++ b/hotspot/src/share/vm/runtime/os.cpp
+@@ -1329,7 +1329,11 @@ void os::block_on_serialize_page_trap() {
+   // Generally, it is unsafe to manipulate locks in signal handlers, but in
+   // this case, it's OK as the signal is synchronous and we know precisely when
+   // it can occur.
+-  Thread::muxAcquire(&SerializePageLock, "set_memory_serialize_page");
++  ParkEvent *ev = NULL;
++  if(ThreadLocalStorage::is_initialized()) {
++    ev = ThreadLocalStorage::get_thread_slow()->_MuxEvent;
++  }
++  Thread::muxAcquireW(&SerializePageLock, ev);
+   Thread::muxRelease(&SerializePageLock);
+ }
+ 

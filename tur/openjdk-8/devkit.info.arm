@@ -1,0 +1,3 @@
+DEVKIT_NAME="Android ARM"
+DEVKIT_TOOLCHAIN_PATH="$DEVKIT_ROOT/arm-linux-androideabi/bin"
+DEVKIT_SYSROOT="$DEVKIT_ROOT/sysroot"

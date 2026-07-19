@@ -1,0 +1,56 @@
+diff --git a/hotspot/src/os/linux/vm/os_linux.cpp b/hotspot/src/os/linux/vm/os_linux.cpp
+index d3a9f240..410693bf 100644
+--- a/hotspot/src/os/linux/vm/os_linux.cpp
++++ b/hotspot/src/os/linux/vm/os_linux.cpp
+@@ -95,13 +95,17 @@
+ # include <semaphore.h>
+ # include <fcntl.h>
+ # include <string.h>
+-# include <syscall.h>
+ # include <sys/sysinfo.h>
+-#ifndef __UCLIBC__
++#if !defined(__UCLIBC__) && !defined(__ANDROID__)
+ # include <gnu/libc-version.h>
+ #endif
+ # include <sys/ipc.h>
++#if !defined(__ANDROID__)
+ # include <sys/shm.h>
++# include <syscall.h>
++#else
++# include <sys/syscall.h>
++#endif
+ # include <link.h>
+ # include <stdint.h>
+ # include <inttypes.h>
+@@ -3046,7 +3050,7 @@ extern "C" JNIEXPORT int fork1() { return fork(); }
+ // Handle request to load libnuma symbol version 1.1 (API v1). If it fails
+ // load symbol from base version instead.
+ void* os::Linux::libnuma_dlsym(void* handle, const char *name) {
+-#ifndef __UCLIBC__
++#if !defined(__UCLIBC__) && !defined(__ANDROID__)
+   void *f = dlvsym(handle, name, "libnuma_1.1");
+   if (f == NULL) {
+     f = dlsym(handle, name);
+@@ -5976,7 +5980,7 @@ bool os::is_thread_cpu_time_supported() {
+ // Linux doesn't yet have a (official) notion of processor sets,
+ // so just return the system wide load average.
+ int os::loadavg(double loadavg[], int nelem) {
+-#ifndef __UCLIBC__
++#if !defined(__UCLIBC__) && !defined(__ANDROID__)
+   return ::getloadavg(loadavg, nelem);
+ #else
+   return -1;
+diff --git a/hotspot/src/os_cpu/linux_aarch32/vm/os_linux_aarch32.cpp b/hotspot/src/os_cpu/linux_aarch32/vm/os_linux_aarch32.cpp
+index 2883fc17..0292a17f 100644
+--- a/hotspot/src/os_cpu/linux_aarch32/vm/os_linux_aarch32.cpp
++++ b/hotspot/src/os_cpu/linux_aarch32/vm/os_linux_aarch32.cpp
+@@ -75,7 +75,9 @@
+ # include <pwd.h>
+ # include <poll.h>
+ # include <ucontext.h>
++#ifndef __ANDROID__
+ # include <fpu_control.h>
++#endif
+ 
+ #define REG_FP 29
+ #define SPELL_REG_SP "sp"
