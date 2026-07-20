@@ -1,0 +1,68 @@
+--- a/pkg/driver/qemu/qemu.go
++++ b/pkg/driver/qemu/qemu.go
+@@ -402,7 +402,7 @@ func audioDevice() string {
+ 	switch runtime.GOOS {
+ 	case "darwin":
+ 		return "coreaudio"
+-	case "linux":
++	case "linux", "android":
+ 		return "pa" // pulseaudio
+ 	case "windows":
+ 		return "dsound"
+@@ -570,8 +570,14 @@ func Cmdline(ctx context.Context, cfg Config) (exe string, args []string, err er
+ 			args = appendArgsIfNoConflict(args, "-machine", "q35,accel="+accel)
+ 		}
+ 	case limatype.AARCH64:
+-		machine := "virt,accel=" + accel
+-		args = appendArgsIfNoConflict(args, "-machine", machine)
++		switch accel {
++		case "tcg":
++			args = appendArgsIfNoConflict(args, "-machine", "virt")
++			args = appendArgsIfNoConflict(args, "-accel", "tcg,thread=multi,tb-size=512")
++		default:
++			machine := "virt,accel=" + accel
++			args = appendArgsIfNoConflict(args, "-machine", machine)
++		}
+ 	case limatype.RISCV64:
+ 		// https://github.com/tianocore/edk2/blob/edk2-stable202408/OvmfPkg/RiscVVirt/README.md#test
+ 		// > Note: the `acpi=off` machine property is specified because Linux guest
+@@ -1102,7 +1108,7 @@ func Accel(arch limatype.Arch) string {
+ 		case "darwin":
+ 			// TODO: return "tcg" if HVF is not available
+ 			return "hvf"
+-		case "linux":
++		case "linux", "android":
+ 			if _, err := os.Stat("/dev/kvm"); err != nil {
+ 				logrus.WithError(err).Warn("/dev/kvm is not available. Disabling KVM. Expect very poor performance.")
+ 				return "tcg"
+@@ -1286,7 +1292,7 @@ func hasHostCPU() bool {
+ 			return false
+ 		}
+ 		return true
+-	case "linux":
++	case "linux", "android":
+ 		return true
+ 	case "netbsd", "windows":
+ 		return false
+--- a/pkg/instance/start.go
++++ b/pkg/instance/start.go
+@@ -38,7 +38,7 @@ import (
+ 
+ // DefaultWatchHostAgentEventsTimeout is the duration to wait for the instance
+ // to be running before timing out.
+-const DefaultWatchHostAgentEventsTimeout = 10 * time.Minute
++const DefaultWatchHostAgentEventsTimeout = 1000 * time.Minute
+ 
+ type Prepared struct {
+ 	Driver              driver.Driver
+--- a/pkg/sshutil/sshutil.go
++++ b/pkg/sshutil/sshutil.go
+@@ -486,7 +486,7 @@ func detectValidPublicKey(content string) bool {
+ 
+ func detectAESAcceleration() bool {
+ 	if !cpu.Initialized {
+-		if runtime.GOOS == "linux" && runtime.GOARCH == "arm64" {
++		if (runtime.GOOS == "linux" || runtime.GOOS == "android") && runtime.GOARCH == "arm64" {
+ 			// cpu.Initialized seems to always be false, even when the cpu.ARM64 struct is filled out
+ 			// it is only being set by readARM64Registers, but not by readHWCAP or readLinuxProcCPUInfo
+ 			return cpu.ARM64.HasAES
