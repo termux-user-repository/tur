@@ -3,7 +3,7 @@ TERMUX_PKG_DESCRIPTION="Correct, reproducible, and fast builds for everyone"
 TERMUX_PKG_LICENSE="Apache-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="8.7.0"
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_REVISION=2
 TERMUX_PKG_SRCURL=https://github.com/bazelbuild/bazel/releases/download/$TERMUX_PKG_VERSION/bazel-$TERMUX_PKG_VERSION-dist.zip
 TERMUX_PKG_SHA256=75ed5aa189fd687e6e7c289ad86a3851844965a6c1479b7a5ce9b846a6e461bc
 TERMUX_PKG_DEPENDS="libarchive, openjdk-21, patch, unzip, zip"
@@ -187,5 +187,4 @@ termux_step_make() {
 termux_step_make_install() {
 	install -Dm700 ./scripts/packages/bazel.sh $TERMUX_PREFIX/bin/bazel
 	install -Dm700 ./bazel-bin/src/bazel_nojdk $TERMUX_PREFIX/bin/bazel-real
-	install -Dm700 ./bazel-bin/src/bazel_nojdk $TERMUX_PREFIX/bin/bazel-$TERMUX_PKG_VERSION
 }
