@@ -1,0 +1,24 @@
+From: Markus Koschany <apo@debian.org>
+Date: Fri, 20 Nov 2015 23:11:48 +0100
+Subject: desktop file
+
+---
+ tuxfootball.desktop.in | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/tuxfootball.desktop.in b/tuxfootball.desktop.in
+index bad1a66..eab45fc 100644
+--- a/tuxfootball.desktop.in
++++ b/tuxfootball.desktop.in
+@@ -1,4 +1,3 @@
+-#!/usr/bin/env xdg-open
+ [Desktop Entry]
+ Name=Tux Football
+ Comment=A fun arcade-style 2D football game, very reminsicent of Sensible Soccer and Kick Off
+@@ -7,4 +6,5 @@ Exec=tuxfootball
+ Terminal=false
+ Icon=tuxfootball
+ Type=Application
+-Categories=Game;ArcadeGame;
++Categories=Game;SportsGame;
++Keywords=soccer;football;sport;
