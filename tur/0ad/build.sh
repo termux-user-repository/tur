@@ -2,9 +2,10 @@ TERMUX_PKG_HOMEPAGE=https://play0ad.com/
 TERMUX_PKG_DESCRIPTION="Free, open-source, historical RTS game of ancient warfare"
 TERMUX_PKG_LICENSE="GPL-2.0"
 TERMUX_PKG_MAINTAINER="@IntinteDAO"
-TERMUX_PKG_VERSION=0.28.0
-TERMUX_PKG_SRCURL=(https://releases.wildfiregames.com/0ad-${TERMUX_PKG_VERSION}-unix-build.tar.xz
-                  https://releases.wildfiregames.com/0ad-${TERMUX_PKG_VERSION}-unix-data.tar.xz)
+TERMUX_PKG_VERSION="0.28.0"
+TERMUX_PKG_REVISION=1
+TERMUX_PKG_SRCURL=("https://releases.wildfiregames.com/0ad-${TERMUX_PKG_VERSION}-unix-build.tar.xz"
+                  "https://releases.wildfiregames.com/0ad-${TERMUX_PKG_VERSION}-unix-data.tar.xz")
 TERMUX_PKG_SHA256=(27e217755ef76a922fe58dbf593d96e54b6ed2375d23f548c35619aa6bd5a42a
                    e844b30ae2102c47e0a4fff2f0e0ef05ba0cebb1890aa72276fa12457c39526f)
 TERMUX_PKG_DEPENDS="0ad-data, boost, curl, glew, libglvnd, libicu, libnspr, libxml2, miniupnpc, openal-soft, sdl2, zlib, libenet, libvorbis, libogg, libpng, libsodium, fmt, gloox"
