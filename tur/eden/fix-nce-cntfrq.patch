@@ -1,0 +1,47 @@
+diff --git a/src/core/arm/nce/patcher.cpp b/src/core/arm/nce/patcher.cpp
+index ea77166..7633ad3 100644
+--- a/src/core/arm/nce/patcher.cpp
++++ b/src/core/arm/nce/patcher.cpp
+@@ -145,7 +145,14 @@ bool Patcher::PatchText(std::span<const u8> program_image, const Kernel::CodeSet
+ 
+         // MRS Xn, CNTFRQ_EL0
+         if (auto mrs = MRS{inst}; mrs.Verify() && mrs.GetSystemReg() == CntfrqEl0) {
+-            UNREACHABLE();
++            bool pre_buffer = false;
++            auto ret = AddRelocations(pre_buffer);
++            if (pre_buffer) {
++                WriteCntfrqHandler(ret, oaknut::XReg{static_cast<int>(mrs.GetRt())}, c_pre);
++            } else {
++                WriteCntfrqHandler(ret, oaknut::XReg{static_cast<int>(mrs.GetRt())}, c);
++            }
++            continue;
+         }
+ 
+         // MSR TPIDR_EL0, Xn
+@@ -621,6 +628,14 @@ void Patcher::WriteCntpctHandler(ModuleDestLabel module_dest, oaknut::XReg dest_
+     cg.dx(raw_factor[1]);
+ }
+ 
++void Patcher::WriteCntfrqHandler(ModuleDestLabel module_dest, oaknut::XReg dest_reg, oaknut::VectorCodeGenerator& cg) {
++    cg.MOV(dest_reg, 19200000);
++    if (&cg == &c_pre)
++        this->BranchToModulePre(module_dest);
++    else
++        this->BranchToModule(module_dest);
++}
++
+ void Patcher::LockContext(oaknut::VectorCodeGenerator& cg) {
+     oaknut::Label retry;
+ 
+diff --git a/src/core/arm/nce/patcher.h b/src/core/arm/nce/patcher.h
+index 980a0c8..7beb913 100644
+--- a/src/core/arm/nce/patcher.h
++++ b/src/core/arm/nce/patcher.h
+@@ -81,6 +81,7 @@ private:
+     void WriteMrsHandler(ModuleDestLabel module_dest, oaknut::XReg dest_reg, oaknut::SystemReg src_reg, oaknut::VectorCodeGenerator& code);
+     void WriteMsrHandler(ModuleDestLabel module_dest, oaknut::XReg src_reg, oaknut::VectorCodeGenerator& code);
+     void WriteCntpctHandler(ModuleDestLabel module_dest, oaknut::XReg dest_reg, oaknut::VectorCodeGenerator& code);
++    void WriteCntfrqHandler(ModuleDestLabel module_dest, oaknut::XReg dest_reg, oaknut::VectorCodeGenerator& code);
+ 
+     // Convenience wrappers using default code generator
+     void WriteLoadContext() { WriteLoadContext(c); }
