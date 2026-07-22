@@ -1,0 +1,3 @@
+TERMUX_SUBPKG_DESCRIPTION="Video cutscenes for Warzone 2100"
+TERMUX_SUBPKG_INCLUDE="share/warzone2100/sequences.wz"
+TERMUX_SUBPKG_PLATFORM_INDEPENDENT=true
