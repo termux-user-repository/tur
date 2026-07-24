@@ -1,0 +1,62 @@
+diff --git a/src/video_core/vulkan_common/vulkan.h b/src/video_core/vulkan_common/vulkan.h
+index 2609e8d..47931bc 100644
+--- a/src/video_core/vulkan_common/vulkan.h
++++ b/src/video_core/vulkan_common/vulkan.h
+@@ -7,12 +7,12 @@
+ #pragma once
+ 
+ #define VK_NO_PROTOTYPES
+-#ifdef _WIN32
++#if defined(YUZU_ANDROID) || defined(EDEN_ANDROID)
++#define VK_USE_PLATFORM_ANDROID_KHR
++#elif defined(_WIN32)
+ #define VK_USE_PLATFORM_WIN32_KHR
+ #elif defined(__APPLE__)
+ #define VK_USE_PLATFORM_METAL_EXT
+-#elif defined(__ANDROID__)
+-#define VK_USE_PLATFORM_ANDROID_KHR
+ #elif defined(__HAIKU__)
+ #define VK_USE_PLATFORM_XCB_KHR
+ #else
+diff --git a/src/video_core/vulkan_common/vulkan_instance.cpp b/src/video_core/vulkan_common/vulkan_instance.cpp
+index 3983422..3370ead 100644
+--- a/src/video_core/vulkan_common/vulkan_instance.cpp
++++ b/src/video_core/vulkan_common/vulkan_instance.cpp
+@@ -43,18 +43,18 @@ namespace {
+     switch (window_type) {
+     case Core::Frontend::WindowSystemType::Headless:
+         break;
+-#ifdef _WIN32
+-    case Core::Frontend::WindowSystemType::Windows:
++#if defined(YUZU_ANDROID) || defined(EDEN_ANDROID)
++    case Core::Frontend::WindowSystemType::Android:
++        extensions.push_back(VK_KHR_ANDROID_SURFACE_EXTENSION_NAME);
++        break;
++#elif defined(_WIN32)
++    case Core::Frontend::WindowSystemType::Win32:
+         extensions.push_back(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
+         break;
+ #elif defined(__APPLE__)
+     case Core::Frontend::WindowSystemType::Cocoa:
+         extensions.push_back(VK_EXT_METAL_SURFACE_EXTENSION_NAME);
+         break;
+-#elif defined(__ANDROID__)
+-    case Core::Frontend::WindowSystemType::Android:
+-        extensions.push_back(VK_KHR_ANDROID_SURFACE_EXTENSION_NAME);
+-        break;
+ #elif defined(__HAIKU__)
+     case Core::Frontend::WindowSystemType::Xcb:
+         extensions.push_back(VK_KHR_XCB_SURFACE_EXTENSION_NAME);
+diff --git a/src/video_core/vulkan_common/vulkan_surface.cpp b/src/video_core/vulkan_common/vulkan_surface.cpp
+index 8b9dcb4..d949aea 100644
+--- a/src/video_core/vulkan_common/vulkan_surface.cpp
++++ b/src/video_core/vulkan_common/vulkan_surface.cpp
+@@ -45,7 +45,7 @@ vk::SurfaceKHR CreateSurface(
+             throw vk::Exception(VK_ERROR_INITIALIZATION_FAILED);
+         }
+     }
+-#elif defined(__ANDROID__)
++#elif defined(YUZU_ANDROID) || defined(EDEN_ANDROID)
+     if (window_info.type == Core::Frontend::WindowSystemType::Android) {
+         const VkAndroidSurfaceCreateInfoKHR android_ci{
+             VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR, nullptr, 0,
