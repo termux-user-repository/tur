@@ -1,0 +1,20 @@
+diff --git a/jdk/src/solaris/native/java/net/net_util_md.c b/jdk/src/solaris/native/java/net/net_util_md.c
+index bd0bd8c2c9..f6273dff47 100644
+--- a/jdk/src/solaris/native/java/net/net_util_md.c
++++ b/jdk/src/solaris/native/java/net/net_util_md.c
+@@ -319,6 +319,7 @@ jint  IPv6_supported()
+     SOCKADDR sa;
+     socklen_t sa_len = sizeof(sa);
+
++#ifndef __ANDROID__  // ANDROID: skip check, see libcore commit ae218d9b
+     fd = JVM_Socket(AF_INET6, SOCK_STREAM, 0) ;
+     if (fd < 0) {
+         /*
+@@ -363,6 +364,7 @@ jint  IPv6_supported()
+         }
+     }
+ #endif
++#endif  // !defined __ANDROID__
+
+     /**
+      * On Solaris 8 it's possible to create INET6 sockets even
