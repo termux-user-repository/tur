@@ -2,10 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://www.embree.org/
 TERMUX_PKG_DESCRIPTION="High-performance ray tracing library developed at Intel"
 TERMUX_PKG_LICENSE="Apache-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="4.4.0"
-TERMUX_PKG_REVISION=2
+TERMUX_PKG_VERSION="4.4.1"
 TERMUX_PKG_SRCURL="https://github.com/RenderKit/embree/archive/refs/tags/v$TERMUX_PKG_VERSION.tar.gz"
-TERMUX_PKG_SHA256=acb517b0ea0f4b442235d5331b69f96192c28da6aca5d5dde0cbe40799638d5c
+TERMUX_PKG_SHA256=dcf338cc61b636c871ccf370e673bfd380c5ecb71ce49ad50f28e1d4ec9995dc
 TERMUX_PKG_DEPENDS="libc++, libtbb"
 TERMUX_PKG_BUILD_DEPENDS="freeglut, libxmu"
 # Embree does not support 32-bit Linux
