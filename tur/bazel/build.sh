@@ -2,10 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://bazel.build/
 TERMUX_PKG_DESCRIPTION="Correct, reproducible, and fast builds for everyone"
 TERMUX_PKG_LICENSE="Apache-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="8.7.0"
-TERMUX_PKG_REVISION=3
+TERMUX_PKG_VERSION="9.2.0"
 TERMUX_PKG_SRCURL=https://github.com/bazelbuild/bazel/releases/download/$TERMUX_PKG_VERSION/bazel-$TERMUX_PKG_VERSION-dist.zip
-TERMUX_PKG_SHA256=75ed5aa189fd687e6e7c289ad86a3851844965a6c1479b7a5ce9b846a6e461bc
+TERMUX_PKG_SHA256=81af02b33128ec1922c6b60212df3fb6150baa96bb33d32ffa020e5fed47fefc
 TERMUX_PKG_DEPENDS="libarchive, openjdk-21, patch, unzip, zip"
 TERMUX_PKG_BUILD_DEPENDS="libandroid-spawn-static, patch, unzip, zip"
 TERMUX_PKG_ANTI_BUILD_DEPENDS="openjdk-21"
@@ -99,7 +98,7 @@ termux_pkg_auto_update() {
 	local api_url="https://api.github.com/repos/bazelbuild/bazel/git/refs/tags"
 	local latest_refs_tags=$(
 		curl -s "$api_url" | jq -r .[].ref | cut -d'/' -f 3 |
-			grep "^8" | grep -v -E "(rc)|(pre)"
+			grep "^9" | grep -v -E "(rc)|(pre)"
 	)
 	if [[ -z "${latest_refs_tags}" ]]; then
 		echo "WARN: Unable to get latest refs tags from upstream. Try again later." >&2
@@ -170,6 +169,7 @@ termux_step_make() {
 	unset CC CXX CFLAGS CXXFLAGS CPPFLAGS LDFLAGS AR AS CPP LD RANLIB READELF STRIP
 	export XDG_CACHE_HOME="$TERMUX_PKG_TMPDIR/fake-xdg-cache-home"
 	bazelisk build \
+		--action_env=PATH \
 		--extra_toolchains=//termux-cross/toolchain/$TERMUX_ARCH:${TERMUX_ARCH}_linux_toolchain \
 		--host_crosstool_top=@bazel_tools//tools/cpp:toolchain \
 		--crosstool_top=//termux-cross/toolchain/${TERMUX_ARCH}:gcc_toolchain \
@@ -187,4 +187,5 @@ termux_step_make() {
 termux_step_make_install() {
 	install -Dm700 ./scripts/packages/bazel.sh $TERMUX_PREFIX/bin/bazel
 	install -Dm700 ./bazel-bin/src/bazel_nojdk $TERMUX_PREFIX/bin/bazel-real
+	install -Dm700 ./bazel-bin/src/bazel_nojdk $TERMUX_PREFIX/bin/bazel-$TERMUX_PKG_VERSION
 }

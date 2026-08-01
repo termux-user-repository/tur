@@ -11,8 +11,8 @@ https://github.com/termux/termux-packages/tree/18bc97d74656ade33269bea1dbbe2ae5d
    CHECK_NE(filename_template, nullptr);
  
    fd = mkstemp(filename_template);
---- a/src/core/lib/security/security_connector/load_system_roots_supported.cc
-+++ b/src/core/lib/security/security_connector/load_system_roots_supported.cc
+--- a/src/core/credentials/transport/tls/load_system_roots_supported.cc
++++ b/src/core/credentials/transport/tls/load_system_roots_supported.cc
 @@ -52,12 +52,12 @@
  
  #if defined(GPR_LINUX) || defined(GPR_ANDROID)
@@ -31,8 +31,8 @@ https://github.com/termux/termux-packages/tree/18bc97d74656ade33269bea1dbbe2ae5d
  #elif defined(GPR_FREEBSD)  // endif GPR_LINUX || GPR_ANDROID
  const char* kCertFiles[] = {"/etc/ssl/cert.pem",
                              "/usr/local/share/certs/ca-root-nss.crt"};
---- a/src/core/lib/security/security_connector/ssl_utils.cc
-+++ b/src/core/lib/security/security_connector/ssl_utils.cc
+--- a/src/core/credentials/transport/tls/ssl_utils.cc
++++ b/src/core/credentials/transport/tls/ssl_utils.cc
 @@ -45,9 +45,9 @@
  static const char* installed_roots_path = GRPC_ROOT_PEM_PATH;
  #elif defined(INSTALL_PREFIX)
@@ -45,25 +45,3 @@ https://github.com/termux/termux-packages/tree/18bc97d74656ade33269bea1dbbe2ae5d
  #endif
 
  #ifndef TSI_OPENSSL_ALPN_SUPPORT
---- a/src/core/util/posix/log.cc
-+++ b/src/core/util/posix/log.cc
-@@ -18,7 +18,7 @@
- 
- #include <grpc/support/port_platform.h>
- 
--#ifdef GPR_POSIX_LOG
-+#if defined(GPR_POSIX_LOG) || defined(__TERMUX__)
- 
- #include <inttypes.h>
- #include <pthread.h>
---- a/src/core/util/android/log.cc
-+++ b/src/core/util/android/log.cc
-@@ -18,7 +18,7 @@
- 
- #include <grpc/support/port_platform.h>
- 
--#ifdef GPR_ANDROID
-+#if defined(GPR_ANDROID) && !defined(__TERMUX__)
- 
- #include <android/log.h>
- #include <stdarg.h>
