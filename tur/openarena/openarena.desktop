@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=OpenArena
+Comment=A fast-paced 3D first-person shooter, similar to id Software Inc.'s Quake III Arena
+Comment[de]=Ein hektischer und netzwerkfähiger 3D Ego-Shooter, ähnlich zu Quake III Arena von id Software Inc.
+Exec=openarena
+Terminal=false
+Icon=openarena
+Type=Application
+Categories=Game;ActionGame;
+Keywords=first person shooter;fps;3d;deathmatch;ctf;capture the flag;
