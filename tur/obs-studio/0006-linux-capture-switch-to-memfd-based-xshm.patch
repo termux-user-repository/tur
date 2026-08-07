@@ -1,0 +1,317 @@
+From 605f9d9c6cb6cfd0bce23d4ba9df6476c60da968 Mon Sep 17 00:00:00 2001
+From: lumaparallax <257510328+lumaparallax@users.noreply.github.com>
+Date: Fri, 24 Apr 2026 15:30:22 +0900
+Subject: [PATCH 06/10] linux capture switch to memfd based xshm
+
+---
+ plugins/linux-capture/xcomposite-input.c | 82 ++++++++++++++++++++++++
+ plugins/linux-capture/xhelpers.c         | 13 ++++
+ plugins/linux-capture/xshm-input.c       | 70 ++++++++++++++++++++
+ 3 files changed, 165 insertions(+)
+
+diff --git a/plugins/linux-capture/xcomposite-input.c b/plugins/linux-capture/xcomposite-input.c
+index 0e86fe443..0cefc382c 100644
+--- a/plugins/linux-capture/xcomposite-input.c
++++ b/plugins/linux-capture/xcomposite-input.c
+@@ -22,6 +22,32 @@
+ #include <util/dstr.h>
+ #include <util/darray.h>
+ 
++#if defined(__ANDROID__)
++#include <xcb/shm.h>
++#include <sys/mman.h>
++#include <unistd.h>
++#include <X11/Xlib-xcb.h>
++#include <sys/syscall.h>
++#include <linux/memfd.h>
++
++/* Polyfill for memfd_create. */
++#ifndef MFD_CLOEXEC
++#define MFD_CLOEXEC 0x0001U
++#endif
++
++#ifndef SYS_memfd_create
++#if defined(__NR_memfd_create)
++#define SYS_memfd_create __NR_memfd_create
++#else
++#define SYS_memfd_create 319 /* Default standard Linux syscall number */
++#endif
++#endif
++
++static inline int sys_memfd_create(const char *name, unsigned int flags) {
++	return syscall(SYS_memfd_create, name, flags);
++}
++#endif
++
+ #define WIN_STRING_DIV "\r\n"
+ #define FIND_WINDOW_INTERVAL 2.0
+ 
+@@ -61,6 +87,12 @@ struct xcompcap {
+ 	Pixmap pixmap;
+ 	gs_texture_t *gltex;
+ 
++	#if defined(__ANDROID__)
++	int shm_fd;
++	xcb_shm_seg_t shm_seg;
++	void *shm_data;
++        #endif
++
+ 	pthread_mutex_t lock;
+ 
+ 	bool show_cursor;
+@@ -335,6 +367,14 @@ void xcomp_cleanup_pixmap(Display *disp, struct xcompcap *s)
+ 		gs_texture_destroy(s->gltex);
+ 		s->gltex = 0;
+ 	}
++   #if defined(__ANDROID__)
++	if (s->shm_data) {
++		xcb_shm_detach(XGetXCBConnection(disp), s->shm_seg);
++		munmap(s->shm_data, s->width * s->height * 4);
++		close(s->shm_fd);
++		s->shm_data = NULL;
++	}
++   #endif
+ 
+ 	if (s->pixmap) {
+ 		XFreePixmap(disp, s->pixmap);
+@@ -387,9 +427,30 @@ void xcomp_create_pixmap(xcb_connection_t *conn, struct xcompcap *s, int log_lev
+ 		return;
+ 	}
+ 
++#if defined(__ANDROID__)
++	uint32_t size = s->width * s->height * 4;
++	s->shm_fd = sys_memfd_create("obs_xcomposite_shm", MFD_CLOEXEC);
++	if (s->shm_fd < 0) {
++		blog(LOG_ERROR, "xcompcap: memfd_create failed");
++	} else {
++		ftruncate(s->shm_fd, size);
++		s->shm_data = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, s->shm_fd, 0);
++
++		if (s->shm_data == MAP_FAILED) {
++			blog(LOG_ERROR, "xcompcap: mmap failed");
++			close(s->shm_fd);
++			s->shm_data = NULL;
++		} else {
++			s->shm_seg = xcb_generate_id(conn);
++			xcb_shm_attach_fd(conn, s->shm_seg, s->shm_fd, 0);
++		}
++	}
++	s->gltex = gs_texture_create(s->width, s->height, GS_BGRA_UNORM, 1, NULL, GS_DYNAMIC);
++#else
+ 	XErrorHandler prev = XSetErrorHandler(silence_x11_errors);
+ 	s->gltex = gs_texture_create_from_pixmap(s->width, s->height, GS_BGRA_UNORM, GL_TEXTURE_2D, (void *)s->pixmap);
+ 	XSetErrorHandler(prev);
++#endif
+ }
+ 
+ struct reg_item {
+@@ -655,6 +716,27 @@ static void xcompcap_video_tick(void *data, float seconds)
+ 	if (xcompcap_get_height(s) == 0 || xcompcap_get_width(s) == 0)
+ 		goto done;
+ 
++#if defined(__ANDROID__)
++	// Use XSHM CPU readback with FDs
++	if (s->gltex && s->pixmap && s->shm_data && xcompcap_get_height(s) > 0 && xcompcap_get_width(s) > 0) {
++		xcb_shm_get_image_cookie_t img_c = xcb_shm_get_image_unchecked(
++			conn, s->pixmap, 0, 0,
++			s->width, s->height, ~0, XCB_IMAGE_FORMAT_Z_PIXMAP,
++			s->shm_seg, 0);
++
++		xcb_shm_get_image_reply_t *img_r = xcb_shm_get_image_reply(conn, img_c, NULL);
++		if (img_r) {
++			gs_texture_set_image(s->gltex, s->shm_data, s->width * 4, false);
++			free(img_r);
++		}
++	}
++#endif
++	if (!s->gltex)
++		goto done;
++
++	if (xcompcap_get_height(s) == 0 || xcompcap_get_width(s) == 0)
++		goto done;
++
+ 	if (s->show_cursor) {
+ 		xcb_xcursor_update(conn, s->cursor);
+ 
+diff --git a/plugins/linux-capture/xhelpers.c b/plugins/linux-capture/xhelpers.c
+index c5ffd9353..5fb357e6f 100644
+--- a/plugins/linux-capture/xhelpers.c
++++ b/plugins/linux-capture/xhelpers.c
+@@ -16,7 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+ 
+ #include <stdint.h>
++#if !defined(__ANDROID__)
+ #include <sys/shm.h>
++#endif
+ #include <xcb/randr.h>
+ #include <xcb/xcb.h>
+ #include <xcb/xinerama.h>
+@@ -264,6 +266,12 @@ fail:
+ 
+ xcb_shm_t *xshm_xcb_attach(xcb_connection_t *xcb, const int w, const int h)
+ {
++#if defined(__ANDROID__)
++	UNUSED_PARAMETER(xcb);
++	UNUSED_PARAMETER(w);
++	UNUSED_PARAMETER(h);
++	return NULL;
++#else
+ 	if (!xcb)
+ 		return NULL;
+ 
+@@ -283,10 +291,14 @@ xcb_shm_t *xshm_xcb_attach(xcb_connection_t *xcb, const int w, const int h)
+ fail:
+ 	xshm_xcb_detach(shm);
+ 	return NULL;
++#endif
+ }
+ 
+ void xshm_xcb_detach(xcb_shm_t *shm)
+ {
++#if defined(__ANDROID__)
++	UNUSED_PARAMETER(shm);
++#else
+ 	if (!shm)
+ 		return;
+ 
+@@ -299,6 +311,7 @@ void xshm_xcb_detach(xcb_shm_t *shm)
+ 		shmctl(shm->shmid, IPC_RMID, NULL);
+ 
+ 	bfree(shm);
++#endif
+ }
+ 
+ xcb_screen_t *xcb_get_screen(xcb_connection_t *xcb, int screen)
+diff --git a/plugins/linux-capture/xshm-input.c b/plugins/linux-capture/xshm-input.c
+index c927209d0..bdb61ed31 100644
+--- a/plugins/linux-capture/xshm-input.c
++++ b/plugins/linux-capture/xshm-input.c
+@@ -28,6 +28,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ #include "xcursor-xcb.h"
+ #include "xhelpers.h"
+ 
++#if defined(__ANDROID__)
++#include <sys/syscall.h>
++#include <linux/memfd.h>
++#include <sys/mman.h>
++#include <unistd.h>
++
++/* Polyfill for memfd_create. */
++#ifndef MFD_CLOEXEC
++#define MFD_CLOEXEC 0x0001U
++#endif
++
++#ifndef SYS_memfd_create
++#if defined(__NR_memfd_create)
++#define SYS_memfd_create __NR_memfd_create
++#else
++#define SYS_memfd_create 319 /* Default standard Linux syscall number */
++#endif
++#endif
++
++static inline int sys_memfd_create(const char *name, unsigned int flags) {
++	return syscall(SYS_memfd_create, name, flags);
++}
++#endif
++
+ #define XSHM_DATA(voidptr) struct xshm_data *data = voidptr;
+ 
+ #define blog(level, msg, ...) blog(level, "xshm-input: " msg, ##__VA_ARGS__)
+@@ -40,6 +64,11 @@ struct xshm_data {
+ 	xcb_connection_t *xcb;
+ 	xcb_screen_t *xcb_screen;
+ 	xcb_shm_t *xshm;
++#if defined(__ANDROID__)
++	int shm_fd;
++	xcb_shm_seg_t shm_seg;
++	void *shm_data;
++#endif
+ 	xcb_xcursor_t *cursor;
+ 
+ 	char *server;
+@@ -197,10 +226,19 @@ static void xshm_capture_stop(struct xshm_data *data)
+ 
+ 	obs_leave_graphics();
+ 
++#if defined(__ANDROID__)
++	if (data->shm_data) {
++		xcb_shm_detach(data->xcb, data->shm_seg);
++		munmap(data->shm_data, data->adj_width * data->adj_height * 4);
++		close(data->shm_fd);
++		data->shm_data = NULL;
++	}
++#else
+ 	if (data->xshm) {
+ 		xshm_xcb_detach(data->xshm);
+ 		data->xshm = NULL;
+ 	}
++#endif
+ 
+ 	if (data->xcb) {
+ 		xcb_disconnect(data->xcb);
+@@ -247,11 +285,33 @@ static void xshm_capture_start(struct xshm_data *data)
+ 		goto fail;
+ 	}
+ 
++#if defined(__ANDROID__)
++	uint32_t size = data->adj_width * data->adj_height * 4;
++	data->shm_fd = sys_memfd_create("obs_xshm_capture", MFD_CLOEXEC);
++	if (data->shm_fd < 0) {
++		blog(LOG_ERROR, "failed to create memfd !");
++		goto fail;
++	} else {
++		ftruncate(data->shm_fd, size);
++		data->shm_data = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, data->shm_fd, 0);
++
++		if (data->shm_data == MAP_FAILED) {
++			blog(LOG_ERROR, "failed to mmap shm !");
++			close(data->shm_fd);
++			data->shm_data = NULL;
++			goto fail;
++		} else {
++			data->shm_seg = xcb_generate_id(data->xcb);
++			xcb_shm_attach_fd(data->xcb, data->shm_seg, data->shm_fd, 0);
++		}
++	}
++#else
+ 	data->xshm = xshm_xcb_attach(data->xcb, data->adj_width, data->adj_height);
+ 	if (!data->xshm) {
+ 		blog(LOG_ERROR, "failed to attach shm !");
+ 		goto fail;
+ 	}
++#endif
+ 
+ 	data->cursor = xcb_xcursor_init(data->xcb);
+ 	xcb_xcursor_offset(data->cursor, data->adj_x_org, data->adj_y_org);
+@@ -497,9 +557,15 @@ static void xshm_video_tick(void *vptr, float seconds)
+ 	xcb_shm_get_image_cookie_t img_c;
+ 	xcb_shm_get_image_reply_t *img_r;
+ 
++#if defined(__ANDROID__)
++	img_c = xcb_shm_get_image_unchecked(data->xcb, data->xcb_screen->root, data->adj_x_org, data->adj_y_org,
++					    data->adj_width, data->adj_height, ~0, XCB_IMAGE_FORMAT_Z_PIXMAP,
++					    data->shm_seg, 0);
++#else
+ 	img_c = xcb_shm_get_image_unchecked(data->xcb, data->xcb_screen->root, data->adj_x_org, data->adj_y_org,
+ 					    data->adj_width, data->adj_height, ~0, XCB_IMAGE_FORMAT_Z_PIXMAP,
+ 					    data->xshm->seg, 0);
++#endif
+ 
+ 	img_r = xcb_shm_get_image_reply(data->xcb, img_c, NULL);
+ 
+@@ -508,7 +574,11 @@ static void xshm_video_tick(void *vptr, float seconds)
+ 
+ 	obs_enter_graphics();
+ 
++#if defined(__ANDROID__)
++	gs_texture_set_image(data->texture, data->shm_data, data->adj_width * 4, false);
++#else
+ 	gs_texture_set_image(data->texture, (void *)data->xshm->data, data->adj_width * 4, false);
++#endif
+ 	xcb_xcursor_update(data->xcb, data->cursor);
+ 
+ 	obs_leave_graphics();
+-- 
+2.54.0
+
