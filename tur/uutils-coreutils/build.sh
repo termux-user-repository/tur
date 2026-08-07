@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="Cross-platform Rust rewrite of the GNU coreutils"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="0.10.0"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://github.com/uutils/coreutils/archive/refs/tags/$TERMUX_PKG_VERSION.tar.gz
 TERMUX_PKG_SHA256=f8e68cd0e3629378f047544ead272161a83211c43f4985a9f52944e5db8f1a44
 TERMUX_PKG_BUILD_IN_SRC=true
