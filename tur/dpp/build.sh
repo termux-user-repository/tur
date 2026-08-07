@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="D++ is a lightweight and simple library for Discord writ
 TERMUX_PKG_LICENSE="Apache-2.0"
 TERMUX_PKG_MAINTAINER="@OrdinaryEnder"
 TERMUX_PKG_VERSION="10.1.6"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://github.com/brainboxdotcc/dpp/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz
 TERMUX_PKG_SHA256=65cf9e5fbc7b40e3fadaf742fa87da9cdede46651e35007c7b45cb765bfc17ba
 TERMUX_PKG_DEPENDS="libc++, libopus, libsodium, openssl, zlib"
