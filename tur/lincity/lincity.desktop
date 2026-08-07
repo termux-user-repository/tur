@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.1
+Type=Application
+Name=Lincity
+GenericName=City Simulation Game
+Comment=Classic city simulation game for X11
+Icon=lincity
+Exec=xlincity
+TryExec=xlincity
+Terminal=false
+Categories=Game;StrategyGame;
