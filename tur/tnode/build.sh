@@ -8,17 +8,30 @@ TERMUX_PKG_SHA256=f81b959bab01c818c8830994df1bdfaee1f4dd96ed5e198a46e9b543141877
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_BUILD_IN_SRC=true
 
+case "$TERMUX_ARCH" in
+	aarch64) CARGO_TARGET="aarch64-linux-android"    ;;
+	x86_64)  CARGO_TARGET="x86_64-linux-android"     ;;
+	arm)     CARGO_TARGET="armv7-linux-androideabi"  ;;
+	i686)    CARGO_TARGET="i686-linux-android"       ;;
+	*)       termux_error_exit "unsupported architecture: $TERMUX_ARCH" ;;
+esac
+
 termux_step_pre_configure() {
 	termux_setup_rust
+}
 
-	case "$TERMUX_ARCH" in
-		aarch64) CARGO_TARGET="aarch64-linux-android" ;;
-		x86_64)  CARGO_TARGET="x86_64-linux-android"  ;;
-		*)       termux_error_exit "unsupported architecture: $TERMUX_ARCH" ;;
-	esac
+termux_step_configure() {
+	:
 }
 
 termux_step_make() {
+	local env_target=$(echo "$CARGO_TARGET" | tr '[:lower:]-' '[:upper:]_')
+	export CARGO_TARGET_${env_target}_LINKER="$CC"
+	export CARGO_TARGET_${env_target}_AR="$AR"
+	
+	export CFLAGS="$CFLAGS"
+	export LDFLAGS="$LDFLAGS"
+
 	cargo build \
 		--target "$CARGO_TARGET" \
 		--release \
