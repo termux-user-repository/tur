@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="Correct, reproducible, and fast builds for everyone"
 TERMUX_PKG_LICENSE="Apache-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="9.2.0"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://github.com/bazelbuild/bazel/releases/download/$TERMUX_PKG_VERSION/bazel-$TERMUX_PKG_VERSION-dist.zip
 TERMUX_PKG_SHA256=81af02b33128ec1922c6b60212df3fb6150baa96bb33d32ffa020e5fed47fefc
 TERMUX_PKG_DEPENDS="libarchive, openjdk-21, patch, unzip, zip"
@@ -175,6 +176,7 @@ termux_step_make() {
 		--crosstool_top=//termux-cross/toolchain/${TERMUX_ARCH}:gcc_toolchain \
 		--host_platform=@platforms//host \
 		--platforms=//termux-cross/platforms:termux_${TERMUX_ARCH} --cpu=${TERMUX_ARCH} \
+		--stamp --embed_label "${TERMUX_PKG_VERSION}" \
 		--enable_bzlmod --verbose_failures \
 			//src:bazel_nojdk && \
 	bazelisk shutdown) || (set -e -u -o pipefail
