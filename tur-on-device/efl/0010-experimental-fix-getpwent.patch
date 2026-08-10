@@ -1,0 +1,13 @@
+diff -ur orig/src/lib/ethumb/ethumb.c mod/src/lib/ethumb/ethumb.c
+--- orig/src/lib/ethumb/ethumb.c	2025-01-11 21:08:11.000000000 +0100
++++ mod/src/lib/ethumb/ethumb.c	2025-01-21 20:56:32.975685953 +0100
+@@ -269,7 +269,8 @@
+ #if defined(HAVE_GETUID) && defined(HAVE_GETEUID)
+    else
+      {
+-        struct passwd *pw = getpwent();
++        uid_t uid = getuid();
++        struct passwd *pw = getpwuid(uid);
+ 
+         if ((!pw) || (!pw->pw_dir)) goto error_plugins_ext;
+         snprintf(buf, sizeof(buf), "%s/.thumbnails", pw->pw_dir);

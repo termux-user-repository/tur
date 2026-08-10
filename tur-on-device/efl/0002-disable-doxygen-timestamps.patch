@@ -1,0 +1,19 @@
+Description: disable doxygen html timestamps
+ This should improve repducibility of efl-doc.
+Author: Ross Vandegrift <ross@kallisti.us>
+Origin: other
+Forwarded: not-needed
+Last-Update: 2018-06-16
+---
+This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+--- a/doc/Doxyfile.in
++++ b/doc/Doxyfile.in
+@@ -906,7 +906,7 @@
+ # page will contain the date and time when the page was generated. Setting
+ # this to NO can help when comparing the output of multiple runs.
+ 
+-HTML_TIMESTAMP         = YES
++HTML_TIMESTAMP         = NO
+ 
+ # If the HTML_DYNAMIC_SECTIONS tag is set to YES then the generated HTML
+ # documentation will contain sections that can be hidden and shown after the

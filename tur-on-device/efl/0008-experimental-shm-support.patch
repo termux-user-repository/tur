@@ -1,0 +1,72 @@
+diff -ur orig/src/modules/ecore_evas/engines/extn/ecore_evas_extn_buf.c mod/src/modules/ecore_evas/engines/extn/ecore_evas_extn_buf.c
+--- orig/src/modules/ecore_evas/engines/extn/ecore_evas_extn_buf.c	2023-12-23 16:56:36.000000000 +0100
++++ mod/src/modules/ecore_evas/engines/extn/ecore_evas_extn_buf.c	2025-01-20 20:13:29.609463916 +0100
+@@ -4,6 +4,43 @@
+ # define O_BINARY 0
+ #endif
+ 
++static int termux_shm_unlink(const char *name) {
++    size_t namelen;
++    char *fname;
++
++    /* Construct the filename.  */
++    while (name[0] == '/') ++name;
++
++    if (name[0] == '\0') {
++        /* The name "/" is not supported.  */
++        errno = EINVAL;
++        return -1;
++    }
++
++    namelen = strlen(name);
++    fname = (char *) alloca(sizeof("@TERMUX_PREFIX@/tmp/") - 1 + namelen + 1);
++    memcpy(fname, "@TERMUX_PREFIX@/tmp/", sizeof("@TERMUX_PREFIX@/tmp/") - 1);
++    memcpy(fname + sizeof("@TERMUX_PREFIX@/tmp/") - 1, name, namelen + 1);
++
++    return unlink(fname);
++}
++
++static int termux_shm_open(const char *name, int oflag, mode_t mode) {
++    size_t namelen;
++    char *fname;
++    int fd;
++
++    /* Construct the filename.  */
++    while (name[0] == '/') ++name;
++
++    if (name[0] == '\0') {
++        /* The name "/" is not supported.  */
++        errno = EINVAL;
++        return -1;
++    }
++}
++
++
+ struct _Extnbuf
+ {
+    const char *file, *lock;
+@@ -57,13 +94,13 @@
+         if (b->lockfd < 0) goto err;
+         b->lock = eina_stringshare_add(tmp);
+         if (!b->lock) goto err;
+-        b->fd = shm_open(b->file, O_RDWR | O_CREAT | O_EXCL, mode);
++        b->fd = termux_shm_open(b->file, O_RDWR | O_CREAT | O_EXCL, mode);
+         if (b->fd < 0) goto err;
+         if (ftruncate(b->fd, b->size) < 0) goto err;
+      }
+    else
+      {
+-        b->fd = shm_open(b->file, O_RDONLY, mode);
++        b->fd = termux_shm_open(b->file, O_RDONLY, mode);
+         if (b->fd < 0) goto err;
+      }
+    b->addr = mmap(NULL, b->size, prot, MAP_SHARED, b->fd, 0);
+@@ -83,7 +120,7 @@
+ 
+    if (b->am_owner)
+      {
+-        if (b->file) shm_unlink(b->file);
++        if (b->file) termux_shm_unlink(b->file);
+         if (b->lock) unlink(b->lock);
+      }
+ 
