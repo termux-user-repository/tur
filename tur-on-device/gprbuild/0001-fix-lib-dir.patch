@@ -1,0 +1,14 @@
+--- a/gpr/src/gpr_imports.c
++++ b/gpr/src/gpr_imports.c
+@@ -69,6 +69,11 @@
+ char __gnat_shared_libgcc_default = SHARED;
+ const char *__gnat_default_libgcc_subdir = "lib";
+ 
++#elif defined(__ANDROID__)
++int __gnat_link_max = 8192;
++char __gnat_shared_libgcc_default = STATIC;
++const char *__gnat_default_libgcc_subdir = "lib";
++
+ #elif defined (linux) || defined(__GLIBC__)
+ int __gnat_link_max = 8192;
+ char __gnat_shared_libgcc_default = STATIC;
