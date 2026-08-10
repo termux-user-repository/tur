@@ -1,0 +1,39 @@
+--- a/src/cc/libbpf/include/linux/compiler.h
++++ b/src/cc/libbpf/include/linux/compiler.h
+@@ -3,6 +3,10 @@
+ #ifndef __LINUX_COMPILER_H
+ #define __LINUX_COMPILER_H
+ 
++#ifdef __ANDROID__
++#include_next <linux/compiler.h>
++#endif
++
+ #define likely(x)		__builtin_expect(!!(x), 1)
+ #define unlikely(x)		__builtin_expect(!!(x), 0)
+ 
+--- a/src/cc/libbpf/include/linux/types.h
++++ b/src/cc/libbpf/include/linux/types.h
+@@ -22,6 +22,10 @@
+ typedef __u64 __bitwise __le64;
+ typedef __u64 __bitwise __be64;
+ 
++#ifdef __ANDROID__
++typedef unsigned __bitwise __poll_t;
++#endif
++
+ #ifndef __aligned_u64
+ # define __aligned_u64 __u64 __attribute__((aligned(8)))
+ #endif
+--- a/introspection/bps.c
++++ b/introspection/bps.c
+@@ -9,6 +9,10 @@
+ #include <ctype.h>
+ #include <sysexits.h>
+ 
++#ifdef __ANDROID__
++#include <strings.h>
++#endif
++
+ #include "libbpf.h"
+ 
+ // TODO: Remove this when CentOS 6 support is not needed anymore
