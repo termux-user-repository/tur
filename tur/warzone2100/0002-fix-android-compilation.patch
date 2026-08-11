@@ -1,0 +1,21 @@
+--- a/3rdparty/GameNetworkingSockets/src/tier0/dbg.cpp
++++ b/3rdparty/GameNetworkingSockets/src/tier0/dbg.cpp
+@@ -91,6 +91,8 @@ bool Plat_IsInDebugSession()
+ 	return false;
+ #elif IsBSD()
+ 	return false;
++#elif IsAndroid()
++	return false;
+ #else
+ 	#error "HALP"
+ #endif
+--- a/3rdparty/GameNetworkingSockets/src/tier1/netadr.cpp
++++ b/3rdparty/GameNetworkingSockets/src/tier1/netadr.cpp
+@@ -660,7 +660,7 @@ int CNetAdr::ToSockadrDirect( void *addr, int addr_size ) const
+ 			auto *s = (struct sockaddr_in*)addr;
+ 			s->sin_family = AF_INET;
+-			s->sin_addr.s_addr = BigDWord( INADDR_BROADCAST );
++			s->sin_addr.s_addr = BigDWord( (uint32)INADDR_BROADCAST );
+ 			s->sin_port = BigWord( m_usPort );
+ 			struct_size = sizeof(sockaddr_in);
+ 		}
