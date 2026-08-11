@@ -1,0 +1,278 @@
+diff --git a/3rdparty/cpuinfo/CMakeLists.txt b/3rdparty/cpuinfo/CMakeLists.txt
+index d8d514a..17045f3 100644
+--- a/3rdparty/cpuinfo/CMakeLists.txt
++++ b/3rdparty/cpuinfo/CMakeLists.txt
+@@ -211,7 +211,7 @@ IF(CPUINFO_SUPPORTED_PLATFORM)
+     ELSEIF(IS_APPLE_OS AND CPUINFO_TARGET_PROCESSOR MATCHES "arm64.*")
+       LIST(APPEND CPUINFO_SRCS src/arm/mach/init.c)
+     ENDIF()
+-    IF(CMAKE_SYSTEM_NAME STREQUAL "Android")
++    IF(CMAKE_SYSTEM_NAME STREQUAL "Android" OR CMAKE_SYSTEM_NAME STREQUAL "Linux")
+       LIST(APPEND CPUINFO_SRCS
+         src/arm/android/properties.c)
+     ENDIF()
+diff --git a/cmake/BuildParameters.cmake b/cmake/BuildParameters.cmake
+index 21d9940..73b5d13 100644
+--- a/cmake/BuildParameters.cmake
++++ b/cmake/BuildParameters.cmake
+@@ -72,8 +72,7 @@ mark_as_advanced(CMAKE_C_FLAGS_DEVEL CMAKE_CXX_FLAGS_DEVEL CMAKE_LINKER_FLAGS_DE
+ #-------------------------------------------------------------------------------
+ # Select the architecture
+ #-------------------------------------------------------------------------------
+-if("${CMAKE_HOST_SYSTEM_PROCESSOR}" STREQUAL "x86_64" OR "${CMAKE_HOST_SYSTEM_PROCESSOR}" STREQUAL "amd64" OR
+-   "${CMAKE_HOST_SYSTEM_PROCESSOR}" STREQUAL "AMD64" OR "${CMAKE_OSX_ARCHITECTURES}" STREQUAL "x86_64")
++if(("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64" OR "${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "amd64" OR "${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "AMD64" OR "${CMAKE_OSX_ARCHITECTURES}" STREQUAL "x86_64") AND NOT ("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "aarch64" OR "${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "arm64"))
+ 	# Multi-ISA only exists on x86.
+ 	option(DISABLE_ADVANCE_SIMD "Disable advance use of SIMD (SSE2+ & AVX)" OFF)
+ 
+@@ -104,12 +103,14 @@ if("${CMAKE_HOST_SYSTEM_PROCESSOR}" STREQUAL "x86_64" OR "${CMAKE_HOST_SYSTEM_PR
+ 			endif()
+ 		endif()
+ 	endif()
+-elseif("${CMAKE_HOST_SYSTEM_PROCESSOR}" STREQUAL "arm64" OR "${CMAKE_HOST_SYSTEM_PROCESSOR}" STREQUAL "aarch64" OR
++elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "arm64" OR "${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "aarch64" OR "${CMAKE_HOST_SYSTEM_PROCESSOR}" STREQUAL "arm64" OR "${CMAKE_HOST_SYSTEM_PROCESSOR}" STREQUAL "aarch64" OR
+        "${CMAKE_OSX_ARCHITECTURES}" STREQUAL "arm64")
+-	message(STATUS "Building for Apple Silicon (ARM64).")
++	message(STATUS "Building for ARM64.")
+ 	list(APPEND PCSX2_DEFS _M_ARM64=1)
+ 	set(_M_ARM64 TRUE)
+-	add_compile_options("-march=armv8.4-a" "-mcpu=apple-m1")
++	if(APPLE)
++		add_compile_options("-march=armv8.4-a" "-mcpu=apple-m1")
++	endif()
+ 
+ 	# If we're running on Linux, we need to detect the page/cache line size.
+ 	# It could be a virtual machine with 4K pages, or 16K with Asahi.
+diff --git a/cmake/Pcsx2Utils.cmake b/cmake/Pcsx2Utils.cmake
+index 157758c..3745dec 100644
+--- a/cmake/Pcsx2Utils.cmake
++++ b/cmake/Pcsx2Utils.cmake
+@@ -224,6 +224,9 @@ function(disable_compiler_warnings_for_target target)
+ endfunction()
+ 
+ function(detect_page_size)
++	if(HOST_PAGE_SIZE)
++		return()
++	endif()
+ 	message(STATUS "Determining host page size")
+ 	set(detect_page_size_file ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/src.c)
+ 	file(WRITE ${detect_page_size_file} "
+@@ -250,6 +253,9 @@ int main() {
+ endfunction()
+ 
+ function(detect_cache_line_size)
++	if(HOST_CACHE_LINE_SIZE)
++		return()
++	endif()
+ 	message(STATUS "Determining host cache line size")
+ 	set(detect_cache_line_size_file ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/src.c)
+ 	file(WRITE ${detect_cache_line_size_file} "
+diff --git a/cmake/SearchForStuff.cmake b/cmake/SearchForStuff.cmake
+index ff66f9c..dfa1e51 100644
+--- a/cmake/SearchForStuff.cmake
++++ b/cmake/SearchForStuff.cmake
+@@ -105,7 +105,7 @@ disable_compiler_warnings_for_target(cubeb)
+ disable_compiler_warnings_for_target(speex)
+ 
+ # Find the Qt components that we need.
+-find_package(Qt6 6.7.2 COMPONENTS CoreTools Core GuiTools Gui WidgetsTools Widgets LinguistTools REQUIRED)
++find_package(Qt6 6.7.2 COMPONENTS CoreTools Core GuiTools Gui GuiPrivate WidgetsTools Widgets LinguistTools REQUIRED)
+ 
+ if(WIN32)
+   add_subdirectory(3rdparty/rainterface EXCLUDE_FROM_ALL)
+diff --git a/common/Linux/LnxHostSys.cpp b/common/Linux/LnxHostSys.cpp
+index 54a8e2f..d6abcf5 100644
+--- a/common/Linux/LnxHostSys.cpp
++++ b/common/Linux/LnxHostSys.cpp
+@@ -1,3 +1,41 @@
++#if defined(__ANDROID__)
++#include <fcntl.h>
++#include <sys/stat.h>
++#include <unistd.h>
++#include <cstdio>
++#include <cstring>
++#include <cerrno>
++
++static inline int shm_unlink(const char *name) {
++	while (name[0] == '/') ++name;
++	if (name[0] == '\0') {
++		errno = EINVAL;
++		return -1;
++	}
++	char fname[256];
++	snprintf(fname, sizeof(fname), "/data/data/com.termux/files/usr/tmp/%s", name);
++	return unlink(fname);
++}
++
++static inline int shm_open(const char *name, int oflag, mode_t mode) {
++	while (name[0] == '/') ++name;
++	if (name[0] == '\0') {
++		errno = EINVAL;
++		return -1;
++	}
++	char fname[256];
++	snprintf(fname, sizeof(fname), "/data/data/com.termux/files/usr/tmp/%s", name);
++	int fd = open(fname, oflag, mode);
++	if (fd != -1) {
++		int flags = fcntl(fd, F_GETFD, 0);
++		if (flags != -1) {
++			fcntl(fd, F_SETFD, flags | FD_CLOEXEC);
++		}
++	}
++	return fd;
++}
++#endif
++
+ // SPDX-FileCopyrightText: 2002-2024 PCSX2 Dev Team
+ // SPDX-License-Identifier: GPL-3.0+
+ 
+diff --git a/pcsx2-qt/CMakeLists.txt b/pcsx2-qt/CMakeLists.txt
+index 2d8a1af..26bf41f 100644
+--- a/pcsx2-qt/CMakeLists.txt
++++ b/pcsx2-qt/CMakeLists.txt
+@@ -231,6 +231,7 @@ target_link_libraries(pcsx2-qt PRIVATE
+ 	PCSX2
+ 	Qt6::Core
+ 	Qt6::Gui
++	Qt6::GuiPrivate
+ 	Qt6::Widgets
+ )
+ 
+diff --git a/pcsx2/CDVD/Linux/DriveUtility.cpp b/pcsx2/CDVD/Linux/DriveUtility.cpp
+index 7da8796..a9f7cdb 100644
+--- a/pcsx2/CDVD/Linux/DriveUtility.cpp
++++ b/pcsx2/CDVD/Linux/DriveUtility.cpp
+@@ -3,12 +3,19 @@
+ 
+ #include "CDVD/CDVDdiscReader.h"
+ 
+-#include <libudev.h>
+ #include <linux/cdrom.h>
+ #include <fcntl.h>
+ #include <sys/ioctl.h>
+ #include <unistd.h>
+ 
++#if defined(__ANDROID__) || !defined(HAVE_LIBUDEV)
++std::vector<std::string> GetOpticalDriveList()
++{
++	return {};
++}
++#else
++#include <libudev.h>
++
+ std::vector<std::string> GetOpticalDriveList()
+ {
+ 	udev* udev_context = udev_new();
+@@ -40,6 +47,7 @@ std::vector<std::string> GetOpticalDriveList()
+ 
+ 	return drives;
+ }
++#endif
+ 
+ void GetValidDrive(std::string& drive)
+ {
+diff --git a/pcsx2/CMakeLists.txt b/pcsx2/CMakeLists.txt
+index 804ab2e..f7c09ee 100644
+--- a/pcsx2/CMakeLists.txt
++++ b/pcsx2/CMakeLists.txt
+@@ -1106,9 +1106,11 @@ if(LINUX)
+ 		${pcsx2LinuxHeaders}
+ 		)
+ 
+-	target_link_libraries(PCSX2_FLAGS INTERFACE
+-		PkgConfig::LIBUDEV
+-	)
++	if(TARGET PkgConfig::LIBUDEV)
++		target_link_libraries(PCSX2_FLAGS INTERFACE
++			PkgConfig::LIBUDEV
++		)
++	endif()
+ endif()
+ 
+ if(WIN32)
+diff --git a/pcsx2/GS/GS.cpp b/pcsx2/GS/GS.cpp
+index 84956d8..00c3cd9 100644
+--- a/pcsx2/GS/GS.cpp
++++ b/pcsx2/GS/GS.cpp
+@@ -1,3 +1,41 @@
++#if defined(__ANDROID__)
++#include <fcntl.h>
++#include <sys/stat.h>
++#include <unistd.h>
++#include <cstdio>
++#include <cstring>
++#include <cerrno>
++
++static inline int shm_unlink(const char *name) {
++	while (name[0] == '/') ++name;
++	if (name[0] == '\0') {
++		errno = EINVAL;
++		return -1;
++	}
++	char fname[256];
++	snprintf(fname, sizeof(fname), "/data/data/com.termux/files/usr/tmp/%s", name);
++	return unlink(fname);
++}
++
++static inline int shm_open(const char *name, int oflag, mode_t mode) {
++	while (name[0] == '/') ++name;
++	if (name[0] == '\0') {
++		errno = EINVAL;
++		return -1;
++	}
++	char fname[256];
++	snprintf(fname, sizeof(fname), "/data/data/com.termux/files/usr/tmp/%s", name);
++	int fd = open(fname, oflag, mode);
++	if (fd != -1) {
++		int flags = fcntl(fd, F_GETFD, 0);
++		if (flags != -1) {
++			fcntl(fd, F_SETFD, flags | FD_CLOEXEC);
++		}
++	}
++	return fd;
++}
++#endif
++
+ // SPDX-FileCopyrightText: 2002-2024 PCSX2 Dev Team
+ // SPDX-License-Identifier: GPL-3.0+
+ 
+diff --git a/pcsx2/GS/Renderers/Vulkan/VKShaderCache.cpp b/pcsx2/GS/Renderers/Vulkan/VKShaderCache.cpp
+index f360178..482b84f 100644
+--- a/pcsx2/GS/Renderers/Vulkan/VKShaderCache.cpp
++++ b/pcsx2/GS/Renderers/Vulkan/VKShaderCache.cpp
+@@ -108,7 +108,7 @@ static void FillPipelineCacheHeader(VK_PIPELINE_CACHE_HEADER* header)
+ 	X(shaderc_compile_options_set_generate_debug_info) \
+ 	X(shaderc_compile_options_set_optimization_level) \
+ 	X(shaderc_compile_options_set_target_env) \
+-	X(shaderc_compilation_status_to_string) \
++	X(shaderc_result_get_compilation_status) \
+ 	X(shaderc_compile_into_spv) \
+ 	X(shaderc_result_release) \
+ 	X(shaderc_result_get_length) \
+@@ -216,21 +216,20 @@ std::optional<VKShaderCache::SPIRVCodeVector> VKShaderCache::CompileShaderToSPV(
+ 
+ 	dyn_shaderc::shaderc_compile_options_set_source_language(options, shaderc_source_language_glsl);
+ 	dyn_shaderc::shaderc_compile_options_set_target_env(options, shaderc_target_env_vulkan, 0);
+-	dyn_shaderc::shaderc_compile_options_set_generate_debug_info(options, debug,
+-		debug && GSDeviceVK::GetInstance()->GetOptionalExtensions().vk_khr_shader_non_semantic_info);
++	if (debug) dyn_shaderc::shaderc_compile_options_set_generate_debug_info(options);
+ 	dyn_shaderc::shaderc_compile_options_set_optimization_level(
+ 		options, debug ? shaderc_optimization_level_zero : shaderc_optimization_level_performance);
+ 
+-	shaderc_compilation_result_t result;
+-	const shaderc_compilation_status status = dyn_shaderc::shaderc_compile_into_spv(
++	shaderc_compilation_result_t result = dyn_shaderc::shaderc_compile_into_spv(
+ 		dyn_shaderc::s_compiler, source.data(), source.length(), static_cast<shaderc_shader_kind>(stage), "source",
+-		"main", options, &result);
++		"main", options);
++	const shaderc_compilation_status status = dyn_shaderc::shaderc_result_get_compilation_status(result);
+ 	if (status != shaderc_compilation_status_success)
+ 	{
+ 		const std::string_view errors(result ? dyn_shaderc::shaderc_result_get_error_message(result) :
+ 											   "null result object");
+ 		ERROR_LOG("Failed to compile shader to SPIR-V: {}\n{}",
+-			dyn_shaderc::shaderc_compilation_status_to_string(status), errors);
++			static_cast<int>(status), errors);
+ 		DumpBadShader(source, errors);
+ 	}
+ 	else
