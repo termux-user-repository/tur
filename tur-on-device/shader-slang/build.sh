@@ -3,17 +3,19 @@ TERMUX_PKG_DESCRIPTION="Shading language that makes it easier to build and maint
 TERMUX_PKG_LICENSE="Apache-2.0"
 TERMUX_PKG_MAINTAINER="@otreblan"
 TERMUX_PKG_VERSION="2026.14.1"
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_REVISION=2
 _SLANG_LUA_VERSION="5.5.0"
 _SLANG_CMARK_VERSION="0.8.0"
 _SLANG_MINIZ_VERSION="3.1.1"
 _SLANG_UNORDERED_DENSE_VERSION="4.8.1"
+_SLANG_FAST_FLOAT_VERSION="8.2.10"
 TERMUX_PKG_SRCURL=(
 	"$TERMUX_PKG_HOMEPAGE/archive/refs/tags/v$TERMUX_PKG_VERSION.tar.gz"
 	"https://github.com/lua/lua/archive/refs/tags/v$_SLANG_LUA_VERSION.tar.gz"
 	"https://github.com/swiftlang/swift-cmark/archive/refs/tags/$_SLANG_CMARK_VERSION.tar.gz"
 	"https://github.com/richgel999/miniz/archive/refs/tags/$_SLANG_MINIZ_VERSION.tar.gz"
 	"https://github.com/martinus/unordered_dense/archive/refs/tags/v$_SLANG_UNORDERED_DENSE_VERSION.tar.gz"
+	"https://github.com/fastfloat/fast_float/archive/refs/tags/v$_SLANG_FAST_FLOAT_VERSION.tar.gz"
 )
 TERMUX_PKG_SHA256=(
 	"2198fa78c65a97118b0b2d4ba63567fa420f02777c3e61a2cc43c4e24268d9e5"
@@ -21,6 +23,7 @@ TERMUX_PKG_SHA256=(
 	"bb755e2a28fac2eb6b02981fbc72cc11e225a726d71ddffd0091055984261a16"
 	"8bb29c7bd6f22356e5583e794bed4a0b3e6dfcbcadb49974fc9270ccca1e5557"
 	"9f7202ec6d8353932ef865d33f5872e4b7a1356e9032da7cd09c3a0c5bb2b7de"
+	"76f958dd97b1cf4d8862d1f0986a47d4bdfa8845252bae15ef0f40de3b95961f"
 )
 TERMUX_PKG_DEPENDS="glslang, libandroid-spawn, libc++, lz4, spirv-tools"
 TERMUX_PKG_BUILD_DEPENDS="clang, cmake, git, glm, python, spirv-headers, stb, vulkan-headers, vulkan-loader"
@@ -44,6 +47,7 @@ TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 -DSLANG_OVERRIDE_CMARK_PATH=$TERMUX_PKG_BUILDDIR
 -DSLANG_OVERRIDE_MINIZ_PATH=$TERMUX_PKG_BUILDDIR
 -DSLANG_OVERRIDE_UNORDERED_DENSE_PATH=$TERMUX_PKG_BUILDDIR
+-DSLANG_OVERRIDE_FAST_FLOAT_PATH=$TERMUX_PKG_BUILDDIR
 "
 # Delete Unix backward compatibility symlink (libslang -> libslang-compiler)
 TERMUX_PKG_RM_AFTER_INSTALL="
@@ -55,6 +59,7 @@ termux_step_post_get_source() {
 	ln -s "$TERMUX_PKG_SRCDIR/swift-cmark-$_SLANG_CMARK_VERSION"               "$TERMUX_PKG_BUILDDIR/cmark"
 	ln -s "$TERMUX_PKG_SRCDIR/miniz-$_SLANG_MINIZ_VERSION"                     "$TERMUX_PKG_BUILDDIR/miniz"
 	ln -s "$TERMUX_PKG_SRCDIR/unordered_dense-$_SLANG_UNORDERED_DENSE_VERSION" "$TERMUX_PKG_BUILDDIR/unordered_dense"
+	ln -s "$TERMUX_PKG_SRCDIR/fast_float-$_SLANG_FAST_FLOAT_VERSION"           "$TERMUX_PKG_BUILDDIR/fast_float"
 
 	cd "$TERMUX_PKG_SRCDIR"
 
