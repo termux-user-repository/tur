@@ -1,0 +1,126 @@
+<?xml version="1.0"?>
+<dump>
+  <flags name="ClapperGtkVideoActionMask" get-type="clapper_gtk_video_action_mask_get_type">
+    <member name="CLAPPER_GTK_VIDEO_ACTION_NONE" nick="none" value="0"/>
+    <member name="CLAPPER_GTK_VIDEO_ACTION_REVEAL_OVERLAYS" nick="reveal-overlays" value="1"/>
+    <member name="CLAPPER_GTK_VIDEO_ACTION_TOGGLE_PLAY" nick="toggle-play" value="2"/>
+    <member name="CLAPPER_GTK_VIDEO_ACTION_TOGGLE_FULLSCREEN" nick="toggle-fullscreen" value="4"/>
+    <member name="CLAPPER_GTK_VIDEO_ACTION_SEEK_REQUEST" nick="seek-request" value="8"/>
+    <member name="CLAPPER_GTK_VIDEO_ACTION_ANY" nick="any" value="67108863"/>
+  </flags>
+  <class name="ClapperGtkAv" get-type="clapper_gtk_av_get_type" parents="GtkWidget,GInitiallyUnowned,GObject">
+    <implements name="GtkAccessible"/>
+    <implements name="GtkBuildable"/>
+    <implements name="GtkConstraintTarget"/>
+    <property name="player" type="ClapperPlayer" flags="1073742049"/>
+    <property name="auto-inhibit" type="gboolean" flags="1073742051" default-value="FALSE"/>
+    <property name="inhibited" type="gboolean" flags="1073742049" default-value="FALSE"/>
+  </class>
+  <class name="ClapperGtkAudio" get-type="clapper_gtk_audio_get_type" parents="ClapperGtkAv,GtkWidget,GInitiallyUnowned,GObject">
+    <implements name="GtkAccessible"/>
+    <implements name="GtkBuildable"/>
+    <implements name="GtkConstraintTarget"/>
+    <property name="child" type="GtkWidget" flags="227"/>
+  </class>
+  <class name="ClapperGtkContainer" get-type="clapper_gtk_container_get_type" parents="GtkWidget,GInitiallyUnowned,GObject">
+    <implements name="GtkAccessible"/>
+    <implements name="GtkBuildable"/>
+    <implements name="GtkConstraintTarget"/>
+    <property name="width-target" type="gint" flags="1073742051" default-value="-1"/>
+    <property name="height-target" type="gint" flags="1073742051" default-value="-1"/>
+    <property name="adaptive-width" type="gint" flags="1073742051" default-value="-1"/>
+    <property name="adaptive-height" type="gint" flags="1073742051" default-value="-1"/>
+    <signal name="adapt" return="void" when="last" no-recurse="1" no-hooks="1">
+      <param type="gboolean"/>
+    </signal>
+  </class>
+  <class name="ClapperGtkBillboard" get-type="clapper_gtk_billboard_get_type" parents="ClapperGtkContainer,GtkWidget,GInitiallyUnowned,GObject">
+    <implements name="GtkAccessible"/>
+    <implements name="GtkBuildable"/>
+    <implements name="GtkConstraintTarget"/>
+  </class>
+  <class name="ClapperGtkExtraMenuButton" get-type="clapper_gtk_extra_menu_button_get_type" parents="GtkWidget,GInitiallyUnowned,GObject">
+    <implements name="GtkAccessible"/>
+    <implements name="GtkBuildable"/>
+    <implements name="GtkConstraintTarget"/>
+    <property name="volume-visible" type="gboolean" flags="1073742051" default-value="TRUE"/>
+    <property name="speed-visible" type="gboolean" flags="1073742051" default-value="TRUE"/>
+    <property name="can-open-subtitles" type="gboolean" flags="1073742051" default-value="FALSE"/>
+    <signal name="open-subtitles" return="void" when="last" no-recurse="1" no-hooks="1">
+      <param type="ClapperMediaItem"/>
+    </signal>
+  </class>
+  <class name="ClapperGtkLeadContainer" get-type="clapper_gtk_lead_container_get_type" parents="ClapperGtkContainer,GtkWidget,GInitiallyUnowned,GObject">
+    <implements name="GtkAccessible"/>
+    <implements name="GtkBuildable"/>
+    <implements name="GtkConstraintTarget"/>
+    <property name="leading" type="gboolean" flags="1073742051" default-value="TRUE"/>
+    <property name="blocked-actions" type="ClapperGtkVideoActionMask" flags="1073742051" default-value="CLAPPER_GTK_VIDEO_ACTION_NONE"/>
+  </class>
+  <class name="ClapperGtkNextItemButton" get-type="clapper_gtk_next_item_button_get_type" parents="GtkButton,GtkWidget,GInitiallyUnowned,GObject">
+    <implements name="GtkAccessible"/>
+    <implements name="GtkBuildable"/>
+    <implements name="GtkConstraintTarget"/>
+    <implements name="GtkActionable"/>
+  </class>
+  <class name="ClapperGtkPreviousItemButton" get-type="clapper_gtk_previous_item_button_get_type" parents="GtkButton,GtkWidget,GInitiallyUnowned,GObject">
+    <implements name="GtkAccessible"/>
+    <implements name="GtkBuildable"/>
+    <implements name="GtkConstraintTarget"/>
+    <implements name="GtkActionable"/>
+  </class>
+  <class name="ClapperGtkSeekBar" get-type="clapper_gtk_seek_bar_get_type" parents="GtkWidget,GInitiallyUnowned,GObject">
+    <implements name="GtkAccessible"/>
+    <implements name="GtkBuildable"/>
+    <implements name="GtkConstraintTarget"/>
+    <property name="reveal-labels" type="gboolean" flags="1073742051" default-value="TRUE"/>
+    <property name="seek-method" type="ClapperPlayerSeekMethod" flags="1073742051" default-value="CLAPPER_PLAYER_SEEK_METHOD_NORMAL"/>
+  </class>
+  <class name="ClapperGtkSimpleControls" get-type="clapper_gtk_simple_controls_get_type" parents="ClapperGtkContainer,GtkWidget,GInitiallyUnowned,GObject">
+    <implements name="GtkAccessible"/>
+    <implements name="GtkBuildable"/>
+    <implements name="GtkConstraintTarget"/>
+    <property name="fullscreenable" type="gboolean" flags="1073742051" default-value="TRUE"/>
+    <property name="seek-method" type="ClapperPlayerSeekMethod" flags="227" default-value="CLAPPER_PLAYER_SEEK_METHOD_NORMAL"/>
+    <property name="extra-menu-button" type="ClapperGtkExtraMenuButton" flags="1073742049"/>
+  </class>
+  <class name="ClapperGtkTitleHeader" get-type="clapper_gtk_title_header_get_type" parents="ClapperGtkLeadContainer,ClapperGtkContainer,GtkWidget,GInitiallyUnowned,GObject">
+    <implements name="GtkAccessible"/>
+    <implements name="GtkBuildable"/>
+    <implements name="GtkConstraintTarget"/>
+    <property name="current-title" type="gchararray" flags="1073742049" default-value="NULL"/>
+    <property name="fallback-to-uri" type="gboolean" flags="227" default-value="FALSE"/>
+  </class>
+  <class name="ClapperGtkTitleLabel" get-type="clapper_gtk_title_label_get_type" parents="GtkWidget,GInitiallyUnowned,GObject">
+    <implements name="GtkAccessible"/>
+    <implements name="GtkBuildable"/>
+    <implements name="GtkConstraintTarget"/>
+    <property name="media-item" type="ClapperMediaItem" flags="1073742051"/>
+    <property name="current-title" type="gchararray" flags="1073742049" default-value="NULL"/>
+    <property name="fallback-to-uri" type="gboolean" flags="1073742051" default-value="FALSE"/>
+  </class>
+  <class name="ClapperGtkToggleFullscreenButton" get-type="clapper_gtk_toggle_fullscreen_button_get_type" parents="GtkButton,GtkWidget,GInitiallyUnowned,GObject">
+    <implements name="GtkAccessible"/>
+    <implements name="GtkBuildable"/>
+    <implements name="GtkConstraintTarget"/>
+    <implements name="GtkActionable"/>
+  </class>
+  <class name="ClapperGtkTogglePlayButton" get-type="clapper_gtk_toggle_play_button_get_type" parents="GtkButton,GtkWidget,GInitiallyUnowned,GObject">
+    <implements name="GtkAccessible"/>
+    <implements name="GtkBuildable"/>
+    <implements name="GtkConstraintTarget"/>
+    <implements name="GtkActionable"/>
+  </class>
+  <class name="ClapperGtkVideo" get-type="clapper_gtk_video_get_type" parents="ClapperGtkAv,GtkWidget,GInitiallyUnowned,GObject">
+    <implements name="GtkAccessible"/>
+    <implements name="GtkBuildable"/>
+    <implements name="GtkConstraintTarget"/>
+    <property name="fade-delay" type="guint" flags="1073742051" default-value="3000"/>
+    <property name="touch-fade-delay" type="guint" flags="1073742051" default-value="5000"/>
+    <signal name="toggle-fullscreen" return="void" when="last" no-recurse="1" no-hooks="1">
+    </signal>
+    <signal name="seek-request" return="void" when="last" no-recurse="1" no-hooks="1">
+      <param type="gboolean"/>
+    </signal>
+  </class>
+</dump>
