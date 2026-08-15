@@ -1,0 +1,39 @@
+diff --git a/build.xml b/build.xml
+index e02160dfb..6f2bd332f 100644
+--- a/build.xml
++++ b/build.xml
+@@ -218,8 +218,8 @@
+             toFile="${app.deb.desktop.temp}"
+             name="${product.name}"
+             comment="${app.description.short}"
+-            exec="/usr/bin/${app.package}"
+-            icon="/usr/share/java/${app.package}/icon.png"
++            exec="@TERMUX_PREFIX@/bin/${app.package}"
++            icon="@TERMUX_PREFIX@/share/java/${app.package}/icon.png"
+             categories="Development;Network;Utility;WebDevelopment;Java"
+         />
+         <deb 
+@@ -231,11 +231,11 @@
+             <version upstream="${version}" />
+             <maintainer name="${vendor}" email="${app.vendor.mail}"/>
+             <description synopsis="${app.description.short}">${app.description}</description>
+-            <tarfileset dir="${dist.dir}" prefix="usr/share/java/${app.package}">
++            <tarfileset dir="${dist.dir}" prefix="@TERMUX_PREFIX@/share/java/${app.package}">
+                 <include name="**"/>
+             </tarfileset>
+-            <tarfileset file="${dist.dir}/${app.script}" fullpath="usr/bin/${app.package}" filemode="755" />
+-            <tarfileset file="${app.deb.desktop.temp}" fullpath="usr/share/applications/${app.deb.desktop.file}.desktop"/>
++            <tarfileset file="${dist.dir}/${app.script}" fullpath="@TERMUX_PREFIX@/bin/${app.package}" filemode="755" />
++            <tarfileset file="${app.deb.desktop.temp}" fullpath="@TERMUX_PREFIX@/share/applications/${app.deb.desktop.file}.desktop"/>
+         </deb>
+         <property name="deb.file" value="${releases.dir}/${prefix.filename}_${version}${version.suffix}.deb" />        
+         <move file="${deb.file.orig}" tofile="${deb.file}" />
+@@ -340,7 +340,7 @@
+     </target>
+     <target name="osx-app-bundle-no-dist" depends="-loadversion">
+         <property name="app.script.temp" value="${app.bundle.dir}/${app.osx.dir}.app/Contents/MacOS/${app.osx.dir}"/>
+-        <echo file="${app.script.temp}">#!/usr/bin/env bash&#10;$(dirname "$${BASH_SOURCE[0]}")/../Resources/${app.script} "$$&#64;"</echo>
++        <echo file="${app.script.temp}">#!@TERMUX_PREFIX@/bin/env bash&#10;$(dirname "$${BASH_SOURCE[0]}")/../Resources/${app.script} "$$&#64;"</echo>
+         <property name="app.info.temp" value="${app.bundle.dir}/${app.osx.dir}.app/Contents/Info.plist"/>
+         <echo file="${app.info.temp}"><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+ <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
