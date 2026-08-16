@@ -140,7 +140,7 @@ termux_step_make() {
 
 	# Use rust nightly to build codex, as std::fs::File::lock should get included in it
 	rustup toolchain install nightly
-	rustup target add aarch64-linux-android --toolchain nightly
+	rustup target add $CARGO_TARGET_NAME --toolchain nightly
 	rustup component add rust-src --toolchain nightly
 
 	local env_name=${CARGO_TARGET_NAME@U}
