@@ -25,7 +25,7 @@ termux_step_make() {
 		ln -s ${TERMUX_PKG_HOSTBUILD_DIR}/bin/mk ${TERMUX_PKG_SRCDIR}/bin/mk
 		export _P9P_BOOTSTRAP=true
 	fi
-	./INSTALL -b 2>&1 | sed 's/$/\n/'
+	./INSTALL -b
 }
 
 termux_step_make_install() {
@@ -34,7 +34,7 @@ termux_step_make_install() {
 	rm -f ${TERMUX_PREFIX}/bin/9
 	(
 		cd ${dir}
-		./INSTALL -c 2>&1 | sed 's/$/\n/'
+		./INSTALL -c
 	)
 	ln -s ../lib/plan9/bin/9 ${TERMUX_PREFIX}/bin/9
 }
