@@ -4,7 +4,7 @@ TERMUX_PKG_LICENSE="Apache-2.0, MIT"
 TERMUX_PKG_LICENSE_FILE="../LICENSE, ../NOTICE"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="0.122.0"
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_REVISION=2
 TERMUX_PKG_SRCURL="https://github.com/openai/codex/archive/refs/tags/rust-v$TERMUX_PKG_VERSION.tar.gz"
 TERMUX_PKG_SHA256=b012a31ce96076dd2a71a3b9606c8a598952140d896a7b12ec07b1471ed130da
 TERMUX_PKG_DEPENDS="libc++, openssl"
@@ -142,6 +142,8 @@ termux_step_make() {
 	rustup toolchain install nightly
 	rustup target add $CARGO_TARGET_NAME --toolchain nightly
 	rustup component add rust-src --toolchain nightly
+	rm -f $TERMUX_PKG_SRCDIR/rust-toolchain.toml
+	echo "nightly" > $TERMUX_PKG_SRCDIR/rust-toolchain
 
 	local env_name=${CARGO_TARGET_NAME@U}
 	env_name=${env_name//-/_}
