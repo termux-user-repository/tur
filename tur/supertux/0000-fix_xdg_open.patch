@@ -1,0 +1,12 @@
+diff -ur a/src/util/file_system.cpp b/src/util/file_system.cpp
+--- a/src/util/file_system.cpp	2021-12-23 00:01:58.000000000 +0100
++++ b/src/util/file_system.cpp	2025-03-17 22:46:31.251141036 +0100
+@@ -234,7 +234,7 @@
+   #if defined(__APPLE__)
+   std::string cmd = "open \"" + path + "\"";
+   #else
+-  std::string cmd = "xdg-open \"" + path + "\"";
++  std::string cmd = "xdg-utils-xdg-open \"" + path + "\"";
+   #endif
+ 
+   int ret = system(cmd.c_str());
