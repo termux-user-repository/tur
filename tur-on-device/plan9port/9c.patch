@@ -22,7 +22,14 @@
  }
  
  quiet()
-@@ -65,6 +73,10 @@ quiet()
+@@ -59,12 +67,16 @@ quiet()
+ 	grep -v '__p9l_autolib_' "$1" |
+ 	$egrep -v "$ignore" |
+ 	sed 's/ .first use in this function.$//; s/\"\([^\"][^\"]*\)\", line \([0-9][0-9]*\)/\1:\2/g' |
+-	$(which uniq) 1>&2  # avoid built-in uniq on SunOS
++	$(command -v uniq) 1>&2  # avoid built-in uniq on SunOS
+ }
+ 
  useclang()
  {
  	cc=${CC9:-clang}
