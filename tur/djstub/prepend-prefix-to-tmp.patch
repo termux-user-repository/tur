@@ -1,0 +1,11 @@
+--- a/djlink
++++ b/djlink
+@@ -75,7 +75,7 @@ if [ -n "$D" ]; then
+     echo "$0: -d is specified but $SO is stripped"
+     exit 1
+   fi
+-  DBG="/tmp/$D"
++  DBG="@TERMUX_PREFIX@/tmp/$D"
+   TMP=$(mktemp)
+   if test "$OS" == "Darwin"; then
+     dsymutil -f $SO -o $DBG
