@@ -10,12 +10,6 @@ TERMUX_PKG_DEPENDS="libresolv-wrapper, libx11, freetype, libandroid-utimes"
 TERMUX_PKG_BUILD_IN_SRC=true
 
 termux_step_make() {
-	export _P9P_BOOTSTRAP=false
-	if [ "${TERMUX_ON_DEVICE_BUILD}" = 'false' ]
-	then
-		ln -s ${TERMUX_PKG_HOSTBUILD_DIR}/bin/mk ${TERMUX_PKG_SRCDIR}/bin/mk
-		export _P9P_BOOTSTRAP=true
-	fi
 	./INSTALL -b
 }
 
@@ -29,3 +23,5 @@ termux_step_make_install() {
 	)
 	ln -s ../lib/plan9/bin/9 ${TERMUX_PREFIX}/bin/9
 }
+
+export _P9P_BOOTSTRAP=false
