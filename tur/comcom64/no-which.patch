@@ -1,0 +1,15 @@
+diff --git a/src/link.sh b/src/link.sh
+index f2f5ae4..b96c72f 100755
+--- a/src/link.sh
++++ b/src/link.sh
+@@ -16,8 +16,8 @@ shift
+ O=$1
+ shift
+
+-OD=`which objdump 2>/dev/null`
+-[ -n "$OD" ] || OD=`which llvm-objdump 2>/dev/null`
++OD=`command -v objdump 2>/dev/null`
++[ -n "$OD" ] || OD=`command -v llvm-objdump 2>/dev/null`
+ [ -n "$OD" ] || die "objdump not found"
+
+ FLG=$($OD -t $L | grep '\*ABS\*.*_shm_flags' | sed -E 's/0*([^ ]+) .+/0x\1/')
