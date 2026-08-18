@@ -1,0 +1,15 @@
+diff --git a/src/libc/dj64/parsers/mkproto.sh b/src/libc/dj64/parsers/mkproto.sh
+index 125c4ce..05237a2 100755
+--- a/src/libc/dj64/parsers/mkproto.sh
++++ b/src/libc/dj64/parsers/mkproto.sh
+@@ -34,8 +34,8 @@ list_syms2() {
+     LC_ALL=C ${CROSS_NM} -A "$1" | grep -E " $2 "\|" $3 " | sed -e 's/.* //' -e 's/^_//'
+ }
+
+-TF=/tmp/tagsxx
+-TL=/tmp/a.so
++TF=@TERMUX_PREFIX@/tmp/tagsxx
++TL=@TERMUX_PREFIX@/tmp/a.so
+ set -e
+
+ ${CROSS_LD} -melf_i386 -shared -Bsymbolic -z notext -o $TL --whole-archive "$1"
