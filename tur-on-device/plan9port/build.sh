@@ -26,4 +26,4 @@ termux_step_make_install() {
 	ln -s ../lib/plan9/bin/9 ${TERMUX_PREFIX}/bin/9
 }
 
-export _P9P_BOOTSTRAP=false
+export _P9P_BOOTSTRAP=true
