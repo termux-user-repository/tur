@@ -10,6 +10,8 @@ TERMUX_PKG_DEPENDS="libresolv-wrapper, libx11, freetype, libandroid-utimes, liba
 TERMUX_PKG_BUILD_IN_SRC=true
 
 termux_step_make() {
+	LDFLAGS+=' -landroid-utimes'
+	LDFLAGS+=' -landroid-support'
 	./INSTALL -b
 }
 
