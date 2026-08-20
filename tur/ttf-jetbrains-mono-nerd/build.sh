@@ -4,6 +4,7 @@ TERMUX_PKG_LICENSE="OFL-1.1"
 TERMUX_PKG_LICENSE_FILE="OFL.txt"
 TERMUX_PKG_MAINTAINER="Gouranga Das Samrat <gouranga.das.khulna@gmail.com>"
 TERMUX_PKG_VERSION=3.5.0
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://github.com/ryanoasis/nerd-fonts/releases/download/v${TERMUX_PKG_VERSION}/JetBrainsMono.zip
 TERMUX_PKG_SHA256=9577de1ae84ec523df16fc69bac5338b89497a5b4fb91489e2dcb79dc06ac2b5
 TERMUX_PKG_PLATFORM_INDEPENDENT=true
