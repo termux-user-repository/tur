@@ -2,15 +2,14 @@ TERMUX_PKG_HOMEPAGE=https://bun.com
 TERMUX_PKG_DESCRIPTION="Incredibly fast JavaScript runtime, bundler, test runner, and package manager"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="Gouranga Das Samrat <gouranga.das.khulna@gmail.com>"
-TERMUX_PKG_VERSION="1.3.14"
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_VERSION="1.4.0"
 TERMUX_PKG_SRCURL=(
 	https://github.com/oven-sh/bun/releases/download/bun-v$TERMUX_PKG_VERSION/bun-linux-aarch64-android.zip
 	https://github.com/oven-sh/bun/releases/download/bun-v$TERMUX_PKG_VERSION/bun-linux-x64-android.zip
 )
 TERMUX_PKG_SHA256=(
-	992bcf239c91bedd873f8150cceef3db3b0618fa78161badd3c14dc6d24fe560
-	9ce0fccae24c55c5e59f6ee87c6defd8c79d0dc8a9ad2c214abd177c23c31d27
+	42544d7438bb92c7e7df7d30b9a5858cb7a834636608e5b850f59138283567fc
+	3425dbabc87aad92eb37d384d561edd4d676ee2b328c02d77d761504aeef6764
 )
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_EXCLUDED_ARCHES="arm,i686"
