@@ -1,0 +1,30 @@
+For some reason that is unknown,
+on Android, hnefatafl-copenhagen's default
+rendering mode does not work and has invisible pieces,
+but the ascii rendering mode does work.
+
+--- a/src/bin/hnefatafl-client/command_line.rs
++++ b/src/bin/hnefatafl-client/command_line.rs
+@@ -54,9 +54,9 @@ pub(crate) struct Args {
+     #[arg(long)]
+     pub social_preview: bool,
+ 
+-    /// Render everything in ASCII
++    /// Disable rendering everything in ASCII
+     #[arg(long)]
+-    pub ascii: bool,
++    pub noascii: bool,
+ 
+     /// Build the manpage
+     #[arg(long)]
+--- a/src/bin/hnefatafl-client/main.rs
++++ b/src/bin/hnefatafl-client/main.rs
+@@ -287,7 +287,7 @@ fn init_client() -> Client {
+     client.error_persistent = error;
+ 
+     let args = Args::parse();
+-    if args.ascii {
++    if !args.noascii {
+         client.chars.ascii();
+     }
+ 
