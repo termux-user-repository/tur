@@ -1,0 +1,931 @@
+--- a/linux.c	2006-03-03 21:52:46.000000000 -0500
++++ b/linux.c	2026-08-08 23:44:51.389797888 -0400
+@@ -12,6 +12,7 @@
+ #include <stdio.h>
+ #include <fcntl.h>
+ #include <errno.h>
++#include <limits.h>
+ #include <sys/time.h>
+ #include <dirent.h>
+ 
+@@ -19,12 +20,85 @@
+ #include "usbi.h"
+ 
+ static char usb_path[PATH_MAX + 1] = "";
++static int termux_usb_fd = -1;
++static int termux_usb_bus = -1;
++static int termux_usb_device = -1;
++
++
++/* Diagnostic helpers */
++static const char *usb_transfer_name(int urbtype, int ep)
++{
++  if (urbtype == USB_URB_TYPE_BULK) {
++    if (ep & USB_ENDPOINT_IN)
++      return "bulk-read";
++    return "bulk-write";
++  }
++
++  if (urbtype == USB_URB_TYPE_INTERRUPT) {
++    if (ep & USB_ENDPOINT_IN)
++      return "interrupt-read";
++    return "interrupt-write";
++  }
++
++  return "unknown";
++}
++
++static void usb_trace_timestamp(void)
++{
++  struct timeval tv;
++
++  gettimeofday(&tv, NULL);
++
++  fprintf(stderr, "[%ld.%03ld] ",
++    (long)tv.tv_sec,
++    tv.tv_usec / 1000);
++}
++
++/*
++ * Termux grants access to one USB device by inheriting an already-open
++ * descriptor and exporting its number in TERMUX_USB_FD.  Resolve that
++ * descriptor to the corresponding /dev/bus/usb/BBB/DDD path so that the
++ * legacy libusb-0.1 bus/device model can represent it.
++ */
++static int termux_usb_get_devinfo(int fd, int *busnum, int *devnum)
++{
++  char proc_path[PATH_MAX + 1];
++  char usb_path_name[PATH_MAX + 1];
++  ssize_t length;
++
++  snprintf(proc_path, sizeof(proc_path), "/proc/self/fd/%d", fd);
++
++  length = readlink(proc_path, usb_path_name, sizeof(usb_path_name) - 1);
++  if (length < 0)
++    return -1;
++
++  usb_path_name[length] = '\0';
++
++  if (sscanf(usb_path_name, "/dev/bus/usb/%d/%d", busnum, devnum) != 2)
++    return -1;
++
++  return 0;
++}
+ 
+ static int device_open(struct usb_device *dev)
+ {
+   char filename[PATH_MAX + 1];
+   int fd;
+ 
++  /*
++   * The descriptor supplied by termux-usb is the only usable access path
++   * under Android.  Never close the original descriptor; each libusb-0.1
++   * handle receives its own duplicate.
++   */
++  if (termux_usb_fd >= 0) {
++    fd = dup(termux_usb_fd);
++    if (fd < 0)
++      USB_ERROR_STR(-errno,
++        "failed to duplicate TERMUX_USB_FD: %s", strerror(errno));
++
++    return fd;
++  }
++
+   snprintf(filename, sizeof(filename) - 1, "%s/%s/%s",
+     usb_path, dev->bus->dirname, dev->filename);
+ 
+@@ -42,7 +116,6 @@
+ int usb_os_open(usb_dev_handle *dev)
+ {
+   dev->fd = device_open(dev->device);
+-
+   return 0;
+ }
+ 
+@@ -75,33 +148,61 @@
+ 
+ int usb_claim_interface(usb_dev_handle *dev, int interface)
+ {
++  errno = 0; /* diagnostic only */
+   int ret;
+-
+   ret = ioctl(dev->fd, IOCTL_USB_CLAIMINTF, &interface);
++
++  int saved_errno = errno;
++  if (ret < 0) {
++    usb_trace_timestamp();
++    fprintf(stderr, "usb_claim_interface failed: ret=%d errno=%d (%s)\n",
++            ret, saved_errno, strerror(saved_errno));
++  } else {
++    usb_trace_timestamp();
++    fprintf(stderr, "usb_claim_interface succeeded: ret=%d\n", ret);
++  }
++
+   if (ret < 0) {
+     if (errno == EBUSY && usb_debug > 0)
+-      fprintf(stderr, "Check that you have permissions to write to %s/%s and, if you don't, that you set up hotplug (http://linux-hotplug.sourceforge.net/) correctly.\n", dev->bus->dirname, dev->device->filename);
++      fprintf(stderr, "Check that you have permissions to write to %s/%s.\n",
++					  dev->bus->dirname, dev->device->filename);
+ 
+     USB_ERROR_STR(-errno, "could not claim interface %d: %s", interface,
+ 	strerror(errno));
+   }
+ 
+   dev->interface = interface;
+-
+   return 0;
+ }
+ 
+ int usb_release_interface(usb_dev_handle *dev, int interface)
+ {
+   int ret;
++  int saved_errno;
+ 
+   ret = ioctl(dev->fd, IOCTL_USB_RELEASEINTF, &interface);
+-  if (ret < 0)
+-    USB_ERROR_STR(-errno, "could not release intf %d: %s", interface,
+-    	strerror(errno));
++  saved_errno = errno;
+ 
+-  dev->interface = -1;
++  if (ret < 0) {
++    if (termux_usb_fd >= 0 && saved_errno == EINVAL) {
++      if (usb_debug)
++      {
++            usb_trace_timestamp();
++			fprintf(stderr,
++				"usb_release_interface: ignoring "
++				"EINVAL for Termux USB fd %d\n",
++				termux_usb_fd);
++      }
++      dev->interface = -1;
++      return 0;
++    }
++
++    USB_ERROR_STR(-saved_errno,
++			"could not release intf %d: %s",
++			interface, strerror(saved_errno));
++  }
+ 
++  dev->interface = -1;
+   return 0;
+ }
+ 
+@@ -150,8 +251,53 @@
+   ctrl.timeout = timeout;
+ 
+   ret = ioctl(dev->fd, IOCTL_USB_CONTROL, &ctrl);
+-  if (ret < 0)
+-    USB_ERROR_STR(-errno, "error sending control message: %s", strerror(errno));
++  //if (ret < 0)
++  //  USB_ERROR_STR(-errno, "error sending control message: %s", strerror(errno));
++  int saved_errno = errno;
++
++  if (ret < 0) {
++    if (usb_debug >= 1) {
++      usb_trace_timestamp();
++      fprintf(stderr,
++        "USB control error: "
++        "fd=%d requesttype=0x%02x request=0x%02x "
++        "value=0x%04x index=0x%04x requested=%d timeout=%d "
++        "ret=%d errno=%d (%s) "
++        "usb_error_type=%d usb_error_str=\"%s\"\n",
++        dev->fd,
++        requesttype,
++        request,
++        value,
++        index,
++        size,
++        timeout,
++        ret,
++        saved_errno,
++        strerror(saved_errno),
++        usb_error_type,
++        usb_error_str);
++    }
++
++    USB_ERROR_STR(-saved_errno,
++      "error sending control message: %s",
++      strerror(saved_errno));
++  } else if (usb_debug >= 3) {
++    usb_trace_timestamp();
++    fprintf(stderr,
++      "USB control: "
++      "fd=%d requesttype=0x%02x request=0x%02x "
++      "value=0x%04x index=0x%04x requested=%d "
++      "actual=%d timeout=%d ret=%d\n",
++      dev->fd,
++      requesttype,
++      request,
++      value,
++      index,
++      size,
++      ret,
++      timeout,
++      ret);
++  }
+ 
+   return ret;
+ }
+@@ -168,6 +314,22 @@
+   struct usb_urb *context;
+   int ret, waiting;
+ 
++  const char *transfer_name;
++
++  transfer_name = usb_transfer_name(urbtype, ep);
++
++  if (usb_debug >= 3) {
++    usb_trace_timestamp();
++    fprintf(stderr,
++      "USB transfer begin: op=%s fd=%d ep=0x%02x "
++      "requested=%d timeout=%d\n",
++      transfer_name,
++      dev->fd,
++      ep,
++      size,
++      timeout);
++  }
++
+   /*
+    * HACK: The use of urb.usercontext is a hack to get threaded applications
+    * sort of working again. Threaded support is still not recommended, but
+@@ -208,31 +370,92 @@
+     urb.usercontext = NULL;
+ 
+     ret = ioctl(dev->fd, IOCTL_USB_SUBMITURB, &urb);
++    //if (ret < 0) {
++    //  USB_ERROR_STR(-errno, "error submitting URB: %s", strerror(errno));
++    //  return ret;
++    //}
++	
+     if (ret < 0) {
+-      USB_ERROR_STR(-errno, "error submitting URB: %s", strerror(errno));
++      int saved_errno = errno;
++
++      if (usb_debug >= 1) {
++		usb_trace_timestamp();
++        fprintf(stderr,
++          "USB URB submit error: "
++          "op=%s fd=%d ep=0x%02x "
++          "requested=%d total=%d bytesdone=%d "
++          "ret=%d errno=%d (%s) "
++          "usb_error_type=%d usb_error_str=\"%s\"\n",
++          transfer_name,
++          dev->fd,
++          ep,
++          requested,
++          size,
++          bytesdone,
++          ret,
++          saved_errno,
++          strerror(saved_errno),
++          usb_error_type,
++          usb_error_str);
++      }
++
++      USB_ERROR_STR(-saved_errno,
++        "error submitting URB: %s",
++        strerror(saved_errno));
+       return ret;
+     }
+ 
++    if (usb_debug >= 3) {
++      usb_trace_timestamp();
++      fprintf(stderr,
++        "USB URB submitted: "
++        "op=%s fd=%d ep=0x%02x requested=%d "
++        "total=%d bytesdone=%d\n",
++        transfer_name,
++        dev->fd,
++        ep,
++        requested,
++        size,
++        bytesdone);
++    }
++
+     FD_ZERO(&writefds);
+     FD_SET(dev->fd, &writefds);
+ 
+ restart:
+     waiting = 1;
+     context = NULL;
+-    while (!urb.usercontext && ((ret = ioctl(dev->fd, IOCTL_USB_REAPURBNDELAY, &context)) == -1) && waiting) {
+-      tv.tv_sec = 0;
+-      tv.tv_usec = 1000; // 1 msec
+-      select(dev->fd + 1, NULL, &writefds, NULL, &tv); //sub second wait
+-
+-      if (timeout) {
+-        /* compare with actual time, as the select timeout is not that precise */
+-        gettimeofday(&tv_now, NULL);
+-
+-        if ((tv_now.tv_sec > tv_ref.tv_sec) ||
+-            ((tv_now.tv_sec == tv_ref.tv_sec) && (tv_now.tv_usec >= tv_ref.tv_usec)))
+-          waiting = 0;
+-      }
+-    }
++		while (!urb.usercontext) {
++		int reap_errno;
++
++		ret = ioctl(dev->fd,
++					IOCTL_USB_REAPURBNDELAY,
++					&context);
++		reap_errno = errno;
++
++		if (ret != -1)
++		  break;
++
++		if (reap_errno != EAGAIN)
++		  break;
++
++		tv.tv_sec = 0;
++		tv.tv_usec = 1000;
++
++		select(dev->fd + 1, NULL, &writefds, NULL, &tv);
++
++		if (timeout) {
++		  gettimeofday(&tv_now, NULL);
++
++		  if ((tv_now.tv_sec > tv_ref.tv_sec) ||
++			  ((tv_now.tv_sec == tv_ref.tv_sec) &&
++			   (tv_now.tv_usec >= tv_ref.tv_usec)))
++			waiting = 0;
++		}
++
++		if (!waiting)
++		  break;
++		}
+ 
+     if (context && context != &urb) {
+       context->usercontext = URB_USERCONTEXT_COOKIE;
+@@ -245,10 +468,63 @@
+      * something happened during the reaping and we should return that
+      * error now
+      */
+-    if (ret < 0 && !urb.usercontext && errno != EAGAIN)
+-      USB_ERROR_STR(-errno, "error reaping URB: %s", strerror(errno));
++    //if (ret < 0 && !urb.usercontext && errno != EAGAIN)
++    //  USB_ERROR_STR(-errno, "error reaping URB: %s", strerror(errno));
++    if (ret < 0 && !urb.usercontext) {
++      int reap_errno = errno;
++
++      if (reap_errno != EAGAIN) {
++        if (usb_debug >= 1) {
++          usb_trace_timestamp();
++          fprintf(stderr,
++            "USB URB reap error: "
++            "op=%s fd=%d ep=0x%02x "
++            "requested=%d actual=%d "
++            "total=%d bytesdone=%d "
++            "ret=%d errno=%d (%s) "
++            "urb_status=%d "
++            "usb_error_type=%d usb_error_str=\"%s\"\n",
++            transfer_name,
++            dev->fd,
++            ep,
++            requested,
++            urb.actual_length,
++            size,
++            bytesdone,
++            ret,
++            reap_errno,
++            strerror(reap_errno),
++            urb.status,
++            usb_error_type,
++            usb_error_str);
++        }
++
++        USB_ERROR_STR(-reap_errno,
++          "error reaping URB: %s",
++          strerror(reap_errno));
++      }
++    }
+ 
+     bytesdone += urb.actual_length;
++    if (usb_debug >= 3) {
++      usb_trace_timestamp();
++      fprintf(stderr,
++        "USB URB complete: "
++        "op=%s fd=%d ep=0x%02x "
++        "requested=%d actual=%d "
++        "total=%d bytesdone=%d "
++        "ret=%d status=%d\n",
++        transfer_name,
++        dev->fd,
++        ep,
++        requested,
++        urb.actual_length,
++        size,
++        bytesdone,
++        ret,
++        urb.status);
++    }
++
+   } while ((ret == 0 || urb.usercontext) && bytesdone < size && urb.actual_length == requested);
+ 
+   /* If the URB didn't complete in success or error, then let's unlink it */
+@@ -260,9 +536,48 @@
+     else
+       rc = urb.status;
+ 
++    if (usb_debug >= 1) {
++      usb_trace_timestamp();
++      fprintf(stderr,
++        "USB URB incomplete: "
++        "op=%s fd=%d ep=0x%02x "
++        "requested=%d actual=%d "
++        "total=%d bytesdone=%d "
++        "waiting=%d ret=%d urb_status=%d\n",
++        transfer_name,
++        dev->fd,
++        ep,
++        requested,
++        urb.actual_length,
++        size,
++        bytesdone,
++        waiting,
++        ret,
++        urb.status);
++    }
++
+     ret = ioctl(dev->fd, IOCTL_USB_DISCARDURB, &urb);
+-    if (ret < 0 && errno != EINVAL && usb_debug >= 1)
+-      fprintf(stderr, "error discarding URB: %s", strerror(errno));
++    {
++      int discard_errno = errno;
++
++      if (ret < 0 &&
++          discard_errno != EINVAL &&
++          usb_debug >= 1) {
++		usb_trace_timestamp();
++        fprintf(stderr,
++          "USB URB discard error: "
++          "op=%s fd=%d ep=0x%02x "
++          "ret=%d errno=%d (%s)\n",
++          transfer_name,
++          dev->fd,
++          ep,
++          ret,
++          discard_errno,
++          strerror(discard_errno));
++      }
++    }
++    //if (ret < 0 && errno != EINVAL && usb_debug >= 1)
++    //  fprintf(stderr, "error discarding URB: %s", strerror(errno));
+ 
+     /*
+      * When the URB is unlinked, it gets moved to the completed list and
+@@ -271,18 +586,116 @@
+      */
+     ioctl(dev->fd, IOCTL_USB_REAPURB, &context);
+ 
++    if (ret < 0 && usb_debug >= 2) {
++      int cleanup_errno = errno;
++
++      fprintf(stderr,
++        "USB URB cleanup reap: "
++        "op=%s fd=%d ep=0x%02x "
++        "ret=%d errno=%d (%s)\n",
++        transfer_name,
++        dev->fd,
++        ep,
++        ret,
++        cleanup_errno,
++        strerror(cleanup_errno));
++    }
++
+     return rc;
+   }
+ 
+   return bytesdone;
+ }
+ 
++
++int usb_bulk_read(usb_dev_handle *dev, int ep, char *bytes, int size,
++        int timeout)
++{
++  if (usb_debug) {
++    usb_trace_timestamp();
++    fprintf(stderr,
++      "ENTER usb_bulk_read: fd=%d ep=0x%02x size=%d timeout=%d\n",
++      dev->fd, ep, size, timeout);
++  }
++
++  int ret;
++
++  ep |= USB_ENDPOINT_IN;
++
++  if (usb_debug >= 2) {
++    usb_trace_timestamp();
++    fprintf(stderr,
++      "usb_bulk_read enter: fd=%d ep=0x%02x requested=%d timeout=%d\n",
++      dev->fd, ep, size, timeout);
++  }
++
++  ret = usb_urb_transfer(dev, ep, USB_URB_TYPE_BULK,
++                         bytes, size, timeout);
++
++  if (usb_debug >= 2) {
++    usb_trace_timestamp();
++    fprintf(stderr,
++      "usb_bulk_read leave: fd=%d ep=0x%02x requested=%d ret=%d\n",
++      dev->fd, ep, size, ret);
++  }
++
++  return ret;
++}
++
++
++int usb_bulk_write(usb_dev_handle *dev, int ep, char *bytes, int size,
++        int timeout)
++{
++  int ret;
++
++  if (usb_debug >= 2) {
++    usb_trace_timestamp();
++    fprintf(stderr,
++      "usb_bulk_write enter: fd=%d ep=0x%02x requested=%d timeout=%d\n",
++      dev->fd, ep, size, timeout);
++  }
++
++  ret = usb_urb_transfer(dev, ep, USB_URB_TYPE_BULK,
++                         bytes, size, timeout);
++
++  if (usb_debug >= 2) {
++    usb_trace_timestamp();
++    fprintf(stderr,
++      "usb_bulk_write leave: fd=%d ep=0x%02x requested=%d ret=%d\n",
++      dev->fd, ep, size, ret);
++  }
++
++  return ret;
++}
++
++#if 0
+ int usb_bulk_write(usb_dev_handle *dev, int ep, char *bytes, int size,
+ 	int timeout)
+ {
+   /* Ensure the endpoint address is correct */
+-  return usb_urb_transfer(dev, ep, USB_URB_TYPE_BULK, bytes, size,
+-		timeout);
++  //return usb_urb_transfer(dev, ep, USB_URB_TYPE_BULK, bytes, size,
++  //    timeout);
++  int ret;
++
++  if (usb_debug >= 4)
++  {
++    usb_trace_timestamp();
++    fprintf(stderr,
++      "usb_bulk_write enter: fd=%d ep=0x%02x requested=%d timeout=%d\n",
++      dev->fd, ep, size, timeout);
++  }
++  ret = usb_urb_transfer(dev, ep, USB_URB_TYPE_BULK,
++                         bytes, size, timeout);
++
++  if (usb_debug >= 4)
++  {
++    usb_trace_timestamp();
++    fprintf(stderr,
++      "usb_bulk_write leave: fd=%d ep=0x%02x requested=%d ret=%d\n",
++      dev->fd, ep, size, ret);
++  }
++
++  return ret;
+ }
+ 
+ int usb_bulk_read(usb_dev_handle *dev, int ep, char *bytes, int size,
+@@ -290,9 +703,30 @@
+ {
+   /* Ensure the endpoint address is correct */
+   ep |= USB_ENDPOINT_IN;
+-  return usb_urb_transfer(dev, ep, USB_URB_TYPE_BULK, bytes, size,
+-		timeout);
++  //return usb_urb_transfer(dev, ep, USB_URB_TYPE_BULK, bytes, size,
++  //    timeout);
++  if (usb_debug >= 4)
++  {
++    usb_trace_timestamp();
++    fprintf(stderr,
++      "usb_bulk_read enter: fd=%d ep=0x%02x requested=%d timeout=%d\n",
++      dev->fd, ep, size, timeout);
++  }
++
++  int ret = usb_urb_transfer(dev, ep, USB_URB_TYPE_BULK,
++                         bytes, size, timeout);
++
++  if (usb_debug >= 4)
++  {
++    usb_trace_timestamp();
++    fprintf(stderr,
++      "usb_bulk_read leave: fd=%d ep=0x%02x requested=%d ret=%d\n",
++      dev->fd, ep, size, ret);
++  }
++
++  return ret;
+ }
++#endif
+ 
+ /*
+  * FIXME: Packetize large buffers here. 2.4 HCDs (atleast, haven't checked
+@@ -311,9 +745,33 @@
+ 	int timeout)
+ {
+   /* Ensure the endpoint address is correct */
++  //ep |= USB_ENDPOINT_IN;
++  //return usb_urb_transfer(dev, ep, USB_URB_TYPE_INTERRUPT, bytes, size,
++  //  timeout);
++  int ret;
++
+   ep |= USB_ENDPOINT_IN;
+-  return usb_urb_transfer(dev, ep, USB_URB_TYPE_INTERRUPT, bytes, size,
+-		timeout);
++
++  if (usb_debug) {
++    usb_trace_timestamp();
++    fprintf(stderr,
++      "ENTER usb_interrupt_read: fd=%d ep=0x%02x "
++      "requested=%d timeout=%d\n",
++      dev->fd, ep, size, timeout);
++  }
++
++  ret = usb_urb_transfer(dev, ep, USB_URB_TYPE_INTERRUPT,
++                         bytes, size, timeout);
++
++  if (usb_debug) {
++    usb_trace_timestamp();
++    fprintf(stderr,
++      "LEAVE usb_interrupt_read: fd=%d ep=0x%02x "
++      "requested=%d ret=%d\n",
++      dev->fd, ep, size, ret);
++  }
++
++  return ret;
+ }
+ 
+ int usb_os_find_busses(struct usb_bus **busses)
+@@ -322,6 +780,33 @@
+   DIR *dir;
+   struct dirent *entry;
+ 
++  /*
++   * In Termux, directory enumeration is not available to ordinary
++   * applications.  Represent the single descriptor granted by termux-usb
++   * as one synthetic bus.
++   */
++  if (termux_usb_fd >= 0) {
++    struct usb_bus *bus;
++
++    bus = malloc(sizeof(*bus));
++    if (!bus)
++      USB_ERROR(-ENOMEM);
++
++    memset((void *)bus, 0, sizeof(*bus));
++    snprintf(bus->dirname, sizeof(bus->dirname), "%03d", termux_usb_bus);
++    LIST_ADD(fbus, bus);
++
++    if (usb_debug >= 2)
++    {
++      usb_trace_timestamp();
++      fprintf(stderr, "usb_os_find_busses: Using Termux USB fd %d "
++        "for bus %03d\n", termux_usb_fd, termux_usb_bus);
++    }
++
++    *busses = fbus;
++    return 0;
++  }
++
+   dir = opendir(usb_path);
+   if (!dir)
+     USB_ERROR_STR(-errno, "couldn't opendir(%s): %s", usb_path,
+@@ -336,8 +821,11 @@
+ 
+     if (!strchr("0123456789", entry->d_name[strlen(entry->d_name) - 1])) {
+       if (usb_debug >= 2)
++      {
++        usb_trace_timestamp();
+         fprintf(stderr, "usb_os_find_busses: Skipping non bus directory %s\n",
+ 		entry->d_name);
++      }
+       continue;
+     }
+ 
+@@ -353,7 +841,10 @@
+     LIST_ADD(fbus, bus);
+ 
+     if (usb_debug >= 2)
++    {
++       usb_trace_timestamp();
+        fprintf(stderr, "usb_os_find_busses: Found %s\n", bus->dirname);
++    }
+   }
+ 
+   closedir(dir);
+@@ -370,6 +861,75 @@
+   struct dirent *entry;
+   char dirpath[PATH_MAX + 1];
+ 
++  /*
++   * Create one synthetic device for the descriptor granted by termux-usb.
++   * usb_find_devices() will subsequently use usb_open() and the normal
++   * descriptor-fetch path for this device.
++   */
++  if (termux_usb_fd >= 0) {
++    unsigned char device_desc[DEVICE_DESC_LENGTH];
++    struct usb_device *dev;
++    usb_dev_handle *udev;
++    int ret;
++
++    dev = malloc(sizeof(*dev));
++    if (!dev)
++      USB_ERROR(-ENOMEM);
++
++    memset((void *)dev, 0, sizeof(*dev));
++    dev->bus = bus;
++    snprintf(dev->filename, sizeof(dev->filename),
++      "%03d", termux_usb_device);
++    dev->devnum = termux_usb_device;
++
++    udev = usb_open(dev);
++    if (!udev) {
++      free(dev);
++      *devices = NULL;
++      return 0;
++    }
++
++    /*
++     * Unlike the traditional Linux usbfs implementation, the inherited
++     * Android descriptor is not read as a sequential usbfs stream.  Fetch
++     * the standard device descriptor through the USB control path.
++     */
++    ret = usb_get_descriptor(udev, USB_DT_DEVICE, 0,
++      (char *)device_desc, sizeof(device_desc));
++    if (ret < DEVICE_DESC_LENGTH) {
++      if (usb_debug)
++      {
++        usb_trace_timestamp();
++        fprintf(stderr,
++          "usb_os_find_devices: Unable to fetch Termux device descriptor\n");
++      usb_close(udev);
++	  }
++      free(dev);
++      *devices = NULL;
++      return 0;
++    }
++
++    memcpy((void *)&dev->descriptor, device_desc,
++      sizeof(dev->descriptor));
++
++    /*
++     * Let the common libusb-0.1 scan path fetch and parse configuration
++     * descriptors after this device is attached to the temporary list.
++     */
++    LIST_ADD(fdev, dev);
++    usb_close(udev);
++
++    if (usb_debug >= 2)
++    {
++      usb_trace_timestamp();
++      fprintf(stderr, "usb_os_find_devices: Using Termux USB device "
++        "%03d/%03d\n", termux_usb_bus, termux_usb_device);
++    }
++
++    *devices = fdev;
++    return 0;
++  }
++
+   snprintf(dirpath, PATH_MAX, "%s/%s", usb_path, bus->dirname);
+ 
+   dir = opendir(dirpath);
+@@ -405,9 +965,11 @@
+       fd = open(filename, O_RDONLY);
+       if (fd < 0) {
+         if (usb_debug >= 2)
++        {
++          usb_trace_timestamp();
+           fprintf(stderr, "usb_os_find_devices: Couldn't open %s\n",
+                   filename);
+-
++        }
+         free(dev);
+         continue;
+       }
+@@ -417,14 +979,20 @@
+     ret = ioctl(fd, IOCTL_USB_CONNECTINFO, &connectinfo);
+     if (ret < 0) {
+       if (usb_debug)
++      {
++        usb_trace_timestamp();
+         fprintf(stderr, "usb_os_find_devices: couldn't get connect info\n");
++      }
+     } else
+       dev->devnum = connectinfo.devnum;
+ 
+     ret = read(fd, (void *)device_desc, DEVICE_DESC_LENGTH);
+     if (ret < 0) {
+       if (usb_debug)
++      {
++        usb_trace_timestamp();
+         fprintf(stderr, "usb_os_find_devices: Couldn't read descriptor\n");
++      }
+ 
+       free(dev);
+ 
+@@ -441,9 +1009,11 @@
+     LIST_ADD(fdev, dev);
+ 
+     if (usb_debug >= 2)
++    {
++      usb_trace_timestamp();
+       fprintf(stderr, "usb_os_find_devices: Found %s on %s\n",
+ 		dev->filename, bus->dirname);
+-
++    }
+     /* Now try to fetch the rest of the descriptors */
+     if (dev->descriptor.bNumConfigurations > USB_MAXCONFIG)
+       /* Silent since we'll try again later */
+@@ -527,6 +1097,10 @@
+ 
+ int usb_os_determine_children(struct usb_bus *bus)
+ {
++
++  if (termux_usb_fd >= 0)                                                 
++    return 0;
++
+   struct usb_device *dev, *devices[256];
+   struct usb_ioctl command;
+   int ret, i, i1;
+@@ -634,13 +1208,58 @@
+ 
+ void usb_os_init(void)
+ {
++
++  const char *termux_fd_string;
++  char *endptr;
++  long fd;
++
++  /*
++   * termux-usb -E exports an inherited descriptor as TERMUX_USB_FD.
++   * The descriptor number is process-specific and must not be hard-coded.
++   */
++  termux_fd_string = getenv("TERMUX_USB_FD");
++  if (termux_fd_string && *termux_fd_string) {
++    errno = 0;
++    endptr = NULL;
++    fd = strtol(termux_fd_string, &endptr, 10);
++
++    if (errno == 0 && endptr != termux_fd_string &&
++        *endptr == '\0' && fd >= 0 && fd <= INT_MAX &&
++        termux_usb_get_devinfo((int)fd,
++          &termux_usb_bus, &termux_usb_device) == 0) {
++      termux_usb_fd = (int)fd;
++
++      if (usb_debug)
++      {
++        usb_trace_timestamp();
++        fprintf(stderr,
++          "usb_os_init: Using TERMUX_USB_FD=%d for USB device %03d/%03d\n",
++          termux_usb_fd, termux_usb_bus, termux_usb_device);
++      }
++      /*
++       * Do not probe /dev/bus/usb or /proc/bus/usb in this mode.  The
++       * descriptor inherited from termux-usb is the access mechanism.
++       */
++      return;
++    }
++
++    if (usb_debug)
++    {
++      usb_trace_timestamp();
++      fprintf(stderr, "usb_os_init: Invalid TERMUX_USB_FD=%s\n",
++        termux_fd_string);
++    }
++  }
++
+   /* Find the path to the virtual filesystem */
+   if (getenv("USB_DEVFS_PATH")) {
+     if (check_usb_vfs(getenv("USB_DEVFS_PATH"))) {
+       strncpy(usb_path, getenv("USB_DEVFS_PATH"), sizeof(usb_path) - 1);
+       usb_path[sizeof(usb_path) - 1] = 0;
+-    } else if (usb_debug)
++    } else if (usb_debug) {
++      usb_trace_timestamp();
+       fprintf(stderr, "usb_os_init: couldn't find USB VFS in USB_DEVFS_PATH\n");
++    }
+   }
+ 
+   if (!usb_path[0]) {
+@@ -656,9 +1275,13 @@
+ 
+   if (usb_debug) {
+     if (usb_path[0])
++    {
++      usb_trace_timestamp();
+       fprintf(stderr, "usb_os_init: Found USB VFS at %s\n", usb_path);
+-    else
++	} else {
++      usb_trace_timestamp();
+       fprintf(stderr, "usb_os_init: No USB VFS found, is it mounted?\n");
++    }
+   }
+ }
+ 

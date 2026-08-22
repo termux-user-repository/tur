@@ -1,0 +1,11 @@
+--- a/src/misc/paths.h	2006-07-30 17:32:36.000000000 -0400
++++ b/src/misc/paths.h	2026-08-12 21:40:22.517000000 -0400
+@@ -33,7 +33,7 @@
+ # define CONF_DIR   	".tiemu/"
+ # define INI_FILE    	"tiemu.ini"
+ # define CACHE_FILE 	"img_list.txt"
+-# define LOG_FILE 		"/tmp/tiemu.log"
++# define LOG_FILE 		"@TERMUX_PREFIX@/tmp/tiemu.log"
+ #elif defined(__WIN32__)
+ # define CONF_DIR   	""
+ # define INI_FILE    	"tiemu.ini"

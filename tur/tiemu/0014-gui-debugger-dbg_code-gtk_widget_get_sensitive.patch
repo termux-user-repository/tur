@@ -1,0 +1,20 @@
+--- a/src/gui/debugger/dbg_code.c	2009-05-06 15:48:47.000000000 -0400
++++ b/src/gui/debugger/dbg_code.c	2026-08-12 21:43:25.077000000 -0400
+@@ -755,7 +755,7 @@
+ #ifdef __WIN32__
+ 	f = fopen("C:\\disasm.txt", "a+t");
+ #else
+-	f = fopen("/tmp/disasm.txt", "a+t");
++	f = fopen("@TERMUX_PREFIX@/tmp/disasm.txt", "a+t");
+ #endif
+ 	if(f == NULL)
+ 		return -1;
+@@ -1117,7 +1117,7 @@
+ 
+ int dbgcode_quit_enabled(void)
+ {
+-	return GTK_WIDGET_SENSITIVE(mi.m8);
++	return gtk_widget_get_sensitive(mi.m8);
+ }
+ 
+ static int close_debugger_wrapper(gpointer data)
