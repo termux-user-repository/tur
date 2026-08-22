@@ -4,14 +4,14 @@ TERMUX_PKG_DESCRIPTION="A fully integrated 3D graphics creation suite"
 # https://www.blender.org/about/license/
 TERMUX_PKG_LICENSE="GPL-3.0-or-later"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="5.1.2"
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_VERSION="5.2.0"
 TERMUX_PKG_SRCURL=git+https://projects.blender.org/blender/blender
 # Blender does not support 32-bit
 TERMUX_PKG_EXCLUDED_ARCHES="arm, i686"
 TERMUX_PKG_DEPENDS="alembic, boost, brotli, desktop-file-utils, draco, ffmpeg, fftw, freetype, glew, hicolor-icon-theme, imath, libandroid-execinfo, libandroid-posix-semaphore, libblosc, libc++, libceres-solver, libepoxy, libharu, libpng, libpugixml, libraw, libsndfile, libspnav, libtbb, libtiff, libwebp, libx11, libxfixes, libxi, libxkbcommon, libyaml-cpp, oidn, openal-soft, opencolorio, openexr, openimageio, openjpeg, openpgl, openshadinglanguage, opensubdiv, openvdb, openxr, potrace, ptex, python, python-numpy, python-pip, shaderc, shared-mime-info, usd, zlib, zstd"
-TERMUX_PKG_BUILD_DEPENDS="boost-headers, eigen5, git-lfs, mold, sse2neon, vulkan-headers, vulkan-loader-generic"
+TERMUX_PKG_BUILD_DEPENDS="boost-headers, draco-static, eigen5, git-lfs, mold, sse2neon, vulkan-headers, vulkan-loader-generic"
 TERMUX_PKG_PYTHON_COMMON_BUILD_DEPS="requests"
+TERMUX_PKG_PYTHON_RUNTIME_DEPS="cattrs, requests"
 # do not enable WITH_CYCLES_NATIVE_ONLY - results in crashing when opening the Edit->Preferences->System menu on some devices
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 -DPYTHON_LIBRARY=$TERMUX_PREFIX/lib/libpython$TERMUX_PYTHON_VERSION.so

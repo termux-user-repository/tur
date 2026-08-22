@@ -1,0 +1,3 @@
+TERMUX_SUBPKG_DESCRIPTION="Game data files for Red Eclipse"
+TERMUX_SUBPKG_INCLUDE="share/redeclipse/"
+TERMUX_SUBPKG_PLATFORM_INDEPENDENT=true
