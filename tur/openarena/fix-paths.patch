@@ -1,0 +1,21 @@
+--- a/Makefile
++++ b/Makefile
+@@ -955,7 +955,6 @@
+     OPTIMIZEVM += -march=i586 -fomit-frame-pointer
+     HAVE_VM_COMPILED=true
+     BASE_CFLAGS += -m32
+-    CLIENT_CFLAGS += -I/usr/X11/include/NVIDIA
+     CLIENT_LDFLAGS += -L/usr/X11/lib/NVIDIA -R/usr/X11/lib/NVIDIA
+   endif
+   endif
+--- a/code/sys/sys_main.c
++++ b/code/sys/sys_main.c
+@@ -640,7 +640,7 @@
+
+ 	Sys_ParseArgs( argc, argv );
+ 	Sys_SetBinaryPath( Sys_Dirname( argv[ 0 ] ) );
+-	Sys_SetDefaultInstallPath( DEFAULT_BASEDIR );
++	Sys_SetDefaultInstallPath( "@TERMUX_PREFIX@/share/openarena" );
+
+ 	// Concatenate the command line for passing to Com_Init
+ 	for( i = 1; i < argc; i++ )

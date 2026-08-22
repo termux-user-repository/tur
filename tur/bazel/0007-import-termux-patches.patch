@@ -10,10 +10,10 @@
  
 --- a/MODULE.bazel
 +++ b/MODULE.bazel
-@@ -418,3 +418,64 @@
- register_toolchains("//src/main/res:empty_rc_toolchain")
+@@ -468,3 +468,64 @@
+ register_toolchains("//tools/res:empty_rc_toolchain")
  
- register_toolchains("@graalvm_toolchains//:gvm")
+ register_toolchains("@graalvm_ce_toolchains//:gvm")
 +
 +# =========================================
 +# Termux patches

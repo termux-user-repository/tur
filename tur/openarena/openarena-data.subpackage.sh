@@ -1,0 +1,3 @@
+TERMUX_SUBPKG_DESCRIPTION="Game data files for OpenArena"
+TERMUX_SUBPKG_INCLUDE="share/openarena/baseoa/"
+TERMUX_SUBPKG_PLATFORM_INDEPENDENT=true

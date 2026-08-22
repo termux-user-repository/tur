@@ -1,10 +1,13 @@
 load("@bazel_tools//tools/build_defs/cc:action_names.bzl", "ACTION_NAMES")
-load("@bazel_tools//tools/cpp:cc_toolchain_config_lib.bzl",
+load(
+    "@bazel_tools//tools/cpp:cc_toolchain_config_lib.bzl",
     "feature",
     "flag_group",
     "flag_set",
     "tool_path",
 )
+load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
+load("@rules_cc//cc:defs.bzl", "CcToolchainConfigInfo")
 
 all_link_actions = [
     ACTION_NAMES.cpp_link_executable,
@@ -76,8 +79,8 @@ def _impl(ctx):
                         flags = [
                             # "--verbose",
                             "-fPIC",
-                            "--sysroot=external/+_repo_rules6+termux-toolchain/sysroot",
-                            "-isystemexternal/+_repo_rules6+termux-prefix/include",
+                            "--sysroot=external/+new_local_repository+termux-toolchain/sysroot",
+                            "-isystemexternal/+new_local_repository+termux-prefix/include",
                             "-no-canonical-prefixes",
                         ],
                     ),
@@ -96,8 +99,8 @@ def _impl(ctx):
                     flag_group(
                         flags = [
                             "-Wl,-rpath=@TERMUX_PREFIX@/lib",
-                            "-Lexternal/+_repo_rules6+termux-prefix/lib",
-                            "--sysroot=external/+_repo_rules6+termux-toolchain/sysroot/",
+                            "-Lexternal/+new_local_repository+termux-prefix/lib",
+                            "--sysroot=external/+new_local_repository+termux-toolchain/sysroot/",
                             "-lc++_shared",
                         ],
                     ),
