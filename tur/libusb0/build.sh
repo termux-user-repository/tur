@@ -1,0 +1,10 @@
+TERMUX_PKG_HOMEPAGE="https://libusb.info/"
+TERMUX_PKG_DESCRIPTION="Library to enable user space application programs to communicate with USB devices. 0.x branch."
+TERMUX_PKG_LICENSE="LGPL-2.1"
+TERMUX_PKG_MAINTAINER="3ls-it <3ls-it@pm.me>"
+TERMUX_PKG_VERSION=0.1.12
+TERMUX_PKG_SRCURL="http://deb.debian.org/debian/pool/main/libu/libusb/libusb_${TERMUX_PKG_VERSION}.orig.tar.gz"
+TERMUX_PKG_SHA256=37f6f7d9de74196eb5fc0bbe0aea9b5c939de7f500acba3af6fd643f3b538b44
+TERMUX_PKG_AUTO_UPDATE=false
+TERMUX_PKG_DEPENDS="glib"
+TERMUX_PKG_BUILD_IN_SRC=true

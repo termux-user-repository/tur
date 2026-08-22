@@ -1,0 +1,53 @@
+--- a/Makefile.am	2006-03-03 21:52:46.000000000 -0500
++++ b/Makefile.am	2026-08-04 15:23:15.855913279 -0400
+@@ -48,8 +48,8 @@
+ 
+ libusb_la_SOURCES = usb.c usbi.h error.c error.h descriptors.c $(OS_SUPPORT)
+ libusbpp_la_SOURCES = usbpp.cpp usbpp.h
+-
+ libusbpp_la_DEPENDENCIES = libusb.la
++libusbpp_la_LIBADD = libusb.la
+ 
+ # Do not add usb.h to *_SOURCES, regardless of dependencies.
+ # It would be added to the dist tarball, which it shouldn't be.
+@@ -65,8 +65,7 @@
+ libusbpp_la_LDFLAGS = \
+ 	-version-info $(LT_CURRENT):$(LT_REVISION):$(LT_AGE) \
+ 	-release $(LT_RELEASE) \
+-	-export-dynamic \
+-	$(LDADDS) -lusb $(PREBIND_FLAGSPP)
++	-export-dynamic
+ 
+ .PHONY: files release snapshot
+ 
+--- a/Makefile.in	2006-03-03 21:54:03.000000000 -0500
++++ b/Makefile.in	2026-08-04 15:29:55.771913279 -0400
+@@ -72,7 +72,6 @@
+ @LINUX_API_TRUE@am__objects_1 = linux.lo
+ am_libusb_la_OBJECTS = usb.lo error.lo descriptors.lo $(am__objects_1)
+ libusb_la_OBJECTS = $(am_libusb_la_OBJECTS)
+-libusbpp_la_LIBADD =
+ am_libusbpp_la_OBJECTS = usbpp.lo
+ libusbpp_la_OBJECTS = $(am_libusbpp_la_OBJECTS)
+ binSCRIPT_INSTALL = $(INSTALL_SCRIPT)
+@@ -278,8 +277,10 @@
+ AM_CPPFLAGS = -I.
+ AM_CXXFLAGS = 
+ libusb_la_SOURCES = usb.c usbi.h error.c error.h descriptors.c $(OS_SUPPORT)
++
+ libusbpp_la_SOURCES = usbpp.cpp usbpp.h
+ libusbpp_la_DEPENDENCIES = libusb.la
++libusbpp_la_LIBADD = libusb.la
+ 
+ # Do not add usb.h to *_SOURCES, regardless of dependencies.
+ # It would be added to the dist tarball, which it shouldn't be.
+@@ -294,8 +295,7 @@
+ libusbpp_la_LDFLAGS = \
+ 	-version-info $(LT_CURRENT):$(LT_REVISION):$(LT_AGE) \
+ 	-release $(LT_RELEASE) \
+-	-export-dynamic \
+-	$(LDADDS) -lusb $(PREBIND_FLAGSPP)
++	-export-dynamic
+ 
+ all: config.h
+ 	$(MAKE) $(AM_MAKEFLAGS) all-recursive

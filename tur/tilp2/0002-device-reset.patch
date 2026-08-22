@@ -1,0 +1,53 @@
+--- a/src/tilp_device.c	2016-03-14 16:26:36.000000000 -0400
++++ b/src/tilp_device.c	2026-08-20 15:10:58.222491036 -0400
+@@ -44,6 +44,7 @@
+ #define PAUSE(x) usleep(1000*(x))
+ #endif
+ 
++static int reset_in_progress = 0;
+ 
+ //----------------------------------------------------------------------------
+ 
+@@ -352,14 +353,34 @@
+ */
+ int tilp_device_reset(void)
+ {
+-	int ret = 0;
++        //static int reset_in_progress = 0;
++        int ret = 0;
+ 
+-	if (lk_open)
+-	{
+-		ret = ticables_cable_reset(cable_handle);
+-		tilp_device_err(ret);
+-		PAUSE(1000);
+-	}
++        if (!lk_open || reset_in_progress)
++                return 0;
+ 
+-	return ret;
++        reset_in_progress = 1;
++
++        tilp_info("tilp_device_reset: performing full close/open\n");
++
++        ret = tilp_device_close();
++
++        if (!ret)
++        {
++                PAUSE(1000);
++                ret = tilp_device_open();
++        }
++
++        tilp_info("tilp_device_reset: close/open returned %d\n", ret);
++
++        /*
++         * Do not call tilp_err() or tilp_device_err() here initially.
++         * tilp_device_close() / tilp_device_open() may already invoke
++         * error handling, and that could recurse back into this function.
++         */
++
++        reset_in_progress = 0;
++
++        return ret;
+ }
++
