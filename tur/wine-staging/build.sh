@@ -3,7 +3,7 @@ TERMUX_PKG_DESCRIPTION="A compatibility layer for running Windows programs"
 TERMUX_PKG_LICENSE="LGPL-2.1"
 TERMUX_PKG_LICENSE_FILE="LICENSE, NOTICES.md, COPYING.LIB"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="11.15"
+TERMUX_PKG_VERSION="11.16"
 _REAL_VERSION="${TERMUX_PKG_VERSION/\~/-}"
 _VERSION_FOLDER="$(test "${_REAL_VERSION:3:1}" = 0 && echo ${_REAL_VERSION:0:4} || echo ${_REAL_VERSION:0:3}x)"
 TERMUX_PKG_SRCURL=(
@@ -11,8 +11,8 @@ TERMUX_PKG_SRCURL=(
 	https://github.com/wine-staging/wine-staging/archive/v$_REAL_VERSION.tar.gz
 )
 TERMUX_PKG_SHA256=(
-	5046f36dae210b198ea69792774d4401feed975d465eca6c251c9394400ec272
-	22d6d6b1940907457943ecf3fe5f06eeb70872bd91b99253661923758ab35864
+	c66e2090343dcd727f7f7fd2f87ee0bfb0b118790c1d745ab7b8a4c3a4197f2f
+	626334d69853c683f558fcfaf66b4a2eefb3b9db5bccf16317fc897bcb514891
 )
 TERMUX_PKG_DEPENDS="fontconfig, freetype, krb5, libandroid-spawn, libc++, libgmp, libgnutls, libxcb, libxcomposite, libxcursor, libxfixes, libxrender, opengl, pulseaudio, sdl2 | sdl2-compat, vulkan-loader, xorg-xrandr"
 TERMUX_PKG_ANTI_BUILD_DEPENDS="sdl2-compat, vulkan-loader"
