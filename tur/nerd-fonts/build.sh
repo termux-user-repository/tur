@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="Meta package that installs all Nerd Fonts patched font p
 TERMUX_PKG_LICENSE="OFL-1.1, MIT, Apache-2.0"
 TERMUX_PKG_MAINTAINER="Gouranga Das Samrat <gouranga.das.khulna@gmail.com>"
 TERMUX_PKG_VERSION=3.5.1
+TERMUX_PKG_REVISION=1
 # The first entry is for the auto-update system to fetch the latest release tarball, the rest are the upstream font zips.
 TERMUX_PKG_SRCURL=(
 	https://github.com/ryanoasis/nerd-fonts/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz
@@ -28,7 +29,7 @@ TERMUX_PKG_SHA256=(
 )
 TERMUX_PKG_PLATFORM_INDEPENDENT=true
 TERMUX_PKG_AUTO_UPDATE=true
-TERMUX_PKG_DEPENDS="ttf-cascadia-code-nerd, ttf-hack-nerd, ttf-inconsolata-nerd, ttf-jetbrains-mono-nerd, ttf-meslo-nerd, ttf-roboto-mono-nerd, ttf-sourcecodepro-nerd, ttf-victor-mono-nerd"
+TERMUX_PKG_DEPENDS="ttf-cascadia-code-nerd, ttf-hack-nerd, ttf-inconsolata-nerd, ttf-jetbrains-mono-nerd, ttf-meslo-nerd, ttf-roboto-mono-nerd, ttf-sourcecodepro-nerd, ttf-victor-mono-nerd, ttf-nerd-fonts-symbols"
 
 termux_step_get_source() {
 	# Skip fetch the first entry since it is only used for auto-update
