@@ -10,11 +10,11 @@ TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_DEPENDS=""
 
 termux_step_make() {
-    termux_setup_rust
-    cargo build --jobs $TERMUX_PKG_MAKE_PROCESSES --target $CARGO_TARGET_NAME --release --manifest-path omnicli/Cargo.toml --locked
+	termux_setup_rust
+	cargo build --jobs $TERMUX_PKG_MAKE_PROCESSES --target $CARGO_TARGET_NAME --release --manifest-path omnicli/Cargo.toml --locked
 }
 
 termux_step_make_install() {
-    install -Dm755 -t $TERMUX_PREFIX/bin omnicli/target/${CARGO_TARGET_NAME}/release/omnicli
-    install -Dm644 -t "$TERMUX_PREFIX/share/doc/$TERMUX_PKG_NAME/" README*
+	install -Dm755 -t $TERMUX_PREFIX/bin omnicli/target/${CARGO_TARGET_NAME}/release/omnicli
+	install -Dm644 -t "$TERMUX_PREFIX/share/doc/$TERMUX_PKG_NAME/" README*
 }
