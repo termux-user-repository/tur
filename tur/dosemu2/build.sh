@@ -3,11 +3,11 @@ TERMUX_PKG_DESCRIPTION="Run DOS programs under linux."
 TERMUX_PKG_LICENSE="GPL-2.0"
 TERMUX_PKG_MAINTAINER="@stsp"
 TERMUX_PKG_VERSION="2.0pre9-git"
-TERMUX_PKG_REVISION=10
+TERMUX_PKG_REVISION=11
 TERMUX_PKG_SRCURL=git+https://github.com/dosemu2/dosemu2
 TERMUX_PKG_GIT_BRANCH=devel
-_COMMIT=82770aba398485117c56523a1a5c261f6e37ca64
-TERMUX_PKG_SHA256=6ae390a22f2e50600937b21172568a11df35c04440002ffbb0554b76bbdbfe58
+_COMMIT=5c4f9a44507993f55fd209ef3dd728689555b850
+TERMUX_PKG_SHA256=925d05c4d4a1722d0a080d4e836c7148da1bd91918064dd4058a6774536701b4
 TERMUX_PKG_DEPENDS="comcom64, instfd, libandroid-posix-semaphore, libandroid-glob, slang, libao, fluidsynth, ladspa-sdk, libslirp, readline, json-c, libseccomp, libsearpc, sdl3, sdl3-ttf, fontconfig, fdpp, dj64dev"
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 --disable-landlock
