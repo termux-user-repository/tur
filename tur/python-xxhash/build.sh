@@ -2,7 +2,7 @@
 # https://www.buymeacoffee.com/Lukl
 TERMUX_PKG_HOMEPAGE=https://github.com/ifduyue/python-xxhash
 TERMUX_PKG_DESCRIPTION="Python binding for xxHash"
-TERMUX_PKG_LICENSE="BSD-2-Clause"
+TERMUX_PKG_LICENSE="BSD 2-Clause"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="4.0.1"
 TERMUX_PKG_SRCURL="https://files.pythonhosted.org/packages/f6/a5/1386f35da1475fcaeef42581deae73417c6d2a6a0b2d2e8914de18844dcd/xxhash-4.0.1.tar.gz"
