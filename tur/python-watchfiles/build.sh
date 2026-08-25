@@ -12,6 +12,10 @@ TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_DEPENDS="python, python-pip"
 TERMUX_PKG_PYTHON_COMMON_BUILD_DEPS="maturin, uv"
 
+termux_step_make() {
+	: # skip upstream Makefile (uv/lint/mypy/test targets are dev-only; cross-pip builds the wheel)
+}
+
 termux_step_configure() {
 	termux_setup_rust
 	export CARGO_BUILD_TARGET="${CARGO_TARGET_NAME}"
