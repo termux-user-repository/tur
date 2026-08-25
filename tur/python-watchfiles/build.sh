@@ -7,6 +7,7 @@ TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="1.2.0"
 TERMUX_PKG_SRCURL="https://files.pythonhosted.org/packages/cd/41/5e1a4bb12aac5f1493fa1bdc11154eca3b258ca4eba65d39c473fe19d8e9/watchfiles-1.2.0.tar.gz"
 TERMUX_PKG_SHA256="c995fba777f1ea992f090f9236e9284cf7a5d1a0130dd5a3d82c598cacd76838"
+TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_DEPENDS="python, python-pip"
 TERMUX_PKG_PYTHON_COMMON_BUILD_DEPS="maturin"

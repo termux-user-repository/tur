@@ -6,6 +6,7 @@ TERMUX_PKG_VERSION="2.3.1"
 TERMUX_PKG_REVISION=2
 TERMUX_PKG_SRCURL="https://github.com/kivy/kivy/archive/refs/tags/$TERMUX_PKG_VERSION.tar.gz"
 TERMUX_PKG_SHA256=83eee956b84ab7bf9e9d5b38544acc40a0e55f05cea7112fd01cda172c98244a
+TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_DEPENDS="mtdev, opengl, python, python-pillow, python-pip, sdl2, sdl2-image, sdl2-mixer, sdl2-ttf"
 TERMUX_PKG_BUILD_DEPENDS="xorgproto"
 TERMUX_PKG_PYTHON_COMMON_BUILD_DEPS="'Cython==3.0.11', wheel, packaging"

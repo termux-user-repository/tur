@@ -7,6 +7,7 @@ TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="0.14.0"
 TERMUX_PKG_SRCURL="https://files.pythonhosted.org/packages/c3/7d/d9daedf0f2ebcacd20d599928f8913e9d2aea1d56d2d355a93bfa2b611d7/fastuuid-0.14.0.tar.gz"
 TERMUX_PKG_SHA256="178947fc2f995b38497a74172adee64fdeb8b7ec18f2a5934d037641ba265d26"
+TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_DEPENDS="python, python-pip"
 TERMUX_PKG_PYTHON_COMMON_BUILD_DEPS="maturin"

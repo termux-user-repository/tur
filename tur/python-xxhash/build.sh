@@ -7,6 +7,7 @@ TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="4.0.1"
 TERMUX_PKG_SRCURL="https://files.pythonhosted.org/packages/f6/a5/1386f35da1475fcaeef42581deae73417c6d2a6a0b2d2e8914de18844dcd/xxhash-4.0.1.tar.gz"
 TERMUX_PKG_SHA256="d55bf4ef10eb09b8b6866790e083d26d087d84caa3cc0946ba87c3ca7ecaf7b7"
+TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_DEPENDS="python, python-pip"
 TERMUX_PKG_PYTHON_COMMON_BUILD_DEPS="maturin"
