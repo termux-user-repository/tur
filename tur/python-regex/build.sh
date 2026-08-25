@@ -3,6 +3,7 @@
 TERMUX_PKG_HOMEPAGE=https://github.com/mrabarnett/mrab-regex
 TERMUX_PKG_DESCRIPTION="Alternative regular expression module, to replace re"
 TERMUX_PKG_LICENSE="Apache-2.0"
+TERMUX_PKG_LICENSE_FILE="LICENSE.txt"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="2026.7.19"
 TERMUX_PKG_SRCURL="https://files.pythonhosted.org/packages/20/98/04b13f1ddfb63158025291c02e03eb42fbb7acb51d091d541050eb4e35e8/regex-2026.7.19.tar.gz"

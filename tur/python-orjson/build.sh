@@ -3,6 +3,7 @@
 TERMUX_PKG_HOMEPAGE=https://github.com/ijl/orjson
 TERMUX_PKG_DESCRIPTION="Fast JSON library for Python"
 TERMUX_PKG_LICENSE="MPL-2.0"
+TERMUX_PKG_LICENSE_FILE="LICENSE-MPL-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="3.12.0"
 TERMUX_PKG_SRCURL="https://files.pythonhosted.org/packages/0f/f3/742fb1f62b825f2c010697eaf4e828004bc2a81e7e806666989c132c7c42/orjson-3.12.0.tar.gz"
