@@ -10,7 +10,7 @@ TERMUX_PKG_SHA256="c995fba777f1ea992f090f9236e9284cf7a5d1a0130dd5a3d82c598cacd76
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_DEPENDS="python, python-pip"
-TERMUX_PKG_PYTHON_COMMON_BUILD_DEPS="maturin"
+TERMUX_PKG_PYTHON_COMMON_BUILD_DEPS="maturin, uv"
 
 termux_step_configure() {
 	termux_setup_rust
