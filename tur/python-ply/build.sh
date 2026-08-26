@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="Implementation of lex and yacc in Python"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="3.11"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL="https://github.com/dabeaz/ply/archive/refs/tags/$TERMUX_PKG_VERSION.tar.gz"
 TERMUX_PKG_SHA256=928c5642612f4710b168d3c49c25f6ece2913a5e8d1c5e37fde5d6162fec3fd2
 TERMUX_PKG_AUTO_UPDATE=false
