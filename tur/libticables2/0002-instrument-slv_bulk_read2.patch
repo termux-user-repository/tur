@@ -1,0 +1,878 @@
+--- a/src/linux/link_usb.c	2016-09-10 15:45:34.000000000 -0400
++++ b/src/linux/link_usb.c	2026-08-12 13:16:39.697000000 -0400
+@@ -96,6 +96,20 @@
+ # include <usb.h>
+ #endif
+ 
++/* Termux porting instrumentation */
++#define SLV_TRACE(level, fmt, ...)                                      \
++       do {                                                               \
++               if (usb_debug >= (level)) {                                    \
++                       struct timeval trace_tv;                                  \
++                       gettimeofday(&trace_tv, NULL);                            \
++                       fprintf(stderr, "[%ld.%03ld] slv_bulk_read2: " fmt "\n",  \
++                               (long)trace_tv.tv_sec,                               \
++                               trace_tv.tv_usec / 1000,                              \
++                               ##__VA_ARGS__);                                       \
++               }                                                              \
++       } while (0)
++/* End instrumentation */
++
+ /* --- */
+ 
+ #ifdef __WIN32__	// found in src/error.h of libusb-win32
+@@ -202,6 +216,9 @@
+ /* variables for slv_check and slv_bulk_read2 */
+ static int io_pending = 0;
+ static struct usb_urb urb;
++
++static int trace_after_halt_recovery = 0;
++static int recovery_reads = 0;
+ #endif
+ 
+ /* --- */
+@@ -285,6 +302,7 @@
+ #define uInEnd              (((usb_struct *)(h->priv2))->in_endpoint)
+ #define uOutEnd             (((usb_struct *)(h->priv2))->out_endpoint)
+ 
++
+ /* Helpers (=driver API) */
+ 
+ static void tigl_get_product(char * string, size_t maxlen, struct usb_device *dev)
+@@ -438,20 +456,55 @@
+ {
+ 	int ret;
+ 
++	fprintf(stderr,
++		"tigl_reset: enter io_pending=%d nBytesRead=%d "
++		"in_ep=0x%02x out_ep=0x%02x fd=%d\n",
++		io_pending,
++		nBytesRead,
++		uInEnd,
++		uOutEnd,
++		uHdl != NULL ? uHdl->fd : -1);
++
+ 	// Reset out pipe
+ 	ret = usb_clear_halt(uHdl, uOutEnd);
++
++	fprintf(stderr,
++		"tigl_reset: clear OUT ep=0x%02x ret=%d",
++		uOutEnd, ret);
++
++	if (ret < 0)
++		fprintf(stderr, " errno=%d (%s)", errno, strerror(errno));
++
++	fprintf(stderr, "\n");
++
+ 	if (ret < 0) 
+ 	{
+ 		ticables_warning("usb_clear_halt of out pipe (%s).\n", usb_strerror());
+ 	}
++
+ 	
+ 	// Reset in pipe
+ 	ret = usb_clear_halt(uHdl, uInEnd);
++
++	fprintf(stderr,
++		"tigl_reset: clear IN ep=0x%02x ret=%d",
++		uInEnd, ret);
++
++	if (ret < 0)
++		fprintf(stderr, " errno=%d (%s)", errno, strerror(errno));
++
++	fprintf(stderr, "\n");
++
+ 	if (ret < 0) 
+ 	{
+ 		ticables_warning("usb_clear_halt of in pipe (%s).\n", usb_strerror());
+ 	}
+ 
++	fprintf(stderr,
++		"tigl_reset: exit io_pending=%d nBytesRead=%d\n",
++		io_pending,
++		nBytesRead);
++
+ 	return 0;
+ }
+ 
+@@ -488,6 +541,13 @@
+ 
+ static int slv_open(CableHandle *h)
+ {
++	fprintf(stderr,
++		"slv_open: enter io_pending=%d nBytesRead=%d "
++		"priv2=%p\n",
++		io_pending,
++		nBytesRead,
++		(void *)h->priv2);
++
+ 	int ret;
+ 	int i;
+ 	struct usb_config_descriptor *config;
+@@ -497,6 +557,17 @@
+ 
+ 	// open device
+ 	ret = tigl_open(h->address, &uHdl);
++
++	fprintf(stderr,
++		"slv_open: tigl_open returned %d handle=%p",
++		ret,
++		(void *)uHdl);
++
++	if (ret == 0 && uHdl != NULL)
++		fprintf(stderr, " fd=%d", uHdl->fd);
++
++	fprintf(stderr, "\n");
++
+ 	if (ret)
+ 	{
+ 		return ret;
+@@ -540,19 +611,101 @@
+ 	nBytesRead = 0;
+ 	was_max_size_packet = 0;
+ 
++	fprintf(stderr,
++		"slv_open: exit io_pending=%d nBytesRead=%d "
++		"in_ep=0x%02x out_ep=0x%02x max_ps=%d "
++		"handle=%p fd=%d\n",
++		io_pending,
++		nBytesRead,
++		uInEnd,
++		uOutEnd,
++		max_ps,
++		(void *)uHdl,
++		uHdl != NULL ? uHdl->fd : -1);
++
+ 	return 0;
+ }
+ 
++#if 0
+ static int slv_close(CableHandle *h)
+ {
++
++	fprintf(stderr,
++		"slv_close: enter io_pending=%d nBytesRead=%d "
++		"priv2=%p handle=%p fd=%d\n",
++		io_pending,
++		nBytesRead,
++		(void *)h->priv2,
++		(void *)uHdl,
++		uHdl != NULL ? uHdl->fd : -1);
++
+ 	if (uHdl != NULL) 
+ 	{
++		fprintf(stderr,
++			"slv_close: calling tigl_close handle=%p fd=%d\n",
++			(void *)uHdl,
++			uHdl->fd);
++
+ 		tigl_close(&uHdl);
++
++		fprintf(stderr,
++			"slv_close: tigl_close returned handle=%p\n",
++			(void *)uHdl);
+ 	}
+ 	uDev = NULL; 
++	free(h->priv2);
++	h->priv2 = NULL;
++	io_pending = FALSE;
++
++	fprintf(stderr,
++		"slv_close: exit io_pending=%d priv2=%p "
++		"handle=%p\n",
++		io_pending,
++		(void *)h->priv2,
++		(void *)uHdl);
++
++	return 0;
++}
++#endif
++
++static int slv_close(CableHandle *h)
++{
++	fprintf(stderr,
++		"slv_close: enter h=%p priv2=%p handle=%p\n",
++		(void *)h,
++		(void *)h->priv2,
++		(void *)uHdl);
++
++	if (uHdl != NULL) {
++		fprintf(stderr,
++			"slv_close: before tigl_close handle=%p fd=%d\n",
++			(void *)uHdl,
++			uHdl->fd);
++
++		tigl_close(&uHdl);
++
++		fprintf(stderr,
++			"slv_close: after tigl_close handle=%p\n",
++			(void *)uHdl);
++	}
++
++	fprintf(stderr, "slv_close: before uDev=NULL\n");
++	uDev = NULL;
++	fprintf(stderr, "slv_close: after uDev=NULL\n");
++
++	fprintf(stderr, "slv_close: before free priv2=%p\n",
++		(void *)h->priv2);
+ 
+ 	free(h->priv2);
++
++	fprintf(stderr, "slv_close: after free\n");
++
+ 	h->priv2 = NULL;
++	fprintf(stderr, "slv_close: after priv2=NULL\n");
++
++	io_pending = FALSE;
++	fprintf(stderr, "slv_close: exit io_pending=%d\n",
++		io_pending);
+ 
+ 	return 0;
+ }
+@@ -567,16 +720,39 @@
+ {
+ 	int ret = 0;
+ 
++	fprintf(stderr,
++		"slv_reset: enter io_pending=%d nBytesRead=%d "
++		"fd=%d\n",
++		io_pending,
++		nBytesRead,
++		uHdl != NULL ? uHdl->fd : -1);
++
+ #if !defined(__BSD__)
+ 	/* Reset both endpoints (send an URB_FUNCTION_RESET_PIPE) */
+ 	ret = tigl_reset(h);
++
++	fprintf(stderr,
++		"slv_reset: tigl_reset returned %d\n",
++		ret);
++
+ 	if (!ret)
+ 	{
+ #ifdef __WIN32__
+ 		/* Reset USB port (send an IOCTL_INTERNAL_USB_RESET_PORT) */
+ 		ret = usb_reset_ex(uHdl, USB_RESET_TYPE_RESET_PORT);
+ #else
++		/*
+ 		ret = usb_reset(uHdl);
++		*/
++		fprintf(stderr, "slv_reset: skipping usb_reset for Termux test\n");
++		ret = 0;
++		fprintf(stderr,
++			"slv_reset: usb_reset skipped; treating result as 0\n");
++		if (ret < 0)
++			fprintf(stderr, " errno=%d (%s)", errno, strerror(errno));
++
++		fprintf(stderr, "\n");
++
+ #endif
+ 
+ 		if (ret < 0)
+@@ -601,15 +777,61 @@
+ 			usleep(500000);
+ #endif
+ 			ret = slv_close(h);
++
++				fprintf(stderr,
++					"slv_reset: after slv_close ret=%d h=%p\n",
++					ret,
++					(void *)h);
++				fflush(stderr);
++
+ 			if (!ret)
+ 			{
+-				h->priv2 = (usb_struct *)calloc(1, sizeof(usb_struct));
+-				ret = slv_open(h);
++				//h->priv2 = (usb_struct *)calloc(1, sizeof(usb_struct));
++				//ret = slv_open(h);
++					fprintf(stderr,
++						"slv_reset: before calloc\n");
++					fflush(stderr);
++
++					usb_struct *new_priv2 =
++						(usb_struct *)calloc(1, sizeof(usb_struct));
++
++					fprintf(stderr,
++						"slv_reset: after calloc new_priv2=%p\n",
++						(void *)new_priv2);
++					fflush(stderr);
++
++					if (new_priv2 == NULL)
++					{
++						fprintf(stderr,
++							"slv_reset: calloc failed\n");
++						return ERR_LIBUSB_OPEN;
++					}
++
++					h->priv2 = new_priv2;
++
++					fprintf(stderr,
++						"slv_reset: assigned h->priv2=%p\n",
++						(void *)h->priv2);
++					fflush(stderr);
++
++					ret = slv_open(h);
++
++					fprintf(stderr,
++						"slv_reset: slv_open returned %d\n",
++						ret);
++					fflush(stderr);
+ 			}
+ 		}
+ 	}
+ #endif
+ 
++	fprintf(stderr,
++		"slv_reset: exit ret=%d io_pending=%d "
++		"nBytesRead=%d\n",
++		ret,
++		io_pending,
++		nBytesRead);
++
+ 	return ret;
+ }
+ 
+@@ -657,15 +879,21 @@
+ 
+ #ifdef __LINUX__
+ #define MAX_READ_WRITE  (16 * 1024)
++
+ static int slv_bulk_read2(usb_dev_handle *dev, int ep, char *bytes, int size,
+ 	int timeout)
+ {
+-	// This is a variant of usb_bulk_read in libusb, edited to take the
+-	// io_pending variable set in slv_check into account.
+-	unsigned int bytesdone = 0, requested;
++	/*
++	 * This is a variant of usb_bulk_read in libusb, edited to take the
++	 * io_pending variable set in slv_check into account.
++	 */
++	unsigned int bytesdone = 0;
++	unsigned int requested;
+ 	struct timeval tv, tv_ref, tv_now;
+ 	void *context;
+-	int ret, waiting;
++	int ret;
++	int waiting;
++	int reap_errno = 0;
+ 
+ 	/*
+ 	 * FIXME: The use of the URB interface is incorrect here if there are
+@@ -674,13 +902,17 @@
+ 	 * in interesting ways.
+ 	 */
+ 
++	SLV_TRACE(2,
++		"enter fd=%d ep=0x%02x size=%d timeout=%d io_pending=%d",
++		dev->fd, ep, size, timeout, io_pending);
++
+ 	/*
+ 	 * Get actual time, and add the timeout value. The result is the absolute
+-	 * time where we have to quit waiting for an message.
++	 * time where we have to quit waiting for a message.
+ 	 */
+ 	gettimeofday(&tv_ref, NULL);
+-	tv_ref.tv_sec = tv_ref.tv_sec + timeout / 1000;
+-	tv_ref.tv_usec = tv_ref.tv_usec + (timeout % 1000) * 1000;
++	tv_ref.tv_sec += timeout / 1000;
++	tv_ref.tv_usec += (timeout % 1000) * 1000;
+ 
+ 	if (tv_ref.tv_usec > 1000000) {
+ 		tv_ref.tv_usec -= 1000000;
+@@ -692,16 +924,15 @@
+ 
+ 		requested = size - bytesdone;
+ 		if (requested > MAX_READ_WRITE)
+-		{
+ 			requested = MAX_READ_WRITE;
+-		}
+ 
+-		if (io_pending)
+-		{
++		if (io_pending) {
++			SLV_TRACE(2,
++				"reusing pending URB fd=%d ep=0x%02x",
++				dev->fd, ep);
++
+ 			io_pending = FALSE;
+-		}
+-		else
+-		{
++		} else {
+ 			urb.type = USB_URB_TYPE_BULK;
+ 			urb.endpoint = ep;
+ 			urb.flags = 0;
+@@ -710,12 +941,39 @@
+ 			urb.usercontext = (void *)(intptr_t)ep;
+ 			urb.signr = 0;
+ 			urb.actual_length = 0;
+-			urb.number_of_packets = 0;	/* don't do isochronous yet */
++			urb.number_of_packets = 0;
++			/* Don't do isochronous transfers yet. */
+ 
+ 			ret = ioctl(dev->fd, IOCTL_USB_SUBMITURB, &urb);
+-			if (ret < 0) {
+-				USB_ERROR_STR(-errno, "error submitting URB: %s", strerror(errno));
+-				return ret;
++
++			{
++				int submit_errno = errno;
++
++				if (ret < 0) {
++					SLV_TRACE(1,
++						"submit FAILED fd=%d ep=0x%02x "
++						"requested=%u ret=%d errno=%d (%s)",
++						dev->fd,
++						ep,
++						requested,
++						ret,
++						submit_errno,
++						strerror(submit_errno));
++
++					USB_ERROR_STR(-submit_errno,
++						"error submitting URB: %s",
++						strerror(submit_errno));
++
++					return ret;
++				}
++
++				SLV_TRACE(3,
++					"submit OK fd=%d ep=0x%02x "
++					"requested=%u usercontext=%p",
++					dev->fd,
++					ep,
++					requested,
++					urb.usercontext);
+ 			}
+ 		}
+ 
+@@ -723,63 +981,322 @@
+ 		FD_SET(dev->fd, &writefds);
+ 
+ 		waiting = 1;
+-		while (((ret = ioctl(dev->fd, IOCTL_USB_REAPURBNDELAY, &context)) == -1) && waiting) {
++
++		while (waiting) {
++			ret = ioctl(dev->fd,
++				IOCTL_USB_REAPURBNDELAY,
++				&context);
++
++			/*
++			 * Save errno immediately. Later calls to select(), gettimeofday(),
++			 * or other functions may overwrite it.
++			 */
++			reap_errno = errno;
++
++			if (ret != -1)
++				break;
++
++			if (reap_errno != EAGAIN)
++				break;
++
+ 			tv.tv_sec = 0;
+-			tv.tv_usec = 1000; // 1 msec
+-			select(dev->fd + 1, NULL, &writefds, NULL, &tv); //sub second wait
++			tv.tv_usec = 1000; /* 1 ms */
+ 
+-			/* compare with actual time, as the select timeout is not that precise */
++			select(dev->fd + 1,
++				NULL,
++				&writefds,
++				NULL,
++				&tv);
++
++			/*
++			 * Compare with actual time because select() timeout
++			 * precision is not sufficient here.
++			 */
+ 			gettimeofday(&tv_now, NULL);
+ 
+ 			if ((tv_now.tv_sec > tv_ref.tv_sec) ||
+-			    ((tv_now.tv_sec == tv_ref.tv_sec) && (tv_now.tv_usec >= tv_ref.tv_usec)))
+-			{
++				((tv_now.tv_sec == tv_ref.tv_sec) &&
++				 (tv_now.tv_usec >= tv_ref.tv_usec))) {
+ 				waiting = 0;
+ 			}
+ 		}
+ 
++		if (ret == 0) {
++			SLV_TRACE(2,
++				"reap COMPLETE fd=%d ep=0x%02x "
++				"requested=%u actual=%d status=%d "
++				"bytesdone_before=%u context=%p",
++				dev->fd,
++				ep,
++				requested,
++				urb.actual_length,
++				urb.status,
++				bytesdone,
++				context);
++		} else if (!waiting) {
++			SLV_TRACE(1,
++				"reap TIMEOUT fd=%d ep=0x%02x "
++				"requested=%u actual=%d status=%d "
++				"bytesdone=%u last_errno=%d (%s)",
++				dev->fd,
++				ep,
++				requested,
++				urb.actual_length,
++				urb.status,
++				bytesdone,
++				reap_errno,
++				strerror(reap_errno));
++		} else {
++			SLV_TRACE(1,
++				"reap ERROR fd=%d ep=0x%02x "
++				"requested=%u actual=%d status=%d "
++				"ret=%d errno=%d (%s)",
++				dev->fd,
++				ep,
++				requested,
++				urb.actual_length,
++				urb.status,
++				ret,
++				reap_errno,
++				strerror(reap_errno));
++		}
++
+ 		/*
+-		 * If there was an error, that wasn't EAGAIN (no completion), then
+-		 * something happened during the reaping and we should return that
+-		 * error now
++		 * The reap ioctl succeeded, but the USB transfer itself failed.
++		 * ret == 0 means the URB was reaped, not that the URB succeeded.
+ 		 */
+-		if (ret < 0 && errno != EAGAIN)
+-		{
+-			USB_ERROR_STR(-errno, "error reaping URB: %s", strerror(errno));
++		if (ret == 0 && urb.status < 0) {
++				if (ret == 0 && urb.status == -EPIPE) {
++					int clear_in;
++					int clear_out;
++					int saved_errno;
++
++					SLV_TRACE(1,
++						"URB stalled fd=%d ep=0x%02x; clearing endpoints",
++						dev->fd, ep);
++
++					clear_in = usb_clear_halt(dev, ep);
++					saved_errno = errno;
++
++					if (clear_in < 0) {
++						SLV_TRACE(1,
++							"clear IN halt FAILED ep=0x%02x ret=%d "
++							"errno=%d (%s)",
++							ep,
++							clear_in,
++							saved_errno,
++							strerror(saved_errno));
++					} else {
++						SLV_TRACE(1,
++							"clear IN halt succeeded ep=0x%02x",
++							ep);
++					}
++
++					clear_out = usb_clear_halt(dev, 0x02);
++					saved_errno = errno;
++
++					if (clear_out < 0) {
++						SLV_TRACE(1,
++							"clear OUT halt FAILED ep=0x02 ret=%d "
++							"errno=%d (%s)",
++							clear_out,
++							saved_errno,
++							strerror(saved_errno));
++					} else {
++						SLV_TRACE(1,
++							"clear OUT halt succeeded ep=0x02");
++					}
++
++					trace_after_halt_recovery = 1;
++					recovery_reads = 0;
++					io_pending = FALSE;
++					return -EPIPE;
++				}
++				/*
++				if (ret == 0 && urb.status == -EPIPE) {
++					int clear_ret;
++					int clear_errno;
++
++					SLV_TRACE(1,
++						"clearing halted endpoint fd=%d ep=0x%02x",
++						dev->fd, ep);
++
++					clear_ret = usb_clear_halt(dev, ep);
++					clear_errno = errno;
++
++					if (clear_ret < 0) {
++						SLV_TRACE(1,
++							"clear halt FAILED fd=%d ep=0x%02x "
++							"ret=%d errno=%d (%s)",
++							dev->fd,
++							ep,
++							clear_ret,
++							clear_errno,
++							strerror(clear_errno));
++					} else {
++						SLV_TRACE(1,
++							"clear halt succeeded fd=%d ep=0x%02x",
++							dev->fd,
++							ep);
++					}
++
++					return -EPIPE;
++				}
++				*/
++
++
++			int urb_status = urb.status;
++
++			SLV_TRACE(1,
++				"URB transfer FAILED fd=%d ep=0x%02x "
++				"requested=%u actual=%d status=%d (%s)",
++				dev->fd,
++				ep,
++				requested,
++				urb.actual_length,
++				urb_status,
++				strerror(-urb_status));
++
++			USB_ERROR_STR(urb_status,
++				"URB transfer failed: %s",
++				strerror(-urb_status));
++
++			return urb_status;
++		}
++
++		/*
++		 * If there was an error other than EAGAIN, something happened
++		 * during reaping and we should report it.
++		 */
++		if (ret < 0 && reap_errno != EAGAIN) {
++			USB_ERROR_STR(-reap_errno,
++				"error reaping URB: %s",
++				strerror(reap_errno));
+ 		}
+ 
+ 		bytesdone += urb.actual_length;
+-	} while (ret == 0 && bytesdone < size && urb.actual_length == requested);
+ 
+-	/* If the URB didn't complete in success or error, then let's unlink it */
++		if (trace_after_halt_recovery && urb.actual_length > 0) {
++				unsigned int i;
++				unsigned int dump_len = urb.actual_length;
++
++				if (dump_len > 32)
++						dump_len = 32;
++
++				fprintf(stderr,
++						"slv_bulk_read2: post-recovery read #%d actual=%d bytes:",
++						recovery_reads,
++						urb.actual_length);
++
++				for (i = 0; i < dump_len; i++)
++						fprintf(stderr, " %02x",
++								(unsigned char)bytes[i]);
++
++				fprintf(stderr, "\n");
++
++				recovery_reads++;
++
++				if (recovery_reads >= 8)
++						trace_after_halt_recovery = 0;
++		}
++
++		SLV_TRACE(2,
++			"progress fd=%d ep=0x%02x "
++			"requested=%u actual=%d bytesdone=%u/%d "
++			"ret=%d waiting=%d",
++			dev->fd,
++			ep,
++			requested,
++			urb.actual_length,
++			bytesdone,
++			size,
++			ret,
++			waiting);
++
++	} while (ret == 0 &&
++		bytesdone < (unsigned int)size &&
++		urb.actual_length == (int)requested);
++
++	/*
++	 * If the URB did not complete successfully, unlink it.
++	 */
+ 	if (ret < 0) {
+ 		int rc;
+ 
+ 		if (!waiting)
+-		{
+ 			rc = -ETIMEDOUT;
+-		}
+ 		else
+-		{
+ 			rc = urb.status;
+-		}
++
++		SLV_TRACE(1,
++			"discarding incomplete URB fd=%d ep=0x%02x "
++			"ret=%d waiting=%d urb_status=%d rc=%d",
++			dev->fd,
++			ep,
++			ret,
++			waiting,
++			urb.status,
++			rc);
+ 
+ 		ret = ioctl(dev->fd, IOCTL_USB_DISCARDURB, &urb);
+-		if (ret < 0 && errno != EINVAL && usb_debug >= 1)
++
+ 		{
+-			fprintf(stderr, "error discarding URB: %s", strerror(errno));
++			int discard_errno = errno;
++
++			if (ret < 0 &&
++				discard_errno != EINVAL &&
++				usb_debug >= 1) {
++				fprintf(stderr,
++					"slv_bulk_read2: discard FAILED "
++					"fd=%d ep=0x%02x ret=%d "
++					"errno=%d (%s)\n",
++					dev->fd,
++					ep,
++					ret,
++					discard_errno,
++					strerror(discard_errno));
++			}
+ 		}
+ 
+ 		/*
+-		 * When the URB is unlinked, it gets moved to the completed list and
+-		 * then we need to reap it or else the next time we call this function,
+-		 * we'll get the previous completion and exit early
++		 * When the URB is unlinked, it moves to the completed list.
++		 * Reap it so the next call does not receive this old completion.
+ 		 */
+-		ioctl(dev->fd, IOCTL_USB_REAPURB, &context);
++		ret = ioctl(dev->fd,
++			IOCTL_USB_REAPURB,
++			&context);
++
++		{
++			int cleanup_errno = errno;
++
++			if (ret < 0 && usb_debug >= 2) {
++				fprintf(stderr,
++					"slv_bulk_read2: cleanup reap "
++					"fd=%d ep=0x%02x ret=%d "
++					"errno=%d (%s)\n",
++					dev->fd,
++					ep,
++					ret,
++					cleanup_errno,
++					strerror(cleanup_errno));
++			}
++		}
++
++		SLV_TRACE(1,
++			"return ERROR fd=%d ep=0x%02x rc=%d",
++			dev->fd,
++			ep,
++			rc);
+ 
+ 		return rc;
+ 	}
+ 
++	SLV_TRACE(2,
++		"return fd=%d ep=0x%02x result=%u",
++		dev->fd,
++		ep,
++		bytesdone);
++
+ 	return bytesdone;
+ }
+ #endif
+@@ -862,6 +1379,13 @@
+ 			ret = usb_bulk_read(uHdl, uInEnd, (char*)rBuf, max_ps, to);
+ #endif
+ 
++			SLV_TRACE(1,
++					"slv_get_: slv_bulk_read2 returned %d "
++					"nBytesRead=%d io_pending=%d",
++					ret,
++					nBytesRead,
++					io_pending);
++
+ 			if (ret == max_ps)
+ 			{
+ 				was_max_size_packet = 1;
+@@ -887,18 +1411,27 @@
+ 
+ 		if (ret == -ETIMEDOUT) 
+ 		{
++			SLV_TRACE(1,
++				"slv_get_: mapping EPIPE to ERR_READ_ERROR");
++
+ 			ticables_warning("usb_bulk_read (%s).\n", usb_strerror());
+ 			nBytesRead = 0;
+ 			return ERR_READ_TIMEOUT;
+ 		} 
+ 		else if (ret == -EPIPE) 
+ 		{
++			SLV_TRACE(1,
++				"slv_get_: mapping EPIPE to ERR_READ_ERROR");
+ 			ticables_warning("usb_bulk_read (%s).\n", usb_strerror());
++
+ 			nBytesRead = 0;
+ 			return ERR_READ_ERROR;
+ 		} 
+ 		else if (ret < 0) 
+ 		{
++			SLV_TRACE(1,
++				"slv_get_: mapping EPIPE to ERR_READ_ERROR");
++
+ 			ticables_warning("usb_bulk_read (%s).\n", usb_strerror());
+ 			nBytesRead = 0;
+ 			return ERR_READ_ERROR;
+@@ -911,6 +1444,12 @@
+ 	*data = *rBufPtr++;
+ 	nBytesRead--;
+ 
++	SLV_TRACE(1,
++        "slv_get_: returning %d nBytesRead=%d io_pending=%d",
++        ret,
++        nBytesRead,
++        io_pending);
++
+ 	return 0;
+ }
+ 
+@@ -949,6 +1488,11 @@
+ 		}
+ 	}
+ 
++    SLV_TRACE(1,
++        "slv_get: returning %d after requesting len=%u",
++        ret,
++        len);
++
+ 	return ret;
+ }
+ 
+@@ -1052,6 +1596,14 @@
+ 		return ERR_READ_ERROR;
+ 	}
+ 
++	fprintf(stderr,
++			"slv_check: reap ret=%d io_pending=%d "
++			"actual=%d status=%d\n",
++			ret,
++			io_pending,
++			urb.actual_length,
++			urb.status);
++
+ 	if (ret >= 0)
+ 	{
+ 		io_pending = FALSE;
