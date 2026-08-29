@@ -40,4 +40,4 @@ termux_step_make_install() {
 		--no-build-isolation \
 		--no-deps \
 		-v
-}
+}# Trigger CI run
