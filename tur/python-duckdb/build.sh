@@ -11,54 +11,56 @@ TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@pablobp10"
 TERMUX_PKG_VERSION="1.5.2"
 
-# Apuntamos directamente al código fuente en crudo
 TERMUX_PKG_SRCURL="https://pypi.io/packages/source/d/duckdb/duckdb-${TERMUX_PKG_VERSION}.tar.gz"
-# El hash de integridad (Lo calcularemos en el siguiente paso)
 TERMUX_PKG_SHA256="638da0d5102b6cb6f7d47f83d0600708ac1d3cb46c5e9aaabc845f9ba4d69246"
 
-# Dependencias necesarias en el móvil de quien lo instale
 TERMUX_PKG_DEPENDS="python, libc++, libexecinfo"
-# Herramientas necesarias para los bots que van a compilarlo
 TERMUX_PKG_BUILD_DEPENDS="cmake, ninja, python-pip, python-setuptools-scm, python-pybind11"
 
-# Obligamos a construir en la misma carpeta fuente para evitar bugs de CMake
 TERMUX_PKG_BUILD_IN_SRC=true
 
 # ------------------------------------------------------------------------------
-# 🛡️ PROTOCOLO MODO INMORTAL (INYECCIÓN PRE-COMPILACIÓN)
+# 🛡️ PROTOCOLO PRE-COMPILACIÓN
 # ------------------------------------------------------------------------------
 termux_step_pre_configure() {
 	termux_setup_ninja
 	termux_setup_cmake
-
-	# 1. Estrangulamiento de hilos para sobrevivir a la RAM (Como pediste)
-	export CMAKE_BUILD_PARALLEL_LEVEL=1
-
-	# 2. Inyección del enlazador para Android (Bionic libc)
-	export LDFLAGS+=" -lexecinfo"
-	export CPPFLAGS+=" -I${TERMUX_PREFIX}/include"
-
-	# 3. Anulamos variables corruptas que confunden a CMake en el CI
-	unset CC
-	unset CXX
-
-	# 4. Obligamos al empaquetador a usar las herramientas nativas del servidor
-	export SKBUILD_CMAKE_EXECUTABLE=$(command -v cmake)
-	export SKBUILD_NINJA_EXECUTABLE=$(command -v ninja)
+	
+	# Aseguramos que se instalan las herramientas de compilación de Python cruzadas
+	termux_setup_python_crossenv
 }
 
 # ------------------------------------------------------------------------------
-# 💥 ASALTO FRONTAL (BYPASS PEP-517)
+# 💥 ASALTO FRONTAL: MODO TURBO + CROSS COMPILATION
 # ------------------------------------------------------------------------------
 termux_step_make_install() {
-	# Añadimos el directorio actual al path para el build-backend de Python
-	export PYTHONPATH=$(pwd):$PYTHONPATH
+	# 1. PARALELISMO MASIVO (Usamos los hilos que asigne el servidor de TUR)
+	export CMAKE_BUILD_PARALLEL_LEVEL=$TERMUX_MAKE_PROCESSES
+	export MAX_JOBS=$TERMUX_MAKE_PROCESSES
 
-	# Disparamos el asalto: --no-build-isolation evita descargar un CMake roto
-	# y --no-deps evita bucles de compilación cruzada.
-	pip install . \
+	# 2. MOTOR NINJA
+	export CMAKE_GENERATOR="Ninja"
+	export SKBUILD_CMAKE_GENERATOR="Ninja"
+
+	# 3. EL SECRETO DE LA COMPILACIÓN CRUZADA
+	# En lugar de borrar CC/CXX, le decimos a CMake exactamente dónde está el mapa 
+	# de Android usando el Toolchain autogenerado por Termux.
+	export CMAKE_ARGS="-DCMAKE_TOOLCHAIN_FILE=${TERMUX_CMAKE_CROSSCOMPILING_TOOLCHAIN}"
+	export SKBUILD_CMAKE_ARGS="-DCMAKE_TOOLCHAIN_FILE=${TERMUX_CMAKE_CROSSCOMPILING_TOOLCHAIN}"
+
+	# 4. ENLAZADOR Y OPTIMIZACIONES AGRESIVAS
+	export LDFLAGS+=" -lexecinfo"
+	export CFLAGS+=" -O3 -fPIC -pipe"
+	export CXXFLAGS+=" -O3 -fPIC -pipe"
+
+	echo "[*] Fundiendo DuckDB (v${TERMUX_PKG_VERSION}) con $MAX_JOBS hilos y Ninja en modo Cruzado..."
+
+	# 5. INSTALACIÓN AISLADA
+	export PYTHONPATH=$(pwd):$PYTHONPATH
+	
+	pip3 install . \
+		--prefix="${TERMUX_PREFIX}" \
 		--no-build-isolation \
 		--no-deps \
-		--prefix="${TERMUX_PREFIX}" \
 		-v
 }
