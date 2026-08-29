@@ -1,0 +1,144 @@
+diff --git a/Make.inc b/Make.inc
+index 851336ccad..3b0fffc795 100644
+--- a/Make.inc
++++ b/Make.inc
+@@ -117,7 +117,7 @@ export LANG=C
+ 
+ # We need python for things like BB triplet recognition and relative path computation.
+ # We don't really care about version, generally, so just find something that works:
+-PYTHON := "$(shell which python 2>/dev/null || which python3 2>/dev/null || which python2 2>/dev/null || echo "{python|python3|python2} not found")"
++PYTHON := "$(shell command -v python 2>/dev/null || command -v python3 2>/dev/null || command -v python2 2>/dev/null || echo "{python|python3|python2} not found")"
+ PYTHON_SYSTEM := $(shell $(PYTHON) -c 'from __future__ import print_function; import platform; print(platform.system())')
+ 
+ # If we're running on Cygwin, but using a native-windows Python, we need to use cygpath -w
+@@ -752,7 +752,7 @@ JCFLAGS += $(SANITIZE_OPTS)
+ JLDFLAGS += $(SANITIZE_LDFLAGS)
+ endif # SANITIZE
+ 
+-TAR := $(shell which gtar 2>/dev/null || which tar 2>/dev/null)
++TAR := $(shell command -v gtar 2>/dev/null || command -v tar 2>/dev/null)
+ TAR_TEST := $(shell $(TAR) --help 2>&1  | grep -E 'bsdtar|strip-components')
+ ifeq (,$(findstring components,$(TAR_TEST)))
+ ifneq (bsdtar,$(findstring bsdtar,$(TAR_TEST)))
+@@ -1188,7 +1188,7 @@ endif
+ 
+ # We need python for things like BB triplet recognition.  We don't really care
+ # about version, generally, so just find something that works:
+-PYTHON := $(shell which python 2>/dev/null || which python3 2>/dev/null || which python2 2>/dev/null || echo not found)
++PYTHON := $(shell command -v python 2>/dev/null || command -v python3 2>/dev/null || command -v python2 2>/dev/null || echo not found)
+ PYTHON_SYSTEM := $(shell $(PYTHON) -c 'from __future__ import print_function; import platform; print(platform.system())')
+ 
+ # If we're running on Cygwin, but using a native-windows Python, we need to use cygpath -w
+diff --git a/base/Makefile b/base/Makefile
+index 22dfe1cd36..4a3d590518 100644
+--- a/base/Makefile
++++ b/base/Makefile
+@@ -200,7 +200,7 @@ symlink_p7zip: $(build_bindir)/7z$(EXE)
+ 
+ ifneq ($(USE_SYSTEM_P7ZIP),0)
+ SYMLINK_SYSTEM_LIBRARIES += symlink_p7zip
+-7Z_PATH := $(shell which 7z$(EXE))
++7Z_PATH := $(shell command -v 7z$(EXE))
+ endif
+ 
+ $(build_bindir)/7z$(EXE):
+@@ -212,7 +212,7 @@ symlink_lld: $(build_bindir)/lld$(EXE)
+ 
+ ifneq ($(USE_SYSTEM_LLD),0)
+ SYMLINK_SYSTEM_LIBRARIES += symlink_lld
+-LLD_PATH := $(shell which lld$(EXE))
++LLD_PATH := $(shell command -v lld$(EXE))
+ endif
+ 
+ $(build_bindir)/lld$(EXE):
+diff --git a/deps/libgit2.mk b/deps/libgit2.mk
+index d68a7a80d6..d05ba4b217 100644
+--- a/deps/libgit2.mk
++++ b/deps/libgit2.mk
+@@ -29,7 +29,7 @@ endif
+ ifeq ($(BUILD_OS),WINNT)
+ LIBGIT2_OPTS += -G"MSYS Makefiles"
+ else
+-LIBGIT2_OPTS += -DBUILD_TESTS=OFF -DDLLTOOL=`which $(CROSS_COMPILE)dlltool`
++LIBGIT2_OPTS += -DBUILD_TESTS=OFF -DDLLTOOL=`command -v $(CROSS_COMPILE)dlltool`
+ LIBGIT2_OPTS += -DCMAKE_FIND_ROOT_PATH=/usr/$(XC_HOST) -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY
+ endif
+ endif
+diff --git a/deps/tools/common.mk b/deps/tools/common.mk
+index e298b6fcc1..6592197457 100644
+--- a/deps/tools/common.mk
++++ b/deps/tools/common.mk
+@@ -36,13 +36,13 @@ ifeq ($(USECCACHE), 1)
+ # `ccache` must be used as compiler launcher, not compiler itself.
+ CMAKE_COMMON += -DCMAKE_C_COMPILER_LAUNCHER=ccache
+ CMAKE_COMMON += -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+-CMAKE_CC := "$$(which $(shell echo $(CC_ARG) | cut -d' ' -f1))"
+-CMAKE_CXX := "$$(which $(shell echo $(CXX_ARG) | cut -d' ' -f1))"
++CMAKE_CC := "$$(command -v $(shell echo $(CC_ARG) | cut -d' ' -f1))"
++CMAKE_CXX := "$$(command -v $(shell echo $(CXX_ARG) | cut -d' ' -f1))"
+ CMAKE_CC_ARG := $(shell echo $(CC_ARG) | cut -d' ' -f2-)
+ CMAKE_CXX_ARG := $(shell echo $(CXX_ARG) | cut -d' ' -f2-)
+ else
+-CMAKE_CC := "$$(which $(CC_BASE))"
+-CMAKE_CXX := "$$(which $(CXX_BASE))"
++CMAKE_CC := "$$(command -v $(CC_BASE))"
++CMAKE_CXX := "$$(command -v $(CXX_BASE))"
+ CMAKE_CC_ARG := $(CC_ARG)
+ CMAKE_CXX_ARG := $(CXX_ARG)
+ endif
+@@ -54,12 +54,12 @@ CMAKE_COMMON += -DCMAKE_CXX_COMPILER=$(CMAKE_CXX)
+ ifneq ($(strip $(CMAKE_CXX_ARG)),)
+ CMAKE_COMMON += -DCMAKE_CXX_COMPILER_ARG1="$(CMAKE_CXX_ARG) $(SANITIZE_OPTS)"
+ endif
+-CMAKE_COMMON += -DCMAKE_LINKER="$$(which $(LD))" -DCMAKE_AR="$$(which $(AR))" -DCMAKE_RANLIB="$$(which $(RANLIB))"
++CMAKE_COMMON += -DCMAKE_LINKER="$$(command -v $(LD))" -DCMAKE_AR="$$(command -v $(AR))" -DCMAKE_RANLIB="$$(command -v $(RANLIB))"
+ 
+ ifneq ($(XC_HOST),)
+ ifeq ($(OS),WINNT)
+ CMAKE_COMMON += -DCMAKE_SYSTEM_NAME=Windows
+-CMAKE_COMMON += -DCMAKE_RC_COMPILER="$$(which $(CROSS_COMPILE)windres)"
++CMAKE_COMMON += -DCMAKE_RC_COMPILER="$$(command -v $(CROSS_COMPILE)windres)"
+ else
+ CMAKE_COMMON += -DCMAKE_SYSTEM_NAME=Linux
+ CMAKE_COMMON += -DCMAKE_SYSTEM_PROCESSOR=$(ARCH)
+diff --git a/deps/tools/jlchecksum b/deps/tools/jlchecksum
+index 87db805dbf..33509062c3 100755
+--- a/deps/tools/jlchecksum
++++ b/deps/tools/jlchecksum
+@@ -87,15 +87,15 @@ SHA512_PROG=""
+ MD5_PROG=""
+ find_checksum_progs()
+ {
+-    if [ ! -z $(which sha512sum) ]; then
++    if [ ! -z $(command -v sha512sum) ]; then
+         SHA512_PROG="sha512sum $ARG1 | awk '{ print \$1; }'"
+-    elif [ ! -z $(which shasum) ]; then
++    elif [ ! -z $(command -v shasum) ]; then
+         SHA512_PROG="shasum -a 512 $ARG1 | awk '{ print \$1; }'"
+     fi
+ 
+-    if [ ! -z $(which md5sum) ]; then
++    if [ ! -z $(command -v md5sum) ]; then
+         MD5_PROG="md5sum $ARG1 | awk '{ print \$1; }'"
+-    elif [ ! -z $(which md5) ]; then
++    elif [ ! -z $(command -v md5) ]; then
+         MD5_PROG="md5 -q $ARG1"
+     fi
+ }
+diff --git a/deps/tools/jldownload b/deps/tools/jldownload
+index 99822195fe..a46a84f501 100755
+--- a/deps/tools/jldownload
++++ b/deps/tools/jldownload
+@@ -5,9 +5,9 @@
+ 
+ CACHE_HOST=https://cache.julialang.org
+ 
+-WGET=$(which wget 2>/dev/null)
+-CURL=$(which curl 2>/dev/null)
+-FETCH=$(which fetch 2>/dev/null)
++WGET=$(command -v wget 2>/dev/null)
++CURL=$(command -v curl 2>/dev/null)
++FETCH=$(command -v fetch 2>/dev/null)
+ 
+ TIMEOUT=15 # seconds
+ WGET_OPTS="--no-check-certificate --tries=1 --timeout=$TIMEOUT"

@@ -1,0 +1,336 @@
+diff --git a/base/Base.jl b/base/Base.jl
+index 4de06175a6..acd7ad4417 100644
+--- a/base/Base.jl
++++ b/base/Base.jl
+@@ -284,6 +284,9 @@ let os = ccall(:jl_get_UNAME, Any, ())
+             push!(DL_LOAD_PATH, "@loader_path/Frameworks")
+         end
+         push!(DL_LOAD_PATH, "@loader_path")
++    else
++        push!(DL_LOAD_PATH, "@executable_path/../lib/julia")
++        push!(DL_LOAD_PATH, "@executable_path/../lib")
+     end
+ end
+ 
+diff --git a/base/loading.jl b/base/loading.jl
+index 4cc2624d00..97204c90d6 100644
+--- a/base/loading.jl
++++ b/base/loading.jl
+@@ -2266,7 +2266,7 @@ evalfile(path::AbstractString, args::Vector) = evalfile(path, String[args...])
+ function load_path_setup_code(load_path::Bool=true)
+     code = """
+     append!(empty!(Base.DEPOT_PATH), $(repr(map(abspath, DEPOT_PATH))))
+-    append!(empty!(Base.DL_LOAD_PATH), $(repr(map(abspath, DL_LOAD_PATH))))
++    append!(empty!(Base.DL_LOAD_PATH), $(repr(map(p -> startswith(p, "@") ? p : abspath(p), DL_LOAD_PATH))))
+     """
+     if load_path
+         load_path = map(abspath, Base.load_path())
+@@ -2327,7 +2327,7 @@ function create_expr_cache(pkg::PkgId, input::String, output::String, output_o::
+     rm(output, force=true)   # Remove file if it exists
+     output_o === nothing || rm(output_o, force=true)
+     depot_path = map(abspath, DEPOT_PATH)
+-    dl_load_path = map(abspath, DL_LOAD_PATH)
++    dl_load_path = map(p -> startswith(p, "@") ? p : abspath(p), DL_LOAD_PATH)
+     load_path = map(abspath, Base.load_path())
+     path_sep = Sys.iswindows() ? ';' : ':'
+     any(path -> path_sep in path, load_path) &&
+diff --git a/cli/Makefile b/cli/Makefile
+index 5e3e647946..63067da923 100644
+--- a/cli/Makefile
++++ b/cli/Makefile
+@@ -7,7 +7,7 @@ include $(JULIAHOME)/deps/llvm-ver.make
+ 
+ HEADERS := $(addprefix $(SRCDIR)/,jl_exports.h loader.h) $(addprefix $(JULIAHOME)/src/,julia_fasttls.h support/platform.h support/dirpath.h jl_exported_data.inc jl_exported_funcs.inc)
+ 
+-LOADER_CFLAGS = $(JCFLAGS) -I$(BUILDROOT)/src -I$(JULIAHOME)/src -I$(JULIAHOME)/src/support -I$(build_includedir) -ffreestanding
++LOADER_CFLAGS = $(fPIC) $(JCFLAGS) -I$(BUILDROOT)/src -I$(JULIAHOME)/src -I$(JULIAHOME)/src/support -I$(build_includedir) -ffreestanding
+ LOADER_LIBPATHS = -L$(build_shlibdir) -L$(build_libdir)
+ LOADER_LDFLAGS = $(JLDFLAGS) -ffreestanding $(LOADER_LIBPATHS)
+ 
+@@ -24,7 +24,11 @@ ifeq ($(OS),WINNT)
+ # path buffers, so link the mingw providers for them.
+ LOADER_LDFLAGS = $(LOADER_LIBPATHS) -lntdll -lkernel32 -lpsapi -lmingwex $(WIN_CRT_LIB)
+ else ifeq ($(OS),Linux)
++ifneq (,$(findstring android,$(XC_HOST)))
++LOADER_LDFLAGS += -Wl,--no-as-needed -ldl -rdynamic -lc -Wl,--as-needed
++else
+ LOADER_LDFLAGS += -Wl,--no-as-needed -ldl -lpthread -rdynamic -lc -Wl,--as-needed
++endif
+ else ifeq ($(OS),FreeBSD)
+ LOADER_LDFLAGS += -Wl,--no-as-needed -ldl -lpthread -rdynamic -lc -Wl,--as-needed
+ else ifeq ($(OS),Darwin)
+diff --git a/cli/loader_lib.c b/cli/loader_lib.c
+index 12feed0c50..f0a26dd9e7 100644
+--- a/cli/loader_lib.c
++++ b/cli/loader_lib.c
+@@ -44,6 +44,8 @@ void jl_loader_print_stderr3(const char * msg1, const char * msg2, const char *
+  * However, if it exists and cannot be loaded, that's a problem. So, we alert the user
+  * and abort the process. */
+ static void * load_library(const char * rel_path, const char * src_dir, int err) {
++    if (rel_path == NULL || rel_path[0] == '\0')
++        return NULL;
+     void * handle = NULL;
+     // See if a handle is already open to the basename
+     const char *basename = rel_path + strlen(rel_path);
+@@ -253,6 +255,9 @@ static void read_wrapper(int fd, char **ret, size_t *ret_len)
+ // The path returned must be freed.
+ static char *libstdcxxprobe(void)
+ {
++#if defined(__ANDROID__)
++    return NULL;
++#else
+     // Create the pipe and child process.
+     int fork_pipe[2];
+     int ret = pipe(fork_pipe);
+@@ -349,6 +354,7 @@ static char *libstdcxxprobe(void)
+         path[pathlen] = '\0';
+         return path;
+     }
++#endif
+ }
+ #endif
+ 
+@@ -427,6 +433,14 @@ __attribute__((constructor)) void jl_load_libjulia_internal(void) {
+         // Chop the string at the colon so it's a valid-ending-string
+         *colon = '\0';
+ 
++        if (curr_dep[0] != '@') {
++            size_t depe_len = strlen(curr_dep);
++            if (depe_len == 0 || curr_dep[depe_len - 1] == '/' || curr_dep[depe_len - 1] == '\\') {
++                curr_dep = colon + 1;
++                continue;
++            }
++        }
++
+         // If this library name starts with `@`, it's a special library
+         // and requires special handling:
+         if (curr_dep[0] == '@') {
+@@ -463,7 +477,7 @@ __attribute__((constructor)) void jl_load_libjulia_internal(void) {
+                 }
+                 // If the probe rejected the system libstdc++ (or didn't find one!)
+                 // just load our bundled libstdc++ as identified by curr_dep;
+-                if (!probe_successful) {
++                if (!probe_successful && curr_dep[0] != '\0') {
+                     load_library(curr_dep, lib_dir, 1);
+                 }
+ #endif
+diff --git a/base/gmp.jl b/base/gmp.jl
+index 8a1451be7a..215a0627ee 100644
+--- a/base/gmp.jl
++++ b/base/gmp.jl
+@@ -26,7 +26,7 @@ if Sys.iswindows()
+ elseif Sys.isapple()
+     const libgmp = "@rpath/libgmp.10.dylib"
+ else
+-    const libgmp = "libgmp.so.10"
++    const libgmp = "libgmp"
+ end
+ 
+ version() = VersionNumber(unsafe_string(unsafe_load(cglobal((:__gmp_version, libgmp), Ptr{Cchar}))))
+diff --git a/base/mpfr.jl b/base/mpfr.jl
+index 2e03018f76..dfe4499094 100644
+--- a/base/mpfr.jl
++++ b/base/mpfr.jl
+@@ -32,7 +32,7 @@ if Sys.iswindows()
+ elseif Sys.isapple()
+     const libmpfr = "@rpath/libmpfr.6.dylib"
+ else
+-    const libmpfr = "libmpfr.so.6"
++    const libmpfr = "libmpfr"
+ end
+ 
+ 
+diff --git a/stdlib/CompilerSupportLibraries_jll/src/CompilerSupportLibraries_jll.jl b/stdlib/CompilerSupportLibraries_jll/src/CompilerSupportLibraries_jll.jl
+index bd7a0571f9..3243ce78d3 100644
+--- a/stdlib/CompilerSupportLibraries_jll/src/CompilerSupportLibraries_jll.jl
++++ b/stdlib/CompilerSupportLibraries_jll/src/CompilerSupportLibraries_jll.jl
+@@ -15,6 +15,8 @@ export libgfortran, libstdcxx, libgomp
+ const PATH = Ref("")
+ const LIBPATH = Ref("")
+ artifact_dir::String = ""
++libgcc_s_handle::Ptr{Cvoid} = C_NULL
++libgcc_s_path::String = ""
+ libgfortran_handle::Ptr{Cvoid} = C_NULL
+ libgfortran_path::String = ""
+ libstdcxx_handle::Ptr{Cvoid} = C_NULL
+@@ -53,20 +55,30 @@ else
+ end
+ 
+ function __init__()
+-    global libgcc_s_handle = dlopen(libgcc_s)
+-    global libgcc_s_path = dlpath(libgcc_s_handle)
+-    global libgfortran_handle = dlopen(libgfortran)
+-    global libgfortran_path = dlpath(libgfortran_handle)
+-    global libstdcxx_handle = dlopen(libstdcxx)
+-    global libstdcxx_path = dlpath(libstdcxx_handle)
+-    global libgomp_handle = dlopen(libgomp)
+-    global libgomp_path = dlpath(libgomp_handle)
++    global libgcc_s_handle = dlopen(libgcc_s; throw_error = false)
++    if libgcc_s_handle !== nothing
++        global libgcc_s_path = dlpath(libgcc_s_handle)
++    end
++    global libgfortran_handle = dlopen(libgfortran; throw_error = false)
++    if libgfortran_handle !== nothing
++        global libgfortran_path = dlpath(libgfortran_handle)
++    end
++    global libstdcxx_handle = dlopen(libstdcxx; throw_error = false)
++    if libstdcxx_handle !== nothing
++        global libstdcxx_path = dlpath(libstdcxx_handle)
++    end
++    global libgomp_handle = dlopen(libgomp; throw_error = false)
++    if libgomp_handle !== nothing
++        global libgomp_path = dlpath(libgomp_handle)
++    end
+     @static if libc(HostPlatform()) != "musl"
+         dlopen(libssp; throw_error = false)
+     end
+     global artifact_dir = dirname(Sys.BINDIR)
+-    LIBPATH[] = dirname(libgcc_s_path)
+-    push!(LIBPATH_list, LIBPATH[])
++    if libgcc_s_path !== ""
++        LIBPATH[] = dirname(libgcc_s_path)
++        push!(LIBPATH_list, LIBPATH[])
++    end
+ end
+ 
+ # JLLWrappers API compatibility shims.  Note that not all of these will really make sense.
+diff --git a/stdlib/OpenBLAS_jll/src/OpenBLAS_jll.jl b/stdlib/OpenBLAS_jll/src/OpenBLAS_jll.jl
+index a0c11ab047..6d3b88de96 100644
+--- a/stdlib/OpenBLAS_jll/src/OpenBLAS_jll.jl
++++ b/stdlib/OpenBLAS_jll/src/OpenBLAS_jll.jl
+@@ -65,7 +65,7 @@ function __init__()
+ 
+     # As mentioned above, we are sneaking this in here so that we don't have to
+     # depend on CSL_jll and load _all_ of its libraries.
+-    dlopen(_libgfortran)
++    dlopen(_libgfortran; throw_error = false)
+ 
+     global libopenblas_handle = dlopen(libopenblas)
+     global libopenblas_path = dlpath(libopenblas_handle)
+diff --git a/base/Makefile b/base/Makefile
+index cf7f974fd7..f191de8d0f 100644
+--- a/base/Makefile
++++ b/base/Makefile
+@@ -171,7 +171,7 @@ endif
+ 
+ define symlink_system_library
+ libname_$2 := $$(notdir $(call versioned_libname,$2,$3))
+-libpath_$2 := $$(shell $$(call spawn,$$(LIBWHICH)) -p $$(libname_$2) 2>/dev/null)
++libpath_$2 := $$(or $$(firstword $$(wildcard $(prefix)/lib/$$(libname_$2)* $(prefix)/lib/$2.$$(SHLIB_EXT)* $$(build_libdir)/$$(libname_$2)* $$(build_libdir)/$2.$$(SHLIB_EXT)*)),$$(shell $$(call spawn,$$(LIBWHICH)) -p $$(libname_$2) 2>/dev/null),$$(shell $$(call spawn,$$(LIBWHICH)) -p $2.$$(SHLIB_EXT) 2>/dev/null))
+ symlink_$2: $$(build_private_libdir)/$$(libname_$2)
+ $$(build_private_libdir)/$$(libname_$2):
+ 	@if [ -e "$$(libpath_$2)" ]; then \
+@@ -180,11 +180,14 @@ $$(build_private_libdir)/$$(libname_$2):
+ 		[ -e "$$$$REALPATH" ] && \
+ 		rm -f "$$@" && \
+ 		echo ln -sf "$$$$REALPATH" "$$@" && \
+-		ln -sf "$$$$REALPATH" "$$@"; \
++		ln -sf "$$$$REALPATH" "$$@" && \
++		if [ -n "$3" ]; then \
++			ln -sf "$$$$REALPATH" "$$(build_private_libdir)/$2.$$(SHLIB_EXT)"; \
++		fi; \
+ 	else \
+ 		if [ "$4" != "ALLOW_FAILURE" ]; then \
+ 			echo "System library symlink failure: Unable to locate $$(libname_$2) on your system!" >&2; \
+-			false; \
++			true; \
+ 		fi; \
+ 	fi
+ ifneq ($$(USE_SYSTEM_$1),0)
+@@ -201,9 +204,9 @@ SYMLINK_SYSTEM_LIBRARIES += symlink_p7zip
+ endif
+ 
+ $(build_bindir)/7z$(EXE):
+-	[ -e "$(7Z_PATH)" ] && \
++	-[ -n "$(7Z_PATH)" ] && [ -e "$(7Z_PATH)" ] && \
+ 	rm -f "$@" && \
+-	ln -svf "$(7Z_PATH)" "$@"
++	ln -svf "$(7Z_PATH)" "$@" || true
+ 
+ symlink_lld: $(build_bindir)/lld$(EXE)
+ 
+@@ -213,9 +216,9 @@ LLD_PATH := $(shell which lld$(EXE))
+ endif
+ 
+ $(build_bindir)/lld$(EXE):
+-	[ -e "$(LLD_PATH)" ] && \
++	-[ -n "$(LLD_PATH)" ] && [ -e "$(LLD_PATH)" ] && \
+ 	rm -f "$@" && \
+-	ln -svf "$(LLD_PATH)" "$@"
++	ln -svf "$(LLD_PATH)" "$@" || true
+ 
+ # the following excludes: libuv.a, libutf8proc.a
+ 
+@@ -238,43 +241,48 @@ $(eval $(call symlink_system_library,CSL,libgcc_s,1))
+ endif
+ endif
+ else
+-$(eval $(call symlink_system_library,CSL,libgcc_s,1))
++$(eval $(call symlink_system_library,CSL,libgcc_s,1,ALLOW_FAILURE))
+ endif
+ ifneq (,$(LIBGFORTRAN_VERSION))
+-$(eval $(call symlink_system_library,CSL,libgfortran,$(LIBGFORTRAN_VERSION)))
++$(eval $(call symlink_system_library,CSL,libgfortran,$(LIBGFORTRAN_VERSION),ALLOW_FAILURE))
+ endif
+-$(eval $(call symlink_system_library,CSL,libstdc++,6))
++$(eval $(call symlink_system_library,CSL,libstdc++,6,ALLOW_FAILURE))
+ # We allow libssp, libatomic, libgomp and libquadmath to fail as they are not available on all systems
+ $(eval $(call symlink_system_library,CSL,libssp,0,ALLOW_FAILURE))
+ $(eval $(call symlink_system_library,CSL,libatomic,1,ALLOW_FAILURE))
+ $(eval $(call symlink_system_library,CSL,libgomp,1,ALLOW_FAILURE))
+ $(eval $(call symlink_system_library,CSL,libquadmath,0,ALLOW_FAILURE))
+-$(eval $(call symlink_system_library,PCRE,libpcre2-8))
++$(eval $(call symlink_system_library,PCRE,libpcre2-8,0))
+ $(eval $(call symlink_system_library,DSFMT,libdSFMT))
+-$(eval $(call symlink_system_library,LIBBLASTRAMPOLINE,libblastrampoline))
++$(eval $(call symlink_system_library,LIBBLASTRAMPOLINE,libblastrampoline,5))
+ $(eval $(call symlink_system_library,BLAS,$(LIBBLASNAME)))
+ ifneq ($(LIBLAPACKNAME),$(LIBBLASNAME))
+ $(eval $(call symlink_system_library,LAPACK,$(LIBLAPACKNAME)))
+ endif
+-$(eval $(call symlink_system_library,GMP,libgmp))
+-$(eval $(call symlink_system_library,MPFR,libmpfr))
+-$(eval $(call symlink_system_library,MBEDTLS,libmbedtls))
+-$(eval $(call symlink_system_library,MBEDTLS,libmbedcrypto))
+-$(eval $(call symlink_system_library,MBEDTLS,libmbedx509))
+-$(eval $(call symlink_system_library,LIBSSH2,libssh2))
+-$(eval $(call symlink_system_library,NGHTTP2,libnghttp2))
+-$(eval $(call symlink_system_library,CURL,libcurl))
+-$(eval $(call symlink_system_library,LIBGIT2,libgit2))
+-$(eval $(call symlink_system_library,LIBSUITESPARSE,libamd))
+-$(eval $(call symlink_system_library,LIBSUITESPARSE,libcamd))
+-$(eval $(call symlink_system_library,LIBSUITESPARSE,libccolamd))
+-$(eval $(call symlink_system_library,LIBSUITESPARSE,libcholmod))
+-$(eval $(call symlink_system_library,LIBSUITESPARSE,libcholmod_cuda))
+-$(eval $(call symlink_system_library,LIBSUITESPARSE,libcolamd))
+-$(eval $(call symlink_system_library,LIBSUITESPARSE,libumfpack))
+-$(eval $(call symlink_system_library,LIBSUITESPARSE,libspqr))
+-$(eval $(call symlink_system_library,LIBSUITESPARSE,libspqr_cuda))
+-$(eval $(call symlink_system_library,LIBSUITESPARSE,libsuitesparseconfig))
++$(eval $(call symlink_system_library,GMP,libgmp,10))
++$(eval $(call symlink_system_library,GMP,libgmpxx,4,ALLOW_FAILURE))
++$(eval $(call symlink_system_library,MPFR,libmpfr,6))
++$(eval $(call symlink_system_library,MBEDTLS,libmbedtls,14))
++$(eval $(call symlink_system_library,MBEDTLS,libmbedcrypto,7))
++$(eval $(call symlink_system_library,MBEDTLS,libmbedx509,1))
++$(eval $(call symlink_system_library,LIBSSH2,libssh2,1))
++$(eval $(call symlink_system_library,NGHTTP2,libnghttp2,14))
++$(eval $(call symlink_system_library,CURL,libcurl,4))
++$(eval $(call symlink_system_library,LIBUV,libuv,2))
++$(eval $(call symlink_system_library,OPENLIBM,libopenlibm,4))
++$(eval $(call symlink_system_library,LIBGIT2,libgit2,1.6,ALLOW_FAILURE))
++$(eval $(call symlink_system_library,ZLIB,libz,1,ALLOW_FAILURE))
++$(eval $(call symlink_system_library,LIBSUITESPARSE,libamd,3))
++$(eval $(call symlink_system_library,LIBSUITESPARSE,libcamd,3))
++$(eval $(call symlink_system_library,LIBSUITESPARSE,libccolamd,3))
++$(eval $(call symlink_system_library,LIBSUITESPARSE,libcholmod,4,ALLOW_FAILURE))
++$(eval $(call symlink_system_library,LIBSUITESPARSE,libcholmod,5,ALLOW_FAILURE))
++$(eval $(call symlink_system_library,LIBSUITESPARSE,libcholmod_cuda,,ALLOW_FAILURE))
++$(eval $(call symlink_system_library,LIBSUITESPARSE,libcolamd,3))
++$(eval $(call symlink_system_library,LIBSUITESPARSE,libumfpack,6))
++$(eval $(call symlink_system_library,LIBSUITESPARSE,libspqr,4))
++$(eval $(call symlink_system_library,LIBSUITESPARSE,libspqr_cuda,,ALLOW_FAILURE))
++$(eval $(call symlink_system_library,LIBSUITESPARSE,libsuitesparseconfig,7))
+ # EXCLUDED LIBRARIES (installed/used, but not vendored for use with dlopen):
+ # libunwind
+ endif # WINNT
