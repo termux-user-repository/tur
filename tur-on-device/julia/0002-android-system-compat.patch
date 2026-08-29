@@ -1,0 +1,172 @@
+diff --git a/src/partr.c b/src/partr.c
+index cb82dc2c3d..b74d7e3b69 100644
+--- a/src/partr.c
++++ b/src/partr.c
+@@ -202,7 +202,7 @@ void jl_threadfun(void *arg)
+ 
+ int jl_running_under_rr(int recheck)
+ {
+-#ifdef _OS_LINUX_
++#if defined(_OS_LINUX_) && !defined(__ANDROID__)
+ #define RR_CALL_BASE 1000
+ #define SYS_rrcall_check_presence (RR_CALL_BASE + 8)
+     static _Atomic(int) is_running_under_rr = 0;
+diff --git a/src/jlapi.c b/src/jlapi.c
+index 3f39d0add2..1bc2ca0926 100644
+--- a/src/jlapi.c
++++ b/src/jlapi.c
+@@ -690,7 +690,7 @@ static void lock_low32(void)
+ // Actual definition in `ast.c`
+ void jl_lisp_prompt(void);
+ 
+-#ifdef _OS_LINUX_
++#if defined(_OS_LINUX_) && !defined(__ANDROID__)
+ static void rr_detach_teleport(void) {
+ #define RR_CALL_BASE 1000
+ #define SYS_rrcall_detach_teleport (RR_CALL_BASE + 9)
+@@ -729,7 +729,7 @@ JL_DLLEXPORT int jl_repl_entrypoint(int argc, char *argv[])
+     // the execution where we actually need to exclude rr (e.g. because we're
+     // testing for the absence of a memory-model-dependent bug).
+     if (jl_options.rr_detach && jl_running_under_rr(0)) {
+-#ifdef _OS_LINUX_
++#if defined(_OS_LINUX_) && !defined(__ANDROID__)
+         rr_detach_teleport();
+         execv("/proc/self/exe", argv);
+ #endif
+diff --git a/src/runtime_ccall.cpp b/src/runtime_ccall.cpp
+index 23793254c2..136fde8a87 100644
+--- a/src/runtime_ccall.cpp
++++ b/src/runtime_ccall.cpp
+@@ -171,7 +171,7 @@ std::string jl_format_filename(StringRef output_pattern)
+                     hostname[sizeof(hostname) - 1] = '\0'; /* Null terminate, just to be safe. */
+                     outfile << hostname;
+                 }
+-#ifndef _OS_WINDOWS_
++#if !defined(_OS_WINDOWS_) && !defined(__ANDROID__)
+                 if (c == 'l' && getdomainname(hostname, sizeof(hostname)) == 0) {
+                     hostname[sizeof(hostname) - 1] = '\0'; /* Null terminate, just to be safe. */
+                     outfile << hostname;
+diff --git a/src/cgmemmgr.cpp b/src/cgmemmgr.cpp
+index d6236ceacd..d003bff2a5 100644
+--- a/src/cgmemmgr.cpp
++++ b/src/cgmemmgr.cpp
+@@ -185,8 +185,8 @@ static intptr_t get_anon_hdl(void)
+ #  endif
+     char shm_name[JL_PATH_MAX] = "julia-codegen-0123456789-0123456789/tmp///";
+     pid_t pid = getpid();
+-    // `shm_open` can't be mapped exec on mac
+-#  ifndef _OS_DARWIN_
++    // `shm_open` can't be mapped exec on mac or Android
++#  if !defined(_OS_DARWIN_) && !defined(__ANDROID__)
+     do {
+         snprintf(shm_name, sizeof(shm_name),
+                  "julia-codegen-%d-%d", (int)pid, rand());
+diff --git a/src/sys.c b/src/sys.c
+index d3473774a5..d366f2dc42 100644
+--- a/src/sys.c
++++ b/src/sys.c
+@@ -573,6 +573,26 @@ JL_DLLEXPORT long jl_SC_CLK_TCK(void)
+ #endif
+ }
+ 
++#if defined(__ANDROID__)
++struct android_dlpath_data {
++    void *handle;
++    const char *result;
++};
++static int find_dlpath_cb(struct dl_phdr_info *info, size_t size, void *data)
++{
++    struct android_dlpath_data *d = (struct android_dlpath_data*)data;
++    if (info->dlpi_name && info->dlpi_name[0]) {
++        void *probe_lib = jl_load_dynamic_library(info->dlpi_name, JL_RTLD_DEFAULT | JL_RTLD_NOLOAD, 0);
++        jl_dlclose(probe_lib);
++        if (((intptr_t)d->handle & (-4)) == ((intptr_t)probe_lib & (-4))) {
++            d->result = info->dlpi_name;
++            return 1;
++        }
++    }
++    return 0;
++}
++#endif
++
+ // Takes a handle (as returned from dlopen()) and returns the absolute path to the image loaded
+ JL_DLLEXPORT const char *jl_pathname_for_handle(void *handle)
+ {
+@@ -615,6 +635,12 @@ JL_DLLEXPORT const char *jl_pathname_for_handle(void *handle)
+     free(pth16);
+     return filepath;
+ 
++#elif defined(__ANDROID__)
++
++    struct android_dlpath_data d = { handle, NULL };
++    dl_iterate_phdr(find_dlpath_cb, &d);
++    return d.result;
++
+ #else // Linux, FreeBSD, ...
+ 
+     struct link_map *map;
+diff --git a/src/support/dtypes.h b/src/support/dtypes.h
+index da570921c1..cee22f11a2 100644
+--- a/src/support/dtypes.h
++++ b/src/support/dtypes.h
+@@ -92,7 +92,7 @@ typedef intptr_t ssize_t;
+ # define JL_DLLEXPORT_CODEGEN JL_DLLIMPORT
+ #endif
+ 
+-#ifdef _OS_LINUX_
++#if defined(_OS_LINUX_) && !defined(__ANDROID__)
+ #include <endian.h>
+ #define LITTLE_ENDIAN  __LITTLE_ENDIAN
+ #define BIG_ENDIAN     __BIG_ENDIAN
+@@ -198,6 +198,10 @@ jl_assume_aligned(T ptr, unsigned align)
+ typedef int bool_t;
+ typedef unsigned char  byte_t;   /* 1 byte */
+ 
++#ifdef __ANDROID__
++#define uint_t jl_uint_t
++#endif
++
+ #ifdef _P64
+ #define TOP_BIT 0x8000000000000000
+ #define NBITS 64
+diff --git a/base/sysinfo.jl b/base/sysinfo.jl
+index 235cf04382..b0bdc9fd73 100644
+--- a/base/sysinfo.jl
++++ b/base/sysinfo.jl
+@@ -201,6 +201,10 @@ function _cpu_summary(io::IO, cpu::AbstractVector{CPUinfo}, i, j)
+ end
+ 
+ function cpu_summary(io::IO=stdout, cpu::AbstractVector{CPUinfo} = cpu_info())
++    if isempty(cpu)
++        println(io, "unknown")
++        return
++    end
+     model = cpu[1].model
+     first = 1
+     for i = 2:length(cpu)
+@@ -216,7 +220,9 @@ function cpu_info()
+     UVcpus = Ref{Ptr{UV_cpu_info_t}}()
+     count = Ref{Int32}()
+     err = ccall(:uv_cpu_info, Int32, (Ptr{Ptr{UV_cpu_info_t}}, Ptr{Int32}), UVcpus, count)
+-    Base.uv_error("uv_cpu_info", err)
++    if err < 0
++        return CPUinfo[]
++    end
+     cpus = Vector{CPUinfo}(undef, count[])
+     for i = 1:length(cpus)
+         cpus[i] = CPUinfo(unsafe_load(UVcpus[], i))
+diff --git a/stdlib/InteractiveUtils/src/InteractiveUtils.jl b/stdlib/InteractiveUtils/src/InteractiveUtils.jl
+index b69ffa3ebc..b974148a03 100644
+--- a/stdlib/InteractiveUtils/src/InteractiveUtils.jl
++++ b/stdlib/InteractiveUtils/src/InteractiveUtils.jl
+@@ -149,7 +149,9 @@ function versioninfo(io::IO=stdout; verbose::Bool=false)
+         end
+     else
+         cpu = Sys.cpu_info()
+-        println(io, "  CPU: ", length(cpu), " × ", cpu[1].model)
++        if !isempty(cpu)
++            println(io, "  CPU: ", length(cpu), " × ", cpu[1].model)
++        end
+     end
+ 
+     if verbose

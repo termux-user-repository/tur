@@ -1,0 +1,42 @@
+diff --git a/contrib/normalize_triplet.py b/contrib/normalize_triplet.py
+index 77c047b360..516f3732d4 100755
+--- a/contrib/normalize_triplet.py
++++ b/contrib/normalize_triplet.py
+@@ -26,6 +26,7 @@ libc_mapping = {
+     'blank_libc': "",
+     'gnu': "-gnu",
+     'musl': "-musl",
++    'android': "-android[\\d\\.]*",
+ }
+ call_abi_mapping = {
+     'blank_call_abi': "",
+diff --git a/base/binaryplatforms.jl b/base/binaryplatforms.jl
+index 57cf568402..fa030a9b1a 100644
+--- a/base/binaryplatforms.jl
++++ b/base/binaryplatforms.jl
+@@ -216,7 +216,7 @@ function validate_tags(tags::Dict)
+     throw_libc_mismatch() = throw(ArgumentError("Invalid os/libc combination: $(tags["os"])/$(tags["libc"])"))
+     if tags["os"] == "linux"
+         # Linux always has a `libc` entry
+-        if tags["libc"] ∉ ("glibc", "musl")
++        if tags["libc"] ∉ ("glibc", "musl", "bionic")
+             throw_libc_mismatch()
+         end
+     else
+@@ -570,6 +570,8 @@ function libc_str(p::AbstractPlatform)
+         return ""
+     elseif lc === "glibc"
+         return "-gnu"
++    elseif lc === "bionic"
++        return "-android"
+     else
+         return string("-", lc)
+     end
+@@ -642,6 +644,7 @@ const libc_mapping = Dict(
+     "libc_nothing" => "",
+     "glibc" => "-gnu",
+     "musl" => "-musl",
++    "bionic" => "-(android|bionic)[\\d\\.]*",
+ )
+ const call_abi_mapping = Dict(
+     "call_abi_nothing" => "",
