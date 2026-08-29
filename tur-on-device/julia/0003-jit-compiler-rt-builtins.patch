@@ -1,0 +1,254 @@
+diff --git a/src/julia.expmap.in b/src/julia.expmap.in
+index b28a714e75..d058e79876 100644
+--- a/src/julia.expmap.in
++++ b/src/julia.expmap.in
+@@ -2,6 +2,37 @@
+   global:
+     pthread*;
+     __stack_chk_*;
++    __*ti3*;
++    __*di3*;
++    __*ti2*;
++    __*di2*;
++    __aeabi_*;
++    __gnu_*;
++    __atomic_*;
++    __sync_*;
++    __trunc*;
++    __extend*;
++    __float*;
++    __fix*;
++    __unord*;
++    __eq*;
++    __ne*;
++    __le*;
++    __lt*;
++    __ge*;
++    __gt*;
++    __sub*;
++    __add*;
++    __mul*;
++    __div*;
++    __mod*;
++    __cmp*;
++    __pow*;
++    __popcount*;
++    __clz*;
++    __ctz*;
++    __ffs*;
++    __bswap*;
+     asprintf*;
+     bitvector_*;
+     ios_*;
+diff --git a/src/jitlayers.cpp b/src/jitlayers.cpp
+index 319641aa85..d60bc123c9 100644
+--- a/src/jitlayers.cpp
++++ b/src/jitlayers.cpp
+@@ -1395,6 +1395,148 @@ JuliaOJIT::PipelineT::PipelineT(orc::ObjectLayer &BaseLayer, TargetMachine &TM,
+ int64_t ___asan_globals_registered;
+ #endif
+ 
++#if defined(__SIZEOF_INT128__)
++typedef unsigned __int128 jl_crt_uint128_t;
++typedef __int128 jl_crt_int128_t;
++typedef union {
++    jl_crt_uint128_t u128;
++    jl_crt_int128_t  i128;
++    struct {
++        uint64_t lo;
++        uint64_t hi;
++    } s;
++    struct {
++        uint64_t lo;
++        int64_t  hi;
++    } si;
++} jl_u128_split_t;
++
++static jl_crt_uint128_t jl_crt_udivti3(jl_crt_uint128_t a, jl_crt_uint128_t b) { return a / b; }
++static jl_crt_uint128_t jl_crt_umodti3(jl_crt_uint128_t a, jl_crt_uint128_t b) { return a % b; }
++static jl_crt_int128_t jl_crt_divti3(jl_crt_int128_t a, jl_crt_int128_t b) { return a / b; }
++static jl_crt_int128_t jl_crt_modti3(jl_crt_int128_t a, jl_crt_int128_t b) { return a % b; }
++
++static int jl_crt_clzti2(jl_crt_uint128_t a) {
++    jl_u128_split_t in; in.u128 = a;
++    if (in.s.hi != 0) return __builtin_clzll(in.s.hi);
++    return 64 + __builtin_clzll(in.s.lo);
++}
++static int jl_crt_ctzti2(jl_crt_uint128_t a) {
++    jl_u128_split_t in; in.u128 = a;
++    if (in.s.lo != 0) return __builtin_ctzll(in.s.lo);
++    return 64 + __builtin_ctzll(in.s.hi);
++}
++static int jl_crt_popcountti2(jl_crt_uint128_t a) {
++    jl_u128_split_t in; in.u128 = a;
++    return __builtin_popcountll(in.s.lo) + __builtin_popcountll(in.s.hi);
++}
++static jl_crt_uint128_t jl_crt_ashlti3(jl_crt_uint128_t a, int b) {
++    jl_u128_split_t in, out;
++    in.u128 = a;
++    if (b >= 128) {
++        out.s.lo = 0;
++        out.s.hi = 0;
++    } else if (b >= 64) {
++        out.s.lo = 0;
++        out.s.hi = in.s.lo << (b - 64);
++    } else if (b == 0) {
++        return a;
++    } else {
++        out.s.lo = in.s.lo << b;
++        out.s.hi = (in.s.hi << b) | (in.s.lo >> (64 - b));
++    }
++    return out.u128;
++}
++static jl_crt_uint128_t jl_crt_lshrti3(jl_crt_uint128_t a, int b) {
++    jl_u128_split_t in, out;
++    in.u128 = a;
++    if (b >= 128) {
++        out.s.lo = 0;
++        out.s.hi = 0;
++    } else if (b >= 64) {
++        out.s.lo = in.s.hi >> (b - 64);
++        out.s.hi = 0;
++    } else if (b == 0) {
++        return a;
++    } else {
++        out.s.lo = (in.s.lo >> b) | (in.s.hi << (64 - b));
++        out.s.hi = in.s.hi >> b;
++    }
++    return out.u128;
++}
++static jl_crt_int128_t jl_crt_ashrti3(jl_crt_int128_t a, int b) {
++    jl_u128_split_t in, out;
++    in.i128 = a;
++    if (b >= 128) {
++        out.si.lo = in.si.hi >> 63;
++        out.si.hi = in.si.hi >> 63;
++    } else if (b >= 64) {
++        out.si.lo = in.si.hi >> (b - 64);
++        out.si.hi = in.si.hi >> 63;
++    } else if (b == 0) {
++        return a;
++    } else {
++        out.si.lo = (in.s.lo >> b) | ((uint64_t)in.si.hi << (64 - b));
++        out.si.hi = in.si.hi >> b;
++    }
++    return out.i128;
++}
++static jl_crt_int128_t jl_crt_multi3(jl_crt_int128_t a, jl_crt_int128_t b) {
++    jl_u128_split_t in_a, in_b, out;
++    in_a.i128 = a;
++    in_b.i128 = b;
++    uint64_t a0 = (uint32_t)in_a.s.lo, a1 = in_a.s.lo >> 32;
++    uint64_t b0 = (uint32_t)in_b.s.lo, b1 = in_b.s.lo >> 32;
++    uint64_t p0 = a0 * b0;
++    uint64_t p1 = a0 * b1;
++    uint64_t p2 = a1 * b0;
++    uint64_t p3 = a1 * b1;
++    uint64_t mid = p1 + (p0 >> 32) + (uint32_t)p2;
++    out.s.lo = (mid << 32) | (uint32_t)p0;
++    out.s.hi = p3 + (mid >> 32) + (p2 >> 32) + (in_a.s.lo * in_b.s.hi) + (in_a.s.hi * in_b.s.lo);
++    return out.i128;
++}
++
++extern "C" {
++JL_DLLEXPORT int __clzti2(jl_crt_uint128_t a) { return jl_crt_clzti2(a); }
++JL_DLLEXPORT int __ctzti2(jl_crt_uint128_t a) { return jl_crt_ctzti2(a); }
++JL_DLLEXPORT int __popcountti2(jl_crt_uint128_t a) { return jl_crt_popcountti2(a); }
++JL_DLLEXPORT jl_crt_uint128_t __ashlti3(jl_crt_uint128_t a, int b) { return jl_crt_ashlti3(a, b); }
++JL_DLLEXPORT jl_crt_uint128_t __lshrti3(jl_crt_uint128_t a, int b) { return jl_crt_lshrti3(a, b); }
++JL_DLLEXPORT jl_crt_int128_t __ashrti3(jl_crt_int128_t a, int b) { return jl_crt_ashrti3(a, b); }
++JL_DLLEXPORT jl_crt_int128_t __multi3(jl_crt_int128_t a, jl_crt_int128_t b) { return jl_crt_multi3(a, b); }
++}
++#endif
++
++#if !defined(_P64)
++extern "C" {
++int64_t __divdi3(int64_t, int64_t);
++int64_t __moddi3(int64_t, int64_t);
++uint64_t __udivdi3(uint64_t, uint64_t);
++uint64_t __umoddi3(uint64_t, uint64_t);
++int64_t __divmoddi4(int64_t, int64_t, int64_t*);
++uint64_t __udivmoddi4(uint64_t, uint64_t, uint64_t*);
++int64_t __muldi3(int64_t, int64_t);
++int64_t __ashldi3(int64_t, int);
++int64_t __ashrdi3(int64_t, int);
++uint64_t __lshrdi3(uint64_t, int);
++#ifdef _CPU_ARM_
++int32_t __aeabi_idiv(int32_t, int32_t);
++uint32_t __aeabi_uidiv(uint32_t, uint32_t);
++int64_t __aeabi_ldivmod(int64_t, int64_t);
++uint64_t __aeabi_uldivmod(uint64_t, uint64_t);
++int64_t __aeabi_lmul(int64_t, int64_t);
++int64_t __aeabi_llsl(int64_t, int);
++int64_t __aeabi_llsr(int64_t, int);
++int64_t __aeabi_lasr(int64_t, int);
++uint16_t __aeabi_f2h(float);
++uint16_t __aeabi_d2h(double);
++float __aeabi_h2f(uint16_t);
++#endif
++}
++#endif
++
++
+ JuliaOJIT::JuliaOJIT()
+   : TM(createTargetMachine()),
+     DL(jl_create_datalayout(*TM)),
+@@ -1521,6 +1663,58 @@ JuliaOJIT::JuliaOJIT()
+     cantFail(GlobalJD.define(orc::symbolAliases(jl_crt)));
+ #endif
+ 
++    orc::SymbolMap crt_builtins;
++#if defined(__SIZEOF_INT128__)
++    crt_builtins[mangle("__udivti3")] = JITEvaluatedSymbol::fromPointer((void*)&jl_crt_udivti3, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__umodti3")] = JITEvaluatedSymbol::fromPointer((void*)&jl_crt_umodti3, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__divti3")] = JITEvaluatedSymbol::fromPointer((void*)&jl_crt_divti3, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__modti3")] = JITEvaluatedSymbol::fromPointer((void*)&jl_crt_modti3, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__clzti2")] = JITEvaluatedSymbol::fromPointer((void*)&jl_crt_clzti2, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__ctzti2")] = JITEvaluatedSymbol::fromPointer((void*)&jl_crt_ctzti2, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__popcountti2")] = JITEvaluatedSymbol::fromPointer((void*)&jl_crt_popcountti2, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__ashlti3")] = JITEvaluatedSymbol::fromPointer((void*)&jl_crt_ashlti3, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__lshrti3")] = JITEvaluatedSymbol::fromPointer((void*)&jl_crt_lshrti3, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__ashrti3")] = JITEvaluatedSymbol::fromPointer((void*)&jl_crt_ashrti3, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__multi3")] = JITEvaluatedSymbol::fromPointer((void*)&jl_crt_multi3, JITSymbolFlags::Exported);
++#endif
++
++#if !defined(_P64)
++    crt_builtins[mangle("__divdi3")] = JITEvaluatedSymbol::fromPointer((void*)&__divdi3, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__moddi3")] = JITEvaluatedSymbol::fromPointer((void*)&__moddi3, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__udivdi3")] = JITEvaluatedSymbol::fromPointer((void*)&__udivdi3, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__umoddi3")] = JITEvaluatedSymbol::fromPointer((void*)&__umoddi3, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__divmoddi4")] = JITEvaluatedSymbol::fromPointer((void*)&__divmoddi4, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__udivmoddi4")] = JITEvaluatedSymbol::fromPointer((void*)&__udivmoddi4, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__muldi3")] = JITEvaluatedSymbol::fromPointer((void*)&__muldi3, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__ashldi3")] = JITEvaluatedSymbol::fromPointer((void*)&__ashldi3, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__ashrdi3")] = JITEvaluatedSymbol::fromPointer((void*)&__ashrdi3, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__lshrdi3")] = JITEvaluatedSymbol::fromPointer((void*)&__lshrdi3, JITSymbolFlags::Exported);
++#ifdef _CPU_ARM_
++    crt_builtins[mangle("__aeabi_idiv")] = JITEvaluatedSymbol::fromPointer((void*)&__aeabi_idiv, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__aeabi_uidiv")] = JITEvaluatedSymbol::fromPointer((void*)&__aeabi_uidiv, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__aeabi_ldivmod")] = JITEvaluatedSymbol::fromPointer((void*)&__aeabi_ldivmod, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__aeabi_uldivmod")] = JITEvaluatedSymbol::fromPointer((void*)&__aeabi_uldivmod, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__aeabi_lmul")] = JITEvaluatedSymbol::fromPointer((void*)&__aeabi_lmul, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__aeabi_llsl")] = JITEvaluatedSymbol::fromPointer((void*)&__aeabi_llsl, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__aeabi_llsr")] = JITEvaluatedSymbol::fromPointer((void*)&__aeabi_llsr, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__aeabi_lasr")] = JITEvaluatedSymbol::fromPointer((void*)&__aeabi_lasr, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__aeabi_f2h")] = JITEvaluatedSymbol::fromPointer((void*)&__aeabi_f2h, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__aeabi_d2h")] = JITEvaluatedSymbol::fromPointer((void*)&__aeabi_d2h, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__aeabi_h2f")] = JITEvaluatedSymbol::fromPointer((void*)&__aeabi_h2f, JITSymbolFlags::Exported);
++#endif
++#endif
++    crt_builtins[mangle("julia__gnu_f2h_ieee")] = JITEvaluatedSymbol::fromPointer((void*)&julia__gnu_f2h_ieee, JITSymbolFlags::Exported);
++    crt_builtins[mangle("julia__truncdfhf2")] = JITEvaluatedSymbol::fromPointer((void*)&julia__truncdfhf2, JITSymbolFlags::Exported);
++    crt_builtins[mangle("julia__gnu_h2f_ieee")] = JITEvaluatedSymbol::fromPointer((void*)&julia__gnu_h2f_ieee, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__gnu_f2h_ieee")] = JITEvaluatedSymbol::fromPointer((void*)&julia__gnu_f2h_ieee, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__truncsfhf2")] = JITEvaluatedSymbol::fromPointer((void*)&julia__gnu_f2h_ieee, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__truncdfhf2")] = JITEvaluatedSymbol::fromPointer((void*)&julia__truncdfhf2, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__gnu_h2f_ieee")] = JITEvaluatedSymbol::fromPointer((void*)&julia__gnu_h2f_ieee, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__extendhfsf2")] = JITEvaluatedSymbol::fromPointer((void*)&julia__gnu_h2f_ieee, JITSymbolFlags::Exported);
++    if (!crt_builtins.empty())
++        cantFail(GlobalJD.define(orc::absoluteSymbols(crt_builtins)));
++
++
+ #ifdef MSAN_EMUTLS_WORKAROUND
+     orc::SymbolMap msan_crt;
+     msan_crt[mangle("__emutls_get_address")] = JITEvaluatedSymbol::fromPointer(msan_workaround::getTLSAddress, JITSymbolFlags::Exported);
