@@ -1,7 +1,7 @@
 TERMUX_PKG_HOMEPAGE=https://www.r-project.org/
 TERMUX_PKG_DESCRIPTION="A free software environment for statistical computing and graphics"
 TERMUX_PKG_LICENSE="GPL-2.0-or-later, LGPL-2.1"
-TERMUX_PKG_MAINTAINER="@termux"
+TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="4.5.3"
 TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL="https://cran.r-project.org/src/base/R-${TERMUX_PKG_VERSION::1}/R-$TERMUX_PKG_VERSION.tar.gz"

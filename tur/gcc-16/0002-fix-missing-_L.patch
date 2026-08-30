@@ -1,0 +1,25 @@
+Based on https://android.googlesource.com/toolchain/gcc/+/44ea170a62f4bb566c5487c446a31300d1e0e319%5E%21/
+
+--- a/libstdc++-v3/config/os/bionic/ctype_base.h
++++ b/libstdc++-v3/config/os/bionic/ctype_base.h
+@@ -28,6 +28,20 @@
+ 
+ // Information as gleaned from /usr/include/ctype.h
+ 
++#if !defined(_U)
++#if !defined(_CTYPE_U)
++#error Bionic header ctype.h does not define either _U nor _CTYPE_U
++#endif
++#define _U _CTYPE_U
++#define _L _CTYPE_L
++#define _N _CTYPE_N
++#define _S _CTYPE_S
++#define _P _CTYPE_P
++#define _C _CTYPE_C
++#define _X _CTYPE_X
++#define _B _CTYPE_B
++#endif
++
+ namespace std _GLIBCXX_VISIBILITY(default)
+ {
+ _GLIBCXX_BEGIN_NAMESPACE_VERSION

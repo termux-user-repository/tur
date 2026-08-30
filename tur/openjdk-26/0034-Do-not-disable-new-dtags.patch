@@ -1,0 +1,11 @@
+--- a/make/common/JdkNativeCompilation.gmk
++++ b/make/common/JdkNativeCompilation.gmk
+@@ -50,7 +50,7 @@ else ifeq ($(call isCompiler, clang), true)
+   else
+     ifeq ($(call isTargetOs, linux), true)
+       SetExecutableOrigin = \
+-          -Wl,-rpath,\$(DOLLAR)ORIGIN$1 -Wl,--disable-new-dtags
++          -Wl,-rpath,\$(DOLLAR)ORIGIN$1
+     else
+       SetExecutableOrigin = \
+           -Wl,-rpath,\$(DOLLAR)ORIGIN$1

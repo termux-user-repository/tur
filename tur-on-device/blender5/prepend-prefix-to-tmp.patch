@@ -1,16 +1,3 @@
-diff --git a/extern/ceres/include/ceres/solver.h b/extern/ceres/include/ceres/solver.h
-index 68438a10..3d549864 100644
---- a/extern/ceres/include/ceres/solver.h
-+++ b/extern/ceres/include/ceres/solver.h
-@@ -730,7 +730,7 @@ class CERES_EXPORT Solver {
-     // non-empty if trust_region_minimizer_iterations_to_dump is
-     // non-empty and trust_region_problem_dump_format_type is not
-     // CONSOLE.
--    std::string trust_region_problem_dump_directory = "/tmp";
-+    std::string trust_region_problem_dump_directory = "@TERMUX_PREFIX@/tmp";
-     DumpFormatType trust_region_problem_dump_format_type = TEXTFILE;
- 
-     // Finite differences options ----------------------------------------------
 diff --git a/extern/glog/src/logging.cc b/extern/glog/src/logging.cc
 index 0c86cf62..57df4573 100644
 --- a/extern/glog/src/logging.cc

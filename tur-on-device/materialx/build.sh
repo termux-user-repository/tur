@@ -2,10 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://materialx.org/
 TERMUX_PKG_DESCRIPTION="Open standard for the exchange of rich material and look-development content in computer graphics"
 TERMUX_PKG_LICENSE="Apache-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="1.39.4"
-TERMUX_PKG_REVISION=3
+TERMUX_PKG_VERSION="1.39.5"
 TERMUX_PKG_SRCURL="https://github.com/AcademySoftwareFoundation/MaterialX/releases/download/v$TERMUX_PKG_VERSION/MaterialX-$TERMUX_PKG_VERSION.tar.gz"
-TERMUX_PKG_SHA256=5335565de46195031763951d7bec29a3a2fa96656d9cf3972e1408b2578f7ebe
+TERMUX_PKG_SHA256=d66c45f942472182c09e5c60461a78d52060d9143dc90f7157688c4ddbebba06
 TERMUX_PKG_DEPENDS="libc++, opencolorio, opengl, openimageio, python, zenity"
 TERMUX_PKG_MAKE_DEPENDS="dos2unix, pybind11"
 # viewer and graph editor GUIs depend on git submodules and an

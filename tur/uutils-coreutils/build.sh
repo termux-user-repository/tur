@@ -2,12 +2,31 @@ TERMUX_PKG_HOMEPAGE=https://uutils.github.io/
 TERMUX_PKG_DESCRIPTION="Cross-platform Rust rewrite of the GNU coreutils"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="0.8.0"
+TERMUX_PKG_VERSION="0.10.0"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://github.com/uutils/coreutils/archive/refs/tags/$TERMUX_PKG_VERSION.tar.gz
-TERMUX_PKG_SHA256=03f765fd23e9cc66f8789edc6928644d8eae5e5a7962d83795739d0a8a85eaef
+TERMUX_PKG_SHA256=f8e68cd0e3629378f047544ead272161a83211c43f4985a9f52944e5db8f1a44
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_UPDATE_TAG_TYPE="latest-release-tag"
+
+termux_step_pre_configure() {
+	termux_setup_rust
+
+	cargo vendor
+	find ./vendor \
+		-mindepth 1 -maxdepth 1 -type d \
+		! -wholename ./vendor/rustix \
+		-exec rm -rf '{}' \;
+
+	patch --silent -p1 \
+		-d ./vendor/rustix/ \
+		< "$TERMUX_PKG_BUILDER_DIR"/rustix-auxv-32bit.diff
+
+	echo "" >> Cargo.toml
+	echo '[patch.crates-io]' >> Cargo.toml
+	echo "rustix = { path = \"./vendor/rustix\" }" >> Cargo.toml
+}
 
 termux_step_make() {
 	termux_setup_rust

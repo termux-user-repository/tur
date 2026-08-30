@@ -1,11 +1,11 @@
 --- a/BUILD.bazel
 +++ b/BUILD.bazel
-@@ -54,7 +54,7 @@
-         ":darwin": "@com_github_grpc_grpc//third_party/cares:config_darwin/ares_config.h",
-         ":windows": "@com_github_grpc_grpc//third_party/cares:config_windows/ares_config.h",
-         ":android": "@com_github_grpc_grpc//third_party/cares:config_android/ares_config.h",
--        "//conditions:default": "@com_github_grpc_grpc//third_party/cares:config_linux/ares_config.h",
-+        "//conditions:default": "@com_github_grpc_grpc//third_party/cares:config_android/ares_config.h",
+@@ -68,7 +68,7 @@
+         ":android": "configs/config_android/ares_config.h",
+         ":openbsd": "configs/config_openbsd/ares_config.h",
+         ":freebsd": "configs/config_freebsd/ares_config.h",
+-        "//conditions:default": "configs/config_linux/ares_config.h",
++        "//conditions:default": "configs/config_android/ares_config.h",
      }),
      out = "ares_config.h",
  )

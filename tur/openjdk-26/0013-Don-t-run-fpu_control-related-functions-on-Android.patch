@@ -1,0 +1,25 @@
+From a0a394b9d96eb54b205b49fc6c3fefb97711555f Mon Sep 17 00:00:00 2001
+From: Duy Tran Khanh <40482367+khanhduytran0@users.noreply.github.com>
+Date: Sat, 12 Jun 2021 06:58:20 +0700
+Subject: [PATCH 16/37] Don't run fpu_control related functions on Android
+
+---
+ src/hotspot/os_cpu/linux_arm/os_linux_arm.cpp |  2 ++
+ src/hotspot/os_cpu/linux_x86/os_linux_x86.cpp | 10 +++++-----
+ 2 files changed, 7 insertions(+), 5 deletions(-)
+
+diff --git a/src/hotspot/os_cpu/linux_arm/os_linux_arm.cpp b/src/hotspot/os_cpu/linux_arm/os_linux_arm.cpp
+index 3bbe93fe7..fc63deb13 100644
+--- a/src/hotspot/os_cpu/linux_arm/os_linux_arm.cpp
++++ b/src/hotspot/os_cpu/linux_arm/os_linux_arm.cpp
+@@ -72,7 +72,9 @@
+ # include <pwd.h>
+ # include <poll.h>
+ # include <ucontext.h>
++#ifndef __ANDROID__
+ # include <fpu_control.h>
++#endif
+ # include <asm/ptrace.h>
+ 
+ #define SPELL_REG_SP  "sp"
+

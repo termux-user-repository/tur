@@ -1,7 +1,7 @@
 TERMUX_PKG_HOMEPAGE=https://salsa.debian.org/cwidget-team/
 TERMUX_PKG_DESCRIPTION="high-level terminal interface library for C++"
 TERMUX_PKG_LICENSE="GPL-2.0"
-TERMUX_PKG_MAINTAINER="@termux"
+TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="0.5.18"
 TERMUX_PKG_REVISION=4
 TERMUX_PKG_SRCURL="http://deb.debian.org/debian/pool/main/c/cwidget/cwidget_$TERMUX_PKG_VERSION.orig.tar.xz"

@@ -1,0 +1,11 @@
+--- a/3rdparty/zmij/zmij.c
++++ b/3rdparty/zmij/zmij.c
+@@ -25,7 +25,7 @@
+ 
+ #ifdef ZMIJ_USE_NEON
+ // Use the provided definition.
+-#elif defined(__ARM_NEON) || defined(_M_ARM64)
++#elif (defined(__ARM_NEON) && !defined(__ANDROID__)) || defined(_M_ARM64)
+ #  define ZMIJ_USE_NEON ZMIJ_USE_SIMD
+ #else
+ #  define ZMIJ_USE_NEON 0

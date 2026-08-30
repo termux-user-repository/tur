@@ -1,0 +1,35 @@
+From 7c527d76624124e67a489e03958467729db8b22c Mon Sep 17 00:00:00 2001
+From: Stas Sergeev <stsp@users.sourceforge.net>
+Date: Mon, 24 Aug 2026 01:26:28 +0300
+Subject: [PATCH] dj64.mk: add android work-around
+
+This is similar to what we had for Darwin.
+The problem: CROSS_PREFIX is assumed to be used only with GNU
+tool-chain, but on Termux we have `x86_64-linux-android-clang`.
+
+Thanks to @robertkirkman for figuring this out and testing this patch,
+see:
+https://github.com/termux-user-repository/tur/pull/2733#issuecomment-5388626798
+---
+ dj64.mk | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/dj64.mk b/dj64.mk
+index f2d1c8ad..a0dbda4e 100644
+--- a/dj64.mk
++++ b/dj64.mk
+@@ -7,9 +7,11 @@ OS = $(shell uname -s)
+ NATIVE=0
+ ifneq ($(filter x86_64 amd64 i686 i586 i386,$(MACH)),)
+ ifneq ($(OS),Darwin)
++ifeq ($(filter android%,$(MACH)),)
+ NATIVE = 1
+ endif
+ endif
++endif
+ ifeq ($(OS),SunOS)
+ NATIVE_PREFIX := g
+ endif
+-- 
+2.53.0
+

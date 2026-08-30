@@ -2,11 +2,11 @@ TERMUX_PKG_HOMEPAGE=https://www.rust-lang.org/
 TERMUX_PKG_DESCRIPTION="Rust compiler and utilities (nightly version)"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="1.97.0-2026.05.07-nightly"
+TERMUX_PKG_VERSION="1.100.0-2026.08.24-nightly"
 _RUST_VERSION=$(echo $TERMUX_PKG_VERSION | cut -d- -f1)
 _DATE="$(echo $TERMUX_PKG_VERSION | cut -d- -f2 | sed 's|\.|-|g')"
 TERMUX_PKG_SRCURL=https://static.rust-lang.org/dist/$_DATE/rustc-nightly-src.tar.xz
-TERMUX_PKG_SHA256=fc212704231d7dfc1c1e065f880294bb68c9e4fdada34890f4d275780e752923
+TERMUX_PKG_SHA256=9b576e815e607528fd79903f96ad9e3065cf466343874e02589afbbbb20ace37
 TERMUX_PKG_DEPENDS="clang, libandroid-execinfo, libc++, libllvm (<< ${TERMUX_LLVM_NEXT_MAJOR_VERSION}), lld, openssl, zlib"
 TERMUX_PKG_BUILD_DEPENDS="wasi-libc"
 TERMUX_PKG_NO_REPLACE_GUESS_SCRIPTS=true
@@ -126,14 +126,6 @@ termux_step_pre_configure() {
 }
 
 termux_step_configure() {
-	# Install llvm-21
-	local _line="deb [arch=amd64] http://apt.llvm.org/noble/ llvm-toolchain-noble-21 main"
-	local _file="/etc/apt/sources.list.d/apt-llvm-org-rustc-nightly.list"
-	__sudo grep -qF -- "$_line" "$_file" || \
-		echo "$_line" | __sudo tee -a "$_file"
-	__sudo apt update
-	__sudo apt install -y llvm-21-dev llvm-21-tools
-
 	# Use nightly toolchain to build nightly toolchain
 	if [[ "${TERMUX_ON_DEVICE_BUILD}" == "false" ]]; then
 		rustup install nightly-$_DATE-x86_64-unknown-linux-gnu
@@ -229,6 +221,7 @@ termux_step_make_install() {
 	# due to CI and on device build error:
 	# error: could not document `std`
 	"${TERMUX_PKG_SRCDIR}/x.py" install -j "${TERMUX_PKG_MAKE_PROCESSES}" --target wasm32-unknown-unknown --stage 2 std
+	"${TERMUX_PKG_SRCDIR}/x.py" install -j "${TERMUX_PKG_MAKE_PROCESSES}" --target wasm32v1-none --stage 2 std
 	[[ ! -e "${TERMUX_PREFIX}/share/wasi-sysroot" ]] && termux_error_exit "wasi-sysroot not found"
 	"${TERMUX_PKG_SRCDIR}/x.py" install -j "${TERMUX_PKG_MAKE_PROCESSES}" --target wasm32-wasip1 --stage 2 std
 	"${TERMUX_PKG_SRCDIR}/x.py" install -j "${TERMUX_PKG_MAKE_PROCESSES}" --target wasm32-wasip2 --stage 2 std

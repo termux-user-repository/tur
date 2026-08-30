@@ -23,7 +23,7 @@
  };
  
  static inline void _tw_add_timer(struct tw_base *base, struct tw_timer_list *timer)
-@@ -228,17 +237,24 @@
+@@ -221,17 +230,24 @@
  	int ret = 0;
  	void *res = NULL;
  
@@ -48,10 +48,10 @@
  
  	ret = pthread_spin_destroy(&base->lock);
  	if (ret != 0) {
-@@ -319,7 +335,11 @@
- 	now = _tw_tick_count() - sleep;
- 	last = now;
+@@ -305,7 +321,11 @@
+ 	start_time = now;
  	expect_time = now + sleep;
+ 	
 +#ifndef __ANDROID__
  	while (1) {
 +#else
@@ -60,7 +60,7 @@
  		run_timers(base);
  
  		now = _tw_tick_count();
-@@ -364,6 +384,10 @@
+@@ -341,6 +361,10 @@
  		goto errout;
  	}
  

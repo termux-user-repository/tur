@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="a modern C++ toolkit containing machine learning algorit
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="20.0.1"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL="https://github.com/davisking/dlib/archive/refs/tags/v$TERMUX_PKG_VERSION.tar.gz"
 TERMUX_PKG_SHA256=dab5b4ec4b68bd7dc128a1fb7900723f89d2da107e44cd5def7d38fc57252a9d
 TERMUX_PKG_DEPENDS="libx11, libxcb, libopenblas, libpng, libjpeg-turbo, libjxl, libwebp, python"

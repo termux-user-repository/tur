@@ -1,0 +1,43 @@
+Do not know why this happens. We have already set `CFLAGS/CPPFLAGS/CXXFLAGS`
+with `__BIONIC__`. Anyway, `__ANDROID__` is always set when compiling, so
+check both __ANDROID__ and __BIONIC__ may solve this issue.
+
+```
+In file included from /home/builder/.termux-build/gcc-13/src/libgcc/gthr.h:148,
+                 from /home/builder/.termux-build/gcc-13/src/libgcc/unwind-dw2-fde-dip.c:47:
+./gthr-default.h:112:9: error: 'pthread_cancel' undeclared here (not in a function); did you mean 'pthread_once'?
+  112 | __gthrw(pthread_cancel)
+      |         ^~~~~~~~~~~~~~
+./gthr-default.h:90:19: note: in definition of macro '__gthrw2'
+``` 
+--- a/libgcc/gthr-posix.h
++++ b/libgcc/gthr-posix.h
+@@ -108,7 +108,7 @@
+ __gthrw(pthread_equal)
+ __gthrw(pthread_self)
+ __gthrw(pthread_detach)
+-#ifndef __BIONIC__
++#if ! (defined (__BIONIC__)  || defined (__ANDROID__))
+ __gthrw(pthread_cancel)
+ #endif
+ __gthrw(sched_yield)
+@@ -238,7 +238,7 @@
+ 	 __pthread_key_create,
+ 	 pthread_key_create)
+ # define GTHR_ACTIVE_PROXY	__gthrw_(__pthread_key_create)
+-#elif defined (__BIONIC__)
++#elif defined (__BIONIC__) || defined (__ANDROID__)
+ # define GTHR_ACTIVE_PROXY	__gthrw_(pthread_create)
+ #else
+ # define GTHR_ACTIVE_PROXY	__gthrw_(pthread_cancel)
+--- a/libgcc/unwind-dw2-fde-dip.c
++++ b/libgcc/unwind-dw2-fde-dip.c
+@@ -53,7 +53,7 @@
+ #endif
+ 
+ #if !defined(inhibit_libc) && defined(HAVE_LD_EH_FRAME_HDR) \
+-    && defined(__BIONIC__)
++    && (defined(__BIONIC__) || defined (__ANDROID__))
+ # define USE_PT_GNU_EH_FRAME
+ #endif
+ 

@@ -2,10 +2,10 @@ TERMUX_PKG_HOMEPAGE=https://www.chromium.org/Home
 TERMUX_PKG_DESCRIPTION="Chromium web browser (Host tools)"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="@licy183"
-TERMUX_PKG_VERSION=148.0.7778.96
+TERMUX_PKG_VERSION=149.0.7827.53
 TERMUX_PKG_SRCURL=https://commondatastorage.googleapis.com/chromium-browser-official/chromium-$TERMUX_PKG_VERSION-lite.tar.xz
-TERMUX_PKG_SHA256=694d4e0269e11056c6dff748da7e8354bfbf90da7ce8f7467a0acfe2994a8688
-TERMUX_PKG_DEPENDS="atk, cups, dbus, fontconfig, gtk3, krb5, libc++, libevdev, libxkbcommon, libminizip, libnss, libx11, mesa, openssl, pango, pulseaudio, zlib"
+TERMUX_PKG_SHA256=dabb5f0af076a53f2eb436703affcb51a5e07e08d078b2f39a0430b1a5166c34
+TERMUX_PKG_DEPENDS="atk, cups, dbus, fontconfig, gtk3, krb5, libc++, libevdev, libxkbcommon, libminizip, libnss, libx11, mesa, openssl, pango, pipewire, pulseaudio, zlib"
 TERMUX_PKG_BUILD_DEPENDS="libffi-static"
 # TODO: Split chromium-common and chromium-headless
 # TERMUX_PKG_DEPENDS+=", chromium-common"
@@ -311,9 +311,6 @@ use_vaapi = false
 is_cfi = false
 use_cfi_icall = false
 use_thin_lto = false
-# OpenCL doesn't work out of box in Termux, use NNAPI instead
-build_tflite_with_opencl = false
-build_tflite_with_nnapi = true
 # Enable rust
 custom_target_rust_abi_target = \"$CARGO_TARGET_NAME\"
 clang_warning_suppression_file = \"\"
@@ -404,6 +401,7 @@ termux_step_make() {
 
 termux_step_make_install() {
 	cd $TERMUX_PKG_BUILDDIR
+	rm -rf $TERMUX_PREFIX/opt/$TERMUX_PKG_NAME
 	mkdir -p $TERMUX_PREFIX/opt/$TERMUX_PKG_NAME
 
 	local v8_tools=(
@@ -411,9 +409,10 @@ termux_step_make_install() {
 		torque                           # torque
 		bytecode_builtins_list_generator # generate_bytecode_builtins_list
 		gen-regexp-special-case          # v8:run_gen-regexp-special-case
+		icudtl.dat                       # icu data
 	)
 	mkdir -p "$TERMUX_PREFIX/opt/$TERMUX_PKG_NAME/$cr_v8_toolchain/"
-	cp "${v8_tools[@]/#/out/Release/$cr_v8_toolchain/}" "$TERMUX_PREFIX/opt/$TERMUX_PKG_NAME/$cr_v8_toolchain/"
+	cp -f "${v8_tools[@]/#/out/Release/$cr_v8_toolchain/}" "$TERMUX_PREFIX/opt/$TERMUX_PKG_NAME/$cr_v8_toolchain/"
 
 	local host_tools=(
 		make_top_domain_list_variables     # generate_top_domain_list_variables_file
@@ -425,7 +424,7 @@ termux_step_make_install() {
 		icudtl.dat                         # icu data
 	)
 	mkdir -p "$TERMUX_PREFIX/opt/$TERMUX_PKG_NAME/host/"
-	cp "${host_tools[@]/#/out/Release/host/}" "$TERMUX_PREFIX/opt/$TERMUX_PKG_NAME/host/"
+	cp -f "${host_tools[@]/#/out/Release/host/}" "$TERMUX_PREFIX/opt/$TERMUX_PKG_NAME/host/"
 
 	local normal_files=(
 		# v8 snapshot data

@@ -1,0 +1,61 @@
+diff --git a/src/system-install.mk b/src/system-install.mk
+index d9ec838..8026a42 100644
+--- a/src/system-install.mk
++++ b/src/system-install.mk
+@@ -60,16 +60,7 @@ system-install-client: client
+ 	install -m755 $(appclient) $(libexecdir)/$(appname)/$(appname)
+ 	install -m755 install/nix/$(appsrcname).am \
+ 		$(gamesbindir)/$(appname)
+-	printf "\
+-	g,@LIBEXECDIR@,\
+-	s,@LIBEXECDIR@,$(patsubst $(DESTDIR)%,%,$(libexecdir)),g\n\
+-	g,@DATADIR@,\
+-	s,@DATADIR@,$(patsubst $(DESTDIR)%,%,$(datadir)),g\n\
+-	g,@DOCDIR@,\
+-	s,@DOCDIR@,$(patsubst $(DESTDIR)%,%,$(docdir)),g\n\
+-	g,@APPNAME@,\
+-	s,@APPNAME@,$(appname),g\n\
+-	w\n" | ed -s $(gamesbindir)/$(appname)
++	sed -i -e 's|@LIBEXECDIR@|$(libexecdir)|g; s|@DATADIR@|$(datadir)|g; s|@DOCDIR@|$(docdir)|g; s|@APPNAME@|$(appname)|g' $(gamesbindir)/$(appname)
+ 
+ system-install-server: server
+ 	$(MKDIR) $(libexecdir)/$(appname)
+@@ -79,26 +70,19 @@ system-install-server: server
+ 		$(libexecdir)/$(appname)/$(appname)-server
+ 	install -m755 install/nix/$(appsrcname)-server.am \
+ 		$(gamesbindir)/$(appname)-server
+-	printf "\
+-	g,@LIBEXECDIR@,\
+-	s,@LIBEXECDIR@,$(patsubst $(DESTDIR)%,%,$(libexecdir)),g\n\
+-	g,@DATADIR@,\
+-	s,@DATADIR@,$(patsubst $(DESTDIR)%,%,$(datadir)),g\n\
+-	g,@DOCDIR@,\
+-	s,@DOCDIR@,$(patsubst $(DESTDIR)%,%,$(docdir)),g\n\
+-	g,@APPNAME@,\
+-	s,@APPNAME@,$(appname),g\n\
+-	w\n" | ed -s $(gamesbindir)/$(appname)-server
++	sed -i -e 's|@LIBEXECDIR@|$(libexecdir)|g; s|@DATADIR@|$(datadir)|g; s|@DOCDIR@|$(docdir)|g; s|@APPNAME@|$(appname)|g' $(gamesbindir)/$(appname)-server
+ 
+ system-install-common:
+ 	$(MKDIR) $(libexecdir)/$(appname)
+ 	$(MKDIR) $(datadir)/$(appname)
+-	$(MKDIR) $(datadir)/$(appname)/doc
+ 	$(MKDIR) $(docdir)/$(appname)
++	rm -rf $(datadir)/$(appname)/config $(libexecdir)/$(appname)/config
+ 	cp -r ../config $(datadir)/$(appname)/config
+ 	ln -s $(patsubst $(DESTDIR)%,%,$(datadir))/$(appname)/config \
+ 		$(libexecdir)/$(appname)/config
++	$(MKDIR) $(datadir)/$(appname)/doc
+ 	install -m644 ../doc/guidelines.txt $(datadir)/$(appname)/doc
++	rm -rf $(libexecdir)/$(appname)/doc $(docdir)/$(appname)/guidelines.txt
+ 	ln -s $(patsubst $(DESTDIR)%,%,$(datadir))/$(appname)/doc \
+ 		$(libexecdir)/$(appname)/doc
+ 	ln -s $(patsubst $(DESTDIR)%,%,$(datadir))/$(appname)/doc/guidelines.txt \
+@@ -107,6 +91,7 @@ system-install-common:
+ system-install-data:
+ 	$(MKDIR) $(datadir)/$(appname)
+ 	$(MKDIR) $(libexecdir)/$(appname)
++	rm -rf $(datadir)/$(appname)/data $(libexecdir)/$(appname)/data
+ 	cp -r ../data $(datadir)/$(appname)/data
+ 	ln -s $(patsubst $(DESTDIR)%,%,$(datadir))/$(appname)/data \
+ 		$(libexecdir)/$(appname)/data

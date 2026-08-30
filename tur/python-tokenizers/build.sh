@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="Fast State-of-the-Art Tokenizers optimized for Research 
 TERMUX_PKG_LICENSE="Apache-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="0.23.1"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL="https://github.com/huggingface/tokenizers/archive/refs/tags/v$TERMUX_PKG_VERSION.tar.gz"
 TERMUX_PKG_SHA256=aa906ad27ece40261e075e171e4a8873c2c5cfdbb64205170735d425f214c7ef
 TERMUX_PKG_AUTO_UPDATE=true

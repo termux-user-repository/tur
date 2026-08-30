@@ -1,7 +1,7 @@
---- blender/intern/cycles/kernel/CMakeLists.txt	2023-12-25 17:41:40.320821135 +0530
-+++ blender.mod/intern/cycles/kernel/CMakeLists.txt	2023-12-25 17:50:01.795511212 +0530
-@@ -1132,17 +1132,6 @@
-   set_source_files_properties(device/cpu/kernel_avx2.cpp PROPERTIES COMPILE_FLAGS "${CYCLES_AVX2_KERNEL_FLAGS}")
+--- a/intern/cycles/kernel/device/cpu/CMakeLists.txt
++++ b/intern/cycles/kernel/device/cpu/CMakeLists.txt
+@@ -44,17 +44,6 @@ if(CXX_HAS_AVX2 AND CXX_HAS_F16C)
+   set_source_files_properties(kernel_avx2.cpp PROPERTIES COMPILE_FLAGS "${CYCLES_AVX2_F16C_FLAGS}")
  endif()
  
 -# Warnings to avoid using doubles in the kernel.
@@ -15,7 +15,6 @@
 -  unset(_has_cxxflag_double_promotion)
 -endif()
 -
- cycles_add_library(cycles_kernel "${LIB}"
-   ${SRC_KERNEL_DEVICE_CPU}
-   ${SRC_KERNEL_DEVICE_CUDA}
-
+ if(WITH_CYCLES_OSL)
+   list(APPEND LIB
+     cycles_kernel_osl
