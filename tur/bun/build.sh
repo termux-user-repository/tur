@@ -4,7 +4,7 @@ TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_LICENSE_FILE="LICENSE.md"
 TERMUX_PKG_MAINTAINER="Gouranga Das Samrat <gouranga.das.khulna@gmail.com>"
 TERMUX_PKG_VERSION="1.4.0"
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_REVISION=2
 TERMUX_PKG_SRCURL=git+https://github.com/oven-sh/bun
 TERMUX_PKG_GIT_BRANCH="bun-v$TERMUX_PKG_VERSION"
 TERMUX_PKG_EXCLUDED_ARCHES="arm,i686"
@@ -51,4 +51,5 @@ termux_step_make() {
 
 termux_step_make_install() {
 	install -Dm755 "$TERMUX_PKG_HOSTBUILD_DIR/bun" "$TERMUX_PREFIX/bin/bun"
+	ln -sf bun "$TERMUX_PREFIX/bin/bunx"
 }
