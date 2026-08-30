@@ -1,8 +1,10 @@
 TERMUX_PKG_HOMEPAGE="https://duckdb.org/"
 TERMUX_PKG_DESCRIPTION="DuckDB is an in-process SQL OLAP database management system"
 TERMUX_PKG_LICENSE="MIT"
+TERMUX_PKG_MAINTAINER="@pablobp10"
 
 TERMUX_PKG_VERSION="1.5.5"
+TERMUX_PKG_SRCURL="https://github.com/duckdb/duckdb/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz"
 TERMUX_PKG_SHA256="72f33ee57ca7595b23957671a2cc7f7fe2be0ecc2d68f63abedcfcaa3a5c1238"
 
 TERMUX_PKG_DEPENDS="python, libc++, libexecinfo"
