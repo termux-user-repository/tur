@@ -5,7 +5,7 @@ TERMUX_PKG_MAINTAINER="@pablobp10"
 
 TERMUX_PKG_VERSION="1.5.5"
 TERMUX_PKG_SRCURL="https://github.com/duckdb/duckdb/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz"
-TERMUX_PKG_SHA256="72f33ee57ca7595b23957671a2cc7f7fe2be0ecc2d68f63abedcfcaa3a5c1238"
+TERMUX_PKG_SHA256="f33155ff962e6e1e08fd1e9caffa487d4325aa60999e2eabc76feff534d6558b"
 
 TERMUX_PKG_DEPENDS="python, libc++"
 TERMUX_PKG_BUILD_DEPENDS="cmake, ninja, pybind11"
