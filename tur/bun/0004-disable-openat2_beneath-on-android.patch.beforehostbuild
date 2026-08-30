@@ -1,0 +1,51 @@
+--- a/src/sys/lib.rs
++++ b/src/sys/lib.rs
+@@ -1934,12 +1934,16 @@
+             Ok(Fd::from_native(rc))
+         }
+     }
+-    #[cfg(any(target_os = "linux", target_os = "android"))]
++    #[cfg(target_os = "linux")]
+     pub fn openat2_beneath(dir: impl AsFd, path: &ZStr, flags: i32, mode: Mode) -> Maybe<Fd> {
+         let dir = dir.as_fd();
+         super::linux_syscall::openat2_beneath(dir, path, flags, mode)
+             .map_err(|e| Error::from_code_int(e, Tag::open).with_path(path.as_bytes()))
+     }
++    #[cfg(target_os = "android")]
++    pub fn openat2_beneath(dir: impl AsFd, path: &ZStr, flags: i32, mode: Mode) -> Maybe<Fd> {
++        openat(dir, path, flags, mode)
++    }
+     /// `openat2(RESOLVE_IN_ROOT | RESOLVE_NO_MAGICLINKS)`: resolves `path` as
+     /// if `dir` were `/`. Falls back to plain `openat` on kernels without
+     /// `openat2` (or when seccomp blocks it), caching the unavailability.
+@@ -2822,6 +2826,12 @@
+         }
+         #[cfg(not(any(target_os = "macos", target_os = "freebsd")))]
+         {
++            #[cfg(target_os = "android")]
++            {
++                return fchmodat(Fd::cwd(), path, mode, libc::AT_SYMLINK_NOFOLLOW);
++            }
++            #[cfg(not(target_os = "android"))]
++            {
+             const SYS_FCHMODAT2: libc::c_long = 452;
+             loop {
+                 // SAFETY: `ZStr::as_ptr()` yields a valid NUL-terminated C string.
+@@ -2846,6 +2856,7 @@
+                 }
+                 return Ok(());
+             }
++            }
+         }
+     }
+     pub fn chown(path: &ZStr, uid: u32, gid: u32) -> Maybe<()> {
+--- a/src/sys/linux_syscall.rs
++++ b/src/sys/linux_syscall.rs
+@@ -89,6 +89,7 @@
+     retry(|| rustix::fs::openat(dir, path.as_cstr(), oflags, mode)).map(own_fd)
+ }
+ 
++#[cfg(target_os = "linux")]
+ #[inline]
+ pub(crate) fn openat2_beneath(dir: Fd, path: &ZStr, flags: i32, mode: Mode) -> Result<Fd, i32> {
+     let oflags = rustix::fs::OFlags::from_bits_retain(flags as u32);
