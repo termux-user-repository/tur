@@ -1,6 +1,6 @@
 TERMUX_PKG_HOMEPAGE=https://github.com/crenoxhq/crenox
 TERMUX_PKG_DESCRIPTION="Statically compiled, zero-dependency Git pre-commit secret detector"
-TERMUX_PKG_LICENSE="AGPL-V3"
+TERMUX_PKG_LICENSE="AGPL-3.0-only"
 TERMUX_PKG_MAINTAINER="@KhaledHani"
 TERMUX_PKG_VERSION="2.1.5"
 TERMUX_PKG_SRCURL=https://github.com/crenoxhq/crenox/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz
