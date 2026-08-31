@@ -16,34 +16,28 @@ termux_step_pre_configure() {
 	termux_setup_ninja
 	termux_setup_cmake
 	pip3 install setuptools_scm --break-system-packages
+
+	# --- ESCUDOS DE CROSS-COMPILING (INYECCIÓN DIRECTA EN CMAKE) ---
+	# 1. Evita que CMake intente ejecutar binarios de test en el servidor
+	sed -i "1i set(DUCKDB_PLATFORM \"android_${TERMUX_ARCH}\")" CMakeLists.txt
+
+	# 2. Falsifica las firmas de Git para evitar que asigne la versión v0.0.1
+	sed -i "1i set(OVERRIDE_GIT_DESCRIBE \"v${TERMUX_PKG_VERSION}-0-g0000000\")" CMakeLists.txt
+	sed -i "1i set(GIT_COMMIT_HASH \"0000000\")" CMakeLists.txt
 }
 
 termux_step_make_install() {
-	# ---------------------------------------------------------
-	# ESCUDOS DE COMPILACIÓN CRUZADA (CROSS-COMPILING SHIELDS)
-	# ---------------------------------------------------------
-	# 1. Forzar la plataforma para evitar el "Exec format error"
-	export DUCKDB_PLATFORM="android-${TERMUX_ARCH}"
-
-	# 2. Engañar a Git para evitar el paquete corrupto "v0.0.1"
-	export OVERRIDE_GIT_DESCRIBE="v${TERMUX_PKG_VERSION}"
-	export SETUPTOOLS_SCM_PRETEND_VERSION="${TERMUX_PKG_VERSION}"
-
-	# 3. Limitar los hilos para que GitHub Actions no se quede sin memoria (OOM Kill)
+	# Limitamos a 2 hilos para evitar que GitHub Actions muera por falta de RAM (OOM)
 	export CMAKE_BUILD_PARALLEL_LEVEL=2
 	export MAX_JOBS=2
-	# ---------------------------------------------------------
 
 	export CMAKE_GENERATOR="Ninja"
 	export SKBUILD_CMAKE_GENERATOR="Ninja"
 
-	export CMAKE_ARGS="-DCMAKE_TOOLCHAIN_FILE=${TERMUX_CMAKE_CROSSCOMPILING_TOOLCHAIN} -DDUCKDB_PLATFORM=${DUCKDB_PLATFORM}"
-	export SKBUILD_CMAKE_ARGS="-DCMAKE_TOOLCHAIN_FILE=${TERMUX_CMAKE_CROSSCOMPILING_TOOLCHAIN} -DDUCKDB_PLATFORM=${DUCKDB_PLATFORM}"
-
 	export CFLAGS+=" -O3 -fPIC -pipe"
 	export CXXFLAGS+=" -O3 -fPIC -pipe"
 
-	echo "[*] Fundiendo DuckDB (v${TERMUX_PKG_VERSION}) para ${DUCKDB_PLATFORM}..."
+	echo "[*] Fundiendo DuckDB (v${TERMUX_PKG_VERSION}) en modo cruzado seguro..."
 
 	export PYTHONPATH=$(pwd):$PYTHONPATH
 
