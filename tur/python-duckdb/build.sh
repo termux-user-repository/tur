@@ -4,24 +4,15 @@ TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@pablobp10"
 
 TERMUX_PKG_VERSION="1.5.5"
-TERMUX_PKG_SRCURL="https://github.com/duckdb/duckdb/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz"
-TERMUX_PKG_SHA256="f33155ff962e6e1e08fd1e9caffa487d4325aa60999e2eabc76feff534d6558b"
+# CAMBIO ESTRUCTURAL: Descargamos el paquete preparado y optimizado de PyPI
+TERMUX_PKG_SRCURL="https://files.pythonhosted.org/packages/source/d/duckdb/duckdb-${TERMUX_PKG_VERSION}.tar.gz"
+TERMUX_PKG_SHA256="0000000000000000000000000000000000000000000000000000000000000000"
 
 TERMUX_PKG_DEPENDS="python, libc++"
 TERMUX_PKG_BUILD_DEPENDS="cmake, ninja, pybind11"
 TERMUX_PKG_BUILD_IN_SRC=true
 
-termux_step_pre_configure() {
-pip3 install setuptools_scm --break-system-packages
-
-# Inyectamos en CMakeLists.txt para evitar el error de "duckdb_platform_binary"
-# y la falsa detección de versión de Git.
-sed -i "/project(/a set(DUCKDB_PLATFORM \"android-${TERMUX_ARCH}\" CACHE STRING \"\" FORCE)" CMakeLists.txt
-sed -i "/project(/a set(GIT_COMMIT_HASH \"0000000000\" CACHE STRING \"\" FORCE)" CMakeLists.txt
-sed -i "/project(/a set(OVERRIDE_GIT_DESCRIBE \"v${TERMUX_PKG_VERSION}-0-g0000000000\" CACHE STRING \"\" FORCE)" CMakeLists.txt
-}
-
-# Desactivamos el "Double Build" (evitamos que Termux compile C++ antes que PIP)
+# Desactivamos el "Double Build". Termux solo mirará; PIP hará todo el trabajo.
 termux_step_configure() {
 return 0
 }
@@ -30,25 +21,20 @@ return 0
 }
 
 termux_step_make_install() {
-export SETUPTOOLS_SCM_PRETEND_VERSION="${TERMUX_PKG_VERSION}"
+export DUCKDB_PLATFORM="android-${TERMUX_ARCH}"
 
-# En lugar de usar una variable de toolchain que no existe, pasamos directamente
-# los compiladores nativos cruzados que Termux ya nos proporciona globalmente ($CC y $CXX)
-export CMAKE_ARGS="-DCMAKE_C_COMPILER=${CC} -DCMAKE_CXX_COMPILER=${CXX}"
-export EXTRA_CMAKE_VARIABLES="${CMAKE_ARGS}"
-
-# Limitamos a 2 hilos para evitar que GitHub Actions muera por falta de RAM (OOM)
+# Limitamos hilos para evitar colapso de RAM en GitHub Actions
 export MAX_JOBS=2
 export CMAKE_BUILD_PARALLEL_LEVEL=2
 
 export CFLAGS+=" -O3 -fPIC -pipe"
 export CXXFLAGS+=" -O3 -fPIC -pipe"
 
-# DuckDB es un monorepo. El código de Python está dentro de esta subcarpeta.
-cd "${TERMUX_PKG_SRCDIR}/tools/pythonpkg" || exit 1
+echo "[*] Fundiendo DuckDB (v${TERMUX_PKG_VERSION}) nativo desde PyPI..."
 
-echo "[*] Fundiendo DuckDB (v${TERMUX_PKG_VERSION}) a través de PIP..."
+export PYTHONPATH="$(pwd):${PYTHONPATH:-}"
 
+# Instalación directa y limpia
 pip3 install . \
 --prefix="${TERMUX_PREFIX}" \
 --no-build-isolation \
