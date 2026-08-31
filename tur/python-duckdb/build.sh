@@ -14,22 +14,27 @@ TERMUX_PKG_BUILD_IN_SRC=true
 termux_step_pre_configure() {
 pip3 install setuptools_scm --break-system-packages
 
-# Inyección a fuego en CMakeLists.txt para evitar el "Exec format error" y la advertencia de Git v0.0.1
+# Inyección quirúrgica en C++ para evitar el Exec format error y los fallos de GIT
 sed -i "/project(/a set(DUCKDB_PLATFORM \"android-${TERMUX_ARCH}\" CACHE STRING \"\" FORCE)" CMakeLists.txt
 sed -i "/project(/a set(GIT_COMMIT_HASH \"0000000000\" CACHE STRING \"\" FORCE)" CMakeLists.txt
-sed -i "/project(/a set(OVERRIDE_GIT_DESCRIBE \"v${TERMUX_PKG_VERSION}-0-g0000000000\" CACHE STRING \"\" FORCE)" CMakeLists.txt
 }
 
-# Desactivamos el "Double Build". Termux solo mirará; PIP hará todo el trabajo.
 termux_step_configure() {
 return 0
 }
+
 termux_step_make() {
 return 0
 }
 
 termux_step_make_install() {
 export SETUPTOOLS_SCM_PRETEND_VERSION="${TERMUX_PKG_VERSION}"
+export OVERRIDE_GIT_DESCRIBE="v${TERMUX_PKG_VERSION}-0-g0000000000"
+
+export DUCKDB_PLATFORM="android-${TERMUX_ARCH}"
+
+export EXTRA_CMAKE_VARIABLES="-DCMAKE_TOOLCHAIN_FILE=${TERMUX_CMAKE_CROSSCOMPILING_TOOLCHAIN} -DDUCKDB_PLATFORM=${DUCKDB_PLATFORM}"
+export CMAKE_ARGS="-DCMAKE_TOOLCHAIN_FILE=${TERMUX_CMAKE_CROSSCOMPILING_TOOLCHAIN} -DDUCKDB_PLATFORM=${DUCKDB_PLATFORM}"
 
 export MAX_JOBS=2
 export CMAKE_BUILD_PARALLEL_LEVEL=2
@@ -37,13 +42,12 @@ export CMAKE_BUILD_PARALLEL_LEVEL=2
 export CFLAGS+=" -O3 -fPIC -pipe"
 export CXXFLAGS+=" -O3 -fPIC -pipe"
 
-# Pasamos los argumentos nativos de Android reales (sin toolchains inventados)
-export CMAKE_ARGS="-DCMAKE_SYSTEM_NAME=Android -DCMAKE_SYSTEM_VERSION=${TERMUX_PKG_API_LEVEL} -DCMAKE_ANDROID_ARCH_ABI=${TERMUX_ARCH}"
-export EXTRA_CMAKE_VARIABLES="${CMAKE_ARGS}"
-
-echo "[*] Fundiendo DuckDB (v${TERMUX_PKG_VERSION}) a través de PIP en entorno cruzado..."
+echo "[*] Entrando en la forja de DuckDB (v${TERMUX_PKG_VERSION})..."
 
 export PYTHONPATH="$(pwd):${PYTHONPATH:-}"
+
+# ¡AQUÍ ESTÁ LA MAGIA! Entramos al directorio del código fuente antes de llamar a PIP
+cd "${TERMUX_PKG_SRCDIR}" || exit 1
 
 pip3 install . \
 --prefix="${TERMUX_PREFIX}" \
