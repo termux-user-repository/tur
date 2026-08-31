@@ -1,0 +1,31 @@
+Description: Fix implicit declaration of function warnings
+ This patch fixes the FTBFS bug. Also fixes a crash bug on 64-bits systems.
+Author: Ying-Chun Liu (PaulLiu) <paulliu@debian.org>
+Last-Update: 2016-05-05
+Index: lincity-1.13.1/main.c
+===================================================================
+--- lincity-1.13.1.orig/main.c
++++ lincity-1.13.1/main.c
+@@ -41,6 +41,10 @@
+ #include <lcx11.h>
+ #endif
+ 
++#if !defined(WIN32)
++#include <locale.h>
++#endif
++
+ #include "lctypes.h"
+ #include "lin-city.h"
+ #include "cliglobs.h"
+Index: lincity-1.13.1/readpng.c
+===================================================================
+--- lincity-1.13.1.orig/readpng.c
++++ lincity-1.13.1/readpng.c
+@@ -3,6 +3,7 @@
+  * This file is part of lincity (see COPYRIGHT for copyright information).
+  * ---------------------------------------------------------------------- */
+ #include <stdlib.h>
++#include <string.h>
+ #include "png.h"
+ #include "malloc.h"
+ #include "lin-city.h"
