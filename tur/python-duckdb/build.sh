@@ -6,7 +6,7 @@ TERMUX_PKG_MAINTAINER="@pablobp10"
 TERMUX_PKG_VERSION="1.5.5"
 # CAMBIO ESTRUCTURAL: Descargamos el paquete preparado y optimizado de PyPI
 TERMUX_PKG_SRCURL="https://files.pythonhosted.org/packages/source/d/duckdb/duckdb-${TERMUX_PKG_VERSION}.tar.gz"
-TERMUX_PKG_SHA256="0000000000000000000000000000000000000000000000000000000000000000"
+TERMUX_PKG_SHA256="72f33ee57ca7595b23957671a2cc7f7fe2be0ecc2d68f63abedcfcaa3a5c1238"
 
 TERMUX_PKG_DEPENDS="python, libc++"
 TERMUX_PKG_BUILD_DEPENDS="cmake, ninja, pybind11"
