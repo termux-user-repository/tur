@@ -15,12 +15,11 @@ termux_step_pre_configure() {
 pip3 install setuptools_scm --break-system-packages
 
 # Inyección segura en el código fuente (después de 'project') para evitar reseteos.
-# Esto resuelve el "Exec format error" que detectó ChatGPT sin romper PIP.
 sed -i "/project(/a set(DUCKDB_PLATFORM \"android-${TERMUX_ARCH}\" CACHE STRING \"\" FORCE)" CMakeLists.txt
 sed -i "/project(/a set(GIT_COMMIT_HASH \"0000000000\" CACHE STRING \"\" FORCE)" CMakeLists.txt
 }
 
-# Desactivamos el "Double Build" (evitamos que Termux compile C++ antes que PIP)
+# Desactivamos el "Double Build"
 termux_step_configure() {
 return 0
 }
@@ -29,8 +28,15 @@ return 0
 }
 
 termux_step_make_install() {
+termux_setup_cmake
+
 export SETUPTOOLS_SCM_PRETEND_VERSION="${TERMUX_PKG_VERSION}"
 export OVERRIDE_GIT_DESCRIBE="v${TERMUX_PKG_VERSION}-0-g0000000000"
+
+export DUCKDB_PLATFORM="android-${TERMUX_ARCH}"
+
+export EXTRA_CMAKE_VARIABLES="-DCMAKE_TOOLCHAIN_FILE=${TERMUX_CMAKE_CROSSCOMPILING_TOOLCHAIN} -DDUCKDB_PLATFORM=${DUCKDB_PLATFORM}"
+export CMAKE_ARGS="-DCMAKE_TOOLCHAIN_FILE=${TERMUX_CMAKE_CROSSCOMPILING_TOOLCHAIN} -DDUCKDB_PLATFORM=${DUCKDB_PLATFORM}"
 
 export MAX_JOBS=2
 export CMAKE_BUILD_PARALLEL_LEVEL=2
@@ -40,7 +46,8 @@ export CXXFLAGS+=" -O3 -fPIC -pipe"
 
 echo "[*] Fundiendo DuckDB (v${TERMUX_PKG_VERSION}) a través de PIP en entorno cruzado..."
 
-export PYTHONPATH="$(pwd):${PYTHONPATH}"
+# Solución al Unbound Variable: Añadimos ':-' para que no explote si está vacía
+export PYTHONPATH="$(pwd):${PYTHONPATH:-}"
 
 pip3 install . \
 --prefix="${TERMUX_PREFIX}" \
