@@ -16,6 +16,11 @@ termux_step_pre_configure() {
 termux_setup_ninja
 termux_setup_cmake
 pip3 install setuptools_scm --break-system-packages
+
+# --- INYECCIÓN LETAL ---
+# Busca la declaración del proyecto y añade la plataforma justo en la línea siguiente.
+# Esto sobrevive al reseteo de CMake y anula la ejecución de 'duckdb_platform_binary'
+sed -i "/project(/a set(DUCKDB_PLATFORM \"android-${TERMUX_ARCH}\")" CMakeLists.txt
 }
 
 termux_step_make_install() {
@@ -27,12 +32,6 @@ export CMAKE_BUILD_PARALLEL_LEVEL=2
 
 export CFLAGS+=" -O3 -fPIC -pipe"
 export CXXFLAGS+=" -O3 -fPIC -pipe"
-
-# --- INYECCIÓN LETAL ---
-# setup.py de Python bloquea nuestras variables de entorno.
-# Usamos sed para escribir la plataforma directamente en el código fuente de CMake
-# y evitar que intente ejecutar binarios de diagnóstico incompatibles.
-sed -i "1i set(DUCKDB_PLATFORM \"android-\${TERMUX_ARCH}\")" CMakeLists.txt
 
 echo "[*] Fundiendo DuckDB (v${TERMUX_PKG_VERSION}) en modo cruzado blindado..."
 
