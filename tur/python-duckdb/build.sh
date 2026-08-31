@@ -15,7 +15,7 @@ TERMUX_PKG_BUILD_IN_SRC=true
 termux_step_pre_configure() {
 	termux_setup_ninja
 	termux_setup_cmake
-	pip3 install setuptools_scm
+	pip3 install setuptools_scm --break-system-packages
 }
 
 termux_step_make_install() {
@@ -39,5 +39,6 @@ termux_step_make_install() {
 		--prefix="${TERMUX_PREFIX}" \
 		--no-build-isolation \
 		--no-deps \
+		--break-system-packages \
 		-v
 }
