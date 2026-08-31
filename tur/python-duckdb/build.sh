@@ -24,11 +24,11 @@ termux_step_make_install() {
 	# ---------------------------------------------------------
 	# 1. Forzar la plataforma para evitar el "Exec format error"
 	export DUCKDB_PLATFORM="android-${TERMUX_ARCH}"
-	
+
 	# 2. Engañar a Git para evitar el paquete corrupto "v0.0.1"
 	export OVERRIDE_GIT_DESCRIBE="v${TERMUX_PKG_VERSION}"
 	export SETUPTOOLS_SCM_PRETEND_VERSION="${TERMUX_PKG_VERSION}"
-	
+
 	# 3. Limitar los hilos para que GitHub Actions no se quede sin memoria (OOM Kill)
 	export CMAKE_BUILD_PARALLEL_LEVEL=2
 	export MAX_JOBS=2
