@@ -14,34 +14,37 @@ TERMUX_PKG_BUILD_IN_SRC=true
 termux_step_pre_configure() {
 pip3 install setuptools_scm --break-system-packages
 
-# Inyección en la raíz de C++ para cuando Python llame a CMake por debajo
+# Inyectamos en CMakeLists.txt para evitar el error de "duckdb_platform_binary"
+# y la falsa detección de versión de Git.
 sed -i "/project(/a set(DUCKDB_PLATFORM \"android-${TERMUX_ARCH}\" CACHE STRING \"\" FORCE)" CMakeLists.txt
 sed -i "/project(/a set(GIT_COMMIT_HASH \"0000000000\" CACHE STRING \"\" FORCE)" CMakeLists.txt
+sed -i "/project(/a set(OVERRIDE_GIT_DESCRIBE \"v${TERMUX_PKG_VERSION}-0-g0000000000\" CACHE STRING \"\" FORCE)" CMakeLists.txt
 }
 
-# Dejamos que Termux configure el entorno base, pero evitamos que compile C++ a ciegas
+# Desactivamos el "Double Build" (evitamos que Termux compile C++ antes que PIP)
+termux_step_configure() {
+return 0
+}
 termux_step_make() {
 return 0
 }
 
 termux_step_make_install() {
 export SETUPTOOLS_SCM_PRETEND_VERSION="${TERMUX_PKG_VERSION}"
-export OVERRIDE_GIT_DESCRIBE="v${TERMUX_PKG_VERSION}-0-g0000000000"
 
-export DUCKDB_PLATFORM="android-${TERMUX_ARCH}"
+# En lugar de usar una variable de toolchain que no existe, pasamos directamente
+# los compiladores nativos cruzados que Termux ya nos proporciona globalmente ($CC y $CXX)
+export CMAKE_ARGS="-DCMAKE_C_COMPILER=${CC} -DCMAKE_CXX_COMPILER=${CXX}"
+export EXTRA_CMAKE_VARIABLES="${CMAKE_ARGS}"
 
-export EXTRA_CMAKE_VARIABLES="-DCMAKE_TOOLCHAIN_FILE=${TERMUX_CMAKE_CROSSCOMPILING_TOOLCHAIN} -DDUCKDB_PLATFORM=${DUCKDB_PLATFORM}"
-export CMAKE_ARGS="-DCMAKE_TOOLCHAIN_FILE=${TERMUX_CMAKE_CROSSCOMPILING_TOOLCHAIN} -DDUCKDB_PLATFORM=${DUCKDB_PLATFORM}"
-
+# Limitamos a 2 hilos para evitar que GitHub Actions muera por falta de RAM (OOM)
 export MAX_JOBS=2
 export CMAKE_BUILD_PARALLEL_LEVEL=2
 
 export CFLAGS+=" -O3 -fPIC -pipe"
 export CXXFLAGS+=" -O3 -fPIC -pipe"
 
-export PYTHONPATH="$(pwd):${PYTHONPATH:-}"
-
-# ¡AQUÍ ESTABA EL ERROR! Entramos en la subcarpeta del paquete Python
+# DuckDB es un monorepo. El código de Python está dentro de esta subcarpeta.
 cd "${TERMUX_PKG_SRCDIR}/tools/pythonpkg" || exit 1
 
 echo "[*] Fundiendo DuckDB (v${TERMUX_PKG_VERSION}) a través de PIP..."
