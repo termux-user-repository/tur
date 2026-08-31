@@ -16,16 +16,19 @@ termux_step_pre_configure() {
 termux_setup_ninja
 termux_setup_cmake
 pip3 install setuptools_scm --break-system-packages
-
-# --- INYECCIÓN LETAL ---
-# Busca la declaración del proyecto y añade la plataforma justo en la línea siguiente.
-# Esto sobrevive al reseteo de CMake y anula la ejecución de 'duckdb_platform_binary'
-sed -i "/project(/a set(DUCKDB_PLATFORM \"android-${TERMUX_ARCH}\")" CMakeLists.txt
 }
 
 termux_step_make_install() {
+# --- INYECCIÓN LETAL ---
+# Escribimos las variables a la fuerza en la línea 1 del archivo fuente
+# Usamos FORCE para que sobrevivan a cualquier reseteo de Python/CMake
+echo "set(DUCKDB_PLATFORM \"android-${TERMUX_ARCH}\" CACHE STRING \"\" FORCE)" > CMakeLists.txt.tmp
+echo "set(GIT_COMMIT_HASH \"0000000000\" CACHE STRING \"\" FORCE)" >> CMakeLists.txt.tmp
+cat CMakeLists.txt >> CMakeLists.txt.tmp
+mv CMakeLists.txt.tmp CMakeLists.txt
+
 export SETUPTOOLS_SCM_PRETEND_VERSION="${TERMUX_PKG_VERSION}"
-export OVERRIDE_GIT_DESCRIBE="v${TERMUX_PKG_VERSION}-0-g0000000"
+export OVERRIDE_GIT_DESCRIBE="v${TERMUX_PKG_VERSION}-0-g0000000000"
 
 export MAX_JOBS=2
 export CMAKE_BUILD_PARALLEL_LEVEL=2
