@@ -29,7 +29,7 @@ export CFLAGS+=" -O3 -fPIC -pipe"
 export CXXFLAGS+=" -O3 -fPIC -pipe"
 
 # --- INYECCIÓN LETAL ---
-# setup.py de Python bloquea nuestras variables de entorno. 
+# setup.py de Python bloquea nuestras variables de entorno.
 # Usamos sed para escribir la plataforma directamente en el código fuente de CMake
 # y evitar que intente ejecutar binarios de diagnóstico incompatibles.
 sed -i "1i set(DUCKDB_PLATFORM \"android-\${TERMUX_ARCH}\")" CMakeLists.txt
