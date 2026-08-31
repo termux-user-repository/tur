@@ -19,6 +19,7 @@ sed -i "/project(/a set(DUCKDB_PLATFORM \"android-${TERMUX_ARCH}\" CACHE STRING 
 sed -i "/project(/a set(GIT_COMMIT_HASH \"0000000000\" CACHE STRING \"\" FORCE)" CMakeLists.txt
 }
 
+# Desactivamos el comportamiento nativo de Termux para evitar el "Double Build"
 termux_step_configure() {
 return 0
 }
@@ -28,6 +29,10 @@ return 0
 }
 
 termux_step_make_install() {
+# ¡AQUÍ ESTÁ LA CLAVE!
+# Forzamos la creación del toolchain para que la variable exista antes de dársela a PIP
+termux_setup_cmake
+
 export SETUPTOOLS_SCM_PRETEND_VERSION="${TERMUX_PKG_VERSION}"
 export OVERRIDE_GIT_DESCRIBE="v${TERMUX_PKG_VERSION}-0-g0000000000"
 
@@ -46,7 +51,7 @@ echo "[*] Entrando en la forja de DuckDB (v${TERMUX_PKG_VERSION})..."
 
 export PYTHONPATH="$(pwd):${PYTHONPATH:-}"
 
-# ¡AQUÍ ESTÁ LA MAGIA! Entramos al directorio del código fuente antes de llamar a PIP
+# Entramos al directorio del código fuente antes de llamar a PIP
 cd "${TERMUX_PKG_SRCDIR}" || exit 1
 
 pip3 install . \
