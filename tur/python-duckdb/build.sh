@@ -14,26 +14,25 @@ TERMUX_PKG_BUILD_IN_SRC=true
 termux_step_pre_configure() {
 pip3 install setuptools_scm --break-system-packages
 
-# Inyección quirúrgica en C++ para evitar el Exec format error
+# Inyección en C++ para evitar el Exec format error y los fallos de GIT
 sed -i "/project(/a set(DUCKDB_PLATFORM \"android-${TERMUX_ARCH}\" CACHE STRING \"\" FORCE)" CMakeLists.txt
 sed -i "/project(/a set(GIT_COMMIT_HASH \"0000000000\" CACHE STRING \"\" FORCE)" CMakeLists.txt
+sed -i "/project(/a set(OVERRIDE_GIT_DESCRIBE \"v${TERMUX_PKG_VERSION}-0-g0000000000\" CACHE STRING \"\" FORCE)" CMakeLists.txt
 }
 
-# 1. NO anulamos 'configure'. Termux lo ejecuta, sobrevive a los chequeos y genera la variable del Toolchain.
-# 2. SÍ anulamos 'make' para evitar la doble compilación de 500 archivos.
+# Dejamos que Termux configure, pero anulamos la fase 'make' para evitar doble compilación masiva
 termux_step_make() {
 return 0
 }
 
 termux_step_make_install() {
 export SETUPTOOLS_SCM_PRETEND_VERSION="${TERMUX_PKG_VERSION}"
-export OVERRIDE_GIT_DESCRIBE="v${TERMUX_PKG_VERSION}-0-g0000000000"
-
 export DUCKDB_PLATFORM="android-${TERMUX_ARCH}"
 
-# La variable ahora EXISTE legalmente gracias a la fase configure
-export EXTRA_CMAKE_VARIABLES="-DCMAKE_TOOLCHAIN_FILE=${TERMUX_CMAKE_CROSSCOMPILING_TOOLCHAIN} -DDUCKDB_PLATFORM=${DUCKDB_PLATFORM}"
-export CMAKE_ARGS="-DCMAKE_TOOLCHAIN_FILE=${TERMUX_CMAKE_CROSSCOMPILING_TOOLCHAIN} -DDUCKDB_PLATFORM=${DUCKDB_PLATFORM}"
+# Extirpamos la variable fantasma que provocaba el Unbound Variable.
+# Solo pasamos la plataforma extra. PIP y Termux se encargarán del compilador cruzado.
+export EXTRA_CMAKE_VARIABLES="-DDUCKDB_PLATFORM=${DUCKDB_PLATFORM}"
+export CMAKE_ARGS="-DDUCKDB_PLATFORM=${DUCKDB_PLATFORM}"
 
 export MAX_JOBS=2
 export CMAKE_BUILD_PARALLEL_LEVEL=2
