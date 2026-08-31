@@ -14,32 +14,32 @@ TERMUX_PKG_BUILD_IN_SRC=true
 termux_step_pre_configure() {
 pip3 install setuptools_scm --break-system-packages
 
-# Inyectamos las variables a la fuerza para que la fase 'configure' de Termux no reviente
+# Inyección a fuego en CMakeLists.txt para evitar el "Exec format error" y la advertencia de Git v0.0.1
 sed -i "/project(/a set(DUCKDB_PLATFORM \"android-${TERMUX_ARCH}\" CACHE STRING \"\" FORCE)" CMakeLists.txt
 sed -i "/project(/a set(GIT_COMMIT_HASH \"0000000000\" CACHE STRING \"\" FORCE)" CMakeLists.txt
+sed -i "/project(/a set(OVERRIDE_GIT_DESCRIBE \"v${TERMUX_PKG_VERSION}-0-g0000000000\" CACHE STRING \"\" FORCE)" CMakeLists.txt
 }
 
-# 1. Dejamos que termux_step_configure() se ejecute por defecto para que cree las variables.
-# 2. Anulamos la fase de make nativa para evitar la doble compilación:
+# Desactivamos el "Double Build". Termux solo mirará; PIP hará todo el trabajo.
+termux_step_configure() {
+return 0
+}
 termux_step_make() {
 return 0
 }
 
 termux_step_make_install() {
 export SETUPTOOLS_SCM_PRETEND_VERSION="${TERMUX_PKG_VERSION}"
-export OVERRIDE_GIT_DESCRIBE="v${TERMUX_PKG_VERSION}-0-g0000000000"
-
-export DUCKDB_PLATFORM="android-${TERMUX_ARCH}"
-
-# Ahora la variable de toolchain SÍ existe gracias a dejar que Termux configure.
-export EXTRA_CMAKE_VARIABLES="-DCMAKE_TOOLCHAIN_FILE=${TERMUX_CMAKE_CROSSCOMPILING_TOOLCHAIN} -DDUCKDB_PLATFORM=${DUCKDB_PLATFORM}"
-export CMAKE_ARGS="-DCMAKE_TOOLCHAIN_FILE=${TERMUX_CMAKE_CROSSCOMPILING_TOOLCHAIN} -DDUCKDB_PLATFORM=${DUCKDB_PLATFORM}"
 
 export MAX_JOBS=2
 export CMAKE_BUILD_PARALLEL_LEVEL=2
 
 export CFLAGS+=" -O3 -fPIC -pipe"
 export CXXFLAGS+=" -O3 -fPIC -pipe"
+
+# Pasamos los argumentos nativos de Android reales (sin toolchains inventados)
+export CMAKE_ARGS="-DCMAKE_SYSTEM_NAME=Android -DCMAKE_SYSTEM_VERSION=${TERMUX_PKG_API_LEVEL} -DCMAKE_ANDROID_ARCH_ABI=${TERMUX_ARCH}"
+export EXTRA_CMAKE_VARIABLES="${CMAKE_ARGS}"
 
 echo "[*] Fundiendo DuckDB (v${TERMUX_PKG_VERSION}) a través de PIP en entorno cruzado..."
 
