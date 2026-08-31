@@ -13,22 +13,14 @@ TERMUX_PKG_BUILD_DEPENDS="cmake, ninja, pybind11"
 TERMUX_PKG_BUILD_IN_SRC=true
 
 termux_step_pre_configure() {
-termux_setup_ninja
-termux_setup_cmake
+# 1. Herramientas previas de Python
 pip3 install setuptools_scm --break-system-packages
-}
 
-termux_step_make_install() {
-# --- INYECCIÓN LETAL ---
-# Escribimos las variables a la fuerza en la línea 1 del archivo fuente
-# Usamos FORCE para que sobrevivan a cualquier reseteo de Python/CMake
-echo "set(DUCKDB_PLATFORM \"android-${TERMUX_ARCH}\" CACHE STRING \"\" FORCE)" > CMakeLists.txt.tmp
-echo "set(GIT_COMMIT_HASH \"0000000000\" CACHE STRING \"\" FORCE)" >> CMakeLists.txt.tmp
-cat CMakeLists.txt >> CMakeLists.txt.tmp
-mv CMakeLists.txt.tmp CMakeLists.txt
-
+# 2. Escudos Globales (Disponibles cuando PIP llame a CMake internamente)
 export SETUPTOOLS_SCM_PRETEND_VERSION="${TERMUX_PKG_VERSION}"
 export OVERRIDE_GIT_DESCRIBE="v${TERMUX_PKG_VERSION}-0-g0000000000"
+
+export DUCKDB_PLATFORM="android-${TERMUX_ARCH}"
 
 export MAX_JOBS=2
 export CMAKE_BUILD_PARALLEL_LEVEL=2
@@ -36,9 +28,27 @@ export CMAKE_BUILD_PARALLEL_LEVEL=2
 export CFLAGS+=" -O3 -fPIC -pipe"
 export CXXFLAGS+=" -O3 -fPIC -pipe"
 
-echo "[*] Fundiendo DuckDB (v${TERMUX_PKG_VERSION}) en modo cruzado blindado..."
+export CMAKE_GENERATOR="Ninja"
+export CMAKE_ARGS="-DCMAKE_TOOLCHAIN_FILE=${TERMUX_CMAKE_CROSSCOMPILING_TOOLCHAIN} -DDUCKDB_PLATFORM=${DUCKDB_PLATFORM}"
+}
 
-export PYTHONPATH=$(pwd):$PYTHONPATH
+# --- ANULACIÓN DEL COMPORTAMIENTO POR DEFECTO DE TERMUX ---
+# Al devolver 0, Termux se salta su compilación C++ nativa, evitando el "Double Build"
+# y el error "Exec format error" del duckdb_platform_binary original.
+
+termux_step_configure() {
+return 0
+}
+
+termux_step_make() {
+return 0
+}
+# ----------------------------------------------------------
+
+termux_step_make_install() {
+echo "[*] Fundiendo Python-DuckDB (v${TERMUX_PKG_VERSION}) a través de PIP..."
+
+export PYTHONPATH="$(pwd):${PYTHONPATH}"
 
 pip3 install . \
 --prefix="${TERMUX_PREFIX}" \
