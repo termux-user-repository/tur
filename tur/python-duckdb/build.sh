@@ -11,7 +11,15 @@ TERMUX_PKG_DEPENDS="python, libc++"
 TERMUX_PKG_BUILD_DEPENDS="cmake, ninja"
 TERMUX_PKG_BUILD_IN_SRC=true
 
-# Desactivamos el doble build de Termux. PIP gestionará todo.
+termux_step_pre_configure() {
+# ¡LA PIEZA QUE FALTABA! Descarga CMake 4.4.3 y Ninja para el Host
+# y genera el TERMUX_CMAKE_CROSSCOMPILING_TOOLCHAIN
+termux_setup_cmake
+termux_setup_ninja
+
+pip3 install setuptools_scm scikit-build-core nanobind --break-system-packages
+}
+
 termux_step_configure() {
 return 0
 }
@@ -21,25 +29,22 @@ return 0
 }
 
 termux_step_make_install() {
-# 1. Instalamos las herramientas vitales de construcción de DuckDB (PyPI)
-pip3 install setuptools_scm scikit-build-core nanobind --break-system-packages
+export DUCKDB_PLATFORM="android-${TERMUX_ARCH}"
 
-# 2. Fijamos la versión para que no busque repositorios Git
-export SETUPTOOLS_SCM_PRETEND_VERSION="${TERMUX_PKG_VERSION}"
+# Alimentamos a scikit-build-core con el toolchain de Termux
+export SKBUILD_CMAKE_ARGS="-DCMAKE_TOOLCHAIN_FILE=${TERMUX_CMAKE_CROSSCOMPILING_TOOLCHAIN} -DDUCKDB_PLATFORM=${DUCKDB_PLATFORM}"
+export CMAKE_ARGS="-DCMAKE_TOOLCHAIN_FILE=${TERMUX_CMAKE_CROSSCOMPILING_TOOLCHAIN} -DDUCKDB_PLATFORM=${DUCKDB_PLATFORM}"
 
-# 3. Pasamos la plataforma a CMake limpiamente a través de CMAKE_ARGS para evitar el "Exec format error"
-export CMAKE_ARGS="-DDUCKDB_PLATFORM=android-${TERMUX_ARCH}"
-
-# 4. Limitamos hilos para no sufrir un Out Of Memory (OOM) en GitHub Actions
 export MAX_JOBS=2
 export CMAKE_BUILD_PARALLEL_LEVEL=2
 
 export CFLAGS+=" -O3 -fPIC -pipe"
 export CXXFLAGS+=" -O3 -fPIC -pipe"
 
-echo "[*] Compilando DuckDB (v${TERMUX_PKG_VERSION}) de forma limpia desde PyPI..."
+export PYTHONPATH="$(pwd):${PYTHONPATH:-}"
 
-# 5. Instalamos desde el directorio raíz nativo
+echo "[*] Fundiendo DuckDB (v${TERMUX_PKG_VERSION}) nativo desde PyPI con scikit-build-core..."
+
 pip3 install . \
 --prefix="${TERMUX_PREFIX}" \
 --no-build-isolation \
