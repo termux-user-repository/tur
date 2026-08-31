@@ -13,38 +13,40 @@ TERMUX_PKG_BUILD_DEPENDS="cmake, ninja, pybind11"
 TERMUX_PKG_BUILD_IN_SRC=true
 
 termux_step_pre_configure() {
-	termux_setup_ninja
-	termux_setup_cmake
-	pip3 install setuptools_scm --break-system-packages
-
-	# --- ESCUDOS DE CROSS-COMPILING (INYECCIÓN DIRECTA EN CMAKE) ---
-	# 1. Evita que CMake intente ejecutar binarios de test en el servidor
-	sed -i "1i set(DUCKDB_PLATFORM \"android_${TERMUX_ARCH}\")" CMakeLists.txt
-
-	# 2. Falsifica las firmas de Git para evitar que asigne la versión v0.0.1
-	sed -i "1i set(OVERRIDE_GIT_DESCRIBE \"v${TERMUX_PKG_VERSION}-0-g0000000\")" CMakeLists.txt
-	sed -i "1i set(GIT_COMMIT_HASH \"0000000\")" CMakeLists.txt
+termux_setup_ninja
+termux_setup_cmake
+pip3 install setuptools_scm --break-system-packages
 }
 
 termux_step_make_install() {
-	# Limitamos a 2 hilos para evitar que GitHub Actions muera por falta de RAM (OOM)
-	export CMAKE_BUILD_PARALLEL_LEVEL=2
-	export MAX_JOBS=2
+# --- ESCUDOS DE CROSS-COMPILING Y PIP ---
 
-	export CMAKE_GENERATOR="Ninja"
-	export SKBUILD_CMAKE_GENERATOR="Ninja"
+# 1. Escudo de Versión: Engaña a setuptools_scm para evitar el fallo de Git (v0.0.1)
+export SETUPTOOLS_SCM_PRETEND_VERSION="${TERMUX_PKG_VERSION}"
+export OVERRIDE_GIT_DESCRIBE="v${TERMUX_PKG_VERSION}-0-g0000000"
 
-	export CFLAGS+=" -O3 -fPIC -pipe"
-	export CXXFLAGS+=" -O3 -fPIC -pipe"
+# 2. Escudo de Plataforma: Dicta la arquitectura nativa para evitar "Exec format error"
+export DUCKDB_PLATFORM="android-${TERMUX_ARCH}"
 
-	echo "[*] Fundiendo DuckDB (v${TERMUX_PKG_VERSION}) en modo cruzado seguro..."
+# 3. Escudo de Toolchain: Obliga a setup.py a usar el compilador de Termux
+export EXTRA_CMAKE_VARIABLES="-DCMAKE_TOOLCHAIN_FILE=${TERMUX_CMAKE_CROSSCOMPILING_TOOLCHAIN} -DDUCKDB_PLATFORM=${DUCKDB_PLATFORM}"
+export CMAKE_ARGS="-DCMAKE_TOOLCHAIN_FILE=${TERMUX_CMAKE_CROSSCOMPILING_TOOLCHAIN} -DDUCKDB_PLATFORM=${DUCKDB_PLATFORM}"
 
-	export PYTHONPATH=$(pwd):$PYTHONPATH
+# 4. Escudo OOM (Out Of Memory): Evita que GitHub colapse el servidor limitando los hilos
+export MAX_JOBS=2
+export CMAKE_BUILD_PARALLEL_LEVEL=2
 
-	pip3 install . \
-		--prefix="${TERMUX_PREFIX}" \
-		--no-build-isolation \
-		--no-deps \
-		--break-system-packages \
-		-v
+export CFLAGS+=" -O3 -fPIC -pipe"
+export CXXFLAGS+=" -O3 -fPIC -pipe"
+
+echo "[*] Fundiendo DuckDB (v${TERMUX_PKG_VERSION}) en modo cruzado blindado..."
+
+export PYTHONPATH=$(pwd):$PYTHONPATH
+
+pip3 install . \
+--prefix="${TERMUX_PREFIX}" \
+--no-build-isolation \
+--no-deps \
+--break-system-packages \
+-v
 }
