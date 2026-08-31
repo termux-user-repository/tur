@@ -19,25 +19,20 @@ pip3 install setuptools_scm --break-system-packages
 }
 
 termux_step_make_install() {
-# --- ESCUDOS DE CROSS-COMPILING Y PIP ---
-
-# 1. Escudo de Versión: Engaña a setuptools_scm para evitar el fallo de Git (v0.0.1)
 export SETUPTOOLS_SCM_PRETEND_VERSION="${TERMUX_PKG_VERSION}"
 export OVERRIDE_GIT_DESCRIBE="v${TERMUX_PKG_VERSION}-0-g0000000"
 
-# 2. Escudo de Plataforma: Dicta la arquitectura nativa para evitar "Exec format error"
-export DUCKDB_PLATFORM="android-${TERMUX_ARCH}"
-
-# 3. Escudo de Toolchain: Obliga a setup.py a usar el compilador de Termux
-export EXTRA_CMAKE_VARIABLES="-DCMAKE_TOOLCHAIN_FILE=${TERMUX_CMAKE_CROSSCOMPILING_TOOLCHAIN} -DDUCKDB_PLATFORM=${DUCKDB_PLATFORM}"
-export CMAKE_ARGS="-DCMAKE_TOOLCHAIN_FILE=${TERMUX_CMAKE_CROSSCOMPILING_TOOLCHAIN} -DDUCKDB_PLATFORM=${DUCKDB_PLATFORM}"
-
-# 4. Escudo OOM (Out Of Memory): Evita que GitHub colapse el servidor limitando los hilos
 export MAX_JOBS=2
 export CMAKE_BUILD_PARALLEL_LEVEL=2
 
 export CFLAGS+=" -O3 -fPIC -pipe"
 export CXXFLAGS+=" -O3 -fPIC -pipe"
+
+# --- INYECCIÓN LETAL ---
+# setup.py de Python bloquea nuestras variables de entorno. 
+# Usamos sed para escribir la plataforma directamente en el código fuente de CMake
+# y evitar que intente ejecutar binarios de diagnóstico incompatibles.
+sed -i "1i set(DUCKDB_PLATFORM \"android-\${TERMUX_ARCH}\")" CMakeLists.txt
 
 echo "[*] Fundiendo DuckDB (v${TERMUX_PKG_VERSION}) en modo cruzado blindado..."
 
