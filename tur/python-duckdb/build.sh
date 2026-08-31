@@ -19,19 +19,31 @@ termux_step_pre_configure() {
 }
 
 termux_step_make_install() {
-	export CMAKE_BUILD_PARALLEL_LEVEL=$TERMUX_MAKE_PROCESSES
-	export MAX_JOBS=$TERMUX_MAKE_PROCESSES
+	# ---------------------------------------------------------
+	# ESCUDOS DE COMPILACIÓN CRUZADA (CROSS-COMPILING SHIELDS)
+	# ---------------------------------------------------------
+	# 1. Forzar la plataforma para evitar el "Exec format error"
+	export DUCKDB_PLATFORM="android-${TERMUX_ARCH}"
+	
+	# 2. Engañar a Git para evitar el paquete corrupto "v0.0.1"
+	export OVERRIDE_GIT_DESCRIBE="v${TERMUX_PKG_VERSION}"
+	export SETUPTOOLS_SCM_PRETEND_VERSION="${TERMUX_PKG_VERSION}"
+	
+	# 3. Limitar los hilos para que GitHub Actions no se quede sin memoria (OOM Kill)
+	export CMAKE_BUILD_PARALLEL_LEVEL=2
+	export MAX_JOBS=2
+	# ---------------------------------------------------------
 
 	export CMAKE_GENERATOR="Ninja"
 	export SKBUILD_CMAKE_GENERATOR="Ninja"
 
-	export CMAKE_ARGS="-DCMAKE_TOOLCHAIN_FILE=${TERMUX_CMAKE_CROSSCOMPILING_TOOLCHAIN}"
-	export SKBUILD_CMAKE_ARGS="-DCMAKE_TOOLCHAIN_FILE=${TERMUX_CMAKE_CROSSCOMPILING_TOOLCHAIN}"
+	export CMAKE_ARGS="-DCMAKE_TOOLCHAIN_FILE=${TERMUX_CMAKE_CROSSCOMPILING_TOOLCHAIN} -DDUCKDB_PLATFORM=${DUCKDB_PLATFORM}"
+	export SKBUILD_CMAKE_ARGS="-DCMAKE_TOOLCHAIN_FILE=${TERMUX_CMAKE_CROSSCOMPILING_TOOLCHAIN} -DDUCKDB_PLATFORM=${DUCKDB_PLATFORM}"
 
 	export CFLAGS+=" -O3 -fPIC -pipe"
 	export CXXFLAGS+=" -O3 -fPIC -pipe"
 
-	echo "[*] Fundiendo DuckDB (v${TERMUX_PKG_VERSION}) con $MAX_JOBS hilos y Ninja en modo Cruzado..."
+	echo "[*] Fundiendo DuckDB (v${TERMUX_PKG_VERSION}) para ${DUCKDB_PLATFORM}..."
 
 	export PYTHONPATH=$(pwd):$PYTHONPATH
 
