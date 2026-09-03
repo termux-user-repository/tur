@@ -2,10 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://www.r-project.org/
 TERMUX_PKG_DESCRIPTION="A free software environment for statistical computing and graphics"
 TERMUX_PKG_LICENSE="GPL-2.0-or-later, LGPL-2.1"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="4.5.3"
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_VERSION="4.6.1"
 TERMUX_PKG_SRCURL="https://cran.r-project.org/src/base/R-${TERMUX_PKG_VERSION::1}/R-$TERMUX_PKG_VERSION.tar.gz"
-TERMUX_PKG_SHA256=aa5c1ed4293c7271ac513d654670356ac0e8a6ad5e42be014365d11150b5b8f2
+TERMUX_PKG_SHA256=4da6e61d2c0aac5f14a2e7e432cb5fcc269efe83da4293050ba7f03dff4e2cf4
 TERMUX_PKG_DEPENDS="libandroid-glob, libdeflate, libiconv, libbz2, libcurl, liblzma, pcre2, readline, zlib, zstd"
 TERMUX_PKG_BUILD_DEPENDS="binutils, gcc-15, openjdk-21, which"
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
@@ -22,8 +21,9 @@ termux_step_pre_configure() {
 		termux_error_exit "This package doesn't support cross-compiling."
 	fi
 
-	CFLAGS="${CFLAGS/-Oz/-O0}"
-	CXXFLAGS="${CXXFLAGS/-Oz/-O0}"
+	CFLAGS="${CFLAGS/-Oz/-O0} -D__STDC_ISO_10646__=201103L"
+	CXXFLAGS="${CXXFLAGS/-Oz/-O0} -D__STDC_ISO_10646__=201103L"
+	CPPFLAGS+=" -D__STDC_ISO_10646__=201103L"
 	LDFLAGS="${LDFLAGS/-static-openmp/''}"
 	LDFLAGS+=" -landroid-glob"
 	export JAVA_HOME=$TERMUX_PREFIX/opt/openjdk-21
