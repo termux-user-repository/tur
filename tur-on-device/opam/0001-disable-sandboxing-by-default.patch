@@ -1,0 +1,51 @@
+--- a/src/client/opamCommands.ml
++++ b/src/client/opamCommands.ml
+@@ -125,7 +125,7 @@
+ 
+ let get_init_config ~no_sandboxing ~no_default_config_file ~add_config_file =
+   let builtin_config =
+-    OpamInitDefaults.init_config ~sandboxing:(not no_sandboxing) ()
++    OpamInitDefaults.init_config ~sandboxing:false ()
+   in
+   let config_files =
+     (if no_default_config_file then []
+@@ -350,6 +350,7 @@
+       cygwin_internal cygwin_location cygwin_extra_packages
+       git_location no_git_location
+       () =
++    let no_sandboxing = true in
+     apply_global_options cli global_options;
+     apply_build_options cli build_options;
+     (* If show option is set, dump opamrc and exit *)
+--- a/src/client/opamInitDefaults.ml
++++ b/src/client/opamInitDefaults.ml
+@@ -139,16 +139,17 @@
+     "rsync";
+   ] |> List.map OpamSysPkg.of_string
+ 
+-let init_scripts () = [
+-  ("sandbox.sh", OpamScript.bwrap), Some bwrap_filter;
+-  ("sandbox.sh", OpamScript.sandbox_exec), Some macos_filter;
+-]
++let init_scripts ~sandboxing () =
++  if sandboxing then [
++    ("sandbox.sh", OpamScript.bwrap), Some bwrap_filter;
++    ("sandbox.sh", OpamScript.sandbox_exec), Some macos_filter;
++  ] else []
+ 
+ module I = OpamFile.InitConfig
+ 
+ let (@|) g f = OpamStd.Op.(g @* f) ()
+ 
+-let init_config ?(sandboxing=true) () =
++let init_config ?(sandboxing=false) () =
+   I.empty |>
+   I.with_repositories
+     [OpamRepositoryName.of_string "default", (repository_url, None)] |>
+@@ -158,5 +159,5 @@
+   I.with_wrappers @| wrappers ~sandboxing |>
+   I.with_recommended_tools @| recommended_tools |>
+   I.with_required_tools @| required_tools ~sandboxing |>
+-  I.with_init_scripts @| init_scripts |>
++  I.with_init_scripts @| init_scripts ~sandboxing |>
+   I.with_dl_tool @| dl_tool
