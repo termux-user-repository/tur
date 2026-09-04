@@ -1,0 +1,46 @@
+#!/data/data/com.termux/files/usr/bin/sh
+# This script was installed as part of the `tilp2` package
+
+set -eu
+
+real="$PREFIX/bin/tilp.real"
+
+if [ ! -x "$real" ]; then
+    printf '%s\n' "tilp: real executable not found: $real" >&2
+    exit 1
+fi
+
+# Permit direct execution when already inside termux-usb.
+if [ -n "${TERMUX_USB_FD:-}" ]; then
+    exec "$real" "$@"
+fi
+
+# Optional explicit device override.
+if [ -n "${TILP_USB_DEVICE:-}" ]; then
+    device=$TILP_USB_DEVICE
+else
+    devices=$(
+        termux-usb -l |
+        grep -o '/dev/bus/usb/[0-9][0-9]*/[0-9][0-9]*' || :
+    )
+
+    count=$(printf '%s\n' "$devices" | sed '/^$/d' | wc -l)
+
+    case "$count" in
+        0)
+            printf '%s\n' "tilp: no USB devices found" >&2
+            exit 1
+            ;;
+        1)
+            device=$(printf '%s\n' "$devices" | sed -n '1p')
+            ;;
+        *)
+            printf '%s\n' \
+                "tilp: multiple USB devices found; set TILP_USB_DEVICE" >&2
+            printf '%s\n' "$devices" >&2
+            exit 1
+            ;;
+    esac
+fi
+
+exec termux-usb -r -E -e "$real" "$device"
