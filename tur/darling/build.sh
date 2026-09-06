@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE="https://github.com/VibeDarling"
 TERMUX_PKG_DESCRIPTION="Darwin/macOS emulation layer for Linux"
 TERMUX_PKG_LICENSE="GPL-3.0"
 TERMUX_PKG_MAINTAINER="@IntinteDAO"
-TERMUX_PKG_VERSION="0.1.20260906-8"
+TERMUX_PKG_VERSION="0.1.20260906-9"
 TERMUX_PKG_SRCURL="https://github.com/VibeDarling/darling/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz"
-TERMUX_PKG_SHA256=39c666c26a6f49e0c7fe621314f9d2483859ba56bca5623df7475c5d92a123e3
+TERMUX_PKG_SHA256=bbc6977400aaaa5fb703a703508333384af650790622f8644d24669fe06d5898
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_EXCLUDED_ARCHES="arm, i686"
 TERMUX_PKG_DEPENDS="dbus, libandroid-posix-semaphore, libbsd, libc++, libcap, libelf, libicu, liblzma, libucontext, libxml2, openssl, python, xdg-user-dirs, zlib"
@@ -17,14 +17,23 @@ TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 "
 
 termux_step_pre_configure() {
+	local CLANG=$(command -v clang-18 || command -v clang || true)
+	local CLANGXX=$(command -v clang++-18 || command -v clang++ || true)
+	if [ -n "$CLANG" ]; then
+		export CC_FOR_BUILD="$CLANG"
+	fi
+	if [ -n "$CLANGXX" ]; then
+		export CXX_FOR_BUILD="$CLANGXX"
+	fi
+
 	if [ "$TERMUX_ARCH" = "aarch64" ]; then
 		TERMUX_PKG_EXTRA_CONFIGURE_ARGS+="
 			-DTARGET_ARM64=ON
 			-DTARGET_i386=OFF
 			-DTARGET_x86_64=OFF
 		"
-		export CFLAGS="-fstack-protector-strong -Oz -mbranch-protection=none"
-		export CXXFLAGS="-fstack-protector-strong -Oz -mbranch-protection=none"
+		export CFLAGS="-fstack-protector-strong -Oz -mbranch-protection=none -D__arm64__"
+		export CXXFLAGS="-fstack-protector-strong -Oz -mbranch-protection=none -D__arm64__"
 	elif [ "$TERMUX_ARCH" = "x86_64" ]; then
 		TERMUX_PKG_EXTRA_CONFIGURE_ARGS+="
 			-DTARGET_ARM64=OFF
