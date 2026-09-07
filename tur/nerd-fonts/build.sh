@@ -3,13 +3,16 @@ TERMUX_PKG_DESCRIPTION="Meta package that installs all Nerd Fonts patched font p
 TERMUX_PKG_LICENSE="OFL-1.1, MIT, Apache-2.0"
 TERMUX_PKG_MAINTAINER="Gouranga Das Samrat <gouranga.das.khulna@gmail.com>"
 TERMUX_PKG_VERSION=3.5.1
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_REVISION=2
 # The first entry is for the auto-update system to fetch the latest release tarball, the rest are the upstream font zips.
 TERMUX_PKG_SRCURL=(
 	https://github.com/ryanoasis/nerd-fonts/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz
 	https://github.com/ryanoasis/nerd-fonts/releases/download/v${TERMUX_PKG_VERSION}/CascadiaCode.zip
+	https://github.com/ryanoasis/nerd-fonts/releases/download/v${TERMUX_PKG_VERSION}/FantasqueSansMono.zip
+	https://github.com/ryanoasis/nerd-fonts/releases/download/v${TERMUX_PKG_VERSION}/FiraCode.zip
 	https://github.com/ryanoasis/nerd-fonts/releases/download/v${TERMUX_PKG_VERSION}/Hack.zip
 	https://github.com/ryanoasis/nerd-fonts/releases/download/v${TERMUX_PKG_VERSION}/Inconsolata.zip
+	https://github.com/ryanoasis/nerd-fonts/releases/download/v${TERMUX_PKG_VERSION}/Iosevka.zip
 	https://github.com/ryanoasis/nerd-fonts/releases/download/v${TERMUX_PKG_VERSION}/JetBrainsMono.zip
 	https://github.com/ryanoasis/nerd-fonts/releases/download/v${TERMUX_PKG_VERSION}/Meslo.zip
 	https://github.com/ryanoasis/nerd-fonts/releases/download/v${TERMUX_PKG_VERSION}/RobotoMono.zip
@@ -19,8 +22,11 @@ TERMUX_PKG_SRCURL=(
 TERMUX_PKG_SHA256=(
 	81627f9e1d79c5028e2ac28a011b46dc335e146c6ce9d0c368f28c5c3601955a
 	1298bf92698afa06185cf1d05e6ae05f2d8a1e8c3cb45ddf4c3035168ab342a1
+	083c543efbfbb1be47897c02c2285ad7f7b75bd74765fad38d8a04f9db45c6f4
+	239395baf60c89b2eaf4862b6b09db0ef95605cd3e8eef51c00345822a81a665
 	fa24da7de7cefe7766614d27762570b20453c852fc1d5b657111666df9a5e449
 	de7bf85382dad8c239696b7ccddd3e69c5a79b77c6d18c6abe9d6676d28a8764
+	0512c8561fdcfed03c5cae130d1c01f279cfad19467337f9eab98a2b730ecc50
 	fab782a66f7d3019da64f6572db9fc5d3a4bcb19f9fa13e2d8a62e3693d6396e
 	fb104893ecd8f57e8afacbc0a7086b42657120448d056d6093c728a9afb8e237
 	b5db570b0b2bf5a3a62911aeefd2c8df91a12dcb66261169e7353f984002d5b7
@@ -29,7 +35,7 @@ TERMUX_PKG_SHA256=(
 )
 TERMUX_PKG_PLATFORM_INDEPENDENT=true
 TERMUX_PKG_AUTO_UPDATE=true
-TERMUX_PKG_DEPENDS="ttf-cascadia-code-nerd, ttf-hack-nerd, ttf-inconsolata-nerd, ttf-jetbrains-mono-nerd, ttf-meslo-nerd, ttf-roboto-mono-nerd, ttf-sourcecodepro-nerd, ttf-victor-mono-nerd, ttf-nerd-fonts-symbols"
+TERMUX_PKG_DEPENDS="ttf-cascadia-code-nerd, ttf-fantasque-sans-mono-nerd, ttf-fira-code-nerd, ttf-hack-nerd, ttf-inconsolata-nerd, ttf-iosevka-nerd, ttf-jetbrains-mono-nerd, ttf-meslo-nerd, ttf-roboto-mono-nerd, ttf-sourcecodepro-nerd, ttf-victor-mono-nerd, ttf-nerd-fonts-symbols"
 
 termux_step_get_source() {
 	# Skip fetch the first entry since it is only used for auto-update
@@ -55,13 +61,16 @@ termux_step_make_install() {
 	## inside the zip>|<nerd-fonts family file prefix>|<styles to keep>".
 	## NOTE: only Regular/Bold/Italic/BoldItalic styles are kept (where
 	## upstream provides them) to keep each subpackage size reasonable.
-	## NOTE: Inconsolata Nerd Font only ships Regular and Bold - there is no
-	## Italic/BoldItalic .ttf in that release.
+	## NOTE: Inconsolata and Fira Code Nerd Fonts only ship Regular and Bold -
+	## there is no Italic/BoldItalic .ttf in those releases.
 	local font
 	for font in \
 		"ttf-cascadia-code-nerd|CascadiaCode|LICENSE|CaskaydiaCoveNerdFont|Regular Bold Italic BoldItalic" \
+		"ttf-fantasque-sans-mono-nerd|FantasqueSansMono|OFL.txt|FantasqueSansMNerdFont|Regular Bold Italic BoldItalic" \
+		"ttf-fira-code-nerd|FiraCode|LICENSE|FiraCodeNerdFont|Regular Bold" \
 		"ttf-hack-nerd|Hack|LICENSE.md|HackNerdFont|Regular Bold Italic BoldItalic" \
 		"ttf-inconsolata-nerd|Inconsolata|OFL.txt|InconsolataNerdFont|Regular Bold" \
+		"ttf-iosevka-nerd|Iosevka|LICENSE.md|IosevkaNerdFont|Regular Bold Oblique BoldOblique" \
 		"ttf-jetbrains-mono-nerd|JetBrainsMono|OFL.txt|JetBrainsMonoNerdFont|Regular Bold Italic BoldItalic" \
 		"ttf-meslo-nerd|Meslo|LICENSE.txt|MesloLGSNerdFont|Regular Bold Italic BoldItalic" \
 		"ttf-roboto-mono-nerd|RobotoMono|LICENSE.txt|RobotoMonoNerdFont|Regular Bold Italic BoldItalic" \
