@@ -76,8 +76,8 @@ def _impl(ctx):
                         flags = [
                             # "--verbose",
                             "-fPIC",
-                            "--sysroot=external/+_repo_rules6+termux-toolchain/sysroot",
-                            "-isystemexternal/+_repo_rules6+termux-prefix/include",
+                            "--sysroot=external/+_repo_rules5+termux-toolchain/sysroot",
+                            "-isystemexternal/+_repo_rules5+termux-prefix/include",
                             "-no-canonical-prefixes",
                         ],
                     ),
@@ -96,8 +96,8 @@ def _impl(ctx):
                     flag_group(
                         flags = [
                             "-Wl,-rpath=@TERMUX_PREFIX@/lib",
-                            "-Lexternal/+_repo_rules6+termux-prefix/lib",
-                            "--sysroot=external/+_repo_rules6+termux-toolchain/sysroot/",
+                            "-Lexternal/+_repo_rules5+termux-prefix/lib",
+                            "--sysroot=external/+_repo_rules5+termux-toolchain/sysroot/",
                             "-lc++_shared",
                         ],
                     ),
