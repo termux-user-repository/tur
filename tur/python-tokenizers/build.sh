@@ -5,8 +5,9 @@ TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="0.23.2"
 TERMUX_PKG_SRCURL="https://github.com/huggingface/tokenizers/archive/refs/tags/v$TERMUX_PKG_VERSION.tar.gz"
 TERMUX_PKG_SHA256=6f900d6be35eb71921339483937946a4f42167dec9c0102e51055874fb239b8b
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_AUTO_UPDATE=true
-TERMUX_PKG_DEPENDS="libc++, python, python-pip"
+TERMUX_PKG_DEPENDS="libc++, python, python-pip, python-hf-xet"
 TERMUX_PKG_PYTHON_COMMON_BUILD_DEPS="'maturin<1.13'"
 TERMUX_PKG_BUILD_IN_SRC=true
 

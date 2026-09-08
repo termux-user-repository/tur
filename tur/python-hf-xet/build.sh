@@ -30,13 +30,13 @@ termux_step_pre_configure() {
 	find ./vendor -mindepth 1 -maxdepth 1 -type d \
 		! -wholename ./vendor/rustls-platform-verifier \
 		-exec rm -rf '{}' \;
-	find vendor/rustls-platform-verifier -type f -print0 | \
+	find vendor/rustls-platform-verifier -type f -print0 |
 		xargs -0 sed -i \
-		-e 's|"android"|"disabling_this_because_it_is_for_building_an_apk"|g' \
-		-e "s|ANDROID|DISABLING_THIS_BECAUSE_IT_IS_FOR_BUILDING_AN_APK|g" \
-		-e 's|"linux"|"android"|g' \
-		-e "s|/etc|$TERMUX_PREFIX/etc|g"
-	cat >> Cargo.toml <<-EOF
+			-e 's|"android"|"disabling_this_because_it_is_for_building_an_apk"|g' \
+			-e "s|ANDROID|DISABLING_THIS_BECAUSE_IT_IS_FOR_BUILDING_AN_APK|g" \
+			-e 's|"linux"|"android"|g' \
+			-e "s|/etc|$TERMUX_PREFIX/etc|g"
+	cat >>Cargo.toml <<-EOF
 
 		[patch.crates-io]
 		rustls-platform-verifier = { path = "./vendor/rustls-platform-verifier" }
@@ -66,7 +66,4 @@ termux_step_make_install() {
 		--no-deps \
 		"$_whl_dest" \
 		--prefix "$TERMUX_PREFIX"
-
-	# Strip optional test dependencies from METADATA so pip debscripts are not triggered
-	sed -i '/^Requires-Dist/d' "$TERMUX_PREFIX/lib/python${TERMUX_PYTHON_VERSION}/site-packages/hf_xet-${TERMUX_PKG_VERSION}.dist-info/METADATA"
 }
