@@ -9,7 +9,7 @@
  		fuse-overlayfs \
  			"${TERMUX_STANDALONE_TOOLCHAIN}" \
  			-o lowerdir="${NDK}/toolchains/llvm/prebuilt/linux-x86_64" \
-@@ -145,12 +145,17 @@ termux_setup_toolchain_29() {
+@@ -145,12 +145,15 @@ termux_setup_toolchain_29() {
  		return
  	fi
  
@@ -22,11 +22,9 @@
  		_NDK_ARCHNAME=x86
  	fi
 +	cp "$NDK/toolchains/llvm/prebuilt/linux-x86_64" "${TERMUX_STANDALONE_TOOLCHAIN}" -r
-+	cp "$NDK/source.properties" "${TERMUX_STANDALONE_TOOLCHAIN}"
-+
+ 	cp $NDK/source.properties $TERMUX_STANDALONE_TOOLCHAIN/
  	# Remove android-support header wrapping not needed on android-21:
  	rm -Rf $TERMUX_STANDALONE_TOOLCHAIN/sysroot/usr/local
- 
 --- a/scripts/run-docker.sh
 +++ b/scripts/run-docker.sh
 @@ -92,7 +92,7 @@ if [ "$UNAME" = Darwin ]; then
