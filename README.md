@@ -114,4 +114,12 @@ TUR also maintains some other git repos. These git repos are listed below.
 `tur-on-device` **Archived**: It has been merged into TUR.
 
 ## Stargazers over time
-[![Stargazers over time](https://starchart.cc/termux-user-repository/tur.svg?variant=adaptive)](https://starchart.cc/termux-user-repository/tur)
+
+<a href="https://www.star-history.com/?repos=termux-user-repository%2Ftur&type=date&logscale=&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=termux-user-repository/tur&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=termux-user-repository/tur&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=termux-user-repository/tur&type=date&legend=top-left" />
+ </picture>
+</a>
+
