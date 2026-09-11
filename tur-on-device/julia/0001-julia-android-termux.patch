@@ -1,0 +1,1714 @@
+diff --git a/Make.inc b/Make.inc
+index 6d2b09426a..851336ccad 100644
+--- a/Make.inc
++++ b/Make.inc
+@@ -400,6 +400,10 @@ override OS := WINNT
+ else ifneq (,$(findstring emscripten,$(XC_HOST)))
+ override OS := emscripten
+ override CROSS_COMPILE:=
++else ifneq (,$(findstring linux,$(XC_HOST)))
++override OS := Linux
++else ifneq (,$(findstring android,$(XC_HOST)))
++override OS := Linux
+ else
+ ifeq (,$(OS))
+ $(error "unknown XC_HOST variable set, please set OS")
+@@ -868,7 +872,7 @@ MARCH := pentium4
+ endif
+ endif
+ 
+-ifneq ($(findstring $(MARCH),i386 i486 i586 i686 pentium pentium2 pentium3),)
++ifneq ($(filter $(MARCH),i386 i486 i586 i686 pentium pentium2 pentium3),)
+ $(error Pre-SSE2 CPU targets not supported. To create a generic 32-bit x86 binary, \
+ pass 'MARCH=pentium4'.)
+ endif
+@@ -962,7 +966,7 @@ endif
+ ifneq (,$(findstring aarch64,$(ARCH)))
+ OPENBLAS_DYNAMIC_ARCH:=0
+ OPENBLAS_TARGET_ARCH:=ARMV8
+-USE_BLAS64:=1
++USE_BLAS64 ?= 1
+ BINARY:=64
+ endif
+ 
+@@ -1050,7 +1054,11 @@ ifeq ($(OS),Darwin)
+ LIBUNWIND:=-lunwind
+ JCPPFLAGS+=-DLLVMLIBUNWIND
+ else
+-LIBUNWIND:=-lunwind
++ifeq ($(ARCH),i686)
++LIBUNWIND:=$(build_shlibdir)/libunwind-x86.so $(build_shlibdir)/libunwind.so
++else
++LIBUNWIND:=$(build_shlibdir)/libunwind-$(ARCH).so $(build_shlibdir)/libunwind.so
++endif
+ endif
+ endif
+ endif
+@@ -1280,7 +1288,9 @@ endif
+ 
+ # Warn if the user tries to build something that requires `gfortran` but they don't have it installed.
+ ifeq ($(FC_VERSION),)
+-ifneq ($(USE_BINARYBUILDER_OPENBLAS)$(USE_BINARYBUILDER_LIBSUITESPARSE),11)
++ifeq ($(USE_SYSTEM_BLAS)$(USE_SYSTEM_LIBSUITESPARSE),11)
++# Using system BLAS and SuiteSparse, no Fortran compiler needed
++else ifneq ($(USE_BINARYBUILDER_OPENBLAS)$(USE_BINARYBUILDER_LIBSUITESPARSE),11)
+ $(error "Attempting to build OpenBLAS or SuiteSparse without a functioning fortran compiler!")
+ endif
+ endif
+@@ -1343,7 +1353,7 @@ endif
+ JLIBLDFLAGS :=
+ 
+ ifeq ($(OS), Linux)
+-OSLIBS += -Wl,--no-as-needed -ldl -lrt -lpthread -latomic -Wl,--export-dynamic,--as-needed,--no-whole-archive
++OSLIBS += -Wl,--no-as-needed -ldl -lrt -lpthread -latomic $(shell $(CC) -print-libgcc-file-name) -Wl,--export-dynamic,--as-needed,--no-whole-archive
+ # Detect if ifunc is supported
+ IFUNC_DETECT_SRC := 'void (*f0(void))(void) { return (void(*)(void))0L; }; void f(void) __attribute__((ifunc("f0")));'
+ ifeq (supported, $(shell echo $(IFUNC_DETECT_SRC) | $(CC) -Werror -x c - -S -o /dev/null > /dev/null 2>&1 && echo supported))
+@@ -1652,7 +1662,17 @@ ifneq ($(findstring $(OS),Linux FreeBSD),)
+ LIBGCC_NAME := libgcc_s.$(SHLIB_EXT).1
+ endif
+ 
++ifneq (,$(findstring android,$(XC_HOST)))
++DISABLE_CSL := 1
++endif
++
+ # USE_SYSTEM_CSL causes it to get symlinked into build_private_shlibdir
++ifeq ($(DISABLE_CSL),1)
++LIBGCC_BUILD_DEPLIB :=
++LIBGCC_INSTALL_DEPLIB :=
++LIBSTDCXX_BUILD_DEPLIB :=
++LIBSTDCXX_INSTALL_DEPLIB :=
++else
+ ifeq ($(USE_SYSTEM_CSL),1)
+ LIBGCC_BUILD_DEPLIB := $(call dep_lib_path,$(build_libdir),$(build_private_shlibdir)/$(LIBGCC_NAME))
+ else
+@@ -1671,6 +1691,7 @@ LIBSTDCXX_BUILD_DEPLIB := $(call dep_lib_path,$(build_libdir),$(build_shlibdir)/
+ endif
+ LIBSTDCXX_INSTALL_DEPLIB := $(call dep_lib_path,$(libdir),$(private_shlibdir)/$(LIBSTDCXX_NAME))
+ endif
++endif
+ 
+ 
+ # USE_SYSTEM_LIBM and USE_SYSTEM_OPENLIBM causes it to get symlinked into build_private_shlibdir
+diff --git a/Makefile b/Makefile
+index 0e6fb78827..a9857943c4 100644
+--- a/Makefile
++++ b/Makefile
+@@ -62,8 +62,8 @@ julia_flisp.boot.inc.phony: julia-deps
+ 	@$(MAKE) $(QUIET_MAKE) -C $(BUILDROOT)/src julia_flisp.boot.inc.phony
+ 
+ # Build the HTML docs (skipped if already exists, notably in tarballs)
+-$(BUILDROOT)/doc/_build/html/en/index.html: $(shell find $(BUILDROOT)/base $(BUILDROOT)/doc \( -path $(BUILDROOT)/doc/_build -o -path $(BUILDROOT)/doc/deps -o -name *_constants.jl -o -name *_h.jl -o -name version_git.jl \) -prune -o -type f -print)
+-	@$(MAKE) docs
++$(BUILDROOT)/doc/_build/html/en/index.html:
++	@mkdir -p $(BUILDROOT)/doc/_build/html/en && touch $@
+ 
+ julia-symlink: julia-cli-$(JULIA_BUILD_MODE)
+ ifeq ($(OS),WINNT)
+@@ -221,7 +221,10 @@ endif
+ ifeq ($(USE_LLVM_SHLIB),1)
+ JL_PRIVATE_LIBS-$(USE_SYSTEM_LLVM) += libLLVM $(LLVM_SHARED_LIB_NAME)
+ endif
+-JL_PRIVATE_LIBS-$(USE_SYSTEM_LIBUNWIND) += libunwind
++JL_PRIVATE_LIBS-$(USE_SYSTEM_LIBUNWIND) += libunwind libunwind-$(ARCH) libunwind-generic
++ifeq ($(ARCH),i686)
++JL_PRIVATE_LIBS-$(USE_SYSTEM_LIBUNWIND) += libunwind-x86
++endif
+ 
+ ifeq ($(USE_SYSTEM_LIBM),0)
+ JL_PRIVATE_LIBS-$(USE_SYSTEM_OPENLIBM) += libopenlibm
+@@ -265,7 +268,7 @@ endif
+ # Note that we disable MSYS2's path munging here, as otherwise
+ # it replaces our `:`-separated list as a `;`-separated one.
+ define stringreplace
+-	MSYS2_ARG_CONV_EXCL='*' $(build_depsbindir)/stringreplace $$(strings -t x - '$1' | grep "$2" | awk '{print $$1;}') "$3" 255 "$(call cygpath_w,$1)"
++	MSYS2_ARG_CONV_EXCL='*' $(build_depsbindir)/stringreplace $$(strings -a -t x '$1' | grep "$2" | awk '{print $$1;}') "$3" 255 "$(call cygpath_w,$1)"
+ endef
+ 
+ 
+@@ -404,7 +407,7 @@ endif
+ 	find $(DESTDIR)$(datarootdir)/julia/test -type f -name \*.jl -exec chmod 0444 '{}' \;
+ 
+ 	# Copy documentation
+-	cp -R -L $(BUILDROOT)/doc/_build/html $(DESTDIR)$(docdir)/
++	-cp -R -L $(BUILDROOT)/doc/_build/html $(DESTDIR)$(docdir)/
+ 	# Remove various files which should not be installed
+ 	-rm -f $(DESTDIR)$(datarootdir)/julia/base/version_git.sh
+ 	-rm -f $(DESTDIR)$(datarootdir)/julia/test/Makefile
+diff --git a/base/Base.jl b/base/Base.jl
+index 4de06175a6..acd7ad4417 100644
+--- a/base/Base.jl
++++ b/base/Base.jl
+@@ -284,6 +284,9 @@ let os = ccall(:jl_get_UNAME, Any, ())
+             push!(DL_LOAD_PATH, "@loader_path/Frameworks")
+         end
+         push!(DL_LOAD_PATH, "@loader_path")
++    else
++        push!(DL_LOAD_PATH, "@executable_path/../lib/julia")
++        push!(DL_LOAD_PATH, "@executable_path/../lib")
+     end
+ end
+ 
+diff --git a/base/Makefile b/base/Makefile
+index cf7f974fd7..f191de8d0f 100644
+--- a/base/Makefile
++++ b/base/Makefile
+@@ -171,7 +171,7 @@ endif
+ 
+ define symlink_system_library
+ libname_$2 := $$(notdir $(call versioned_libname,$2,$3))
+-libpath_$2 := $$(shell $$(call spawn,$$(LIBWHICH)) -p $$(libname_$2) 2>/dev/null)
++libpath_$2 := $$(or $$(firstword $$(wildcard $(prefix)/lib/$$(libname_$2)* $(prefix)/lib/$2.$$(SHLIB_EXT)* $$(build_libdir)/$$(libname_$2)* $$(build_libdir)/$2.$$(SHLIB_EXT)*)),$$(shell $$(call spawn,$$(LIBWHICH)) -p $$(libname_$2) 2>/dev/null),$$(shell $$(call spawn,$$(LIBWHICH)) -p $2.$$(SHLIB_EXT) 2>/dev/null))
+ symlink_$2: $$(build_private_libdir)/$$(libname_$2)
+ $$(build_private_libdir)/$$(libname_$2):
+ 	@if [ -e "$$(libpath_$2)" ]; then \
+@@ -180,11 +180,14 @@ $$(build_private_libdir)/$$(libname_$2):
+ 		[ -e "$$$$REALPATH" ] && \
+ 		rm -f "$$@" && \
+ 		echo ln -sf "$$$$REALPATH" "$$@" && \
+-		ln -sf "$$$$REALPATH" "$$@"; \
++		ln -sf "$$$$REALPATH" "$$@" && \
++		if [ -n "$3" ]; then \
++			ln -sf "$$$$REALPATH" "$$(build_private_libdir)/$2.$$(SHLIB_EXT)"; \
++		fi; \
+ 	else \
+ 		if [ "$4" != "ALLOW_FAILURE" ]; then \
+ 			echo "System library symlink failure: Unable to locate $$(libname_$2) on your system!" >&2; \
+-			false; \
++			true; \
+ 		fi; \
+ 	fi
+ ifneq ($$(USE_SYSTEM_$1),0)
+@@ -201,9 +204,9 @@ SYMLINK_SYSTEM_LIBRARIES += symlink_p7zip
+ endif
+ 
+ $(build_bindir)/7z$(EXE):
+-	[ -e "$(7Z_PATH)" ] && \
++	-[ -n "$(7Z_PATH)" ] && [ -e "$(7Z_PATH)" ] && \
+ 	rm -f "$@" && \
+-	ln -svf "$(7Z_PATH)" "$@"
++	ln -svf "$(7Z_PATH)" "$@" || true
+ 
+ symlink_lld: $(build_bindir)/lld$(EXE)
+ 
+@@ -213,9 +216,9 @@ LLD_PATH := $(shell which lld$(EXE))
+ endif
+ 
+ $(build_bindir)/lld$(EXE):
+-	[ -e "$(LLD_PATH)" ] && \
++	-[ -n "$(LLD_PATH)" ] && [ -e "$(LLD_PATH)" ] && \
+ 	rm -f "$@" && \
+-	ln -svf "$(LLD_PATH)" "$@"
++	ln -svf "$(LLD_PATH)" "$@" || true
+ 
+ # the following excludes: libuv.a, libutf8proc.a
+ 
+@@ -238,43 +241,48 @@ $(eval $(call symlink_system_library,CSL,libgcc_s,1))
+ endif
+ endif
+ else
+-$(eval $(call symlink_system_library,CSL,libgcc_s,1))
++$(eval $(call symlink_system_library,CSL,libgcc_s,1,ALLOW_FAILURE))
+ endif
+ ifneq (,$(LIBGFORTRAN_VERSION))
+-$(eval $(call symlink_system_library,CSL,libgfortran,$(LIBGFORTRAN_VERSION)))
++$(eval $(call symlink_system_library,CSL,libgfortran,$(LIBGFORTRAN_VERSION),ALLOW_FAILURE))
+ endif
+-$(eval $(call symlink_system_library,CSL,libstdc++,6))
++$(eval $(call symlink_system_library,CSL,libstdc++,6,ALLOW_FAILURE))
+ # We allow libssp, libatomic, libgomp and libquadmath to fail as they are not available on all systems
+ $(eval $(call symlink_system_library,CSL,libssp,0,ALLOW_FAILURE))
+ $(eval $(call symlink_system_library,CSL,libatomic,1,ALLOW_FAILURE))
+ $(eval $(call symlink_system_library,CSL,libgomp,1,ALLOW_FAILURE))
+ $(eval $(call symlink_system_library,CSL,libquadmath,0,ALLOW_FAILURE))
+-$(eval $(call symlink_system_library,PCRE,libpcre2-8))
++$(eval $(call symlink_system_library,PCRE,libpcre2-8,0))
+ $(eval $(call symlink_system_library,DSFMT,libdSFMT))
+-$(eval $(call symlink_system_library,LIBBLASTRAMPOLINE,libblastrampoline))
++$(eval $(call symlink_system_library,LIBBLASTRAMPOLINE,libblastrampoline,5))
+ $(eval $(call symlink_system_library,BLAS,$(LIBBLASNAME)))
+ ifneq ($(LIBLAPACKNAME),$(LIBBLASNAME))
+ $(eval $(call symlink_system_library,LAPACK,$(LIBLAPACKNAME)))
+ endif
+-$(eval $(call symlink_system_library,GMP,libgmp))
+-$(eval $(call symlink_system_library,MPFR,libmpfr))
+-$(eval $(call symlink_system_library,MBEDTLS,libmbedtls))
+-$(eval $(call symlink_system_library,MBEDTLS,libmbedcrypto))
+-$(eval $(call symlink_system_library,MBEDTLS,libmbedx509))
+-$(eval $(call symlink_system_library,LIBSSH2,libssh2))
+-$(eval $(call symlink_system_library,NGHTTP2,libnghttp2))
+-$(eval $(call symlink_system_library,CURL,libcurl))
+-$(eval $(call symlink_system_library,LIBGIT2,libgit2))
+-$(eval $(call symlink_system_library,LIBSUITESPARSE,libamd))
+-$(eval $(call symlink_system_library,LIBSUITESPARSE,libcamd))
+-$(eval $(call symlink_system_library,LIBSUITESPARSE,libccolamd))
+-$(eval $(call symlink_system_library,LIBSUITESPARSE,libcholmod))
+-$(eval $(call symlink_system_library,LIBSUITESPARSE,libcholmod_cuda))
+-$(eval $(call symlink_system_library,LIBSUITESPARSE,libcolamd))
+-$(eval $(call symlink_system_library,LIBSUITESPARSE,libumfpack))
+-$(eval $(call symlink_system_library,LIBSUITESPARSE,libspqr))
+-$(eval $(call symlink_system_library,LIBSUITESPARSE,libspqr_cuda))
+-$(eval $(call symlink_system_library,LIBSUITESPARSE,libsuitesparseconfig))
++$(eval $(call symlink_system_library,GMP,libgmp,10))
++$(eval $(call symlink_system_library,GMP,libgmpxx,4,ALLOW_FAILURE))
++$(eval $(call symlink_system_library,MPFR,libmpfr,6))
++$(eval $(call symlink_system_library,MBEDTLS,libmbedtls,14))
++$(eval $(call symlink_system_library,MBEDTLS,libmbedcrypto,7))
++$(eval $(call symlink_system_library,MBEDTLS,libmbedx509,1))
++$(eval $(call symlink_system_library,LIBSSH2,libssh2,1))
++$(eval $(call symlink_system_library,NGHTTP2,libnghttp2,14))
++$(eval $(call symlink_system_library,CURL,libcurl,4))
++$(eval $(call symlink_system_library,LIBUV,libuv,2))
++$(eval $(call symlink_system_library,OPENLIBM,libopenlibm,4))
++$(eval $(call symlink_system_library,LIBGIT2,libgit2,1.6,ALLOW_FAILURE))
++$(eval $(call symlink_system_library,ZLIB,libz,1,ALLOW_FAILURE))
++$(eval $(call symlink_system_library,LIBSUITESPARSE,libamd,3))
++$(eval $(call symlink_system_library,LIBSUITESPARSE,libcamd,3))
++$(eval $(call symlink_system_library,LIBSUITESPARSE,libccolamd,3))
++$(eval $(call symlink_system_library,LIBSUITESPARSE,libcholmod,4,ALLOW_FAILURE))
++$(eval $(call symlink_system_library,LIBSUITESPARSE,libcholmod,5,ALLOW_FAILURE))
++$(eval $(call symlink_system_library,LIBSUITESPARSE,libcholmod_cuda,,ALLOW_FAILURE))
++$(eval $(call symlink_system_library,LIBSUITESPARSE,libcolamd,3))
++$(eval $(call symlink_system_library,LIBSUITESPARSE,libumfpack,6))
++$(eval $(call symlink_system_library,LIBSUITESPARSE,libspqr,4))
++$(eval $(call symlink_system_library,LIBSUITESPARSE,libspqr_cuda,,ALLOW_FAILURE))
++$(eval $(call symlink_system_library,LIBSUITESPARSE,libsuitesparseconfig,7))
+ # EXCLUDED LIBRARIES (installed/used, but not vendored for use with dlopen):
+ # libunwind
+ endif # WINNT
+diff --git a/base/binaryplatforms.jl b/base/binaryplatforms.jl
+index 57cf568402..fa030a9b1a 100644
+--- a/base/binaryplatforms.jl
++++ b/base/binaryplatforms.jl
+@@ -216,7 +216,7 @@ function validate_tags(tags::Dict)
+     throw_libc_mismatch() = throw(ArgumentError("Invalid os/libc combination: $(tags["os"])/$(tags["libc"])"))
+     if tags["os"] == "linux"
+         # Linux always has a `libc` entry
+-        if tags["libc"] ∉ ("glibc", "musl")
++        if tags["libc"] ∉ ("glibc", "musl", "bionic")
+             throw_libc_mismatch()
+         end
+     else
+@@ -570,6 +570,8 @@ function libc_str(p::AbstractPlatform)
+         return ""
+     elseif lc === "glibc"
+         return "-gnu"
++    elseif lc === "bionic"
++        return "-android"
+     else
+         return string("-", lc)
+     end
+@@ -642,6 +644,7 @@ const libc_mapping = Dict(
+     "libc_nothing" => "",
+     "glibc" => "-gnu",
+     "musl" => "-musl",
++    "bionic" => "-(android|bionic)[\\d\\.]*",
+ )
+ const call_abi_mapping = Dict(
+     "call_abi_nothing" => "",
+diff --git a/base/float.jl b/base/float.jl
+index aa61f2c844..caab8a1823 100644
+--- a/base/float.jl
++++ b/base/float.jl
+@@ -411,6 +411,11 @@ widen(::Type{Float32}) = Float64
+ *(x::T, y::T) where {T<:IEEEFloat} = mul_float(x, y)
+ /(x::T, y::T) where {T<:IEEEFloat} = div_float(x, y)
+ 
+++(x::Float16, y::Float16) = Float16(Float32(x) + Float32(y))
++-(x::Float16, y::Float16) = Float16(Float32(x) - Float32(y))
++*(x::Float16, y::Float16) = Float16(Float32(x) * Float32(y))
++/(x::Float16, y::Float16) = Float16(Float32(x) / Float32(y))
++
+ muladd(x::T, y::T, z::T) where {T<:IEEEFloat} = muladd_float(x, y, z)
+ 
+ # TODO: faster floating point div?
+@@ -868,7 +873,7 @@ such `y` exists (e.g. if `x` is `-Inf` or `NaN`), then return `x`.
+ prevfloat(x::AbstractFloat) = nextfloat(x,-1)
+ 
+ for Ti in (Int8, Int16, Int32, Int64, Int128, UInt8, UInt16, UInt32, UInt64, UInt128)
+-    for Tf in (Float16, Float32, Float64)
++    for Tf in (Float32, Float64)
+         if Ti <: Unsigned || sizeof(Ti) < sizeof(Tf)
+             # Here `Tf(typemin(Ti))-1` is exact, so we can compare the lower-bound
+             # directly. `Tf(typemax(Ti))+1` is either always exactly representable, or
+@@ -915,6 +920,10 @@ for Ti in (Int8, Int16, Int32, Int64, Int128, UInt8, UInt16, UInt32, UInt64, UIn
+             end
+         end
+     end
++    @eval begin
++        trunc(::Type{$Ti}, x::Float16) = trunc($Ti, Float32(x))
++        (::Type{$Ti})(x::Float16) = ($Ti)(Float32(x))
++    end
+ end
+ 
+ """
+diff --git a/base/gmp.jl b/base/gmp.jl
+index 8a1451be7a..215a0627ee 100644
+--- a/base/gmp.jl
++++ b/base/gmp.jl
+@@ -26,7 +26,7 @@ if Sys.iswindows()
+ elseif Sys.isapple()
+     const libgmp = "@rpath/libgmp.10.dylib"
+ else
+-    const libgmp = "libgmp.so.10"
++    const libgmp = "libgmp"
+ end
+ 
+ version() = VersionNumber(unsafe_string(unsafe_load(cglobal((:__gmp_version, libgmp), Ptr{Cchar}))))
+diff --git a/base/loading.jl b/base/loading.jl
+index 4cc2624d00..97204c90d6 100644
+--- a/base/loading.jl
++++ b/base/loading.jl
+@@ -2266,7 +2266,7 @@ evalfile(path::AbstractString, args::Vector) = evalfile(path, String[args...])
+ function load_path_setup_code(load_path::Bool=true)
+     code = """
+     append!(empty!(Base.DEPOT_PATH), $(repr(map(abspath, DEPOT_PATH))))
+-    append!(empty!(Base.DL_LOAD_PATH), $(repr(map(abspath, DL_LOAD_PATH))))
++    append!(empty!(Base.DL_LOAD_PATH), $(repr(map(p -> startswith(p, "@") ? p : abspath(p), DL_LOAD_PATH))))
+     """
+     if load_path
+         load_path = map(abspath, Base.load_path())
+@@ -2327,7 +2327,7 @@ function create_expr_cache(pkg::PkgId, input::String, output::String, output_o::
+     rm(output, force=true)   # Remove file if it exists
+     output_o === nothing || rm(output_o, force=true)
+     depot_path = map(abspath, DEPOT_PATH)
+-    dl_load_path = map(abspath, DL_LOAD_PATH)
++    dl_load_path = map(p -> startswith(p, "@") ? p : abspath(p), DL_LOAD_PATH)
+     load_path = map(abspath, Base.load_path())
+     path_sep = Sys.iswindows() ? ';' : ':'
+     any(path -> path_sep in path, load_path) &&
+diff --git a/base/mpfr.jl b/base/mpfr.jl
+index 2e03018f76..dfe4499094 100644
+--- a/base/mpfr.jl
++++ b/base/mpfr.jl
+@@ -32,7 +32,7 @@ if Sys.iswindows()
+ elseif Sys.isapple()
+     const libmpfr = "@rpath/libmpfr.6.dylib"
+ else
+-    const libmpfr = "libmpfr.so.6"
++    const libmpfr = "libmpfr"
+ end
+ 
+ 
+diff --git a/base/sysinfo.jl b/base/sysinfo.jl
+index 235cf04382..b0bdc9fd73 100644
+--- a/base/sysinfo.jl
++++ b/base/sysinfo.jl
+@@ -201,6 +201,10 @@ function _cpu_summary(io::IO, cpu::AbstractVector{CPUinfo}, i, j)
+ end
+ 
+ function cpu_summary(io::IO=stdout, cpu::AbstractVector{CPUinfo} = cpu_info())
++    if isempty(cpu)
++        println(io, "unknown")
++        return
++    end
+     model = cpu[1].model
+     first = 1
+     for i = 2:length(cpu)
+@@ -216,7 +220,9 @@ function cpu_info()
+     UVcpus = Ref{Ptr{UV_cpu_info_t}}()
+     count = Ref{Int32}()
+     err = ccall(:uv_cpu_info, Int32, (Ptr{Ptr{UV_cpu_info_t}}, Ptr{Int32}), UVcpus, count)
+-    Base.uv_error("uv_cpu_info", err)
++    if err < 0
++        return CPUinfo[]
++    end
+     cpus = Vector{CPUinfo}(undef, count[])
+     for i = 1:length(cpus)
+         cpus[i] = CPUinfo(unsafe_load(UVcpus[], i))
+diff --git a/cli/Makefile b/cli/Makefile
+index 5e3e647946..63067da923 100644
+--- a/cli/Makefile
++++ b/cli/Makefile
+@@ -7,7 +7,7 @@ include $(JULIAHOME)/deps/llvm-ver.make
+ 
+ HEADERS := $(addprefix $(SRCDIR)/,jl_exports.h loader.h) $(addprefix $(JULIAHOME)/src/,julia_fasttls.h support/platform.h support/dirpath.h jl_exported_data.inc jl_exported_funcs.inc)
+ 
+-LOADER_CFLAGS = $(JCFLAGS) -I$(BUILDROOT)/src -I$(JULIAHOME)/src -I$(JULIAHOME)/src/support -I$(build_includedir) -ffreestanding
++LOADER_CFLAGS = $(fPIC) $(JCFLAGS) -I$(BUILDROOT)/src -I$(JULIAHOME)/src -I$(JULIAHOME)/src/support -I$(build_includedir) -ffreestanding
+ LOADER_LIBPATHS = -L$(build_shlibdir) -L$(build_libdir)
+ LOADER_LDFLAGS = $(JLDFLAGS) -ffreestanding $(LOADER_LIBPATHS)
+ 
+@@ -24,7 +24,11 @@ ifeq ($(OS),WINNT)
+ # path buffers, so link the mingw providers for them.
+ LOADER_LDFLAGS = $(LOADER_LIBPATHS) -lntdll -lkernel32 -lpsapi -lmingwex $(WIN_CRT_LIB)
+ else ifeq ($(OS),Linux)
++ifneq (,$(findstring android,$(XC_HOST)))
++LOADER_LDFLAGS += -Wl,--no-as-needed -ldl -rdynamic -lc -Wl,--as-needed
++else
+ LOADER_LDFLAGS += -Wl,--no-as-needed -ldl -lpthread -rdynamic -lc -Wl,--as-needed
++endif
+ else ifeq ($(OS),FreeBSD)
+ LOADER_LDFLAGS += -Wl,--no-as-needed -ldl -lpthread -rdynamic -lc -Wl,--as-needed
+ else ifeq ($(OS),Darwin)
+diff --git a/cli/loader_lib.c b/cli/loader_lib.c
+index 12feed0c50..f0a26dd9e7 100644
+--- a/cli/loader_lib.c
++++ b/cli/loader_lib.c
+@@ -44,6 +44,8 @@ void jl_loader_print_stderr3(const char * msg1, const char * msg2, const char *
+  * However, if it exists and cannot be loaded, that's a problem. So, we alert the user
+  * and abort the process. */
+ static void * load_library(const char * rel_path, const char * src_dir, int err) {
++    if (rel_path == NULL || rel_path[0] == '\0')
++        return NULL;
+     void * handle = NULL;
+     // See if a handle is already open to the basename
+     const char *basename = rel_path + strlen(rel_path);
+@@ -253,6 +255,9 @@ static void read_wrapper(int fd, char **ret, size_t *ret_len)
+ // The path returned must be freed.
+ static char *libstdcxxprobe(void)
+ {
++#if defined(__ANDROID__)
++    return NULL;
++#else
+     // Create the pipe and child process.
+     int fork_pipe[2];
+     int ret = pipe(fork_pipe);
+@@ -349,6 +354,7 @@ static char *libstdcxxprobe(void)
+         path[pathlen] = '\0';
+         return path;
+     }
++#endif
+ }
+ #endif
+ 
+@@ -427,6 +433,14 @@ __attribute__((constructor)) void jl_load_libjulia_internal(void) {
+         // Chop the string at the colon so it's a valid-ending-string
+         *colon = '\0';
+ 
++        if (curr_dep[0] != '@') {
++            size_t depe_len = strlen(curr_dep);
++            if (depe_len == 0 || curr_dep[depe_len - 1] == '/' || curr_dep[depe_len - 1] == '\\') {
++                curr_dep = colon + 1;
++                continue;
++            }
++        }
++
+         // If this library name starts with `@`, it's a special library
+         // and requires special handling:
+         if (curr_dep[0] == '@') {
+@@ -463,7 +477,7 @@ __attribute__((constructor)) void jl_load_libjulia_internal(void) {
+                 }
+                 // If the probe rejected the system libstdc++ (or didn't find one!)
+                 // just load our bundled libstdc++ as identified by curr_dep;
+-                if (!probe_successful) {
++                if (!probe_successful && curr_dep[0] != '\0') {
+                     load_library(curr_dep, lib_dir, 1);
+                 }
+ #endif
+diff --git a/cli/trampolines/trampolines_i686.S b/cli/trampolines/trampolines_i686.S
+index 3d9cacf0ce..5acdd9e3ec 100644
+--- a/cli/trampolines/trampolines_i686.S
++++ b/cli/trampolines/trampolines_i686.S
+@@ -3,6 +3,21 @@
+ #include "common.h"
+ #include "../../src/jl_exported_funcs.inc"
+ 
++#if defined(__ELF__) && !defined(_OS_WINDOWS_)
++#define XX(name) \
++DEBUGINFO(CNAME(name)); \
++.global CNAME(name); \
++.cfi_startproc; \
++CNAME(name)##:; \
++    CET_START(); \
++    calll 1f; \
++1:  popl %ecx; \
++    addl $_GLOBAL_OFFSET_TABLE_ + (. - 1b), %ecx; \
++    jmpl *CNAMEADDR(name)@GOTOFF(%ecx); \
++    ud2; \
++.cfi_endproc; \
++EXPORT(name);
++#else
+ #define XX(name) \
+ DEBUGINFO(CNAME(name)); \
+ .global CNAME(name); \
+@@ -12,7 +27,8 @@ CNAME(name)##:; \
+     jmpl *(CNAMEADDR(name)); \
+     ud2; \
+ .cfi_endproc; \
+-EXPORT(name); \
++EXPORT(name);
++#endif
+ 
+ JL_RUNTIME_EXPORTED_FUNCS(XX)
+ #ifdef _OS_WINDOWS_
+diff --git a/contrib/normalize_triplet.py b/contrib/normalize_triplet.py
+index 77c047b360..516f3732d4 100755
+--- a/contrib/normalize_triplet.py
++++ b/contrib/normalize_triplet.py
+@@ -26,6 +26,7 @@ libc_mapping = {
+     'blank_libc': "",
+     'gnu': "-gnu",
+     'musl': "-musl",
++    'android': "-android[\\d\\.]*",
+ }
+ call_abi_mapping = {
+     'blank_call_abi': "",
+diff --git a/deps/blastrampoline.mk b/deps/blastrampoline.mk
+index bd1cb65c6a..c9f1435416 100644
+--- a/deps/blastrampoline.mk
++++ b/deps/blastrampoline.mk
+@@ -6,11 +6,11 @@ BLASTRAMPOLINE_GIT_URL := https://github.com/JuliaLinearAlgebra/libblastrampolin
+ BLASTRAMPOLINE_TAR_URL = https://api.github.com/repos/JuliaLinearAlgebra/libblastrampoline/tarball/$1
+ $(eval $(call git-external,blastrampoline,BLASTRAMPOLINE,,,$(BUILDDIR)))
+ 
+-BLASTRAMPOLINE_BUILD_OPTS := $(MAKE_COMMON) CC="$(CC) $(SANITIZE_OPTS)" CFLAGS="$(CFLAGS)" LDFLAGS="$(LDFLAGS)"
+-BLASTRAMPOLINE_BUILD_OPTS += ARCH="$(ARCH)" OS="$(OS)"
++BLASTRAMPOLINE_BUILD_OPTS := $(MAKE_COMMON) CC="$(CC) $(SANITIZE_OPTS)" CFLAGS="$(CFLAGS) -fPIC" LDFLAGS="$(LDFLAGS)" ARCH="$(ARCH)" OS="$(OS)" ASFLAGS="-fPIC"
+ 
+ $(BUILDDIR)/$(BLASTRAMPOLINE_SRC_DIR)/build-configured: $(BUILDDIR)/$(BLASTRAMPOLINE_SRC_DIR)/source-extracted
+ 	mkdir -p $(dir $@)
++	cd $(dir $@) && patch -p1 -f < $(SRCDIR)/patches/libblastrampoline-i686-pic.patch || true
+ 	echo 1 > $@
+ 
+ BLASTRAMPOLINE_BUILD_ROOT := $(BUILDDIR)/$(BLASTRAMPOLINE_SRC_DIR)/src
+diff --git a/deps/libuv.mk b/deps/libuv.mk
+index eacabac55e..455327bd0b 100644
+--- a/deps/libuv.mk
++++ b/deps/libuv.mk
+@@ -2,7 +2,7 @@
+ ifneq ($(USE_BINARYBUILDER_LIBUV),1)
+ LIBUV_GIT_URL:=https://github.com/JuliaLang/libuv.git
+ LIBUV_TAR_URL=https://api.github.com/repos/JuliaLang/libuv/tarball/$1
+-$(eval $(call git-external,libuv,LIBUV,configure,,$(SRCCACHE)))
++$(eval $(call git-external,libuv,LIBUV,configure,libuv-android.patch,$(SRCCACHE)))
+ 
+ UV_CFLAGS := -O2
+ 
+@@ -33,7 +33,11 @@ $(LIBUV_BUILDDIR)/build-compiled: $(LIBUV_BUILDDIR)/build-configured
+ 	emmake $(MAKE) -C $(dir $<) $(UV_MFLAGS)
+ 	echo 1 > $@
+ else
+-$(LIBUV_BUILDDIR)/build-configured: $(SRCCACHE)/$(LIBUV_SRC_DIR)/source-extracted
++$(SRCCACHE)/$(LIBUV_SRC_DIR)/libuv-android.patch-applied: $(SRCCACHE)/$(LIBUV_SRC_DIR)/source-extracted
++	cd $(SRCCACHE)/$(LIBUV_SRC_DIR) && patch -p1 -f < $(SRCDIR)/patches/libuv-android.patch
++	echo 1 > $@
++
++$(LIBUV_BUILDDIR)/build-configured: $(SRCCACHE)/$(LIBUV_SRC_DIR)/libuv-android.patch-applied
+ 	touch -c $(SRCCACHE)/$(LIBUV_SRC_DIR)/aclocal.m4 # touch a few files to prevent autogen from getting called
+ 	touch -c $(SRCCACHE)/$(LIBUV_SRC_DIR)/Makefile.in
+ 	touch -c $(SRCCACHE)/$(LIBUV_SRC_DIR)/configure
+diff --git a/deps/libwhich.mk b/deps/libwhich.mk
+index 7901783819..8b4516fa8a 100644
+--- a/deps/libwhich.mk
++++ b/deps/libwhich.mk
+@@ -1,12 +1,16 @@
+ ## LIBWHICH ##
+ LIBWHICH_GIT_URL := https://github.com/vtjnash/libwhich.git
+ LIBWHICH_TAR_URL = https://api.github.com/repos/vtjnash/libwhich/tarball/$1
+-$(eval $(call git-external,libwhich,LIBWHICH,,,$(BUILDDIR)))
++$(eval $(call git-external,libwhich,LIBWHICH,,libwhich-android.patch,$(BUILDDIR)))
+ 
+ LIBWHICH_OBJ_LIB := $(build_depsbindir)/libwhich
+-LIBWHICH_MFLAGS := CC="$(HOSTCC)"
++LIBWHICH_MFLAGS := CC="$(CC)" CFLAGS="$(CFLAGS)"
+ 
+-$(BUILDDIR)/$(LIBWHICH_SRC_DIR)/build-compiled: $(BUILDDIR)/$(LIBWHICH_SRC_DIR)/source-extracted
++$(BUILDDIR)/$(LIBWHICH_SRC_DIR)/libwhich-android.patch-applied: $(BUILDDIR)/$(LIBWHICH_SRC_DIR)/source-extracted
++	cd $(dir $@) && patch -p1 -f < $(SRCDIR)/patches/libwhich-android.patch
++	echo 1 > $@
++
++$(BUILDDIR)/$(LIBWHICH_SRC_DIR)/build-compiled: $(BUILDDIR)/$(LIBWHICH_SRC_DIR)/libwhich-android.patch-applied
+ 	$(MAKE) -C $(dir $<) $(LIBWHICH_MFLAGS) libwhich
+ 	echo 1 > $@
+ 
+diff --git a/deps/llvm.mk b/deps/llvm.mk
+index 8a6f9b7c8e..13dd6ab260 100644
+--- a/deps/llvm.mk
++++ b/deps/llvm.mk
+@@ -89,11 +89,17 @@ LLVM_CMAKE += -DLLVM_WINDOWS_PREFER_FORWARD_SLASH=False
+ LLVM_CFLAGS += $(CFLAGS)
+ LLVM_CXXFLAGS += $(CXXFLAGS)
+ LLVM_CPPFLAGS += $(CPPFLAGS)
+-LLVM_LDFLAGS += $(LDFLAGS)
++LLVM_LDFLAGS += $(LDFLAGS) -Wl,--undefined-version
++LLVM_CMAKE += -DCMAKE_SHARED_LINKER_FLAGS="$(LLVM_LDFLAGS)" -DCMAKE_EXE_LINKER_FLAGS="$(LLVM_LDFLAGS)" -DCMAKE_MODULE_LINKER_FLAGS="$(LLVM_LDFLAGS)"
+ LLVM_CMAKE += -DLLVM_TARGETS_TO_BUILD:STRING="$(LLVM_TARGETS)" -DCMAKE_BUILD_TYPE="$(LLVM_CMAKE_BUILDTYPE)"
+ LLVM_CMAKE += -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD:STRING="$(LLVM_EXPERIMENTAL_TARGETS)"
+ LLVM_CMAKE += -DLLVM_ENABLE_LIBXML2=OFF -DLLVM_HOST_TRIPLE="$(or $(XC_HOST),$(BUILD_MACHINE))"
+-LLVM_CMAKE += -DLLVM_ENABLE_ZLIB=FORCE_ON -DZLIB_ROOT="$(build_prefix)"
++LLVM_CMAKE += -DLLVM_ENABLE_ZLIB=FORCE_ON
++ifeq ($(USE_SYSTEM_ZLIB), 1)
++LLVM_CMAKE += -DZLIB_INCLUDE_DIR="$(prefix)/include" -DZLIB_LIBRARY="$(prefix)/lib/libz.so" -DZLIB_ROOT="$(prefix)"
++else
++LLVM_CMAKE += -DZLIB_ROOT="$(build_prefix)"
++endif
+ ifeq ($(USE_POLLY_ACC),1)
+ LLVM_CMAKE += -DPOLLY_ENABLE_GPGPU_CODEGEN=ON
+ endif
+@@ -101,6 +107,7 @@ LLVM_CMAKE += -DLLVM_TOOLS_INSTALL_DIR=$(call rel_path,$(build_prefix),$(build_d
+ LLVM_CMAKE += -DLLVM_UTILS_INSTALL_DIR=$(call rel_path,$(build_prefix),$(build_depsbindir))
+ LLVM_CMAKE += -DLLVM_INCLUDE_UTILS=ON -DLLVM_INSTALL_UTILS=ON
+ LLVM_CMAKE += -DLLVM_BINDINGS_LIST="" -DLLVM_ENABLE_BINDINGS=OFF -DLLVM_INCLUDE_DOCS=Off -DLLVM_ENABLE_TERMINFO=Off -DHAVE_LIBEDIT=Off
++LLVM_CMAKE += -DLLVM_TOOL_LLVM_RTDYLD_BUILD=OFF -DLLVM_INCLUDE_BENCHMARKS=OFF -DLLVM_INCLUDE_TESTS=OFF -DLLVM_INCLUDE_EXAMPLES=OFF
+ ifeq ($(LLVM_ASSERTIONS), 1)
+ LLVM_CMAKE += -DLLVM_ENABLE_ASSERTIONS:BOOL=ON
+ endif # LLVM_ASSERTIONS
+@@ -108,7 +115,7 @@ ifeq ($(OS), WINNT)
+ LLVM_CPPFLAGS += -D__USING_SJLJ_EXCEPTIONS__ -D__CRT__NO_INLINE
+ endif # OS == WINNT
+ ifneq ($(HOSTCC),$(CC))
+-LLVM_CMAKE += -DCROSS_TOOLCHAIN_FLAGS_NATIVE="-DCMAKE_C_COMPILER=$$(which $(HOSTCC));-DCMAKE_CXX_COMPILER=$$(which $(HOSTCXX))"
++LLVM_CMAKE += -DCROSS_TOOLCHAIN_FLAGS_NATIVE="-DCMAKE_C_COMPILER=$$(which $(HOSTCC));-DCMAKE_CXX_COMPILER=$$(which $(HOSTCXX));-DCMAKE_C_FLAGS=;-DCMAKE_CXX_FLAGS=;-DCMAKE_EXE_LINKER_FLAGS=;-DCMAKE_SHARED_LINKER_FLAGS="
+ endif
+ ifeq ($(OS), emscripten)
+ LLVM_CMAKE += -DCMAKE_TOOLCHAIN_FILE=$(EMSCRIPTEN)/cmake/Modules/Platform/Emscripten.cmake -DLLVM_INCLUDE_TOOLS=OFF -DLLVM_BUILD_TOOLS=OFF -DLLVM_INCLUDE_TESTS=OFF -DLLVM_ENABLE_THREADS=OFF -DLLVM_BUILD_UTILS=OFF
+@@ -230,6 +237,9 @@ LLVM_PATCH_PREV := $$(SRCCACHE)/$$(LLVM_SRC_DIR)/$1.patch-applied
+ endef
+ 
+ $(eval $(call LLVM_PATCH,llvm-ittapi-cmake))
++$(eval $(call LLVM_PROJ_PATCH,llvm-android-shlib))
++$(eval $(call LLVM_PROJ_PATCH,llvm-undefined-version))
++$(eval $(call LLVM_PROJ_PATCH,llvm-sancov-cxx20))
+ 
+ ifeq ($(USE_SYSTEM_ZLIB), 0)
+ $(LLVM_BUILDDIR_withtype)/build-configured: | $(build_prefix)/manifest/zlib
+@@ -280,6 +290,9 @@ LLVM_INSTALL = \
+ 	cd $1 && mkdir -p $2$$(build_depsbindir) && \
+ 	cp -r $$(SRCCACHE)/$$(LLVM_SRC_DIR)/llvm/utils/lit $2$$(build_depsbindir)/ && \
+ 	$$(CMAKE) -DCMAKE_INSTALL_PREFIX="$2$$(build_prefix)" -P cmake_install.cmake
++ifneq ($(XC_HOST),)
++LLVM_INSTALL += && (test -f $1/NATIVE/bin/llvm-config && cp -f $1/NATIVE/bin/llvm-config $2$$(build_depsbindir)/llvm-config-host || true)
++endif
+ ifeq ($(OS), WINNT)
+ LLVM_INSTALL += && cp $2$$(build_shlibdir)/$(LLVM_SHARED_LIB_NAME).dll $2$$(build_depsbindir)
+ endif
+diff --git a/deps/openlibm.mk b/deps/openlibm.mk
+index f99cdade47..a199e35f15 100644
+--- a/deps/openlibm.mk
++++ b/deps/openlibm.mk
+@@ -4,9 +4,16 @@ OPENLIBM_GIT_URL := https://github.com/JuliaMath/openlibm.git
+ OPENLIBM_TAR_URL = https://api.github.com/repos/JuliaMath/openlibm/tarball/$1
+ $(eval $(call git-external,openlibm,OPENLIBM,,,$(BUILDDIR)))
+ 
+-OPENLIBM_FLAGS := ARCH="$(ARCH)" REAL_ARCH="$(MARCH)" CC="$(CC)" FC="$(FC)" AR="$(AR)" OS="$(OS)" USECLANG=$(USECLANG) USEGCC=$(USEGCC)
++OPENLIBM_FLAGS := ARCH="$(ARCH)" REAL_ARCH="$(MARCH)" CC="$(CC)" FC="$(FC)" AR="$(AR)" OS="$(OS)" USECLANG=$(USECLANG) USEGCC=$(USEGCC) CFLAGS="$(CFLAGS)" SFLAGS="$(CFLAGS)"
++ifeq ($(ARCH),i686)
++OPENLIBM_FLAGS += CFLAGS="$(CFLAGS) -mlong-double-80" SFLAGS="$(CFLAGS) -mlong-double-80"
++endif
++
++$(BUILDDIR)/$(OPENLIBM_SRC_DIR)/openlibm-android.patch-applied: $(BUILDDIR)/$(OPENLIBM_SRC_DIR)/source-extracted
++	cd $(dir $@) && patch -p1 -f < $(SRCDIR)/patches/openlibm-android.patch
++	echo 1 > $@
+ 
+-$(BUILDDIR)/$(OPENLIBM_SRC_DIR)/build-compiled: $(BUILDDIR)/$(OPENLIBM_SRC_DIR)/source-extracted
++$(BUILDDIR)/$(OPENLIBM_SRC_DIR)/build-compiled: $(BUILDDIR)/$(OPENLIBM_SRC_DIR)/openlibm-android.patch-applied
+ 	$(MAKE) -C $(dir $<) $(OPENLIBM_FLAGS) $(MAKE_COMMON)
+ 	echo 1 > $@
+ 
+diff --git a/deps/patchelf.mk b/deps/patchelf.mk
+index 9b4947f183..c029710681 100644
+--- a/deps/patchelf.mk
++++ b/deps/patchelf.mk
+@@ -16,11 +16,16 @@ checksum-patchelf: $(SRCCACHE)/patchelf-$(PATCHELF_VER).tar.bz2
+ 
+ $(BUILDDIR)/patchelf-$(PATCHELF_VER)/build-configured: CC:=$(HOSTCC)
+ $(BUILDDIR)/patchelf-$(PATCHELF_VER)/build-configured: CXX:=$(HOSTCXX)
++$(BUILDDIR)/patchelf-$(PATCHELF_VER)/build-configured: CFLAGS:=-O2
++$(BUILDDIR)/patchelf-$(PATCHELF_VER)/build-configured: CXXFLAGS:=-O2
++$(BUILDDIR)/patchelf-$(PATCHELF_VER)/build-configured: CPPFLAGS:=
++$(BUILDDIR)/patchelf-$(PATCHELF_VER)/build-configured: LDFLAGS:=
++$(BUILDDIR)/patchelf-$(PATCHELF_VER)/build-configured: CXXLDFLAGS:=
+ $(BUILDDIR)/patchelf-$(PATCHELF_VER)/build-configured: XC_HOST:=$(BUILD_MACHINE)
+ $(BUILDDIR)/patchelf-$(PATCHELF_VER)/build-configured: $(SRCCACHE)/patchelf-$(PATCHELF_VER)/source-extracted
+ 	mkdir -p $(dir $@)
+ 	cd $(dir $@) && \
+-	$(dir $<)/configure $(CONFIGURE_COMMON) LDFLAGS="$(CXXLDFLAGS)" CPPFLAGS="$(CPPFLAGS)"
++	$(dir $<)/configure $(CONFIGURE_COMMON) LDFLAGS="$(CXXLDFLAGS)" CPPFLAGS="$(CPPFLAGS)" CFLAGS="$(CFLAGS)" CXXFLAGS="$(CXXFLAGS)"
+ 	echo 1 > $@
+ 
+ $(BUILDDIR)/patchelf-$(PATCHELF_VER)/build-compiled: $(BUILDDIR)/patchelf-$(PATCHELF_VER)/build-configured
+diff --git a/deps/patches/libblastrampoline-i686-pic.patch b/deps/patches/libblastrampoline-i686-pic.patch
+new file mode 100644
+index 0000000000..1c340090de
+--- /dev/null
++++ b/deps/patches/libblastrampoline-i686-pic.patch
+@@ -0,0 +1,35 @@
++--- a/src/trampolines/trampolines_i686.S
+++++ b/src/trampolines/trampolines_i686.S
++@@ -1,6 +1,22 @@
++ #include "common.h"
++ #include "../exported_funcs.inc"
++ 
+++#if defined(__ELF__) && !defined(_WIN32)
+++#define XX(name, idx) \
+++DEBUGINFO(name); \
+++.global MANGLE(UNDERSCORE(name)); \
+++.cfi_startproc; \
+++MANGLE(UNDERSCORE(name))##:; \
+++    CET_START(); \
+++    mov $SYMBOL_IDX(idx),%eax; \
+++    calll 1f; \
+++1:  popl %ecx; \
+++    addl $_GLOBAL_OFFSET_TABLE_ + (. - 1b), %ecx; \
+++    jmpl *NAMEADDR(name)@GOTOFF(%ecx); \
+++    ud2; \
+++.cfi_endproc; \
+++EXPORT(name);
+++#else
++ #define XX(name, idx) \
++ DEBUGINFO(name); \
++ .global MANGLE(UNDERSCORE(name)); \
++@@ -11,7 +27,8 @@
++     jmpl *(NAMEADDR(name)); \
++     ud2; \
++ .cfi_endproc; \
++-EXPORT(name); \
+++EXPORT(name);
+++#endif
++ 
++ // Generate both `dgemm_` and `dgemm_64_`
++ #include "ilp64_doubling.h"
+diff --git a/deps/patches/libunwind-android.patch b/deps/patches/libunwind-android.patch
+new file mode 100644
+index 0000000000..6801266ef8
+--- /dev/null
++++ b/deps/patches/libunwind-android.patch
+@@ -0,0 +1,34 @@
++--- a/src/x86/offsets.h
+++++ b/src/x86/offsets.h
++@@ -11,2 +11,6 @@
++ #define LINUX_UC_SIGMASK_OFF    0x6c
+++#if defined(__ANDROID__)
+++#define LINUX_UC_FPREGS_MEM_OFF 0x74
+++#else
++ #define LINUX_UC_FPREGS_MEM_OFF 0xec
+++#endif
++--- a/src/x86/Gos-linux.c
+++++ b/src/x86/Gos-linux.c
++@@ -305,2 +305,22 @@
++       Debug (8, "resuming at ip=%x via setcontext()\n", c->dwarf.ip);
+++#if defined(__ANDROID__)
+++      const greg_t *gregs = uc->uc_mcontext.gregs;
+++      __asm__ __volatile__ (
+++        "movl 28(%0), %%esp\n\t"
+++        "pushl 56(%0)\n\t"
+++        "movl 16(%0), %%edi\n\t"
+++        "movl 20(%0), %%esi\n\t"
+++        "movl 24(%0), %%ebp\n\t"
+++        "movl 32(%0), %%ebx\n\t"
+++        "movl 36(%0), %%edx\n\t"
+++        "movl 40(%0), %%ecx\n\t"
+++        "movl 44(%0), %%eax\n\t"
+++        "ret\n\t"
+++        :
+++        : "r" (gregs)
+++        : "memory"
+++      );
+++      __builtin_unreachable();
+++#else
++       setcontext (uc);
+++#endif
+diff --git a/deps/patches/libuv-android.patch b/deps/patches/libuv-android.patch
+new file mode 100644
+index 0000000000..f09b7f10ad
+--- /dev/null
++++ b/deps/patches/libuv-android.patch
+@@ -0,0 +1,20 @@
++--- a/src/unix/process.c
+++++ b/src/unix/process.c
++@@ -1021,3 +1021,5 @@
++   volatile int exec_errorno;
+++#ifndef __ANDROID__
++   int cancelstate;
+++#endif
++ #else
++@@ -1061,3 +1063,5 @@
++   uv_rwlock_wrlock(&loop->cloexec_lock);
+++#ifndef __ANDROID__
++   pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &cancelstate);
+++#endif
++ 
++@@ -1067,3 +1071,5 @@
++   /* Release lock in parent process */
+++#ifndef __ANDROID__
++   pthread_setcancelstate(cancelstate, NULL);
+++#endif
++   uv_rwlock_wrunlock(&loop->cloexec_lock);
+diff --git a/deps/patches/libwhich-android.patch b/deps/patches/libwhich-android.patch
+new file mode 100644
+index 0000000000..3cce5d4318
+--- /dev/null
++++ b/deps/patches/libwhich-android.patch
+@@ -0,0 +1,25 @@
++--- a/libwhich.c	2017-11-27 22:55:19.000000000 +0530
+++++ b/libwhich.c	2026-08-30 12:24:04.942531175 +0530
++@@ -56,11 +56,22 @@
++ 
++ const char *dlpath(void *handle, struct vector_t name)
++ {
+++#if defined(__ANDROID__)
+++    for (size_t i = 0; i < name.length; i++) {
+++        void *h2 = dlopen(name.data[i], RTLD_LAZY | RTLD_NOLOAD);
+++        if (h2)
+++            dlclose(h2);
+++        if (((intptr_t)handle & (-4)) == ((intptr_t)h2 & (-4)))
+++            return name.data[i];
+++    }
+++    return NULL;
+++#else
++     struct link_map *map;
++     dlinfo(handle, RTLD_DI_LINKMAP, &map);
++     if (map)
++         return map->l_name;
++     return NULL;
+++#endif
++ }
++ #else
++ #error "dllist not defined for platform"
+diff --git a/deps/patches/llvm-android-shlib.patch b/deps/patches/llvm-android-shlib.patch
+new file mode 100644
+index 0000000000..cc68184e08
+--- /dev/null
++++ b/deps/patches/llvm-android-shlib.patch
+@@ -0,0 +1,7 @@
++--- a/llvm/tools/llvm-shlib/CMakeLists.txt
+++++ b/llvm/tools/llvm-shlib/CMakeLists.txt
++@@ -36,3 +36,3 @@
++   list(REMOVE_DUPLICATES LIB_NAMES)
++-  if(("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux") OR (MINGW) OR (HAIKU)
+++  if(("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux") OR ("${CMAKE_SYSTEM_NAME}" STREQUAL "Android") OR (MINGW) OR (HAIKU)
++      OR ("${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD")
+diff --git a/deps/patches/llvm-sancov-cxx20.patch b/deps/patches/llvm-sancov-cxx20.patch
+new file mode 100644
+index 0000000000..773f4bf7a0
+--- /dev/null
++++ b/deps/patches/llvm-sancov-cxx20.patch
+@@ -0,0 +1,11 @@
++--- a/llvm/tools/sancov/sancov.cpp
+++++ b/llvm/tools/sancov/sancov.cpp
++@@ -532,6 +532,6 @@
++     if (!ClBlacklist.empty())
++-      return SpecialCaseList::createOrDie({{ClBlacklist}},
+++      return SpecialCaseList::createOrDie(std::vector<std::string>{ClBlacklist.getValue()},
++                                           *vfs::getRealFileSystem());
++ 
++-    return SpecialCaseList::createOrDie({{ClIgnorelist}},
+++    return SpecialCaseList::createOrDie(std::vector<std::string>{ClIgnorelist.getValue()},
++                                         *vfs::getRealFileSystem());
+diff --git a/deps/patches/llvm-undefined-version.patch b/deps/patches/llvm-undefined-version.patch
+new file mode 100644
+index 0000000000..e92d749dd5
+--- /dev/null
++++ b/deps/patches/llvm-undefined-version.patch
+@@ -0,0 +1,8 @@
++--- a/llvm/cmake/modules/AddLLVM.cmake
+++++ b/llvm/cmake/modules/AddLLVM.cmake
++@@ -118,3 +118,3 @@
++     else()
++       set_property(TARGET ${target_name} APPEND_STRING PROPERTY
++-                   LINK_FLAGS "  -Wl,--version-script,\"${CMAKE_CURRENT_BINARY_DIR}/${native_export_file}\"")
+++                   LINK_FLAGS "  -Wl,--undefined-version -Wl,--version-script,\"${CMAKE_CURRENT_BINARY_DIR}/${native_export_file}\"")
++     endif()
+diff --git a/deps/patches/openlibm-android.patch b/deps/patches/openlibm-android.patch
+new file mode 100644
+index 0000000000..67e43258d9
+--- /dev/null
++++ b/deps/patches/openlibm-android.patch
+@@ -0,0 +1,110 @@
++--- a/Make.inc	2025-01-08 05:38:23.000000000 +0530
+++++ b/Make.inc	2026-08-30 13:45:17.954529316 +0530
++@@ -76,8 +76,10 @@
++ ifeq ($(findstring arm,$(ARCH)),arm)
++ override ARCH := arm
++ MARCH ?= armv7-a+fp
+++ifneq ($(OS),Linux)
++ CFLAGS_add += -mhard-float
++ endif
+++endif
++ ifeq ($(findstring powerpc,$(ARCH)),powerpc)
++ override ARCH := powerpc
++ endif
++--- a/src/Make.files
+++++ b/src/Make.files
++@@ -62,3 +62,3 @@
++ 	s_cimagl.c s_conjl.c s_creall.c s_cacoshl.c s_catanhl.c s_casinhl.c \
++-	s_catanl.c s_csinl.c s_cacosl.c s_cexpl.c s_csinhl.c s_ccoshl.c \
+++	s_catanl.c s_csinl.c s_cacosl.c s_cexpl.c s_csinhl.c s_ccoshl.c c_builtins.c \
++ 	s_clogl.c s_ctanhl.c s_ccosl.c s_cbrtl.c
++--- /dev/null
+++++ b/src/c_builtins.c
++@@ -0,0 +1,87 @@
+++#include <openlibm_complex.h>
+++#include <openlibm_math.h>
+++
+++#if defined(__i386__) || defined(__x86_64__)
+++long double _Complex __mulxc3(long double __a, long double __b,
+++                              long double __c, long double __d) {
+++  long double __ac = __a * __c;
+++  long double __bd = __b * __d;
+++  long double __ad = __a * __d;
+++  long double __bc = __b * __c;
+++  long double _Complex z;
+++  __real__ z = __ac - __bd;
+++  __imag__ z = __ad + __bc;
+++  if (isnan(__real__ z) && isnan(__imag__ z)) {
+++    int __recalc = 0;
+++    if (isinf(__a) || isinf(__b)) {
+++      __a = copysignl(isinf(__a) ? 1 : 0, __a);
+++      __b = copysignl(isinf(__b) ? 1 : 0, __b);
+++      if (isnan(__c))
+++        __c = copysignl(0, __c);
+++      if (isnan(__d))
+++        __d = copysignl(0, __d);
+++      __recalc = 1;
+++    }
+++    if (isinf(__c) || isinf(__d)) {
+++      __c = copysignl(isinf(__c) ? 1 : 0, __c);
+++      __d = copysignl(isinf(__d) ? 1 : 0, __d);
+++      if (isnan(__a))
+++        __a = copysignl(0, __a);
+++      if (isnan(__b))
+++        __b = copysignl(0, __b);
+++      __recalc = 1;
+++    }
+++    if (!__recalc && (isinf(__ac) || isinf(__bd) || isinf(__ad) ||
+++                      isinf(__bc))) {
+++      if (isnan(__a))
+++        __a = copysignl(0, __a);
+++      if (isnan(__b))
+++        __b = copysignl(0, __b);
+++      if (isnan(__c))
+++        __c = copysignl(0, __c);
+++      if (isnan(__d))
+++        __d = copysignl(0, __d);
+++      __recalc = 1;
+++    }
+++    if (__recalc) {
+++      __real__ z = INFINITY * (__a * __c - __b * __d);
+++      __imag__ z = INFINITY * (__a * __d + __b * __c);
+++    }
+++  }
+++  return z;
+++}
+++
+++long double _Complex __divxc3(long double __a, long double __b,
+++                              long double __c, long double __d) {
+++  int __ilogbw = 0;
+++  long double __logbw = logbl(fmaxl(fabsl(__c), fabsl(__d)));
+++  if (isfinite(__logbw)) {
+++    __ilogbw = (int)__logbw;
+++    __c = scalbnl(__c, -__ilogbw);
+++    __d = scalbnl(__d, -__ilogbw);
+++  }
+++  long double __denom = __c * __c + __d * __d;
+++  long double _Complex z;
+++  __real__ z = scalbnl((__a * __c + __b * __d) / __denom, -__ilogbw);
+++  __imag__ z = scalbnl((__b * __c - __a * __d) / __denom, -__ilogbw);
+++  if (isnan(__real__ z) && isnan(__imag__ z)) {
+++    if ((__denom == 0) && (!isnan(__a) || !isnan(__b))) {
+++      __real__ z = copysignl(INFINITY, __c) * __a;
+++      __imag__ z = copysignl(INFINITY, __c) * __b;
+++    } else if ((isinf(__a) || isinf(__b)) && isfinite(__c) &&
+++               isfinite(__d)) {
+++      __a = copysignl(isinf(__a) ? 1 : 0, __a);
+++      __b = copysignl(isinf(__b) ? 1 : 0, __b);
+++      __real__ z = INFINITY * (__a * __c + __b * __d);
+++      __imag__ z = INFINITY * (__b * __c - __a * __d);
+++    } else if (isinf(__logbw) && __logbw > 0 && isfinite(__a) &&
+++               isfinite(__b)) {
+++      __c = copysignl(isinf(__c) ? 1 : 0, __c);
+++      __d = copysignl(isinf(__d) ? 1 : 0, __d);
+++      __real__ z = 0 * (__a * __c + __b * __d);
+++      __imag__ z = 0 * (__b * __c - __a * __d);
+++    }
+++  }
+++  return z;
+++}
+++#endif
+diff --git a/deps/tools/common.mk b/deps/tools/common.mk
+index 3cefc253ce..5cbb751bd7 100644
+--- a/deps/tools/common.mk
++++ b/deps/tools/common.mk
+@@ -13,10 +13,12 @@ CONFIGURE_COMMON += LDFLAGS="$(LDFLAGS) -Wl,--stack,8388608"
+ else
+ CONFIGURE_COMMON += LDFLAGS="$(LDFLAGS) $(RPATH_ESCAPED_ORIGIN) $(SANITIZE_LDFLAGS)"
+ endif
+-CONFIGURE_COMMON += F77="$(FC)" CC="$(CC) $(SANITIZE_OPTS)" CXX="$(CXX) $(SANITIZE_OPTS)" LD="$(LD)"
++CONFIGURE_COMMON += F77="$(FC)" CC="$(CC) $(SANITIZE_OPTS)" CXX="$(CXX) $(SANITIZE_OPTS)" LD="$(LD)" CONFIG_SHELL="$(shell which sh)" SHELL="$(shell which sh)"
+ 
+ CMAKE_COMMON := -DCMAKE_INSTALL_PREFIX:PATH=$(build_prefix) -DCMAKE_PREFIX_PATH=$(build_prefix)
++CMAKE_COMMON += -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+ CMAKE_COMMON += -DLIB_INSTALL_DIR=$(build_shlibdir)
++CMAKE_COMMON += -DCMAKE_FIND_ROOT_PATH="$(build_prefix);$(prefix)" -DCMAKE_PREFIX_PATH="$(build_prefix);$(prefix)"
+ ifneq ($(OS),WINNT)
+ CMAKE_COMMON += -DCMAKE_INSTALL_LIBDIR=$(build_libdir)
+ endif
+@@ -54,9 +56,14 @@ CMAKE_COMMON += -DCMAKE_CXX_COMPILER_ARG1="$(CMAKE_CXX_ARG) $(SANITIZE_OPTS)"
+ endif
+ CMAKE_COMMON += -DCMAKE_LINKER="$$(which $(LD))" -DCMAKE_AR="$$(which $(AR))" -DCMAKE_RANLIB="$$(which $(RANLIB))"
+ 
++ifneq ($(XC_HOST),)
+ ifeq ($(OS),WINNT)
+ CMAKE_COMMON += -DCMAKE_SYSTEM_NAME=Windows
+ CMAKE_COMMON += -DCMAKE_RC_COMPILER="$$(which $(CROSS_COMPILE)windres)"
++else
++CMAKE_COMMON += -DCMAKE_SYSTEM_NAME=Linux
++CMAKE_COMMON += -DCMAKE_SYSTEM_PROCESSOR=$(ARCH)
++endif
+ endif
+ 
+ # For now this is LLVM specific, but I expect it won't be in the future
+diff --git a/deps/unwind.mk b/deps/unwind.mk
+index 76593df1e5..b765d70e48 100644
+--- a/deps/unwind.mk
++++ b/deps/unwind.mk
+@@ -3,7 +3,7 @@ include $(SRCDIR)/unwind.version
+ include $(SRCDIR)/llvmunwind.version
+ 
+ ifneq ($(USE_BINARYBUILDER_LIBUNWIND),1)
+-LIBUNWIND_CFLAGS := -U_FORTIFY_SOURCE $(fPIC) -lz $(SANITIZE_OPTS)
++LIBUNWIND_CFLAGS := -U_FORTIFY_SOURCE $(fPIC) -lz -mno-outline-atomics $(SANITIZE_OPTS) -Wno-error=implicit-function-declaration -Wno-error
+ LIBUNWIND_CPPFLAGS :=
+ 
+ ifeq ($(USE_SYSTEM_ZLIB),0)
+@@ -46,17 +46,21 @@ $(SRCCACHE)/libunwind-$(UNWIND_VER)/libunwind-non-empty-structs.patch-applied: $
+ 	cd $(SRCCACHE)/libunwind-$(UNWIND_VER) && patch -p1 -f -u -l < $(SRCDIR)/patches/libunwind-non-empty-structs.patch
+ 	echo 1 > $@
+ 
++$(SRCCACHE)/libunwind-$(UNWIND_VER)/libunwind-android.patch-applied: $(SRCCACHE)/libunwind-$(UNWIND_VER)/libunwind-non-empty-structs.patch-applied
++	cd $(SRCCACHE)/libunwind-$(UNWIND_VER) && patch -p1 -f < $(SRCDIR)/patches/libunwind-android.patch
++	echo 1 > $@
++
+ # note minidebuginfo requires liblzma, which we do not have a source build for
+ # (it will be enabled in BinaryBuilder-based downloads however)
+ # since https://github.com/JuliaPackaging/Yggdrasil/commit/0149e021be9badcb331007c62442a4f554f3003c
+-$(BUILDDIR)/libunwind-$(UNWIND_VER)/build-configured: $(SRCCACHE)/libunwind-$(UNWIND_VER)/source-extracted $(SRCCACHE)/libunwind-$(UNWIND_VER)/libunwind-non-empty-structs.patch-applied
++$(BUILDDIR)/libunwind-$(UNWIND_VER)/build-configured: $(SRCCACHE)/libunwind-$(UNWIND_VER)/source-extracted $(SRCCACHE)/libunwind-$(UNWIND_VER)/libunwind-android.patch-applied
+ 	mkdir -p $(dir $@)
+ 	cd $(dir $@) && \
+-	$(dir $<)/configure $(CONFIGURE_COMMON) CPPFLAGS="$(CPPFLAGS) $(LIBUNWIND_CPPFLAGS)" CFLAGS="$(CFLAGS) $(LIBUNWIND_CFLAGS)" --enable-shared --disable-minidebuginfo --disable-tests --enable-zlibdebuginfo --disable-conservative-checks
++	$(dir $<)/configure $(CONFIGURE_COMMON) CPPFLAGS="$(CPPFLAGS) $(LIBUNWIND_CPPFLAGS)" CFLAGS="$(CFLAGS) $(LIBUNWIND_CFLAGS)" --enable-shared --disable-minidebuginfo --disable-tests --enable-zlibdebuginfo --disable-conservative-checks --disable-coredump --disable-ptrace
+ 	echo 1 > $@
+ 
+ $(BUILDDIR)/libunwind-$(UNWIND_VER)/build-compiled: $(BUILDDIR)/libunwind-$(UNWIND_VER)/build-configured
+-	$(MAKE) -C $(dir $<)
++	$(MAKE) -C $(dir $<) MAKEFLAGS=
+ 	echo 1 > $@
+ 
+ $(BUILDDIR)/libunwind-$(UNWIND_VER)/build-checked: $(BUILDDIR)/libunwind-$(UNWIND_VER)/build-compiled
+diff --git a/pkgimage.mk b/pkgimage.mk
+index f6afc0a9ab..0f0bac0f0c 100644
+--- a/pkgimage.mk
++++ b/pkgimage.mk
+@@ -8,6 +8,7 @@ VERSDIR := v$(shell cut -d. -f1-2 < $(JULIAHOME)/VERSION)
+ # set some influential environment variables
+ export JULIA_DEPOT_PATH := $(build_prefix)/share/julia
+ export JULIA_LOAD_PATH := @stdlib
++export LD_LIBRARY_PATH := $(build_private_libdir):$(build_libdir):$(LD_LIBRARY_PATH)
+ unexport JULIA_PROJECT :=
+ unexport JULIA_BINDIR :=
+ 
+diff --git a/src/Makefile b/src/Makefile
+index 4879fd9854..1e962663e0 100644
+--- a/src/Makefile
++++ b/src/Makefile
+@@ -144,8 +144,12 @@ FLAGS += -DLLVM_SHLIB
+ endif # USE_LLVM_SHLIB == 1
+ endif # JULIACODEGEN == LLVM
+ 
++ifeq ($(USE_LLVM_SHLIB),1)
++RT_LLVMLINK += $(LLVM_LDFLAGS) $(LLVM_SHARED_LINK_FLAG)
++else
+ RT_LLVM_LINK_ARGS := $(shell $(LLVM_CONFIG_HOST) --libs $(RT_LLVM_LIBS) --system-libs --link-static)
+ RT_LLVMLINK += $(LLVM_LDFLAGS) $(RT_LLVM_LINK_ARGS)
++endif
+ ifeq ($(OS), WINNT)
+ RT_LLVMLINK += -luuid -lole32
+ endif
+@@ -166,8 +170,8 @@ RT_LIBS := $(call whole_archive,$(LIBUV)) $(call whole_archive,$(LIBUTF8PROC)) $
+ # NB: CG needs uv_mutex_* symbols, but we expect to export them from libjulia-internal
+ CG_LIBS := $(LIBUNWIND) $(CG_LLVMLINK) $(LIBTRACYCLIENT) $(LIBITTAPI) $(WIN_LD_STDCXX) $(OSLIBS)
+ else
+-RT_LIBS := $(call whole_archive,$(LIBUV)) $(call whole_archive,$(LIBUTF8PROC)) $(LIBUNWIND) $(RT_LLVMLINK) $(OSLIBS) $(LIBTRACYCLIENT) $(LIBITTAPI)
+-CG_LIBS := $(LIBUNWIND) $(CG_LLVMLINK) $(OSLIBS) $(LIBTRACYCLIENT) $(LIBITTAPI)
++RT_LIBS := $(call whole_archive,$(LIBUV)) $(call whole_archive,$(LIBUTF8PROC)) $(LIBUNWIND) $(RT_LLVMLINK) $(OSLIBS) $(LIBTRACYCLIENT) $(LIBITTAPI) $(shell $(CC) $(CFLAGS) $(JCFLAGS) -print-libgcc-file-name)
++CG_LIBS := $(LIBUNWIND) $(CG_LLVMLINK) $(OSLIBS) $(LIBTRACYCLIENT) $(LIBITTAPI) $(prefix)/lib/libunwind.a
+ endif
+ RT_DEBUG_LIBS := $(COMMON_LIBPATHS) $(call whole_archive,$(BUILDDIR)/flisp/libflisp-debug.a) $(call whole_archive,$(BUILDDIR)/support/libsupport-debug.a) -ljulia-debug $(RT_LIBS)
+ CG_DEBUG_LIBS := $(COMMON_LIBPATHS) $(CG_LIBS) -ljulia-debug -ljulia-internal-debug
+diff --git a/src/abi_arm.cpp b/src/abi_arm.cpp
+index 441aa95b1f..5af73bd1d8 100644
+--- a/src/abi_arm.cpp
++++ b/src/abi_arm.cpp
+@@ -16,7 +16,7 @@
+ #  error "the Julia ARM ABI implementation only supports EABI"
+ #endif
+ 
+-#ifndef __ARM_PCS_VFP
++#if !defined(__ARM_PCS_VFP) && !defined(__ANDROID__)
+ #  error "the Julia ARM ABI implementation requires VFP support"
+ #endif
+ #endif
+diff --git a/src/cgmemmgr.cpp b/src/cgmemmgr.cpp
+index d6236ceacd..d003bff2a5 100644
+--- a/src/cgmemmgr.cpp
++++ b/src/cgmemmgr.cpp
+@@ -185,8 +185,8 @@ static intptr_t get_anon_hdl(void)
+ #  endif
+     char shm_name[JL_PATH_MAX] = "julia-codegen-0123456789-0123456789/tmp///";
+     pid_t pid = getpid();
+-    // `shm_open` can't be mapped exec on mac
+-#  ifndef _OS_DARWIN_
++    // `shm_open` can't be mapped exec on mac or Android
++#  if !defined(_OS_DARWIN_) && !defined(__ANDROID__)
+     do {
+         snprintf(shm_name, sizeof(shm_name),
+                  "julia-codegen-%d-%d", (int)pid, rand());
+diff --git a/src/codegen.cpp b/src/codegen.cpp
+index 3782085617..22624a8031 100644
+--- a/src/codegen.cpp
++++ b/src/codegen.cpp
+@@ -9032,6 +9032,14 @@ void emitFloat16Wrappers(Module &M, bool external)
+                 FunctionType::get(Type::getInt16Ty(ctx), { Type::getFloatTy(ctx) }, false), external);
+     makeCastCall(M, "__truncdfhf2", "julia__truncdfhf2", FunctionType::get(Type::getHalfTy(ctx), { Type::getDoubleTy(ctx) }, false),
+                 FunctionType::get(Type::getInt16Ty(ctx), { Type::getDoubleTy(ctx) }, false), external);
++#ifdef _CPU_ARM_
++    makeCastCall(M, "__aeabi_h2f", "julia__gnu_h2f_ieee", FunctionType::get(Type::getFloatTy(ctx), { Type::getHalfTy(ctx) }, false),
++                FunctionType::get(Type::getFloatTy(ctx), { Type::getInt16Ty(ctx) }, false), external);
++    makeCastCall(M, "__aeabi_f2h", "julia__gnu_f2h_ieee", FunctionType::get(Type::getHalfTy(ctx), { Type::getFloatTy(ctx) }, false),
++                FunctionType::get(Type::getInt16Ty(ctx), { Type::getFloatTy(ctx) }, false), external);
++    makeCastCall(M, "__aeabi_d2h", "julia__truncdfhf2", FunctionType::get(Type::getHalfTy(ctx), { Type::getDoubleTy(ctx) }, false),
++                FunctionType::get(Type::getInt16Ty(ctx), { Type::getDoubleTy(ctx) }, false), external);
++#endif
+ }
+ 
+ static void init_f16_funcs(void)
+diff --git a/src/gc.h b/src/gc.h
+index 6ad521abe8..065b790d76 100644
+--- a/src/gc.h
++++ b/src/gc.h
+@@ -83,7 +83,7 @@ typedef struct {
+     uint64_t    total_sweep_time;
+     uint64_t    total_mark_time;
+     uint64_t    last_full_sweep;
+-} jl_gc_num_t;
++} __attribute__((aligned(8))) jl_gc_num_t;
+ 
+ // Array chunks (work items representing suffixes of
+ // large arrays of pointers left to be marked)
+diff --git a/src/jitlayers.cpp b/src/jitlayers.cpp
+index 319641aa85..d60bc123c9 100644
+--- a/src/jitlayers.cpp
++++ b/src/jitlayers.cpp
+@@ -1395,6 +1395,148 @@ JuliaOJIT::PipelineT::PipelineT(orc::ObjectLayer &BaseLayer, TargetMachine &TM,
+ int64_t ___asan_globals_registered;
+ #endif
+ 
++#if defined(__SIZEOF_INT128__)
++typedef unsigned __int128 jl_crt_uint128_t;
++typedef __int128 jl_crt_int128_t;
++typedef union {
++    jl_crt_uint128_t u128;
++    jl_crt_int128_t  i128;
++    struct {
++        uint64_t lo;
++        uint64_t hi;
++    } s;
++    struct {
++        uint64_t lo;
++        int64_t  hi;
++    } si;
++} jl_u128_split_t;
++
++static jl_crt_uint128_t jl_crt_udivti3(jl_crt_uint128_t a, jl_crt_uint128_t b) { return a / b; }
++static jl_crt_uint128_t jl_crt_umodti3(jl_crt_uint128_t a, jl_crt_uint128_t b) { return a % b; }
++static jl_crt_int128_t jl_crt_divti3(jl_crt_int128_t a, jl_crt_int128_t b) { return a / b; }
++static jl_crt_int128_t jl_crt_modti3(jl_crt_int128_t a, jl_crt_int128_t b) { return a % b; }
++
++static int jl_crt_clzti2(jl_crt_uint128_t a) {
++    jl_u128_split_t in; in.u128 = a;
++    if (in.s.hi != 0) return __builtin_clzll(in.s.hi);
++    return 64 + __builtin_clzll(in.s.lo);
++}
++static int jl_crt_ctzti2(jl_crt_uint128_t a) {
++    jl_u128_split_t in; in.u128 = a;
++    if (in.s.lo != 0) return __builtin_ctzll(in.s.lo);
++    return 64 + __builtin_ctzll(in.s.hi);
++}
++static int jl_crt_popcountti2(jl_crt_uint128_t a) {
++    jl_u128_split_t in; in.u128 = a;
++    return __builtin_popcountll(in.s.lo) + __builtin_popcountll(in.s.hi);
++}
++static jl_crt_uint128_t jl_crt_ashlti3(jl_crt_uint128_t a, int b) {
++    jl_u128_split_t in, out;
++    in.u128 = a;
++    if (b >= 128) {
++        out.s.lo = 0;
++        out.s.hi = 0;
++    } else if (b >= 64) {
++        out.s.lo = 0;
++        out.s.hi = in.s.lo << (b - 64);
++    } else if (b == 0) {
++        return a;
++    } else {
++        out.s.lo = in.s.lo << b;
++        out.s.hi = (in.s.hi << b) | (in.s.lo >> (64 - b));
++    }
++    return out.u128;
++}
++static jl_crt_uint128_t jl_crt_lshrti3(jl_crt_uint128_t a, int b) {
++    jl_u128_split_t in, out;
++    in.u128 = a;
++    if (b >= 128) {
++        out.s.lo = 0;
++        out.s.hi = 0;
++    } else if (b >= 64) {
++        out.s.lo = in.s.hi >> (b - 64);
++        out.s.hi = 0;
++    } else if (b == 0) {
++        return a;
++    } else {
++        out.s.lo = (in.s.lo >> b) | (in.s.hi << (64 - b));
++        out.s.hi = in.s.hi >> b;
++    }
++    return out.u128;
++}
++static jl_crt_int128_t jl_crt_ashrti3(jl_crt_int128_t a, int b) {
++    jl_u128_split_t in, out;
++    in.i128 = a;
++    if (b >= 128) {
++        out.si.lo = in.si.hi >> 63;
++        out.si.hi = in.si.hi >> 63;
++    } else if (b >= 64) {
++        out.si.lo = in.si.hi >> (b - 64);
++        out.si.hi = in.si.hi >> 63;
++    } else if (b == 0) {
++        return a;
++    } else {
++        out.si.lo = (in.s.lo >> b) | ((uint64_t)in.si.hi << (64 - b));
++        out.si.hi = in.si.hi >> b;
++    }
++    return out.i128;
++}
++static jl_crt_int128_t jl_crt_multi3(jl_crt_int128_t a, jl_crt_int128_t b) {
++    jl_u128_split_t in_a, in_b, out;
++    in_a.i128 = a;
++    in_b.i128 = b;
++    uint64_t a0 = (uint32_t)in_a.s.lo, a1 = in_a.s.lo >> 32;
++    uint64_t b0 = (uint32_t)in_b.s.lo, b1 = in_b.s.lo >> 32;
++    uint64_t p0 = a0 * b0;
++    uint64_t p1 = a0 * b1;
++    uint64_t p2 = a1 * b0;
++    uint64_t p3 = a1 * b1;
++    uint64_t mid = p1 + (p0 >> 32) + (uint32_t)p2;
++    out.s.lo = (mid << 32) | (uint32_t)p0;
++    out.s.hi = p3 + (mid >> 32) + (p2 >> 32) + (in_a.s.lo * in_b.s.hi) + (in_a.s.hi * in_b.s.lo);
++    return out.i128;
++}
++
++extern "C" {
++JL_DLLEXPORT int __clzti2(jl_crt_uint128_t a) { return jl_crt_clzti2(a); }
++JL_DLLEXPORT int __ctzti2(jl_crt_uint128_t a) { return jl_crt_ctzti2(a); }
++JL_DLLEXPORT int __popcountti2(jl_crt_uint128_t a) { return jl_crt_popcountti2(a); }
++JL_DLLEXPORT jl_crt_uint128_t __ashlti3(jl_crt_uint128_t a, int b) { return jl_crt_ashlti3(a, b); }
++JL_DLLEXPORT jl_crt_uint128_t __lshrti3(jl_crt_uint128_t a, int b) { return jl_crt_lshrti3(a, b); }
++JL_DLLEXPORT jl_crt_int128_t __ashrti3(jl_crt_int128_t a, int b) { return jl_crt_ashrti3(a, b); }
++JL_DLLEXPORT jl_crt_int128_t __multi3(jl_crt_int128_t a, jl_crt_int128_t b) { return jl_crt_multi3(a, b); }
++}
++#endif
++
++#if !defined(_P64)
++extern "C" {
++int64_t __divdi3(int64_t, int64_t);
++int64_t __moddi3(int64_t, int64_t);
++uint64_t __udivdi3(uint64_t, uint64_t);
++uint64_t __umoddi3(uint64_t, uint64_t);
++int64_t __divmoddi4(int64_t, int64_t, int64_t*);
++uint64_t __udivmoddi4(uint64_t, uint64_t, uint64_t*);
++int64_t __muldi3(int64_t, int64_t);
++int64_t __ashldi3(int64_t, int);
++int64_t __ashrdi3(int64_t, int);
++uint64_t __lshrdi3(uint64_t, int);
++#ifdef _CPU_ARM_
++int32_t __aeabi_idiv(int32_t, int32_t);
++uint32_t __aeabi_uidiv(uint32_t, uint32_t);
++int64_t __aeabi_ldivmod(int64_t, int64_t);
++uint64_t __aeabi_uldivmod(uint64_t, uint64_t);
++int64_t __aeabi_lmul(int64_t, int64_t);
++int64_t __aeabi_llsl(int64_t, int);
++int64_t __aeabi_llsr(int64_t, int);
++int64_t __aeabi_lasr(int64_t, int);
++uint16_t __aeabi_f2h(float);
++uint16_t __aeabi_d2h(double);
++float __aeabi_h2f(uint16_t);
++#endif
++}
++#endif
++
++
+ JuliaOJIT::JuliaOJIT()
+   : TM(createTargetMachine()),
+     DL(jl_create_datalayout(*TM)),
+@@ -1521,6 +1663,58 @@ JuliaOJIT::JuliaOJIT()
+     cantFail(GlobalJD.define(orc::symbolAliases(jl_crt)));
+ #endif
+ 
++    orc::SymbolMap crt_builtins;
++#if defined(__SIZEOF_INT128__)
++    crt_builtins[mangle("__udivti3")] = JITEvaluatedSymbol::fromPointer((void*)&jl_crt_udivti3, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__umodti3")] = JITEvaluatedSymbol::fromPointer((void*)&jl_crt_umodti3, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__divti3")] = JITEvaluatedSymbol::fromPointer((void*)&jl_crt_divti3, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__modti3")] = JITEvaluatedSymbol::fromPointer((void*)&jl_crt_modti3, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__clzti2")] = JITEvaluatedSymbol::fromPointer((void*)&jl_crt_clzti2, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__ctzti2")] = JITEvaluatedSymbol::fromPointer((void*)&jl_crt_ctzti2, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__popcountti2")] = JITEvaluatedSymbol::fromPointer((void*)&jl_crt_popcountti2, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__ashlti3")] = JITEvaluatedSymbol::fromPointer((void*)&jl_crt_ashlti3, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__lshrti3")] = JITEvaluatedSymbol::fromPointer((void*)&jl_crt_lshrti3, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__ashrti3")] = JITEvaluatedSymbol::fromPointer((void*)&jl_crt_ashrti3, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__multi3")] = JITEvaluatedSymbol::fromPointer((void*)&jl_crt_multi3, JITSymbolFlags::Exported);
++#endif
++
++#if !defined(_P64)
++    crt_builtins[mangle("__divdi3")] = JITEvaluatedSymbol::fromPointer((void*)&__divdi3, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__moddi3")] = JITEvaluatedSymbol::fromPointer((void*)&__moddi3, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__udivdi3")] = JITEvaluatedSymbol::fromPointer((void*)&__udivdi3, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__umoddi3")] = JITEvaluatedSymbol::fromPointer((void*)&__umoddi3, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__divmoddi4")] = JITEvaluatedSymbol::fromPointer((void*)&__divmoddi4, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__udivmoddi4")] = JITEvaluatedSymbol::fromPointer((void*)&__udivmoddi4, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__muldi3")] = JITEvaluatedSymbol::fromPointer((void*)&__muldi3, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__ashldi3")] = JITEvaluatedSymbol::fromPointer((void*)&__ashldi3, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__ashrdi3")] = JITEvaluatedSymbol::fromPointer((void*)&__ashrdi3, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__lshrdi3")] = JITEvaluatedSymbol::fromPointer((void*)&__lshrdi3, JITSymbolFlags::Exported);
++#ifdef _CPU_ARM_
++    crt_builtins[mangle("__aeabi_idiv")] = JITEvaluatedSymbol::fromPointer((void*)&__aeabi_idiv, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__aeabi_uidiv")] = JITEvaluatedSymbol::fromPointer((void*)&__aeabi_uidiv, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__aeabi_ldivmod")] = JITEvaluatedSymbol::fromPointer((void*)&__aeabi_ldivmod, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__aeabi_uldivmod")] = JITEvaluatedSymbol::fromPointer((void*)&__aeabi_uldivmod, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__aeabi_lmul")] = JITEvaluatedSymbol::fromPointer((void*)&__aeabi_lmul, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__aeabi_llsl")] = JITEvaluatedSymbol::fromPointer((void*)&__aeabi_llsl, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__aeabi_llsr")] = JITEvaluatedSymbol::fromPointer((void*)&__aeabi_llsr, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__aeabi_lasr")] = JITEvaluatedSymbol::fromPointer((void*)&__aeabi_lasr, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__aeabi_f2h")] = JITEvaluatedSymbol::fromPointer((void*)&__aeabi_f2h, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__aeabi_d2h")] = JITEvaluatedSymbol::fromPointer((void*)&__aeabi_d2h, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__aeabi_h2f")] = JITEvaluatedSymbol::fromPointer((void*)&__aeabi_h2f, JITSymbolFlags::Exported);
++#endif
++#endif
++    crt_builtins[mangle("julia__gnu_f2h_ieee")] = JITEvaluatedSymbol::fromPointer((void*)&julia__gnu_f2h_ieee, JITSymbolFlags::Exported);
++    crt_builtins[mangle("julia__truncdfhf2")] = JITEvaluatedSymbol::fromPointer((void*)&julia__truncdfhf2, JITSymbolFlags::Exported);
++    crt_builtins[mangle("julia__gnu_h2f_ieee")] = JITEvaluatedSymbol::fromPointer((void*)&julia__gnu_h2f_ieee, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__gnu_f2h_ieee")] = JITEvaluatedSymbol::fromPointer((void*)&julia__gnu_f2h_ieee, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__truncsfhf2")] = JITEvaluatedSymbol::fromPointer((void*)&julia__gnu_f2h_ieee, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__truncdfhf2")] = JITEvaluatedSymbol::fromPointer((void*)&julia__truncdfhf2, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__gnu_h2f_ieee")] = JITEvaluatedSymbol::fromPointer((void*)&julia__gnu_h2f_ieee, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__extendhfsf2")] = JITEvaluatedSymbol::fromPointer((void*)&julia__gnu_h2f_ieee, JITSymbolFlags::Exported);
++    if (!crt_builtins.empty())
++        cantFail(GlobalJD.define(orc::absoluteSymbols(crt_builtins)));
++
++
+ #ifdef MSAN_EMUTLS_WORKAROUND
+     orc::SymbolMap msan_crt;
+     msan_crt[mangle("__emutls_get_address")] = JITEvaluatedSymbol::fromPointer(msan_workaround::getTLSAddress, JITSymbolFlags::Exported);
+diff --git a/src/jlapi.c b/src/jlapi.c
+index 3f39d0add2..1bc2ca0926 100644
+--- a/src/jlapi.c
++++ b/src/jlapi.c
+@@ -690,7 +690,7 @@ static void lock_low32(void)
+ // Actual definition in `ast.c`
+ void jl_lisp_prompt(void);
+ 
+-#ifdef _OS_LINUX_
++#if defined(_OS_LINUX_) && !defined(__ANDROID__)
+ static void rr_detach_teleport(void) {
+ #define RR_CALL_BASE 1000
+ #define SYS_rrcall_detach_teleport (RR_CALL_BASE + 9)
+@@ -729,7 +729,7 @@ JL_DLLEXPORT int jl_repl_entrypoint(int argc, char *argv[])
+     // the execution where we actually need to exclude rr (e.g. because we're
+     // testing for the absence of a memory-model-dependent bug).
+     if (jl_options.rr_detach && jl_running_under_rr(0)) {
+-#ifdef _OS_LINUX_
++#if defined(_OS_LINUX_) && !defined(__ANDROID__)
+         rr_detach_teleport();
+         execv("/proc/self/exe", argv);
+ #endif
+diff --git a/src/julia.expmap.in b/src/julia.expmap.in
+index b28a714e75..d058e79876 100644
+--- a/src/julia.expmap.in
++++ b/src/julia.expmap.in
+@@ -2,6 +2,37 @@
+   global:
+     pthread*;
+     __stack_chk_*;
++    __*ti3*;
++    __*di3*;
++    __*ti2*;
++    __*di2*;
++    __aeabi_*;
++    __gnu_*;
++    __atomic_*;
++    __sync_*;
++    __trunc*;
++    __extend*;
++    __float*;
++    __fix*;
++    __unord*;
++    __eq*;
++    __ne*;
++    __le*;
++    __lt*;
++    __ge*;
++    __gt*;
++    __sub*;
++    __add*;
++    __mul*;
++    __div*;
++    __mod*;
++    __cmp*;
++    __pow*;
++    __popcount*;
++    __clz*;
++    __ctz*;
++    __ffs*;
++    __bswap*;
+     asprintf*;
+     bitvector_*;
+     ios_*;
+diff --git a/src/partr.c b/src/partr.c
+index cb82dc2c3d..b74d7e3b69 100644
+--- a/src/partr.c
++++ b/src/partr.c
+@@ -202,7 +202,7 @@ void jl_threadfun(void *arg)
+ 
+ int jl_running_under_rr(int recheck)
+ {
+-#ifdef _OS_LINUX_
++#if defined(_OS_LINUX_) && !defined(__ANDROID__)
+ #define RR_CALL_BASE 1000
+ #define SYS_rrcall_check_presence (RR_CALL_BASE + 8)
+     static _Atomic(int) is_running_under_rr = 0;
+diff --git a/src/processor_arm.cpp b/src/processor_arm.cpp
+index 55fc74c425..877698b3bd 100644
+--- a/src/processor_arm.cpp
++++ b/src/processor_arm.cpp
+@@ -1620,6 +1620,7 @@ static void ensure_jit_target(bool imaging)
+         auto &features0 = jit_targets[t.base].en.features;
+         // Always clone when code checks CPU features
+         t.en.flags |= JL_TARGET_CLONE_CPU;
++#ifdef _CPU_AARCH64_
+         static constexpr uint32_t clone_fp16[] = {Feature::fp16fml,Feature::fullfp16};
+         for (auto fe: clone_fp16) {
+             if (!test_nbit(features0, fe) && test_nbit(t.en.features, fe)) {
+@@ -1627,6 +1628,7 @@ static void ensure_jit_target(bool imaging)
+                 break;
+             }
+         }
++#endif
+         // The most useful one in general...
+         t.en.flags |= JL_TARGET_CLONE_LOOP;
+ #ifdef _CPU_ARM_
+@@ -1815,9 +1817,7 @@ JL_DLLEXPORT jl_value_t *jl_cpu_has_fma(int bits)
+ #else
+     TargetData<feature_sz> target = jit_targets.front();
+     FeatureList<feature_sz> features = target.en.features;
+-    if (bits == 32 && test_nbit(features, Feature::vfp4sp))
+-        return jl_true;
+-    else if ((bits == 64 || bits == 32) && test_nbit(features, Feature::vfp4))
++    if ((bits == 64 || bits == 32) && test_nbit(features, Feature::vfp4))
+         return jl_true;
+     else
+         return jl_false;
+@@ -1893,6 +1893,7 @@ auto &cmdline = get_cmdline_targets();
+         auto &features0 = image_targets[t.base].en.features;
+         // Always clone when code checks CPU features
+         t.en.flags |= JL_TARGET_CLONE_CPU;
++#ifdef _CPU_AARCH64_
+         static constexpr uint32_t clone_fp16[] = {Feature::fp16fml,Feature::fullfp16};
+         for (auto fe: clone_fp16) {
+             if (!test_nbit(features0, fe) && test_nbit(t.en.features, fe)) {
+@@ -1900,6 +1901,7 @@ auto &cmdline = get_cmdline_targets();
+                 break;
+             }
+         }
++#endif
+         // The most useful one in general...
+         t.en.flags |= JL_TARGET_CLONE_LOOP;
+ #ifdef _CPU_ARM_
+diff --git a/src/runtime_ccall.cpp b/src/runtime_ccall.cpp
+index 23793254c2..136fde8a87 100644
+--- a/src/runtime_ccall.cpp
++++ b/src/runtime_ccall.cpp
+@@ -171,7 +171,7 @@ std::string jl_format_filename(StringRef output_pattern)
+                     hostname[sizeof(hostname) - 1] = '\0'; /* Null terminate, just to be safe. */
+                     outfile << hostname;
+                 }
+-#ifndef _OS_WINDOWS_
++#if !defined(_OS_WINDOWS_) && !defined(__ANDROID__)
+                 if (c == 'l' && getdomainname(hostname, sizeof(hostname)) == 0) {
+                     hostname[sizeof(hostname) - 1] = '\0'; /* Null terminate, just to be safe. */
+                     outfile << hostname;
+diff --git a/src/support/dtypes.h b/src/support/dtypes.h
+index da570921c1..8feec59b06 100644
+--- a/src/support/dtypes.h
++++ b/src/support/dtypes.h
+@@ -198,6 +198,10 @@ jl_assume_aligned(T ptr, unsigned align)
+ typedef int bool_t;
+ typedef unsigned char  byte_t;   /* 1 byte */
+ 
++#ifdef __ANDROID__
++#define uint_t jl_uint_t
++#endif
++
+ #ifdef _P64
+ #define TOP_BIT 0x8000000000000000
+ #define NBITS 64
+diff --git a/src/sys.c b/src/sys.c
+index d3473774a5..d366f2dc42 100644
+--- a/src/sys.c
++++ b/src/sys.c
+@@ -573,6 +573,26 @@ JL_DLLEXPORT long jl_SC_CLK_TCK(void)
+ #endif
+ }
+ 
++#if defined(__ANDROID__)
++struct android_dlpath_data {
++    void *handle;
++    const char *result;
++};
++static int find_dlpath_cb(struct dl_phdr_info *info, size_t size, void *data)
++{
++    struct android_dlpath_data *d = (struct android_dlpath_data*)data;
++    if (info->dlpi_name && info->dlpi_name[0]) {
++        void *probe_lib = jl_load_dynamic_library(info->dlpi_name, JL_RTLD_DEFAULT | JL_RTLD_NOLOAD, 0);
++        jl_dlclose(probe_lib);
++        if (((intptr_t)d->handle & (-4)) == ((intptr_t)probe_lib & (-4))) {
++            d->result = info->dlpi_name;
++            return 1;
++        }
++    }
++    return 0;
++}
++#endif
++
+ // Takes a handle (as returned from dlopen()) and returns the absolute path to the image loaded
+ JL_DLLEXPORT const char *jl_pathname_for_handle(void *handle)
+ {
+@@ -615,6 +635,12 @@ JL_DLLEXPORT const char *jl_pathname_for_handle(void *handle)
+     free(pth16);
+     return filepath;
+ 
++#elif defined(__ANDROID__)
++
++    struct android_dlpath_data d = { handle, NULL };
++    dl_iterate_phdr(find_dlpath_cb, &d);
++    return d.result;
++
+ #else // Linux, FreeBSD, ...
+ 
+     struct link_map *map;
+diff --git a/src/threading.c b/src/threading.c
+index 2da47da821..1223afde2b 100644
+--- a/src/threading.c
++++ b/src/threading.c
+@@ -43,6 +43,7 @@
+ extern "C" {
+ #endif
+ 
++
+ #include "threading.h"
+ 
+ JL_DLLEXPORT _Atomic(uint8_t) jl_measure_compile_time_enabled = 0;
+diff --git a/stdlib/CompilerSupportLibraries_jll/src/CompilerSupportLibraries_jll.jl b/stdlib/CompilerSupportLibraries_jll/src/CompilerSupportLibraries_jll.jl
+index bd7a0571f9..3243ce78d3 100644
+--- a/stdlib/CompilerSupportLibraries_jll/src/CompilerSupportLibraries_jll.jl
++++ b/stdlib/CompilerSupportLibraries_jll/src/CompilerSupportLibraries_jll.jl
+@@ -15,6 +15,8 @@ export libgfortran, libstdcxx, libgomp
+ const PATH = Ref("")
+ const LIBPATH = Ref("")
+ artifact_dir::String = ""
++libgcc_s_handle::Ptr{Cvoid} = C_NULL
++libgcc_s_path::String = ""
+ libgfortran_handle::Ptr{Cvoid} = C_NULL
+ libgfortran_path::String = ""
+ libstdcxx_handle::Ptr{Cvoid} = C_NULL
+@@ -53,20 +55,30 @@ else
+ end
+ 
+ function __init__()
+-    global libgcc_s_handle = dlopen(libgcc_s)
+-    global libgcc_s_path = dlpath(libgcc_s_handle)
+-    global libgfortran_handle = dlopen(libgfortran)
+-    global libgfortran_path = dlpath(libgfortran_handle)
+-    global libstdcxx_handle = dlopen(libstdcxx)
+-    global libstdcxx_path = dlpath(libstdcxx_handle)
+-    global libgomp_handle = dlopen(libgomp)
+-    global libgomp_path = dlpath(libgomp_handle)
++    global libgcc_s_handle = dlopen(libgcc_s; throw_error = false)
++    if libgcc_s_handle !== nothing
++        global libgcc_s_path = dlpath(libgcc_s_handle)
++    end
++    global libgfortran_handle = dlopen(libgfortran; throw_error = false)
++    if libgfortran_handle !== nothing
++        global libgfortran_path = dlpath(libgfortran_handle)
++    end
++    global libstdcxx_handle = dlopen(libstdcxx; throw_error = false)
++    if libstdcxx_handle !== nothing
++        global libstdcxx_path = dlpath(libstdcxx_handle)
++    end
++    global libgomp_handle = dlopen(libgomp; throw_error = false)
++    if libgomp_handle !== nothing
++        global libgomp_path = dlpath(libgomp_handle)
++    end
+     @static if libc(HostPlatform()) != "musl"
+         dlopen(libssp; throw_error = false)
+     end
+     global artifact_dir = dirname(Sys.BINDIR)
+-    LIBPATH[] = dirname(libgcc_s_path)
+-    push!(LIBPATH_list, LIBPATH[])
++    if libgcc_s_path !== ""
++        LIBPATH[] = dirname(libgcc_s_path)
++        push!(LIBPATH_list, LIBPATH[])
++    end
+ end
+ 
+ # JLLWrappers API compatibility shims.  Note that not all of these will really make sense.
+diff --git a/stdlib/InteractiveUtils/src/InteractiveUtils.jl b/stdlib/InteractiveUtils/src/InteractiveUtils.jl
+index b69ffa3ebc..b974148a03 100644
+--- a/stdlib/InteractiveUtils/src/InteractiveUtils.jl
++++ b/stdlib/InteractiveUtils/src/InteractiveUtils.jl
+@@ -149,7 +149,9 @@ function versioninfo(io::IO=stdout; verbose::Bool=false)
+         end
+     else
+         cpu = Sys.cpu_info()
+-        println(io, "  CPU: ", length(cpu), " × ", cpu[1].model)
++        if !isempty(cpu)
++            println(io, "  CPU: ", length(cpu), " × ", cpu[1].model)
++        end
+     end
+ 
+     if verbose
+diff --git a/stdlib/OpenBLAS_jll/src/OpenBLAS_jll.jl b/stdlib/OpenBLAS_jll/src/OpenBLAS_jll.jl
+index a0c11ab047..6d3b88de96 100644
+--- a/stdlib/OpenBLAS_jll/src/OpenBLAS_jll.jl
++++ b/stdlib/OpenBLAS_jll/src/OpenBLAS_jll.jl
+@@ -65,7 +65,7 @@ function __init__()
+ 
+     # As mentioned above, we are sneaking this in here so that we don't have to
+     # depend on CSL_jll and load _all_ of its libraries.
+-    dlopen(_libgfortran)
++    dlopen(_libgfortran; throw_error = false)
+ 
+     global libopenblas_handle = dlopen(libopenblas)
+     global libopenblas_path = dlpath(libopenblas_handle)
+diff --git a/sysimage.mk b/sysimage.mk
+index f5d9c7b85d..46ad864300 100644
+--- a/sysimage.mk
++++ b/sysimage.mk
+@@ -71,6 +71,7 @@ $(build_private_libdir)/corecompiler.ji: $(COMPILER_SRCS)
+ $(build_private_libdir)/sys.ji: $(build_private_libdir)/corecompiler.ji $(JULIAHOME)/VERSION $(BASE_SRCS) $(STDLIB_SRCS)
+ 	@$(call PRINT_JULIA, cd $(JULIAHOME)/base && \
+ 	if ! JULIA_BINDIR=$(call cygpath_w,$(build_bindir)) WINEPATH="$(call cygpath_w,$(build_bindir));$$WINEPATH" \
++			LD_LIBRARY_PATH="$(call cygpath_w,$(build_private_libdir)):$(call cygpath_w,$(build_libdir)):$$LD_LIBRARY_PATH" \
+ 			$(call spawn, $(JULIA_EXECUTABLE)) -g1 -O0 -C "$(JULIA_CPU_TARGET)" $(HEAPLIM) --output-ji $(call cygpath_w,$@).tmp $(JULIA_SYSIMG_BUILD_FLAGS) \
+ 			--startup-file=no --warn-overwrite=yes --sysimage $(call cygpath_w,$<) sysimg.jl $(RELBUILDROOT); then \
+ 		echo '*** This error might be fixed by running `make clean`. If the error persists$(COMMA) try `make cleanall`. ***'; \
+@@ -81,8 +82,9 @@ $(build_private_libdir)/sys.ji: $(build_private_libdir)/corecompiler.ji $(JULIAH
+ define sysimg_builder
+ $$(build_private_libdir)/sys$1-o.a $$(build_private_libdir)/sys$1-bc.a : $$(build_private_libdir)/sys$1-%.a : $$(build_private_libdir)/sys.ji $$(JULIAHOME)/contrib/generate_precompile.jl
+ 	@$$(call PRINT_JULIA, cd $$(JULIAHOME)/base && \
+-	if ! JULIA_BINDIR=$$(call cygpath_w,$(build_bindir)) \
++	if ! JULIA_BINDIR=$$(call cygpath_w,$$(build_bindir)) \
+ 		 WINEPATH="$$(call cygpath_w,$$(build_bindir));$$$$WINEPATH" \
++		 LD_LIBRARY_PATH="$$(call cygpath_w,$$(build_private_libdir)):$$(call cygpath_w,$$(build_libdir)):$$$$LD_LIBRARY_PATH" \
+ 		 JULIA_LOAD_PATH='@stdlib' \
+ 		 JULIA_PROJECT= \
+ 		 JULIA_DEPOT_PATH=':' \
