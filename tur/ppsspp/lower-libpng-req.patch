@@ -1,0 +1,15 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index fa7735adf8..922889fdfe 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -844,8 +844,8 @@ else()
+ 	set(LIBZIP_LIBRARY libzip)
+ endif()
+ 
+-# Arm platforms require at least libpng17.
+-if(ANDROID OR ARMV7 OR ARM64 OR ARM OR IOS)
++# Android and iOS require at least libpng17.
++if(ANDROID OR IOS)
+ 	set(PNG_REQUIRED_VERSION 1.7)
+ else()
+ 	set(PNG_REQUIRED_VERSION 1.6)
