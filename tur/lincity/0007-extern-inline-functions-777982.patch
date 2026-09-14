@@ -1,0 +1,28 @@
+Index: lincity-1.13.1/mouse.c
+===================================================================
+--- lincity-1.13.1.orig/mouse.c	2004-07-03 11:03:17.000000000 +0300
++++ lincity-1.13.1/mouse.c	2015-05-10 22:21:08.407451801 +0300
+@@ -1057,6 +1057,7 @@
+    and set to 1 if the existing transport if the more expensive sort
+    (e.g. GROUP_RAIL when overwriting GROUP_ROAD).
+ */
++extern inline int mt_erase (int x, int y);
+ inline int
+ mt_erase(int x, int y)
+ {
+@@ -1094,6 +1095,7 @@
+     return 0;
+ }
+ 
++extern inline int mt_temp (int x, int y);
+ inline int
+ mt_temp(int x, int y)
+ {
+@@ -1128,6 +1130,7 @@
+     return 0;
+ }
+ 
++extern inline int mt_perm (int x, int y);
+ inline int
+ mt_perm(int x, int y)
+ {

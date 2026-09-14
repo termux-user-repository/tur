@@ -1,0 +1,27 @@
+Index: lincity-1.13.1/geometry.c
+===================================================================
+--- lincity-1.13.1.orig/geometry.c	2016-05-22 09:26:21.000000000 +0300
++++ lincity-1.13.1/geometry.c	2020-05-02 10:17:22.278922136 +0300
+@@ -384,8 +384,10 @@
+     Rect* mw = &scr.main_win;
+     mw->w = new_width - 640 + MAIN_WIN_W;
+     mw->w = (mw->w/16)*16;
++    mw->w = mw->w > MAIN_WIN_MAX ? MAIN_WIN_MAX : mw->w;
+     mw->h = new_height - 480 + MAIN_WIN_H;
+     mw->h = (mw->h/16)*16;
++    mw->h = mw->h > MAIN_WIN_MAX ? MAIN_WIN_MAX : mw->h;
+     adjust_main_origin (main_screen_originx, main_screen_originy,0);
+ }
+ 
+Index: lincity-1.13.1/geometry.h
+===================================================================
+--- lincity-1.13.1.orig/geometry.h	2004-06-22 18:28:00.000000000 +0300
++++ lincity-1.13.1/geometry.h	2020-05-02 10:24:37.249512064 +0300
+@@ -139,6 +139,7 @@
+ #define MAIN_WIN_X 56+8+1
+ #define MAIN_WIN_Y 8
+ #define MAIN_WIN_H 400
++#define MAIN_WIN_MAX ((WORLD_SIDE_LEN-2)*16)
+ 
+ /* Speed buttons */
+ #define SPEED_BUTTONS_X 0 + MENU_BUTTON_W
