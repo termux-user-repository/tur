@@ -1,0 +1,16 @@
+pub fn `memfd_create` for Android, Android Bionic’s libc.so does not actually provide this symbol when targeting API < 30 (Android 11). When building under Termux/TUR (targeting API 24), the C library headers do not expose it, so the linker (ld.lld) fails to find the function
+--- a/scheduling-utils/src/handshake/server.rs	2026-08-28 18:42:46.000000000 +0000
++++ b/scheduling-utils/src/handshake/server.rs	2026-09-18 11:13:58.712165843 +0000
+@@ -272,7 +272,12 @@
+         };
+ 
+         unsafe {
++            #[cfg(target_os = "android")]
++            let ret = libc::syscall(libc::SYS_memfd_create, SHMEM_NAME.as_ptr(), flags) as libc::c_int;
++
++            #[cfg(not(target_os = "android"))]
+             let ret = libc::memfd_create(SHMEM_NAME.as_ptr(), flags);
++
+             if ret == -1 {
+                 return Err(std::io::Error::last_os_error());
+             }
