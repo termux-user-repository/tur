@@ -3,10 +3,10 @@ TERMUX_PKG_DESCRIPTION="Solana CLI binaries package provides the essential tools
 TERMUX_PKG_LICENSE="Apache-2.0"
 TERMUX_PKG_LICENSE_FILE="LICENSE"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="3.1.14"
+TERMUX_PKG_VERSION="4.2.2"
 TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL="https://github.com/anza-xyz/agave/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz"
-TERMUX_PKG_SHA256=b7e84caad554388a04e64c40f535b787fea3d1d24ead1ced4748294e8ed0214d
+TERMUX_PKG_SHA256=6ae81fb5657beb5fbe8c7bb83e6f0794a7a46c10a05c0a36bbb12e76579c7f50
 TERMUX_PKG_DEPENDS="libandroid-shmem, openssl, protobuf, zlib"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_EXCLUDED_ARCHES="i686, arm"
@@ -51,6 +51,8 @@ termux_step_pre_configure() {
 }
 
 termux_step_make() {
+	# rocksdb-sys is built using the Android NDK's Clang (which links against LLVM's libc++), but Rust invokes the linker with -lstdc++ instead of -lc++_shared
+	export RUSTFLAGS="-C link-arg=-lc++_shared"
 	# We use -p (package) instead of --bin to ensure we only build
 	# the specific workspace members, which helps skip heavy validator code.
 	cargo build \
