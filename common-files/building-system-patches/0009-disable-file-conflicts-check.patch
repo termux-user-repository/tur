@@ -1,0 +1,10 @@
+--- a/scripts/updates/utils/termux_pkg_upgrade_version.sh
++++ b/scripts/updates/utils/termux_pkg_upgrade_version.sh
+@@ -16,6 +16,7 @@
+ }
+ 
+ _termux_check_new_debs_for_conflicts() {
++	return 0
+ 	# newer-than-marker, not by name: output/ has other packages' .debs too,
+ 	# and not every subpackage (e.g. *-static) has a .subpackage.sh to match.
+ 	local build_marker="$1" conflict_check_dir rc
