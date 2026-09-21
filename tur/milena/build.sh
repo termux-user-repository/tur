@@ -1,64 +1,56 @@
+# Canonical Milena release package for TUR. Keep VERSION, SRCURL tag and
+# SHA256 synchronized; never replace this tarball with a fork or generated artifact.
 TERMUX_PKG_HOMEPAGE="https://github.com/46Neon/Milena"
 TERMUX_PKG_DESCRIPTION="Spanish programming language for data analysis"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@46Neon"
 TERMUX_PKG_VERSION="0.2.0"
 TERMUX_PKG_SRCURL="https://github.com/46Neon/Milena/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz"
-TERMUX_PKG_SHA256=56e189bbd1e89aa25a7e8588e0606f0ea42d3bf5f1086fcfa3442d632d571153
-# Python is needed only by the upstream source-manifest checks.  make and
-# clang are supplied by the TUR/Termux build toolchain and must not be listed
-# as package dependencies (and neither is a runtime dependency).
+TERMUX_PKG_SHA256="56e189bbd1e89aa25a7e8588e0606f0ea42d3bf5f1086fcfa3442d632d571153"
+# Python is build-only for upstream source guards. make, clang and Bionic are
+# supplied by TUR/Termux and must not become runtime dependencies.
 TERMUX_PKG_BUILD_DEPENDS="python"
 TERMUX_PKG_BUILD_IN_SRC=true
 
 termux_step_post_get_source() {
-	# Keep this package tied to the canonical release layout and language path;
-	# do not silently build a fork, generated artifact, or legacy runtime.
-	[[ -f Makefile && -f LICENSE && -f README.md ]] || \
-		termux_error_exit "Milena source is missing a required top-level file."
-	[[ -d include && -d src && -d tests ]] || \
-		termux_error_exit "Milena source is missing canonical source directories."
-	grep -q '^MIT License$' LICENSE || \
-		termux_error_exit "Milena source license is not MIT."
-	grep -q '^TARGET = milena$' Makefile || \
-		termux_error_exit "Refusing to build a non-canonical Milena target."
-	grep -q "^#define MILENA_VERSION \"${TERMUX_PKG_VERSION}\"$" \
-		include/common.h || termux_error_exit "Milena source identity/version check failed."
-	for source in src/lexer.c src/parser.c src/ast.c src/language_semantic.c \
-		src/language_runtime.c src/table.c; do
+	local compiler="${CC:-clang}" macros
+	[[ -f Makefile && -f LICENSE && -f README.md && -d include && -d src && -d tests ]] || \
+		termux_error_exit "Milena canonical source layout is incomplete."
+	grep -q '^MIT License$' LICENSE || termux_error_exit "Milena source license is not MIT."
+	grep -q '^TARGET = milena$' Makefile || termux_error_exit "Unexpected Milena target."
+	grep -q "^#define MILENA_VERSION \"${TERMUX_PKG_VERSION}\"$" include/common.h || \
+		termux_error_exit "Release tag and embedded Milena version disagree."
+	for source in src/lexer.c src/parser.c src/ast.c src/language_semantic.c src/language_runtime.c src/table.c; do
 		[[ -f "$source" ]] || termux_error_exit "Canonical source is missing: $source"
 	done
+	# Upstream architecture guards: fail closed, never silently skip isolation.
+	command -v python3 >/dev/null || termux_error_exit "python3 is required for source guards."
+	python3 scripts/check_source_manifest.py
+	python3 scripts/check_experimental_isolation.py
 
-	# TUR supplies these tools in its build environment; fail early rather than
-	# silently falling back to a host compiler or an incomplete build image.
 	command -v make >/dev/null || termux_error_exit "TUR build environment is missing make."
-	local compiler="${CC:-clang}"
-	command -v "$compiler" >/dev/null || \
-		termux_error_exit "TUR build environment is missing the configured C compiler: $compiler."
-	"$compiler" --version 2>&1 | grep -qi clang || \
-		termux_error_exit "Milena requires the Termux Clang toolchain."
-	local macros
+	command -v "$compiler" >/dev/null || termux_error_exit "Configured C compiler is unavailable: $compiler."
+	"$compiler" --version 2>&1 | grep -qi clang || termux_error_exit "Milena requires Termux Clang."
 	macros=$(printf '#include <stddef.h>\n' | "$compiler" ${CPPFLAGS:-} -dM -E -x c - 2>/dev/null) || \
-		termux_error_exit "Unable to query the Termux compiler predefines."
-	grep -q '^#define __ANDROID__ ' <<<"$macros" || \
-		termux_error_exit "Configured compiler is not targeting Android/Bionic (__ANDROID__ missing)."
-	printf 'int main(void) { return 0; }\n' | "$compiler" ${CPPFLAGS:-} ${CFLAGS:-} \
-		-std=c17 -fsyntax-only -x c - >/dev/null 2>&1 || \
-		termux_error_exit "Configured Android/Bionic compiler does not accept C17."
+		termux_error_exit "Unable to query compiler predefines."
+	grep -q '^#define __ANDROID__ ' <<<"$macros" || termux_error_exit "Compiler is not Android/Bionic (__ANDROID__ missing)."
+	printf 'int main(void) { return 0; }\n' | "$compiler" ${CPPFLAGS:-} ${CFLAGS:-} -std=c17 -fsyntax-only -x c - >/dev/null 2>&1 || \
+		termux_error_exit "Android/Bionic compiler does not accept C17."
 }
 
 termux_step_make() {
-	make -j "${TERMUX_PKG_MAKE_PROCESSES:-1}" \
-		TERMUX=1 CC="${CC:-clang}" \
-		CFLAGS="${CFLAGS:-} -std=c17 -Iinclude" \
-		CPPFLAGS="${CPPFLAGS:-}" LDFLAGS="${LDFLAGS:-} -lm" all
+	make -j "${TERMUX_PKG_MAKE_PROCESSES:-1}" TERMUX=1 CC="${CC:-clang}" \
+		CFLAGS="${CFLAGS:-} -std=c17 -Iinclude" CPPFLAGS="${CPPFLAGS:-}" \
+		LDFLAGS="${LDFLAGS:-} -lm" all
 }
 
+# Separate test/smoke phase. TUR versions may not call this hook automatically;
+# it is not evidence that every package build executed it. See RUNNER.md.
 termux_step_make_test() {
-	make -j "${TERMUX_PKG_MAKE_PROCESSES:-1}" \
-		TERMUX=1 CC="${CC:-clang}" \
-		CFLAGS="${CFLAGS:-} -std=c17 -Iinclude" \
-		CPPFLAGS="${CPPFLAGS:-}" LDFLAGS="${LDFLAGS:-} -lm" test
+	make -j "${TERMUX_PKG_MAKE_PROCESSES:-1}" TERMUX=1 CC="${CC:-clang}" \
+		CFLAGS="${CFLAGS:-} -std=c17 -Iinclude" CPPFLAGS="${CPPFLAGS:-}" \
+		LDFLAGS="${LDFLAGS:-} -lm" test
+	./milena --version >/dev/null
 }
 
 termux_step_make_install() {
@@ -67,8 +59,8 @@ termux_step_make_install() {
 }
 
 termux_step_post_make_install() {
-	[[ -x "${TERMUX_PREFIX}/bin/milena" ]] || \
-		termux_error_exit "Milena binary was not installed."
-	[[ -s "${TERMUX_PREFIX}/share/doc/${TERMUX_PKG_NAME}/README.md" ]] || \
-		termux_error_exit "Milena package documentation was not installed."
+	[[ -x "${TERMUX_PREFIX}/bin/milena" ]] || termux_error_exit "Milena binary was not installed."
+	[[ -s "${TERMUX_PREFIX}/share/doc/${TERMUX_PKG_NAME}/README.md" ]] || termux_error_exit "Milena README was not installed."
+	find "${TERMUX_PREFIX}/bin" -maxdepth 1 -type f ! -name milena -print -quit | grep -q . && \
+		termux_error_exit "Unexpected executable in Milena payload." || true
 }
