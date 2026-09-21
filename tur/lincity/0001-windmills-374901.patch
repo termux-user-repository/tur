@@ -1,0 +1,32 @@
+Index: lincity-1.13.1/modules/substation.c
+===================================================================
+--- lincity-1.13.1.orig/modules/substation.c	2004-07-03 10:37:35.000000000 +0300
++++ lincity-1.13.1/modules/substation.c	2012-02-04 20:20:13.978884367 +0200
+@@ -101,8 +101,11 @@
+     format_power (s, sizeof(s), MP_INFO(x,y).int_5);    
+     mps_store_title(i++,_("Local Demand"));
+     mps_store_title(i++,s);
+-    i++;
+ 
++    if (MP_INFO(x,y).int_6 == 0)
++      return;
++
++    i++;
+     mps_store_title(i++,_("Grid Status"));
+ 
+     format_power (s, sizeof(s), grid[MP_INFO(x,y).int_6]->max_power);
+Index: lincity-1.13.1/modules/windmill.c
+===================================================================
+--- lincity-1.13.1.orig/modules/windmill.c	2004-06-23 17:49:52.000000000 +0300
++++ lincity-1.13.1/modules/windmill.c	2012-02-04 20:21:04.854883480 +0200
+@@ -97,6 +97,10 @@
+ 
+ 	mps_store_sfp(i++,_("Tech"),
+ 		  MP_INFO(x,y).int_2 * 100.0 / MAX_TECH_LEVEL);  
++
++	if (MP_INFO(x,y).int_6 == 0)
++	  return;
++
+ 	i++;
+ 	
+ 	mps_store_title(i++,_("Grid Status"));

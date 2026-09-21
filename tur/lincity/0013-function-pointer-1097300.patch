@@ -1,0 +1,22 @@
+Description: Provide required function pointer arguments
+ Prior to GCC 15, function pointer declarations could omit
+ arguments. In GCC 15, they are interpreted strictly as nullary
+ functions and trying to call them with any arguments is a compile
+ error.
+ .
+ Upstream's dead so not forwarded.
+Forwarded: no
+Author: Kari Pahula <kaol@debian.org>
+Last-Update: 2025-09-07
+
+--- a/mouse.c
++++ b/mouse.c
+@@ -1155,7 +1155,7 @@
+ }
+ 
+ int
+-do_mt_draw (int x1, int x2, int y1, int y2, int (*mode)())
++do_mt_draw (int x1, int x2, int y1, int y2, int (*mode)(int, int))
+ {
+     int dir = 1;
+     int horiz = 1;
