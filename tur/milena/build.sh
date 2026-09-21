@@ -5,8 +5,9 @@ TERMUX_PKG_MAINTAINER="@46Neon"
 TERMUX_PKG_VERSION="0.2.0"
 TERMUX_PKG_SRCURL="https://github.com/46Neon/Milena/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz"
 TERMUX_PKG_SHA256=56e189bbd1e89aa25a7e8588e0606f0ea42d3bf5f1086fcfa3442d632d571153
-# The upstream `test` target runs source-manifest and packaging checks with
-# Python; Python is build-only and is not a runtime dependency.
+# Python is needed only by the upstream source-manifest checks.  make and
+# clang are supplied by the TUR/Termux build toolchain and must not be listed
+# as package dependencies (and neither is a runtime dependency).
 TERMUX_PKG_BUILD_DEPENDS="python"
 TERMUX_PKG_BUILD_IN_SRC=true
 
@@ -27,10 +28,26 @@ termux_step_post_get_source() {
 		src/language_runtime.c src/table.c; do
 		[[ -f "$source" ]] || termux_error_exit "Canonical source is missing: $source"
 	done
+
+	# TUR supplies these tools in its build environment; fail early rather than
+	# silently falling back to a host compiler or an incomplete build image.
+	command -v make >/dev/null || termux_error_exit "TUR build environment is missing make."
+	local compiler="${CC:-clang}"
+	command -v "$compiler" >/dev/null || \
+		termux_error_exit "TUR build environment is missing the configured C compiler: $compiler."
+	"$compiler" --version 2>&1 | grep -qi clang || \
+		termux_error_exit "Milena requires the Termux Clang toolchain."
+	local macros
+	macros=$(printf '#include <stddef.h>\n' | "$compiler" ${CPPFLAGS:-} -dM -E -x c - 2>/dev/null) || \
+		termux_error_exit "Unable to query the Termux compiler predefines."
+	grep -q '^#define __ANDROID__ ' <<<"$macros" || \
+		termux_error_exit "Configured compiler is not targeting Android/Bionic (__ANDROID__ missing)."
+	printf 'int main(void) { return 0; }\n' | "$compiler" ${CPPFLAGS:-} ${CFLAGS:-} \
+		-std=c17 -fsyntax-only -x c - >/dev/null 2>&1 || \
+		termux_error_exit "Configured Android/Bionic compiler does not accept C17."
 }
 
 termux_step_make() {
-	# TERMUX=1 selects the upstream Bionic/size-optimized build contract.
 	make -j "${TERMUX_PKG_MAKE_PROCESSES:-1}" \
 		TERMUX=1 CC="${CC:-clang}" \
 		CFLAGS="${CFLAGS:-} -std=c17 -Iinclude" \
@@ -38,7 +55,6 @@ termux_step_make() {
 }
 
 termux_step_make_test() {
-	# Run the upstream suite, including architecture/source-manifest guards.
 	make -j "${TERMUX_PKG_MAKE_PROCESSES:-1}" \
 		TERMUX=1 CC="${CC:-clang}" \
 		CFLAGS="${CFLAGS:-} -std=c17 -Iinclude" \
