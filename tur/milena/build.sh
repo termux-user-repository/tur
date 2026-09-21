@@ -3,6 +3,7 @@
 TERMUX_PKG_HOMEPAGE="https://github.com/46Neon/Milena"
 TERMUX_PKG_DESCRIPTION="Spanish programming language for data analysis"
 TERMUX_PKG_LICENSE="MIT"
+TERMUX_PKG_LICENSE_FILE="LICENSE"
 TERMUX_PKG_MAINTAINER="@46Neon"
 TERMUX_PKG_VERSION="0.2.0"
 TERMUX_PKG_SRCURL="https://github.com/46Neon/Milena/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz"
@@ -23,7 +24,6 @@ termux_step_post_get_source() {
 	for source in src/lexer.c src/parser.c src/ast.c src/language_semantic.c src/language_runtime.c src/table.c; do
 		[[ -f "$source" ]] || termux_error_exit "Canonical source is missing: $source"
 	done
-	# Upstream architecture guards: fail closed, never silently skip isolation.
 	command -v python3 >/dev/null || termux_error_exit "python3 is required for source guards."
 	python3 scripts/check_source_manifest.py
 	python3 scripts/check_experimental_isolation.py
@@ -39,28 +39,40 @@ termux_step_post_get_source() {
 }
 
 termux_step_make() {
-	make -j "${TERMUX_PKG_MAKE_PROCESSES:-1}" TERMUX=1 CC="${CC:-clang}" \
-		CFLAGS="${CFLAGS:-} -std=c17 -Iinclude" CPPFLAGS="${CPPFLAGS:-}" \
-		LDFLAGS="${LDFLAGS:-} -lm" all
+	# TERMUX=1 selects Milena's canonical -Oz/section/GC defaults. Do not pass
+	# CFLAGS/LDFLAGS here: TUR's flags must remain authoritative and additive.
+	make -j "${TERMUX_PKG_MAKE_PROCESSES:-1}" TERMUX=1 CC="${CC:-clang}" all
 }
 
-# Separate test/smoke phase. TUR versions may not call this hook automatically;
-# it is not evidence that every package build executed it. See RUNNER.md.
+# TUR versions may not invoke this hook. RUNNER.md documents the explicit test
+# command; this hook is useful only when the runner actually schedules it.
 termux_step_make_test() {
-	make -j "${TERMUX_PKG_MAKE_PROCESSES:-1}" TERMUX=1 CC="${CC:-clang}" \
-		CFLAGS="${CFLAGS:-} -std=c17 -Iinclude" CPPFLAGS="${CPPFLAGS:-}" \
-		LDFLAGS="${LDFLAGS:-} -lm" test
+	make -j "${TERMUX_PKG_MAKE_PROCESSES:-1}" TERMUX=1 CC="${CC:-clang}" test
 	./milena --version >/dev/null
 }
 
 termux_step_make_install() {
 	install -Dm755 milena "${TERMUX_PREFIX}/bin/milena"
 	install -Dm644 README.md "${TERMUX_PREFIX}/share/doc/${TERMUX_PKG_NAME}/README.md"
+	install -Dm644 LICENSE "${TERMUX_PREFIX}/share/doc/${TERMUX_PKG_NAME}/LICENSE"
 }
 
 termux_step_post_make_install() {
-	[[ -x "${TERMUX_PREFIX}/bin/milena" ]] || termux_error_exit "Milena binary was not installed."
-	[[ -s "${TERMUX_PREFIX}/share/doc/${TERMUX_PKG_NAME}/README.md" ]] || termux_error_exit "Milena README was not installed."
-	find "${TERMUX_PREFIX}/bin" -maxdepth 1 -type f ! -name milena -print -quit | grep -q . && \
-		termux_error_exit "Unexpected executable in Milena payload." || true
+	local staged_prefix="${TERMUX_PKG_MASSAGEDIR:-}${TERMUX_PREFIX:-}"
+	[[ -n "${TERMUX_PKG_MASSAGEDIR:-}" && -d "$staged_prefix" ]] || \
+		termux_error_exit "TUR staging root is unavailable; refusing global-prefix validation."
+	[[ -x "$staged_prefix/bin/milena" ]] || termux_error_exit "Milena binary is absent from staging."
+	for file in "$staged_prefix/share/doc/${TERMUX_PKG_NAME}/README.md" "$staged_prefix/share/doc/${TERMUX_PKG_NAME}/LICENSE"; do
+		[[ -s "$file" ]] || termux_error_exit "Required staged artifact is absent: $file"
+	done
+	find "$staged_prefix" -type f \( -path '*/bin/*' -o -path '*/lib/*' \) ! -name milena -print -quit | grep -q . && \
+		termux_error_exit "Unexpected executable/library in Milena payload." || true
+	if command -v llvm-readelf >/dev/null 2>&1 || command -v readelf >/dev/null 2>&1; then
+		local readelf_bin="$(command -v llvm-readelf || command -v readelf)" needed
+		"$readelf_bin" -h "$staged_prefix/bin/milena" >/dev/null || termux_error_exit "Staged Milena file is not ELF."
+		needed=$("$readelf_bin" -d "$staged_prefix/bin/milena" 2>/dev/null | sed -n 's/.*Shared library: \[\([^]]*\)\].*/\1/p')
+		while IFS= read -r lib; do
+			case "$lib" in libc.so|libm.so|libdl.so|liblog.so|libc.so.*|libm.so.*) ;; *) termux_error_exit "Unexpected Android DT_NEEDED entry: $lib" ;; esac
+		done <<<"$needed"
+	fi
 }
