@@ -32,17 +32,17 @@ termux_step_post_get_source() {
 termux_step_make() {
 	# TERMUX=1 selects the upstream Bionic/size-optimized build contract.
 	make -j "${TERMUX_PKG_MAKE_PROCESSES:-1}" \
-		TERMUX=1 CC="${CC}" \
-		CFLAGS="${CFLAGS} -std=c17 -Iinclude" \
-		CPPFLAGS="${CPPFLAGS}" LDFLAGS="${LDFLAGS} -lm" all
+		TERMUX=1 CC="${CC:-clang}" \
+		CFLAGS="${CFLAGS:-} -std=c17 -Iinclude" \
+		CPPFLAGS="${CPPFLAGS:-}" LDFLAGS="${LDFLAGS:-} -lm" all
 }
 
 termux_step_make_test() {
 	# Run the upstream suite, including architecture/source-manifest guards.
 	make -j "${TERMUX_PKG_MAKE_PROCESSES:-1}" \
-		TERMUX=1 CC="${CC}" \
-		CFLAGS="${CFLAGS} -std=c17 -Iinclude" \
-		CPPFLAGS="${CPPFLAGS}" LDFLAGS="${LDFLAGS} -lm" test
+		TERMUX=1 CC="${CC:-clang}" \
+		CFLAGS="${CFLAGS:-} -std=c17 -Iinclude" \
+		CPPFLAGS="${CPPFLAGS:-}" LDFLAGS="${LDFLAGS:-} -lm" test
 }
 
 termux_step_make_install() {
