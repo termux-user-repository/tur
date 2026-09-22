@@ -65,14 +65,22 @@ termux_step_post_make_install() {
 	for file in "$staged_prefix/share/doc/${TERMUX_PKG_NAME}/README.md" "$staged_prefix/share/doc/${TERMUX_PKG_NAME}/LICENSE"; do
 		[[ -s "$file" ]] || termux_error_exit "Required staged artifact is absent: $file"
 	done
-	find "$staged_prefix" -type f \( -path '*/bin/*' -o -path '*/lib/*' \) ! -name milena -print -quit | grep -q . && \
-		termux_error_exit "Unexpected executable/library in Milena payload." || true
-	if command -v llvm-readelf >/dev/null 2>&1 || command -v readelf >/dev/null 2>&1; then
-		local readelf_bin="$(command -v llvm-readelf || command -v readelf)" needed
-		"$readelf_bin" -h "$staged_prefix/bin/milena" >/dev/null || termux_error_exit "Staged Milena file is not ELF."
-		needed=$("$readelf_bin" -d "$staged_prefix/bin/milena" 2>/dev/null | sed -n 's/.*Shared library: \[\([^]]*\)\].*/\1/p')
-		while IFS= read -r lib; do
-			case "$lib" in libc.so|libm.so|libdl.so|liblog.so|libc.so.*|libm.so.*) ;; *) termux_error_exit "Unexpected Android DT_NEEDED entry: $lib" ;; esac
-		done <<<"$needed"
-	fi
+	# The package payload is deliberately closed: TUR metadata is generated separately.
+	local actual expected
+	expected=$'bin/milena\nshare/doc/'"${TERMUX_PKG_NAME}"$'/README.md\nshare/doc/'"${TERMUX_PKG_NAME}"$'/LICENSE'
+	actual=$(find "$staged_prefix" -type f -printf '%P\n' | sort)
+	[[ "$actual" == "$(printf '%s\n' "$expected" | sort)" ]] || \
+		termux_error_exit "Unexpected staged payload (expected binary and README/license only)."
+
+	# Do not silently skip this audit: it rejects host binaries and unreviewed deps.
+	local readelf_bin needed
+	readelf_bin="$(command -v llvm-readelf || command -v readelf || true)"
+	[[ -n "$readelf_bin" ]] || termux_error_exit "No llvm-readelf/readelf available for ELF audit."
+	"$readelf_bin" -h "$staged_prefix/bin/milena" >/dev/null || termux_error_exit "Staged Milena file is not ELF."
+	needed=$("$readelf_bin" -d "$staged_prefix/bin/milena" 2>/dev/null | sed -n 's/.*Shared library: \[\([^]]*\)\].*/\1/p')
+	while IFS= read -r lib; do
+		case "$lib" in libc.so|libm.so|libdl.so|liblog.so|libc.so.*|libm.so.*) ;; *) termux_error_exit "Unexpected Android DT_NEEDED entry: $lib" ;; esac
+	done <<<"$needed"
+
 }
+
