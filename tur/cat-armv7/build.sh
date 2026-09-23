@@ -14,4 +14,3 @@ termux_step_make_install() {
 	clang --target=armv7a-linux-gnueabihf -nostdlib -static \
 		-o $TERMUX_PREFIX/bin/cat_armv7 $TERMUX_BUILD_DIR/cat_armv7.s
 }
-https://github.com/ivan1231545/cat-armv7/archive/refs/tags/main.tar.gz
