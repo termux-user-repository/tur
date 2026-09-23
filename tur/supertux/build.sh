@@ -16,7 +16,6 @@ TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 -DCMAKE_SYSTEM_NAME=Linux
 -DIS_SUPERTUX_RELEASE=true
 -DINSTALL_SUBDIR_BIN=bin
--DINSTALL_SUBDIR_SHARE=share/games/supertux2
 -DINSTALL_SUBDIR_DOC=share/doc/supertux
 -DUSE_STATIC_SIMPLESQUIRREL=ON
 -DSSQ_BUILD_INSTALL=OFF
@@ -29,11 +28,5 @@ share/doc/supertux/LICENSE.txt
 "
 
 termux_step_pre_configure() {
-	export LDFLAGS+=" -landroid-execinfo -landroid-spawn -llog"
-}
-
-termux_step_post_make_install() {
-	ln -sf supertux.png "$TERMUX_PREFIX/share/pixmaps/supertux2.png"
-	install -Dm644 data/images/engine/icons/supertux.png \
-		"$TERMUX_PREFIX/share/icons/hicolor/256x256/apps/supertux2.png"
+        export LDFLAGS+=" -landroid-execinfo -landroid-spawn -llog"
 }
