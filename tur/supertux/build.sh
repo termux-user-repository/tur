@@ -1,34 +1,39 @@
 TERMUX_PKG_HOMEPAGE=https://www.supertux.org
-TERMUX_PKG_DESCRIPTION="SuperTux is a jump'n'run game with strong inspiration from the Super Mario Bros. games for the various Nintendo platforms."
+TERMUX_PKG_DESCRIPTION="Classic 2D jump'n'run sidescroller game in a style similar to Super Mario Bros"
 TERMUX_PKG_LICENSE="GPL-3.0"
 TERMUX_PKG_MAINTAINER="@IntinteDAO"
-TERMUX_PKG_VERSION="0.7.0-beta.1"
-TERMUX_PKG_SRCURL=https://github.com/SuperTux/supertux/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz
-TERMUX_PKG_SHA256=df3e702afdd6c14b936e68dbbf8fc7e916be2d527b159144b07fc328f7653db8
+TERMUX_PKG_VERSION="0.7.0"
+TERMUX_PKG_SRCURL="https://github.com/SuperTux/supertux/releases/download/v${TERMUX_PKG_VERSION}/SuperTux-v${TERMUX_PKG_VERSION}-Source.tar.gz"
+TERMUX_PKG_SHA256=32fc5b99b9994ed58e58341d6f21de925764b381256e108591136de53bc31da5
+TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_BUILD_IN_SRC=true
-TERMUX_PKG_BUILD_DEPENDS="boost-headers"
-TERMUX_PKG_DEPENDS="boost, glm, sdl2, sdl2-image, sdl2-ttf, glew, openal-soft, libphysfs, freetype, libandroid-execinfo, fmt, supertux-data, libandroid-spawn"
+TERMUX_PKG_BUILD_DEPENDS="glm"
+TERMUX_PKG_DEPENDS="fmt, freetype, glew, libandroid-execinfo, libandroid-spawn, libandroid-stub, libcurl, libogg, libphysfs, libpng, libvorbis, openal-soft, sdl2, sdl2-image, supertux-data, xdg-utils, zlib"
 TERMUX_PKG_FORCE_CMAKE=true
-TERMUX_ON_DEVICE_BUILD=false
 TERMUX_PKG_GROUPS="games"
 
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
--DANDROID=OFF
--DBoost_INCLUDE_DIR=$TERMUX_PREFIX/include
--DCMAKE_INSTALL_PREFIX=$TERMUX_PREFIX
+-DCMAKE_SYSTEM_NAME=Linux
 -DIS_SUPERTUX_RELEASE=true
 -DINSTALL_SUBDIR_BIN=bin
--DINSTALL_SUBDIR_SHARE=share/games/supertux
+-DINSTALL_SUBDIR_SHARE=share/games/supertux2
 -DINSTALL_SUBDIR_DOC=share/doc/supertux
+-DUSE_STATIC_SIMPLESQUIRREL=ON
+-DSSQ_BUILD_INSTALL=OFF
+-DSQ_DISABLE_INSTALLER=ON
+-DENABLE_DISCORD=OFF
+"
+
+TERMUX_PKG_RM_AFTER_INSTALL="
+share/doc/supertux/LICENSE.txt
 "
 
 termux_step_pre_configure() {
-	export LDFLAGS+=" -Wl,--no-as-needed,-lOpenSLES,--as-needed -landroid-spawn -llog"
-	export CMAKE_PREFIX_PATH=$TERMUX_PREFIX
+	export LDFLAGS+=" -landroid-execinfo -landroid-spawn -llog"
+}
 
-	git clone --recurse-submodules https://github.com/SuperTux/tinygettext external/tinygettext
-	git clone --recurse-submodules https://github.com/SuperTux/simplesquirrel external/simplesquirrel
-	git clone --recurse-submodules https://github.com/SuperTux/sexp-cpp external/sexp-cpp
-	git clone --recurse-submodules https://github.com/SuperTux/SDL_ttf external/SDL_ttf
-
+termux_step_post_make_install() {
+	ln -sf supertux.png "$TERMUX_PREFIX/share/pixmaps/supertux2.png"
+	install -Dm644 data/images/engine/icons/supertux.png \
+		"$TERMUX_PREFIX/share/icons/hicolor/256x256/apps/supertux2.png"
 }
