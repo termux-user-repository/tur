@@ -1,6 +1,6 @@
---- a/scripts/build/toolchain/termux_setup_toolchain_29.sh
-+++ b/scripts/build/toolchain/termux_setup_toolchain_29.sh
-@@ -133,7 +133,7 @@ termux_setup_toolchain_29() {
+--- a/scripts/build/toolchain/termux_setup_toolchain_30.sh
++++ b/scripts/build/toolchain/termux_setup_toolchain_30.sh
+@@ -133,7 +133,7 @@ termux_setup_toolchain_30() {
  	[ -d "${TERMUX_STANDALONE_TOOLCHAIN}-work" ] || mkdir -p "${TERMUX_STANDALONE_TOOLCHAIN}-work"
  
  
@@ -9,7 +9,7 @@
  		fuse-overlayfs \
  			"${TERMUX_STANDALONE_TOOLCHAIN}" \
  			-o lowerdir="${NDK}/toolchains/llvm/prebuilt/linux-x86_64" \
-@@ -145,12 +145,15 @@ termux_setup_toolchain_29() {
+@@ -145,12 +145,15 @@ termux_setup_toolchain_30() {
  		return
  	fi
  
