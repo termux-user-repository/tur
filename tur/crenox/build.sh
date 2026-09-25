@@ -2,10 +2,10 @@ TERMUX_PKG_HOMEPAGE=https://github.com/crenoxhq/crenox
 TERMUX_PKG_DESCRIPTION="Statically compiled, zero-dependency Git pre-commit secret detector"
 TERMUX_PKG_LICENSE="AGPL-3.0-only"
 TERMUX_PKG_MAINTAINER="@KhaledHani"
-TERMUX_PKG_VERSION="2.1.5"
+TERMUX_PKG_VERSION="2.1.10"
 TERMUX_PKG_SRCURL=https://github.com/crenoxhq/crenox/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz
 # crenox:ignore
-TERMUX_PKG_SHA256=de3cd10d2975251ac2ade633a585a8fbc57edd77d9c5578881197bd532ae85f5
+TERMUX_PKG_SHA256=a75441fdc928bc79d42c59cd4306091771d71f979281568e074d1fb878b7e77d
 TERMUX_PKG_AUTO_UPDATE=true
 
 termux_step_make() {
