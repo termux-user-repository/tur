@@ -1,6 +1,6 @@
 TERMUX_PKG_HOMEPAGE=https://github.com/vanhauser-thc/thc-hydra
 TERMUX_PKG_DESCRIPTION="hydra"
-TERMUX_PKG_LICENSE="AGPL-V3"
+TERMUX_PKG_LICENSE="AGPL-3.0-or-later"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="9.7"
 TERMUX_PKG_SRCURL=git+https://github.com/vanhauser-thc/thc-hydra
