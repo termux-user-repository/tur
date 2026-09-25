@@ -1,6 +1,6 @@
 TERMUX_PKG_HOMEPAGE="https://github.com/OptiVorbis/OptiVorbis"
 TERMUX_PKG_DESCRIPTION="Vorbis optimizer that reconstruct ogg files to a smaller size, without losing any audio quality"
-TERMUX_PKG_LICENSE="AGPL-V3"
+TERMUX_PKG_LICENSE="AGPL-3.0-only, BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="@flosnvjx"
 TERMUX_PKG_VERSION="0.3.0"
 TERMUX_PKG_REVISION=1
