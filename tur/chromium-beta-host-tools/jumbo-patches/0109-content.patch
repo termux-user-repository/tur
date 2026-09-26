@@ -2537,6 +2537,7 @@ index db280b0576..66fd0c8244 100644
 +         (!::features::kSendGPUChannelEarlyTopChromeOnly.Get() ||
            IsForTopChromeWebUI());
  }
+ 
 diff --git a/content/browser/renderer_host/render_frame_host_impl.cc b/content/browser/renderer_host/render_frame_host_impl.cc
 index 3f171553b2..4140d63f95 100644
 --- a/content/browser/renderer_host/render_frame_host_impl.cc
