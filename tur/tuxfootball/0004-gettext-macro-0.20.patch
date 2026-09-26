@@ -1,0 +1,13 @@
+Description: Make autopoint regenerate gettext files
+Author: Adrian Bunk <bunk@debian.org>
+
+--- tuxfootball-0.3.1.orig/configure.ac
++++ tuxfootball-0.3.1/configure.ac
+@@ -6,6 +6,7 @@ AC_CONFIG_SRCDIR([src/main.cpp])
+ AC_CONFIG_HEADER([config.h])
+ AM_INIT_AUTOMAKE(AC_PACKAGE_NAME, AC_PACKAGE_VERSION, [dist-bzip2])
+ AM_MAINTAINER_MODE
++AM_GNU_GETTEXT_VERSION([0.18])
+ AM_GNU_GETTEXT([external])
+ 
+ # Checks for programs.
