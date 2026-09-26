@@ -1,0 +1,11 @@
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -29,7 +29,7 @@ cuda = ["ort/cuda"]
+ directml = ["ort/directml"]
+ 
+ [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+-ort = { version = "=2.0.0-rc.11" }
++ort = { version = "=2.0.0-rc.11", features = ["pkg-config"] }
+ ndarray = "0.17.2"
+ 
+ [target.'cfg(target_arch = "wasm32")'.dependencies]
