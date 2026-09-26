@@ -1480,3 +1480,22 @@ index a46f182f01..29ee139cdf 100644
  }  // namespace media
 +
 +#undef kSampleFormat
+diff --git a/services/network/public/cpp/declarative_performance_observer_parser.cc b/services/network/public/cpp/declarative_performance_observer_parser.cc
+index 462f58b62b..9ee7a8df35 100644
+--- a/services/network/public/cpp/declarative_performance_observer_parser.cc
++++ b/services/network/public/cpp/declarative_performance_observer_parser.cc
+@@ -7,6 +7,8 @@
+ #include "base/strings/string_util.h"
+ #include "net/http/structured_headers.h"
+ 
++#define kReportTo kReportTo_declarative_performance_observer_parser
++
+ namespace network {
+ 
+ namespace {
+@@ -92,3 +94,5 @@ ParseDeclarativePerformanceObserverPolicy(std::string_view header) {
+ }
+ 
+ }  // namespace network
++
++#undef kReportTo
