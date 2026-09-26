@@ -1,0 +1,200 @@
+diff --git a/Make.inc b/Make.inc
+index 6d2b09426a..851336ccad 100644
+--- a/Make.inc
++++ b/Make.inc
+@@ -400,6 +400,10 @@ override OS := WINNT
+ else ifneq (,$(findstring emscripten,$(XC_HOST)))
+ override OS := emscripten
+ override CROSS_COMPILE:=
++else ifneq (,$(findstring linux,$(XC_HOST)))
++override OS := Linux
++else ifneq (,$(findstring android,$(XC_HOST)))
++override OS := Linux
+ else
+ ifeq (,$(OS))
+ $(error "unknown XC_HOST variable set, please set OS")
+@@ -868,7 +872,7 @@ MARCH := pentium4
+ endif
+ endif
+ 
+-ifneq ($(findstring $(MARCH),i386 i486 i586 i686 pentium pentium2 pentium3),)
++ifneq ($(filter $(MARCH),i386 i486 i586 i686 pentium pentium2 pentium3),)
+ $(error Pre-SSE2 CPU targets not supported. To create a generic 32-bit x86 binary, \
+ pass 'MARCH=pentium4'.)
+ endif
+@@ -962,7 +966,7 @@ endif
+ ifneq (,$(findstring aarch64,$(ARCH)))
+ OPENBLAS_DYNAMIC_ARCH:=0
+ OPENBLAS_TARGET_ARCH:=ARMV8
+-USE_BLAS64:=1
++USE_BLAS64 ?= 1
+ BINARY:=64
+ endif
+ 
+@@ -1050,7 +1054,11 @@ ifeq ($(OS),Darwin)
+ LIBUNWIND:=-lunwind
+ JCPPFLAGS+=-DLLVMLIBUNWIND
+ else
+-LIBUNWIND:=-lunwind
++ifeq ($(ARCH),i686)
++LIBUNWIND:=$(build_shlibdir)/libunwind-x86.so $(build_shlibdir)/libunwind.so
++else
++LIBUNWIND:=$(build_shlibdir)/libunwind-$(ARCH).so $(build_shlibdir)/libunwind.so
++endif
+ endif
+ endif
+ endif
+@@ -1280,7 +1288,9 @@ endif
+ 
+ # Warn if the user tries to build something that requires `gfortran` but they don't have it installed.
+ ifeq ($(FC_VERSION),)
+-ifneq ($(USE_BINARYBUILDER_OPENBLAS)$(USE_BINARYBUILDER_LIBSUITESPARSE),11)
++ifeq ($(USE_SYSTEM_BLAS)$(USE_SYSTEM_LIBSUITESPARSE),11)
++# Using system BLAS and SuiteSparse, no Fortran compiler needed
++else ifneq ($(USE_BINARYBUILDER_OPENBLAS)$(USE_BINARYBUILDER_LIBSUITESPARSE),11)
+ $(error "Attempting to build OpenBLAS or SuiteSparse without a functioning fortran compiler!")
+ endif
+ endif
+@@ -1343,7 +1353,7 @@ endif
+ JLIBLDFLAGS :=
+ 
+ ifeq ($(OS), Linux)
+-OSLIBS += -Wl,--no-as-needed -ldl -lrt -lpthread -latomic -Wl,--export-dynamic,--as-needed,--no-whole-archive
++OSLIBS += -Wl,--no-as-needed -ldl -lrt -lpthread -latomic $(shell $(CC) -print-libgcc-file-name) -Wl,--export-dynamic,--as-needed,--no-whole-archive
+ # Detect if ifunc is supported
+ IFUNC_DETECT_SRC := 'void (*f0(void))(void) { return (void(*)(void))0L; }; void f(void) __attribute__((ifunc("f0")));'
+ ifeq (supported, $(shell echo $(IFUNC_DETECT_SRC) | $(CC) -Werror -x c - -S -o /dev/null > /dev/null 2>&1 && echo supported))
+@@ -1652,7 +1662,17 @@ ifneq ($(findstring $(OS),Linux FreeBSD),)
+ LIBGCC_NAME := libgcc_s.$(SHLIB_EXT).1
+ endif
+ 
++ifneq (,$(findstring android,$(XC_HOST)))
++DISABLE_CSL := 1
++endif
++
+ # USE_SYSTEM_CSL causes it to get symlinked into build_private_shlibdir
++ifeq ($(DISABLE_CSL),1)
++LIBGCC_BUILD_DEPLIB :=
++LIBGCC_INSTALL_DEPLIB :=
++LIBSTDCXX_BUILD_DEPLIB :=
++LIBSTDCXX_INSTALL_DEPLIB :=
++else
+ ifeq ($(USE_SYSTEM_CSL),1)
+ LIBGCC_BUILD_DEPLIB := $(call dep_lib_path,$(build_libdir),$(build_private_shlibdir)/$(LIBGCC_NAME))
+ else
+@@ -1671,6 +1691,7 @@ LIBSTDCXX_BUILD_DEPLIB := $(call dep_lib_path,$(build_libdir),$(build_shlibdir)/
+ endif
+ LIBSTDCXX_INSTALL_DEPLIB := $(call dep_lib_path,$(libdir),$(private_shlibdir)/$(LIBSTDCXX_NAME))
+ endif
++endif
+ 
+ 
+ # USE_SYSTEM_LIBM and USE_SYSTEM_OPENLIBM causes it to get symlinked into build_private_shlibdir
+diff --git a/Makefile b/Makefile
+index 0e6fb78827..a9857943c4 100644
+--- a/Makefile
++++ b/Makefile
+@@ -62,8 +62,8 @@ julia_flisp.boot.inc.phony: julia-deps
+ 	@$(MAKE) $(QUIET_MAKE) -C $(BUILDROOT)/src julia_flisp.boot.inc.phony
+ 
+ # Build the HTML docs (skipped if already exists, notably in tarballs)
+-$(BUILDROOT)/doc/_build/html/en/index.html: $(shell find $(BUILDROOT)/base $(BUILDROOT)/doc \( -path $(BUILDROOT)/doc/_build -o -path $(BUILDROOT)/doc/deps -o -name *_constants.jl -o -name *_h.jl -o -name version_git.jl \) -prune -o -type f -print)
+-	@$(MAKE) docs
++$(BUILDROOT)/doc/_build/html/en/index.html:
++	@mkdir -p $(BUILDROOT)/doc/_build/html/en && touch $@
+ 
+ julia-symlink: julia-cli-$(JULIA_BUILD_MODE)
+ ifeq ($(OS),WINNT)
+@@ -221,7 +221,10 @@ endif
+ ifeq ($(USE_LLVM_SHLIB),1)
+ JL_PRIVATE_LIBS-$(USE_SYSTEM_LLVM) += libLLVM $(LLVM_SHARED_LIB_NAME)
+ endif
+-JL_PRIVATE_LIBS-$(USE_SYSTEM_LIBUNWIND) += libunwind
++JL_PRIVATE_LIBS-$(USE_SYSTEM_LIBUNWIND) += libunwind libunwind-$(ARCH) libunwind-generic
++ifeq ($(ARCH),i686)
++JL_PRIVATE_LIBS-$(USE_SYSTEM_LIBUNWIND) += libunwind-x86
++endif
+ 
+ ifeq ($(USE_SYSTEM_LIBM),0)
+ JL_PRIVATE_LIBS-$(USE_SYSTEM_OPENLIBM) += libopenlibm
+@@ -265,7 +268,7 @@ endif
+ # Note that we disable MSYS2's path munging here, as otherwise
+ # it replaces our `:`-separated list as a `;`-separated one.
+ define stringreplace
+-	MSYS2_ARG_CONV_EXCL='*' $(build_depsbindir)/stringreplace $$(strings -t x - '$1' | grep "$2" | awk '{print $$1;}') "$3" 255 "$(call cygpath_w,$1)"
++	MSYS2_ARG_CONV_EXCL='*' $(build_depsbindir)/stringreplace $$(strings -a -t x '$1' | grep "$2" | awk '{print $$1;}') "$3" 255 "$(call cygpath_w,$1)"
+ endef
+ 
+ 
+@@ -404,7 +407,7 @@ endif
+ 	find $(DESTDIR)$(datarootdir)/julia/test -type f -name \*.jl -exec chmod 0444 '{}' \;
+ 
+ 	# Copy documentation
+-	cp -R -L $(BUILDROOT)/doc/_build/html $(DESTDIR)$(docdir)/
++	-cp -R -L $(BUILDROOT)/doc/_build/html $(DESTDIR)$(docdir)/
+ 	# Remove various files which should not be installed
+ 	-rm -f $(DESTDIR)$(datarootdir)/julia/base/version_git.sh
+ 	-rm -f $(DESTDIR)$(datarootdir)/julia/test/Makefile
+diff --git a/src/Makefile b/src/Makefile
+index 4879fd9854..1e962663e0 100644
+--- a/src/Makefile
++++ b/src/Makefile
+@@ -144,8 +144,12 @@ FLAGS += -DLLVM_SHLIB
+ endif # USE_LLVM_SHLIB == 1
+ endif # JULIACODEGEN == LLVM
+ 
++ifeq ($(USE_LLVM_SHLIB),1)
++RT_LLVMLINK += $(LLVM_LDFLAGS) $(LLVM_SHARED_LINK_FLAG)
++else
+ RT_LLVM_LINK_ARGS := $(shell $(LLVM_CONFIG_HOST) --libs $(RT_LLVM_LIBS) --system-libs --link-static)
+ RT_LLVMLINK += $(LLVM_LDFLAGS) $(RT_LLVM_LINK_ARGS)
++endif
+ ifeq ($(OS), WINNT)
+ RT_LLVMLINK += -luuid -lole32
+ endif
+@@ -166,8 +170,8 @@ RT_LIBS := $(call whole_archive,$(LIBUV)) $(call whole_archive,$(LIBUTF8PROC)) $
+ # NB: CG needs uv_mutex_* symbols, but we expect to export them from libjulia-internal
+ CG_LIBS := $(LIBUNWIND) $(CG_LLVMLINK) $(LIBTRACYCLIENT) $(LIBITTAPI) $(WIN_LD_STDCXX) $(OSLIBS)
+ else
+-RT_LIBS := $(call whole_archive,$(LIBUV)) $(call whole_archive,$(LIBUTF8PROC)) $(LIBUNWIND) $(RT_LLVMLINK) $(OSLIBS) $(LIBTRACYCLIENT) $(LIBITTAPI)
+-CG_LIBS := $(LIBUNWIND) $(CG_LLVMLINK) $(OSLIBS) $(LIBTRACYCLIENT) $(LIBITTAPI)
++RT_LIBS := $(call whole_archive,$(LIBUV)) $(call whole_archive,$(LIBUTF8PROC)) $(LIBUNWIND) $(RT_LLVMLINK) $(OSLIBS) $(LIBTRACYCLIENT) $(LIBITTAPI) $(shell $(CC) $(CFLAGS) $(JCFLAGS) -print-libgcc-file-name)
++CG_LIBS := $(LIBUNWIND) $(CG_LLVMLINK) $(OSLIBS) $(LIBTRACYCLIENT) $(LIBITTAPI) $(prefix)/lib/libunwind.a
+ endif
+ RT_DEBUG_LIBS := $(COMMON_LIBPATHS) $(call whole_archive,$(BUILDDIR)/flisp/libflisp-debug.a) $(call whole_archive,$(BUILDDIR)/support/libsupport-debug.a) -ljulia-debug $(RT_LIBS)
+ CG_DEBUG_LIBS := $(COMMON_LIBPATHS) $(CG_LIBS) -ljulia-debug -ljulia-internal-debug
+diff --git a/sysimage.mk b/sysimage.mk
+index f5d9c7b85d..46ad864300 100644
+--- a/sysimage.mk
++++ b/sysimage.mk
+@@ -71,6 +71,7 @@ $(build_private_libdir)/corecompiler.ji: $(COMPILER_SRCS)
+ $(build_private_libdir)/sys.ji: $(build_private_libdir)/corecompiler.ji $(JULIAHOME)/VERSION $(BASE_SRCS) $(STDLIB_SRCS)
+ 	@$(call PRINT_JULIA, cd $(JULIAHOME)/base && \
+ 	if ! JULIA_BINDIR=$(call cygpath_w,$(build_bindir)) WINEPATH="$(call cygpath_w,$(build_bindir));$$WINEPATH" \
++			LD_LIBRARY_PATH="$(call cygpath_w,$(build_private_libdir)):$(call cygpath_w,$(build_libdir)):$$LD_LIBRARY_PATH" \
+ 			$(call spawn, $(JULIA_EXECUTABLE)) -g1 -O0 -C "$(JULIA_CPU_TARGET)" $(HEAPLIM) --output-ji $(call cygpath_w,$@).tmp $(JULIA_SYSIMG_BUILD_FLAGS) \
+ 			--startup-file=no --warn-overwrite=yes --sysimage $(call cygpath_w,$<) sysimg.jl $(RELBUILDROOT); then \
+ 		echo '*** This error might be fixed by running `make clean`. If the error persists$(COMMA) try `make cleanall`. ***'; \
+@@ -81,8 +82,9 @@ $(build_private_libdir)/sys.ji: $(build_private_libdir)/corecompiler.ji $(JULIAH
+ define sysimg_builder
+ $$(build_private_libdir)/sys$1-o.a $$(build_private_libdir)/sys$1-bc.a : $$(build_private_libdir)/sys$1-%.a : $$(build_private_libdir)/sys.ji $$(JULIAHOME)/contrib/generate_precompile.jl
+ 	@$$(call PRINT_JULIA, cd $$(JULIAHOME)/base && \
+-	if ! JULIA_BINDIR=$$(call cygpath_w,$(build_bindir)) \
++	if ! JULIA_BINDIR=$$(call cygpath_w,$$(build_bindir)) \
+ 		 WINEPATH="$$(call cygpath_w,$$(build_bindir));$$$$WINEPATH" \
++		 LD_LIBRARY_PATH="$$(call cygpath_w,$$(build_private_libdir)):$$(call cygpath_w,$$(build_libdir)):$$$$LD_LIBRARY_PATH" \
+ 		 JULIA_LOAD_PATH='@stdlib' \
+ 		 JULIA_PROJECT= \
+ 		 JULIA_DEPOT_PATH=':' \
+diff --git a/pkgimage.mk b/pkgimage.mk
+index f6afc0a9ab..0f0bac0f0c 100644
+--- a/pkgimage.mk
++++ b/pkgimage.mk
+@@ -8,6 +8,7 @@ VERSDIR := v$(shell cut -d. -f1-2 < $(JULIAHOME)/VERSION)
+ # set some influential environment variables
+ export JULIA_DEPOT_PATH := $(build_prefix)/share/julia
+ export JULIA_LOAD_PATH := @stdlib
++export LD_LIBRARY_PATH := $(build_private_libdir):$(build_libdir):$(LD_LIBRARY_PATH)
+ unexport JULIA_PROJECT :=
+ unexport JULIA_BINDIR :=
+ 

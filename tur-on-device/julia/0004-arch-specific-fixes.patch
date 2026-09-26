@@ -1,0 +1,164 @@
+diff --git a/src/abi_arm.cpp b/src/abi_arm.cpp
+index 441aa95b1f..5af73bd1d8 100644
+--- a/src/abi_arm.cpp
++++ b/src/abi_arm.cpp
+@@ -16,7 +16,7 @@
+ #  error "the Julia ARM ABI implementation only supports EABI"
+ #endif
+ 
+-#ifndef __ARM_PCS_VFP
++#if !defined(__ARM_PCS_VFP) && !defined(__ANDROID__)
+ #  error "the Julia ARM ABI implementation requires VFP support"
+ #endif
+ #endif
+diff --git a/src/processor_arm.cpp b/src/processor_arm.cpp
+index 55fc74c425..877698b3bd 100644
+--- a/src/processor_arm.cpp
++++ b/src/processor_arm.cpp
+@@ -1620,6 +1620,7 @@ static void ensure_jit_target(bool imaging)
+         auto &features0 = jit_targets[t.base].en.features;
+         // Always clone when code checks CPU features
+         t.en.flags |= JL_TARGET_CLONE_CPU;
++#ifdef _CPU_AARCH64_
+         static constexpr uint32_t clone_fp16[] = {Feature::fp16fml,Feature::fullfp16};
+         for (auto fe: clone_fp16) {
+             if (!test_nbit(features0, fe) && test_nbit(t.en.features, fe)) {
+@@ -1627,6 +1628,7 @@ static void ensure_jit_target(bool imaging)
+                 break;
+             }
+         }
++#endif
+         // The most useful one in general...
+         t.en.flags |= JL_TARGET_CLONE_LOOP;
+ #ifdef _CPU_ARM_
+@@ -1815,9 +1817,7 @@ JL_DLLEXPORT jl_value_t *jl_cpu_has_fma(int bits)
+ #else
+     TargetData<feature_sz> target = jit_targets.front();
+     FeatureList<feature_sz> features = target.en.features;
+-    if (bits == 32 && test_nbit(features, Feature::vfp4sp))
+-        return jl_true;
+-    else if ((bits == 64 || bits == 32) && test_nbit(features, Feature::vfp4))
++    if ((bits == 64 || bits == 32) && test_nbit(features, Feature::vfp4))
+         return jl_true;
+     else
+         return jl_false;
+@@ -1893,6 +1893,7 @@ auto &cmdline = get_cmdline_targets();
+         auto &features0 = image_targets[t.base].en.features;
+         // Always clone when code checks CPU features
+         t.en.flags |= JL_TARGET_CLONE_CPU;
++#ifdef _CPU_AARCH64_
+         static constexpr uint32_t clone_fp16[] = {Feature::fp16fml,Feature::fullfp16};
+         for (auto fe: clone_fp16) {
+             if (!test_nbit(features0, fe) && test_nbit(t.en.features, fe)) {
+@@ -1900,6 +1901,7 @@ auto &cmdline = get_cmdline_targets();
+                 break;
+             }
+         }
++#endif
+         // The most useful one in general...
+         t.en.flags |= JL_TARGET_CLONE_LOOP;
+ #ifdef _CPU_ARM_
+diff --git a/src/codegen.cpp b/src/codegen.cpp
+index 3782085617..22624a8031 100644
+--- a/src/codegen.cpp
++++ b/src/codegen.cpp
+@@ -9032,6 +9032,14 @@ void emitFloat16Wrappers(Module &M, bool external)
+                 FunctionType::get(Type::getInt16Ty(ctx), { Type::getFloatTy(ctx) }, false), external);
+     makeCastCall(M, "__truncdfhf2", "julia__truncdfhf2", FunctionType::get(Type::getHalfTy(ctx), { Type::getDoubleTy(ctx) }, false),
+                 FunctionType::get(Type::getInt16Ty(ctx), { Type::getDoubleTy(ctx) }, false), external);
++#ifdef _CPU_ARM_
++    makeCastCall(M, "__aeabi_h2f", "julia__gnu_h2f_ieee", FunctionType::get(Type::getFloatTy(ctx), { Type::getHalfTy(ctx) }, false),
++                FunctionType::get(Type::getFloatTy(ctx), { Type::getInt16Ty(ctx) }, false), external);
++    makeCastCall(M, "__aeabi_f2h", "julia__gnu_f2h_ieee", FunctionType::get(Type::getHalfTy(ctx), { Type::getFloatTy(ctx) }, false),
++                FunctionType::get(Type::getInt16Ty(ctx), { Type::getFloatTy(ctx) }, false), external);
++    makeCastCall(M, "__aeabi_d2h", "julia__truncdfhf2", FunctionType::get(Type::getHalfTy(ctx), { Type::getDoubleTy(ctx) }, false),
++                FunctionType::get(Type::getInt16Ty(ctx), { Type::getDoubleTy(ctx) }, false), external);
++#endif
+ }
+ 
+ static void init_f16_funcs(void)
+diff --git a/base/float.jl b/base/float.jl
+index aa61f2c844..caab8a1823 100644
+--- a/base/float.jl
++++ b/base/float.jl
+@@ -411,6 +411,11 @@ widen(::Type{Float32}) = Float64
+ *(x::T, y::T) where {T<:IEEEFloat} = mul_float(x, y)
+ /(x::T, y::T) where {T<:IEEEFloat} = div_float(x, y)
+ 
+++(x::Float16, y::Float16) = Float16(Float32(x) + Float32(y))
++-(x::Float16, y::Float16) = Float16(Float32(x) - Float32(y))
++*(x::Float16, y::Float16) = Float16(Float32(x) * Float32(y))
++/(x::Float16, y::Float16) = Float16(Float32(x) / Float32(y))
++
+ muladd(x::T, y::T, z::T) where {T<:IEEEFloat} = muladd_float(x, y, z)
+ 
+ # TODO: faster floating point div?
+@@ -868,7 +873,7 @@ such `y` exists (e.g. if `x` is `-Inf` or `NaN`), then return `x`.
+ prevfloat(x::AbstractFloat) = nextfloat(x,-1)
+ 
+ for Ti in (Int8, Int16, Int32, Int64, Int128, UInt8, UInt16, UInt32, UInt64, UInt128)
+-    for Tf in (Float16, Float32, Float64)
++    for Tf in (Float32, Float64)
+         if Ti <: Unsigned || sizeof(Ti) < sizeof(Tf)
+             # Here `Tf(typemin(Ti))-1` is exact, so we can compare the lower-bound
+             # directly. `Tf(typemax(Ti))+1` is either always exactly representable, or
+@@ -915,6 +920,10 @@ for Ti in (Int8, Int16, Int32, Int64, Int128, UInt8, UInt16, UInt32, UInt64, UIn
+             end
+         end
+     end
++    @eval begin
++        trunc(::Type{$Ti}, x::Float16) = trunc($Ti, Float32(x))
++        (::Type{$Ti})(x::Float16) = ($Ti)(Float32(x))
++    end
+ end
+ 
+ """
+diff --git a/src/gc.h b/src/gc.h
+index 6ad521abe8..065b790d76 100644
+--- a/src/gc.h
++++ b/src/gc.h
+@@ -83,7 +83,7 @@ typedef struct {
+     uint64_t    total_sweep_time;
+     uint64_t    total_mark_time;
+     uint64_t    last_full_sweep;
+-} jl_gc_num_t;
++} __attribute__((aligned(8))) jl_gc_num_t;
+ 
+ // Array chunks (work items representing suffixes of
+ // large arrays of pointers left to be marked)
+diff --git a/cli/trampolines/trampolines_i686.S b/cli/trampolines/trampolines_i686.S
+index 3d9cacf0ce..5acdd9e3ec 100644
+--- a/cli/trampolines/trampolines_i686.S
++++ b/cli/trampolines/trampolines_i686.S
+@@ -3,6 +3,21 @@
+ #include "common.h"
+ #include "../../src/jl_exported_funcs.inc"
+ 
++#if defined(__ELF__) && !defined(_OS_WINDOWS_)
++#define XX(name) \
++DEBUGINFO(CNAME(name)); \
++.global CNAME(name); \
++.cfi_startproc; \
++CNAME(name)##:; \
++    CET_START(); \
++    calll 1f; \
++1:  popl %ecx; \
++    addl $_GLOBAL_OFFSET_TABLE_ + (. - 1b), %ecx; \
++    jmpl *CNAMEADDR(name)@GOTOFF(%ecx); \
++    ud2; \
++.cfi_endproc; \
++EXPORT(name);
++#else
+ #define XX(name) \
+ DEBUGINFO(CNAME(name)); \
+ .global CNAME(name); \
+@@ -12,7 +27,8 @@ CNAME(name)##:; \
+     jmpl *(CNAMEADDR(name)); \
+     ud2; \
+ .cfi_endproc; \
+-EXPORT(name); \
++EXPORT(name);
++#endif
+ 
+ JL_RUNTIME_EXPORTED_FUNCS(XX)
+ #ifdef _OS_WINDOWS_
