@@ -187,10 +187,10 @@ diff --git a/chrome/browser/BUILD.gn b/chrome/browser/BUILD.gn
 index 740af9876e..299c6e56f7 100644
 --- a/chrome/browser/BUILD.gn
 +++ b/chrome/browser/BUILD.gn
-@@ -277,6 +277,7 @@
-     "universal_web_contents_observers.cc",
-     "universal_web_contents_observers.h",
-   ]
+@@ -1568,6 +1568,7 @@
+ # require many files from it. This makes linking more efficient.
+ jumbo_static_library("browser") {
+   sources = []
 +  jumbo_excluded_sources = []
  
    configs += [
@@ -206,33 +206,6 @@ index 740af9876e..299c6e56f7 100644
 
      sources += [
        "web_applications/isolated_web_apps/window_management/isolated_web_apps_window_open_permission_service.cc",
-@@ -3043,6 +3048,11 @@
-       "ui/ash/shelf/chrome_shelf_metrics_provider.cc",
-       "ui/ash/shelf/chrome_shelf_metrics_provider.h",
-     ]
-+    jumbo_excluded_sources += [
-+      # `QUERY` in `components/search_engines/template_url.h` conflicts with
-+      # the one in NDK's `nameser_compat.h`
-+      "first_run/first_run.cc",
-+    ]
- 
-     deps += [
-       "//ash",
-diff --git a/chrome/browser/actor/BUILD.gn b/chrome/browser/actor/BUILD.gn
-index 623752ebed..d1b290735a 100644
---- a/chrome/browser/actor/BUILD.gn
-+++ b/chrome/browser/actor/BUILD.gn
-@@ -171,6 +171,10 @@ jumbo_source_set("impl") {
-     "tools/wait_tool.h",
-     "tools/wait_tool_request.cc",
-   ]
-+  jumbo_excluded_sources = [
-+    # Too many conflicts with `ostream <<`
-+    "aggregated_journal.cc"
-+  ]
-   deps = [
-     ":actor",
-     ":variants",
 diff --git a/chrome/browser/actor/tools/media_control_tool.cc b/chrome/browser/actor/tools/media_control_tool.cc
 index 896683b21f..0870b742c5 100644
 --- a/chrome/browser/actor/tools/media_control_tool.cc
@@ -901,17 +874,6 @@ index 7c555cfd5f..e8a3466654 100644
      content::WebContents* web_contents = tab->GetContents();
      CHECK(web_contents);
  
-diff --git a/chrome/browser/extensions/api/tabs/tabs_event_router_platform_delegate_non_android.h b/chrome/browser/extensions/api/tabs/tabs_event_router_platform_delegate_non_android.h
-index ed959562b7..aba15ad707 100644
---- a/chrome/browser/extensions/api/tabs/tabs_event_router_platform_delegate_non_android.h
-+++ b/chrome/browser/extensions/api/tabs/tabs_event_router_platform_delegate_non_android.h
-@@ -68,7 +68,7 @@ class TabsEventRouterPlatformDelegate
-   void TabGroupedStateChanged(TabStripModel* tab_strip_model,
-                               std::optional<tab_groups::TabGroupId> old_group,
-                               std::optional<tab_groups::TabGroupId> new_group,
--                              tabs::TabInterface* tab,
-+                              ::tabs::TabInterface* tab,
-                               int index) override;
    void OnTabGroupChanged(const TabGroupChange& change) override;
    void OnSplitTabChanged(const SplitTabChange& change) override;
 diff --git a/chrome/browser/extensions/browser_extension_window_controller.cc b/chrome/browser/extensions/browser_extension_window_controller.cc
@@ -948,7 +910,7 @@ index 5af8b82010..13c46f4168 100644
      }
 -    std::vector<tabs::TabInterface*> all_tabs = tab_list->GetAllTabs();
 +    std::vector<::tabs::TabInterface*> all_tabs = tab_list->GetAllTabs();
-     if (base::Contains(all_tabs, tab)) {
+     if (std::ranges::contains(all_tabs, tab)) {
        return browser;  // Found it!
      }
 diff --git a/chrome/browser/extensions/extension_view_host_factory.cc b/chrome/browser/extensions/extension_view_host_factory.cc
@@ -993,25 +955,6 @@ index e8cea2242c..efae52430a 100644
  
    if (!is_android) {
      # TODO(b/470059315): Make these work on Android, or move them to the
-diff --git a/chrome/browser/glic/common/glic_panel_hotkey_delegate.cc b/chrome/browser/glic/common/glic_panel_hotkey_delegate.cc
-index 17dd2cc32b..4bb787f009 100644
---- a/chrome/browser/glic/common/glic_panel_hotkey_delegate.cc
-+++ b/chrome/browser/glic/common/glic_panel_hotkey_delegate.cc
-@@ -25,6 +25,8 @@
- #include "ui/android/window_android.h"
- #endif
- 
-+#define kSupportedHotkeys kSupportedHotkeys_glic_panel_hotkey_delegate
-+
- namespace glic {
- 
- namespace {
-@@ -145,3 +147,5 @@ std::unique_ptr<LocalHotkeyManager> MakeGlicWindowHotkeyManager(
- }
- 
- }  // namespace glic
-+
-+#undef kSupportedHotkeys
 diff --git a/chrome/browser/glic/host/context/glic_focused_tab_manager.cc b/chrome/browser/glic/host/context/glic_focused_tab_manager.cc
 index a6bfe8e0fa..f6a9ae8f08 100644
 --- a/chrome/browser/glic/host/context/glic_focused_tab_manager.cc
@@ -1346,27 +1289,6 @@ index e3612e5f9b..20d26ce5d5 100644
  WEB_CONTENTS_USER_DATA_KEY_IMPL(ChromePasswordManagerClient);
 +
 +#undef Logger
-diff --git a/chrome/browser/password_manager/password_change/change_password_form_filling_submission_helper.cc b/chrome/browser/password_manager/password_change/change_password_form_filling_submission_helper.cc
-index de434c463e..dd36713f30 100644
---- a/chrome/browser/password_manager/password_change/change_password_form_filling_submission_helper.cc
-+++ b/chrome/browser/password_manager/password_change/change_password_form_filling_submission_helper.cc
-@@ -28,6 +28,9 @@
- #include "content/public/browser/web_contents.h"
- #include "third_party/abseil-cpp/absl/cleanup/cleanup.h"
- 
-+#define GetAIPageContentOptions GetAIPageContentOptions_ChangePasswordFormFillingSubmissionHelper
-+#define GetLoggerIfAvailable    GetLoggerIfAvailable_ChangePasswordFormFillingSubmissionHelper
-+
- namespace {
- 
- using Logger = password_manager::BrowserSavePasswordProgressLogger;
-@@ -487,3 +490,6 @@ void ChangePasswordFormFillingSubmissionHelper::OnChangePasswordFormFound(
-   TriggerFilling(*form_manager->GetParsedObservedForm(),
-                  form_manager->GetDriver());
- }
-+
-+#undef GetAIPageContentOptions
-+#undef GetLoggerIfAvailable
 diff --git a/chrome/browser/password_manager/password_change/change_password_form_finder.cc b/chrome/browser/password_manager/password_change/change_password_form_finder.cc
 index 9e3e552a3f..0c0e2d2385 100644
 --- a/chrome/browser/password_manager/password_change/change_password_form_finder.cc
@@ -1910,18 +1832,6 @@ index 4cef995ac6..2da13d8f94 100644
    }
  
    if (is_win || is_mac) {
-@@ -4777,6 +4790,11 @@ jumbo_static_library("ui") {
-       "//chrome/browser/upgrade_detector",
-       "//ui/base/mojom:ui_base_types",
-     ]
-+    jumbo_excluded_sources += [
-+      # DISTANCE_BUTTON_VERTICAL both exists in
-+      # permission_prompt_bubble_base_view.h and file_system_access_restore_permission_bubble_view.h
-+      "views/file_system_access/file_system_access_restore_permission_bubble_view.cc",
-+    ]
- 
-     deps += [
-       "//base",
 diff --git a/chrome/browser/ui/exclusive_access/keyboard_lock_controller.cc b/chrome/browser/ui/exclusive_access/keyboard_lock_controller.cc
 index 1b380812b5..11078b4879 100644
 --- a/chrome/browser/ui/exclusive_access/keyboard_lock_controller.cc
@@ -2354,25 +2264,6 @@ index 7af83d7cf3..fdce72bd05 100644
 +
  BEGIN_METADATA(DownloadBubbleSecurityView)
  END_METADATA
-diff --git a/chrome/browser/ui/views/file_system_access/file_system_access_icon_view.cc b/chrome/browser/ui/views/file_system_access/file_system_access_icon_view.cc
-index 191d28ef8a..39f0d5a0e8 100644
---- a/chrome/browser/ui/views/file_system_access/file_system_access_icon_view.cc
-+++ b/chrome/browser/ui/views/file_system_access/file_system_access_icon_view.cc
-@@ -22,6 +22,8 @@
- #include "ui/base/metadata/metadata_impl_macros.h"
- #include "ui/views/accessibility/view_accessibility.h"
- 
-+#define GetPaths GetPaths_FileSystemAccessIconView
-+
- namespace {
- 
- std::vector<base::FilePath> GetPaths(
-@@ -119,3 +121,5 @@ const gfx::VectorIcon& FileSystemAccessIconView::GetVectorIcon() const {
- 
- BEGIN_METADATA(FileSystemAccessIconView)
- END_METADATA
-+
-+#undef GetPaths
 diff --git a/chrome/browser/ui/views/frame/contents_container_view.cc b/chrome/browser/ui/views/frame/contents_container_view.cc
 index 10246ce3c0..079b23e4f5 100644
 --- a/chrome/browser/ui/views/frame/contents_container_view.cc
@@ -4109,100 +4000,6 @@ index 9ec63739f7..a84318dc11 100644
  }  // namespace actor
 +
 +#undef ToTabObservationResult
-diff --git a/chrome/browser/glic/suggestions/glic_cue_target.cc b/chrome/browser/glic/suggestions/glic_cue_target.cc
-index 322b6d8002..2934cc6075 100644
---- a/chrome/browser/glic/suggestions/glic_cue_target.cc
-+++ b/chrome/browser/glic/suggestions/glic_cue_target.cc
-@@ -47,7 +47,7 @@ void GlicCueTarget::Register(BrowserWindowInterface& browser_window_interface) {
-       browser_window_interface.GetFeatures().contextual_cueing_controller();
-   CHECK(contextual_cueing_controller);
-   contextual_cueing_controller->RegisterCueTarget(
--      contextual_cueing::CueTargetType::kGlic,
-+      ::contextual_cueing::CueTargetType::kGlic,
-       std::make_unique<GlicCueTarget>(
-           *glic_keyed_service,
-           OptimizationGuideKeyedServiceFactory::GetForProfile(
-@@ -72,24 +72,24 @@ bool GlicCueTarget::IsEligible() const {
-              *browser_window_interface_);
- }
- 
--void GlicCueTarget::OnClick(contextual_cueing::CueActionData data) {
-+void GlicCueTarget::OnClick(::contextual_cueing::CueActionData data) {
-   InvokeGlic(std::move(data), base::FeatureList::IsEnabled(
-                                   features::kGlicContextualCueingV2AutoSubmit));
- }
- 
--void GlicCueTarget::OnEditPrompt(contextual_cueing::CueActionData data) {
-+void GlicCueTarget::OnEditPrompt(::contextual_cueing::CueActionData data) {
-   InvokeGlic(std::move(data), /*should_autosubmit=*/false);
- }
- 
--void GlicCueTarget::InvokeGlic(contextual_cueing::CueActionData data,
-+void GlicCueTarget::InvokeGlic(::contextual_cueing::CueActionData data,
-                                bool should_autosubmit) {
- #if BUILDFLAG(IS_ANDROID)
-   NOTIMPLEMENTED() << "Glic contextual cue not yet implemented for Android.";
- #else
--  if (!std::holds_alternative<contextual_cueing::GlicCueActionData>(data)) {
-+  if (!std::holds_alternative<::contextual_cueing::GlicCueActionData>(data)) {
-     return;
-   }
--  auto& glic_data = std::get<contextual_cueing::GlicCueActionData>(data);
-+  auto& glic_data = std::get<::contextual_cueing::GlicCueActionData>(data);
-   GlicInvokeOptions options(
-       Target(browser_window_interface_->GetActiveTabInterface(),
-              NewConversation()),
-@@ -132,9 +132,9 @@ ui::ImageModel GlicCueTarget::GetOmniboxChipIcon() const {
-       ui::kColorSysOnSurface, 18);
- }
- 
--contextual_cueing::CueActionData GlicCueTarget::CueActionDataFromResponse(
-+::contextual_cueing::CueActionData GlicCueTarget::CueActionDataFromResponse(
-     const optimization_guide::proto::ContextualCueingResponse& response) const {
--  contextual_cueing::GlicCueActionData data;
-+  ::contextual_cueing::GlicCueActionData data;
-   if (!response.has_gemini_in_chrome_surface()) {
-     CUEING_LOG("Missing Gemini surface data.");
-     return data;
-diff --git a/chrome/browser/glic/suggestions/glic_cue_target.h b/chrome/browser/glic/suggestions/glic_cue_target.h
-index 28224aadbb..563c3c4a9e 100644
---- a/chrome/browser/glic/suggestions/glic_cue_target.h
-+++ b/chrome/browser/glic/suggestions/glic_cue_target.h
-@@ -16,7 +16,7 @@ namespace glic {
- 
- class GlicKeyedService;
- 
--class GlicCueTarget : public contextual_cueing::CueTarget {
-+class GlicCueTarget : public ::contextual_cueing::CueTarget {
-  public:
-   static void Register(BrowserWindowInterface& browser_window_interface);
- 
-@@ -26,20 +26,20 @@ class GlicCueTarget : public contextual_cueing::CueTarget {
-       BrowserWindowInterface& browser_window_interface);
-   ~GlicCueTarget() override;
- 
--  // contextual_cueing::CueTarget:
-+  // ::contextual_cueing::CueTarget:
-   bool IsEligible() const override;
--  void OnClick(contextual_cueing::CueActionData data) override;
--  void OnEditPrompt(contextual_cueing::CueActionData data) override;
-+  void OnClick(::contextual_cueing::CueActionData data) override;
-+  void OnEditPrompt(::contextual_cueing::CueActionData data) override;
-   ui::ImageModel GetAnchoredMessageIcon() const override;
-   ui::ImageModel GetOmniboxChipIcon() const override;
--  contextual_cueing::CueActionData CueActionDataFromResponse(
-+  ::contextual_cueing::CueActionData CueActionDataFromResponse(
-       const optimization_guide::proto::ContextualCueingResponse& response)
-       const override;
-   optimization_guide::proto::ContextualCueingSurface GetSurface()
-       const override;
- 
-  private:
--  void InvokeGlic(contextual_cueing::CueActionData data,
-+  void InvokeGlic(::contextual_cueing::CueActionData data,
-                   bool should_autosubmit);
- 
-   tabs::TabHandle GetActiveTabHandle();
 diff --git a/chrome/browser/BUILD.gn b/chrome/browser/BUILD.gn
 index e4ed7f1468..c6db8b574d 100644
 --- a/chrome/browser/BUILD.gn
@@ -4242,3 +4039,418 @@ index 10bb528ee3..8edeef64d8 100644
 +    ]
    }
  }
+diff --git a/chrome/browser/password_manager/password_change/change_password_form_filler.cc b/chrome/browser/password_manager/password_change/change_password_form_filler.cc
+index 58c6a15042..78ca52fce1 100644
+--- a/chrome/browser/password_manager/password_change/change_password_form_filler.cc
++++ b/chrome/browser/password_manager/password_change/change_password_form_filler.cc
+@@ -22,6 +22,8 @@
+ #include "components/password_manager/core/browser/password_manager_util.h"
+ #include "content/public/browser/web_contents.h"
+ 
++#define kSubmitFormFlowStep kSubmitFormFlowStep_change_password_form_filler
++
+ namespace {
+ 
+ using Logger = password_manager::BrowserSavePasswordProgressLogger;
+@@ -192,3 +194,5 @@ void ChangePasswordFormFiller::OnChangePasswordFormFound(
+   form_manager_ = form_manager->Clone();
+   TriggerFilling(parsed_form, driver);
+ }
++
++#undef kSubmitFormFlowStep
+diff --git a/chrome/browser/password_manager/password_change/change_password_form_filling_submission_helper.cc b/chrome/browser/password_manager/password_change/change_password_form_filling_submission_helper.cc
+index 242b826a75..b9832874dd 100644
+--- a/chrome/browser/password_manager/password_change/change_password_form_filling_submission_helper.cc
++++ b/chrome/browser/password_manager/password_change/change_password_form_filling_submission_helper.cc
+@@ -31,6 +31,8 @@
+ #include "content/public/browser/web_contents.h"
+ #include "third_party/abseil-cpp/absl/cleanup/cleanup.h"
+ 
++#define GetAIPageContentOptions GetAIPageContentOptions_change_password_form_filling_submission_helper
++
+ namespace {
+ 
+ using Logger = password_manager::BrowserSavePasswordProgressLogger;
+@@ -268,3 +270,4 @@ void ChangePasswordFormFillingSubmissionHelper::OnTimeout() {
+   std::move(callback_).Run(base::unexpected(SubmissionError::kTimeout));
+ }
+ 
++#undef GetAIPageContentOptions
+diff --git a/chrome/browser/extensions/api/tabs/tabs_event_router.cc b/chrome/browser/extensions/api/tabs/tabs_event_router.cc
+index d4c48c003f..f59f3104e2 100644
+--- a/chrome/browser/extensions/api/tabs/tabs_event_router.cc
++++ b/chrome/browser/extensions/api/tabs/tabs_event_router.cc
+@@ -204,7 +204,7 @@ void TabsEventRouter::TabEntry::OnPinnedStateChanged(::tabs::TabInterface* tab,
+ }
+ 
+ void TabsEventRouter::TabEntry::OnGroupChanged(
+-    tabs::TabInterface* tab,
++    ::tabs::TabInterface* tab,
+     std::optional<tab_groups::TabGroupId> new_group) {
+   router_->TabUpdated(this, {kGroupIdKey});
+ }
+diff --git a/chrome/browser/extensions/api/tabs/tabs_event_router.h b/chrome/browser/extensions/api/tabs/tabs_event_router.h
+index 5d06bc2354..ac0dacffa6 100644
+--- a/chrome/browser/extensions/api/tabs/tabs_event_router.h
++++ b/chrome/browser/extensions/api/tabs/tabs_event_router.h
+@@ -112,7 +112,7 @@ class TabsEventRouter : public favicon::FaviconDriverObserver,
+     void OnPinnedStateChanged(::tabs::TabInterface* tab, bool new_pinned_state);
+ 
+     // Called when the group state has changed for the given tab.
+-    void OnGroupChanged(tabs::TabInterface* tab,
++    void OnGroupChanged(::tabs::TabInterface* tab,
+                         std::optional<tab_groups::TabGroupId> new_group);
+ 
+     // Whether we are waiting to fire the 'complete' status change. This will
+diff --git a/chrome/browser/apps/link_capturing/enable_link_capturing_infobar_delegate.cc b/chrome/browser/apps/link_capturing/enable_link_capturing_infobar_delegate.cc
+index ba67442ef5..e222b525a1 100644
+--- a/chrome/browser/apps/link_capturing/enable_link_capturing_infobar_delegate.cc
++++ b/chrome/browser/apps/link_capturing/enable_link_capturing_infobar_delegate.cc
+@@ -191,7 +191,7 @@ std::u16string EnableLinkCapturingInfoBarDelegate::GetButtonLabel(
+ 
+ const gfx::VectorIcon& EnableLinkCapturingInfoBarDelegate::GetVectorIcon()
+     const {
+-  return features::IsRoundedIconsEnabled() ? vector_icons::kSettingsFilledIcon
++  return ::features::IsRoundedIconsEnabled() ? vector_icons::kSettingsFilledIcon
+                                            : vector_icons::kSettingsOldIcon;
+ }
+ 
+diff --git a/chrome/browser/glic/common/panel_visibility_dependent_hotkey_manager.cc b/chrome/browser/glic/common/panel_visibility_dependent_hotkey_manager.cc
+index 2cde4691e3..ada4312637 100644
+--- a/chrome/browser/glic/common/panel_visibility_dependent_hotkey_manager.cc
++++ b/chrome/browser/glic/common/panel_visibility_dependent_hotkey_manager.cc
+@@ -9,6 +9,8 @@
+ #include "chrome/browser/glic/common/application_hotkey_delegate.h"
+ #include "chrome/browser/profiles/profile.h"
+ 
++#define kSupportedCommands kSupportedCommands_panel_visibility_dependent_hotkey_manager
++
+ namespace glic {
+ 
+ namespace {
+@@ -57,3 +59,5 @@ void PanelVisibilityDependentHotkeyManager::InitializeAccelerators() {
+ }
+ 
+ }  // namespace glic
++
++#undef kSupportedCommands
+diff --git a/chrome/browser/metrics/tab_stats/tab_stats_tracker.cc b/chrome/browser/metrics/tab_stats/tab_stats_tracker.cc
+index c0d4725a66..c2a765e8ee 100644
+--- a/chrome/browser/metrics/tab_stats/tab_stats_tracker.cc
++++ b/chrome/browser/metrics/tab_stats/tab_stats_tracker.cc
+@@ -901,7 +901,7 @@ void TabStatsTracker::UmaStatsReportingDelegate::ReportDailyMetrics(
+     if (profile->IsOffTheRecord()) {
+       continue;
+     }
+-    bool mru_enabled = profile->GetPrefs()->GetBoolean(prefs::kCtrlTabMru);
++    bool mru_enabled = profile->GetPrefs()->GetBoolean(::prefs::kCtrlTabMru);
+     base::UmaHistogramEnumeration(kKeyboardTabSwitchModeHistogramName,
+                                   mru_enabled
+                                       ? KeyboardTabSwitchMode::kMRU
+diff --git a/chrome/browser/ui/views/payments/payment_request_item_list.cc b/chrome/browser/ui/views/payments/payment_request_item_list.cc
+index 52840f8304..89e905e76e 100644
+--- a/chrome/browser/ui/views/payments/payment_request_item_list.cc
++++ b/chrome/browser/ui/views/payments/payment_request_item_list.cc
+@@ -102,7 +102,7 @@ void PaymentRequestItemList::Item::Init() {
+     edit_button->SetBorder(nullptr);
+     edit_button->SetImageModel(
+         views::Button::STATE_NORMAL,
+-        ui::ImageModel::FromVectorIcon(features::IsRoundedIconsEnabled()
++        ui::ImageModel::FromVectorIcon(::features::IsRoundedIconsEnabled()
+                                            ? vector_icons::kEditFilledIcon
+                                            : vector_icons::kEditOldIcon,
+                                        ui::kColorIcon, kEditIconSize));
+@@ -141,7 +141,7 @@ std::unique_ptr<views::ImageView> PaymentRequestItemList::Item::CreateCheckmark(
+   checkmark->SetID(static_cast<int>(DialogViewID::CHECKMARK_VIEW));
+   checkmark->SetCanProcessEventsWithinSubtree(false);
+   checkmark->SetImage(ui::ImageModel::FromVectorIcon(
+-      features::IsRoundedIconsEnabled() ? views::kCheckSmallIcon
++      ::features::IsRoundedIconsEnabled() ? views::kCheckSmallIcon
+                                         : views::kMenuCheckOldIcon,
+       kCheckmarkColor));
+   checkmark->SetVisible(selected);
+diff --git a/chrome/browser/ui/views/payments/payment_request_sheet_controller.cc b/chrome/browser/ui/views/payments/payment_request_sheet_controller.cc
+index 4aa882f127..713fdbd156 100644
+--- a/chrome/browser/ui/views/payments/payment_request_sheet_controller.cc
++++ b/chrome/browser/ui/views/payments/payment_request_sheet_controller.cc
+@@ -247,7 +247,7 @@ class PaymentRequestBackArrowButton : public views::ImageButton {
+     ConfigureVectorImageButton(this);
+     views::SetImageFromVectorIconWithColor(
+         this,
+-        features::IsRoundedIconsEnabled() ? vector_icons::kArrowBackIcon
++       ::features::IsRoundedIconsEnabled() ? vector_icons::kArrowBackIcon
+                                           : vector_icons::kBackArrowOldIcon,
+         {kColorPaymentsRequestBackArrowButtonIcon,
+          kColorPaymentsRequestBackArrowButtonIconDisabled});
+diff --git a/chrome/browser/ui/views/payments/payment_request_views_util.cc b/chrome/browser/ui/views/payments/payment_request_views_util.cc
+index 5c926088fa..2ef4f23337 100644
+--- a/chrome/browser/ui/views/payments/payment_request_views_util.cc
++++ b/chrome/browser/ui/views/payments/payment_request_views_util.cc
+@@ -445,7 +445,7 @@ std::unique_ptr<views::View> CreateWarningView(const std::u16string& message,
+     auto warning_icon = std::make_unique<views::ImageView>();
+     warning_icon->SetCanProcessEventsWithinSubtree(false);
+     warning_icon->SetImage(ui::ImageModel::FromVectorIcon(
+-        features::IsRoundedIconsEnabled() ? vector_icons::kWarningFilledIcon
++        ::features::IsRoundedIconsEnabled() ? vector_icons::kWarningFilledIcon
+                                           : vector_icons::kWarningOldIcon,
+         ui::kColorAlertHighSeverity, 16));
+     header_view->AddChildView(std::move(warning_icon));
+diff --git a/chrome/browser/ui/views/payments/payment_sheet_view_controller.cc b/chrome/browser/ui/views/payments/payment_sheet_view_controller.cc
+index d8ee859cb1..0155e3ab30 100644
+--- a/chrome/browser/ui/views/payments/payment_sheet_view_controller.cc
++++ b/chrome/browser/ui/views/payments/payment_sheet_view_controller.cc
+@@ -264,12 +264,12 @@ class PaymentSheetRowBuilder {
+       std::unique_ptr<views::View> extra_content_view) {
+     auto chevron =
+         std::make_unique<views::ImageView>(ui::ImageModel::FromVectorIcon(
+-            features::IsRoundedIconsEnabled()
++            ::features::IsRoundedIconsEnabled()
+                 ? vector_icons::kArrowRightFlippableIcon
+                 : vector_icons::kSubmenuArrowOldIcon,
+             ui::kColorIcon,
+             gfx::GetDefaultSizeOfVectorIcon(
+-                features::IsRoundedIconsEnabled()
++                ::features::IsRoundedIconsEnabled()
+                     ? vector_icons::kArrowRightFlippableIcon
+                     : vector_icons::kSubmenuArrowOldIcon)));
+     chevron->SetCanProcessEventsWithinSubtree(false);
+diff --git a/chrome/browser/ui/views/payments/secure_payment_confirmation_dialog_view.cc b/chrome/browser/ui/views/payments/secure_payment_confirmation_dialog_view.cc
+index 6a398f4b5a..337ff492b9 100644
+--- a/chrome/browser/ui/views/payments/secure_payment_confirmation_dialog_view.cc
++++ b/chrome/browser/ui/views/payments/secure_payment_confirmation_dialog_view.cc
+@@ -291,7 +291,7 @@ void SecurePaymentConfirmationDialogView::OnModelUpdated() {
+     }
+     if (model_->instrument_icon()->drawsNothing()) {
+       image_view->SetImage(ui::ImageModel::FromVectorIcon(
+-          features::IsRoundedIconsEnabled() ? kCreditCardIcon
++          ::features::IsRoundedIconsEnabled() ? kCreditCardIcon
+                                             : kCreditCardOldIcon,
+           ui::kColorSysOnSurfaceSubtle,
+           kSecurePaymentConfirmationIconDefaultWidthPx));
+@@ -413,7 +413,7 @@ void SecurePaymentConfirmationDialogView::InitViews() {
+       model_->merchant_origin().has_value()) {
+     AddChildView(CreateNewRowView(
+         ui::ImageModel::FromVectorIcon(
+-            features::IsRoundedIconsEnabled()
++            ::features::IsRoundedIconsEnabled()
+                 ? vector_icons::kStorefrontIcon
+                 : vector_icons::kStorefrontOldIcon,
+             ui::kColorSysOnSurfaceSubtle,
+@@ -424,7 +424,7 @@ void SecurePaymentConfirmationDialogView::InitViews() {
+   } else {
+     AddChildView(CreateNewRowView(
+         ui::ImageModel::FromVectorIcon(
+-            features::IsRoundedIconsEnabled()
++            ::features::IsRoundedIconsEnabled()
+                 ? vector_icons::kStorefrontIcon
+                 : vector_icons::kStorefrontOldIcon,
+             ui::kColorSysOnSurfaceSubtle,
+@@ -446,7 +446,7 @@ void SecurePaymentConfirmationDialogView::InitViews() {
+   ui::ImageModel instrument_icon;
+   if (model_->instrument_icon()->drawsNothing()) {
+     instrument_icon = ui::ImageModel::FromVectorIcon(
+-        features::IsRoundedIconsEnabled() ? kCreditCardIcon
++        ::features::IsRoundedIconsEnabled() ? kCreditCardIcon
+                                           : kCreditCardOldIcon,
+         ui::kColorSysOnSurfaceSubtle,
+         kSecurePaymentConfirmationIconDefaultWidthPx);
+@@ -465,7 +465,7 @@ void SecurePaymentConfirmationDialogView::InitViews() {
+   // Total Row
+   AddChildView(CreateNewRowView(
+       ui::ImageModel::FromVectorIcon(
+-          features::IsRoundedIconsEnabled() ? vector_icons::kPaymentsIcon
++          ::features::IsRoundedIconsEnabled() ? vector_icons::kPaymentsIcon
+                                             : vector_icons::kPaymentsOldIcon,
+           ui::kColorSysOnSurfaceSubtle,
+           kSecurePaymentConfirmationIconDefaultWidthPx),
+diff --git a/chrome/browser/glic/suggestions/glic_cue_target.cc b/chrome/browser/glic/suggestions/glic_cue_target.cc
+index 774f71b8d1..7bb19d5527 100644
+--- a/chrome/browser/glic/suggestions/glic_cue_target.cc
++++ b/chrome/browser/glic/suggestions/glic_cue_target.cc
+@@ -48,7 +48,7 @@ void GlicCueTarget::Register(BrowserWindowInterface& browser_window_interface) {
+       browser_window_interface.GetFeatures().contextual_cueing_controller();
+   CHECK(contextual_cueing_controller);
+   contextual_cueing_controller->RegisterCueTarget(
+-      contextual_cueing::CueTargetType::kGlic,
++      ::contextual_cueing::CueTargetType::kGlic,
+       std::make_unique<GlicCueTarget>(
+           *glic_keyed_service,
+           OptimizationGuideKeyedServiceFactory::GetForProfile(
+@@ -79,24 +79,24 @@ bool GlicCueTarget::IsEligible() const {
+              glic::prefs::kGlicDefaultTabContextEnabled);
+ }
+ 
+-void GlicCueTarget::OnClick(contextual_cueing::CueActionData data) {
++void GlicCueTarget::OnClick(::contextual_cueing::CueActionData data) {
+   InvokeGlic(std::move(data), base::FeatureList::IsEnabled(
+                                   features::kGlicContextualCueingV2AutoSubmit));
+ }
+ 
+-void GlicCueTarget::OnEditPrompt(contextual_cueing::CueActionData data) {
++void GlicCueTarget::OnEditPrompt(::contextual_cueing::CueActionData data) {
+   InvokeGlic(std::move(data), /*should_autosubmit=*/false);
+ }
+ 
+-void GlicCueTarget::InvokeGlic(contextual_cueing::CueActionData data,
++void GlicCueTarget::InvokeGlic(::contextual_cueing::CueActionData data,
+                                bool should_autosubmit) {
+ #if BUILDFLAG(IS_ANDROID)
+   NOTIMPLEMENTED() << "Glic contextual cue not yet implemented for Android.";
+ #else
+-  if (!std::holds_alternative<contextual_cueing::GlicCueActionData>(data)) {
++  if (!std::holds_alternative<::contextual_cueing::GlicCueActionData>(data)) {
+     return;
+   }
+-  auto& glic_data = std::get<contextual_cueing::GlicCueActionData>(data);
++  auto& glic_data = std::get<::contextual_cueing::GlicCueActionData>(data);
+   GlicInvokeOptions options(
+       Target(browser_window_interface_->GetActiveTabInterface(),
+              NewConversation()),
+@@ -132,10 +132,10 @@ ui::ImageModel GlicCueTarget::GetOmniboxChipIcon() const {
+       ui::kColorSysOnSurface, 18);
+ }
+ 
+-contextual_cueing::CueActionData GlicCueTarget::CueActionDataFromResponse(
++::contextual_cueing::CueActionData GlicCueTarget::CueActionDataFromResponse(
+     const optimization_guide::proto::ContextualCue& cue,
+     std::vector<tabs::TabHandle> tabs_to_show) const {
+-  contextual_cueing::GlicCueActionData data;
++  ::contextual_cueing::GlicCueActionData data;
+   if (!cue.has_gemini_in_chrome_surface()) {
+     CUEING_LOG("Missing Gemini surface data.");
+     return data;
+diff --git a/chrome/browser/glic/suggestions/glic_cue_target.h b/chrome/browser/glic/suggestions/glic_cue_target.h
+index ff5a0a7665..bb66499f3a 100644
+--- a/chrome/browser/glic/suggestions/glic_cue_target.h
++++ b/chrome/browser/glic/suggestions/glic_cue_target.h
+@@ -16,7 +16,7 @@ namespace glic {
+ 
+ class GlicKeyedService;
+ 
+-class GlicCueTarget : public contextual_cueing::CueTarget {
++class GlicCueTarget : public ::contextual_cueing::CueTarget {
+  public:
+   static void Register(BrowserWindowInterface& browser_window_interface);
+ 
+@@ -28,18 +28,18 @@ class GlicCueTarget : public contextual_cueing::CueTarget {
+ 
+   // contextual_cueing::CueTarget:
+   bool IsEligible() const override;
+-  void OnClick(contextual_cueing::CueActionData data) override;
+-  void OnEditPrompt(contextual_cueing::CueActionData data) override;
++  void OnClick(::contextual_cueing::CueActionData data) override;
++  void OnEditPrompt(::contextual_cueing::CueActionData data) override;
+   ui::ImageModel GetAnchoredMessageIcon() const override;
+   ui::ImageModel GetOmniboxChipIcon() const override;
+-  contextual_cueing::CueActionData CueActionDataFromResponse(
++  ::contextual_cueing::CueActionData CueActionDataFromResponse(
+       const optimization_guide::proto::ContextualCue& cue,
+       std::vector<tabs::TabHandle> tabs_to_show) const override;
+   optimization_guide::proto::ContextualCueingSurface GetSurface()
+       const override;
+ 
+  private:
+-  void InvokeGlic(contextual_cueing::CueActionData data,
++  void InvokeGlic(::contextual_cueing::CueActionData data,
+                   bool should_autosubmit);
+ 
+   tabs::TabHandle GetActiveTabHandle();
+diff --git a/chrome/browser/ui/BUILD.gn b/chrome/browser/ui/BUILD.gn
+index 42451f66f5..32f4f9d09d 100644
+--- a/chrome/browser/ui/BUILD.gn
++++ b/chrome/browser/ui/BUILD.gn
+@@ -3206,6 +3206,10 @@ jumbo_static_library("ui") {
+       "webui/signin/batch_upload_ui.cc",
+       "webui/signin/batch_upload_ui.h",
+     ]
++    jumbo_excluded_sources += [
++      # Also defined in //chrome/browser/ui/profiles:impl
++      "profiles/batch_upload_ui_delegate.cc",
++    ]
+     deps += [ "webui/signin/batch_upload:mojo_bindings" ]
+   }
+ 
+diff --git a/chrome/browser/ui/profiles/BUILD.gn b/chrome/browser/ui/profiles/BUILD.gn
+index 9b23bc197e..ed2fd467ba 100644
+--- a/chrome/browser/ui/profiles/BUILD.gn
++++ b/chrome/browser/ui/profiles/BUILD.gn
+@@ -61,6 +61,7 @@ jumbo_source_set("profiles") {
+ 
+ jumbo_source_set("impl") {
+   sources = [ "profile_error_dialog.cc" ]
++  jumbo_excluded_sources = []
+   deps = [
+     ":profiles",
+     "//chrome/browser/feedback",
+@@ -112,6 +113,10 @@ jumbo_source_set("impl") {
+         "signin_intercept_first_run_experience_dialog.cc",
+         "signin_intercept_first_run_experience_dialog.h",
+       ]
++      jumbo_excluded_sources += [
++        # Also defined in //chrome/browser/ui:ui
++        "batch_upload_ui_delegate.cc",
++      ]
+ 
+       deps += [
+         "//chrome/browser/ui/webui/signin",
+diff --git a/chrome/browser/ui/views/page_action/multi_icon_button.cc b/chrome/browser/ui/views/page_action/multi_icon_button.cc
+index 4ebb2eaff2..e7327777be 100644
+--- a/chrome/browser/ui/views/page_action/multi_icon_button.cc
++++ b/chrome/browser/ui/views/page_action/multi_icon_button.cc
+@@ -38,6 +38,8 @@
+ #include "ui/views/view_class_properties.h"
+ #include "ui/views/view_utils.h"
+ 
++#define kAnchoredMessageIconSize kAnchoredMessageIconSize_multi_icon_button
++
+ namespace page_actions {
+ 
+ namespace {
+@@ -233,3 +235,5 @@ BEGIN_METADATA(MultiIconButton)
+ END_METADATA
+ 
+ }  // namespace page_actions
++
++#undef kAnchoredMessageIconSize
+diff --git a/chrome/browser/ui/views/web_apps/web_app_install_dialog_delegate.cc b/chrome/browser/ui/views/web_apps/web_app_install_dialog_delegate.cc
+index e25a3be63e..2ee6d27cf4 100644
+--- a/chrome/browser/ui/views/web_apps/web_app_install_dialog_delegate.cc
++++ b/chrome/browser/ui/views/web_apps/web_app_install_dialog_delegate.cc
+@@ -51,6 +51,9 @@
+ #include "components/metrics/structured/structured_metrics_client.h"  // nogncheck
+ #endif
+ 
++#define NewPageActionHighlight NewPageActionHighlight_web_app_install_dialog_delegate
++#define kMinBoundsForInstallDialog kMinBoundsForInstallDialog_web_app_install_dialog_delegate
++
+ namespace web_app {
+ 
+ namespace {
+@@ -377,3 +380,6 @@ void WebAppInstallDialogDelegate::MeasureCancelUserActionsForInstallDialog() {
+ }
+ 
+ }  // namespace web_app
++
++#undef NewPageActionHighlight
++#undef kMinBoundsForInstallDialog
+diff --git a/chrome/browser/ui/views/web_apps/web_app_launch_dialog.cc b/chrome/browser/ui/views/web_apps/web_app_launch_dialog.cc
+index c93cc47816..7d7f1fe610 100644
+--- a/chrome/browser/ui/views/web_apps/web_app_launch_dialog.cc
++++ b/chrome/browser/ui/views/web_apps/web_app_launch_dialog.cc
+@@ -34,6 +34,9 @@
+ #include "ui/views/widget/widget_observer.h"
+ #include "web_app_modal_dialog_delegate.h"
+ 
++#define kMinBoundsForInstallDialog kMinBoundsForInstallDialog_web_app_launch_dialog
++#define IsWidgetCurrentSizeSmallerThanPreferredSize IsWidgetCurrentSizeSmallerThanPreferredSize_web_app_launch_dialog
++
+ namespace web_app {
+ 
+ DEFINE_ELEMENT_IDENTIFIER_VALUE(kWebInstallLaunchDialogAppName);
+@@ -200,3 +203,6 @@ base::AutoReset<bool> SetAutoAcceptWebInstallLaunchDialogForTesting() {
+ }
+ 
+ }  // namespace web_app
++
++#undef kMinBoundsForInstallDialog
++#undef IsWidgetCurrentSizeSmallerThanPreferredSize
