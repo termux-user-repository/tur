@@ -871,3 +871,14 @@ index 5562515695..3c3e94150c 100644
  }  // namespace net
 +
 +#undef ToLegacyDestinationEndpoint
+--- a/net/cert/BUILD.gn
++++ b/net/cert/BUILD.gn
+@@ -5,6 +5,8 @@
+ import("//third_party/protobuf/proto_library.gni")
+ 
+ proto_library("root_store_proto_full") {
++  disable_jumbo = true
++
+   proto_out_dir = "net/cert/root_store_proto_full/"
+   sources = [
+     "duration.proto",
