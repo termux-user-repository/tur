@@ -1672,25 +1672,6 @@ index 218f61da75..5a22a5537a 100644
  }  // namespace persistent_cache
 +
 +#undef kLruCacheCapacity
-diff --git a/components/policy/core/browser/incognito/incognito_mode_policy_handler.cc b/components/policy/core/browser/incognito/incognito_mode_policy_handler.cc
-index 63df4e3d62..d2e12ef245 100644
---- a/components/policy/core/browser/incognito/incognito_mode_policy_handler.cc
-+++ b/components/policy/core/browser/incognito/incognito_mode_policy_handler.cc
-@@ -18,6 +18,8 @@
- #include "components/strings/grit/components_strings.h"
- #include "components/url_matcher/url_util.h"
- 
-+#define ValidateHost ValidateHost_incognito_mode_policy_handler
-+
- namespace {
- bool IsValidAvailabilityInt(int in_value) {
-   return in_value >= 0 &&
-@@ -233,3 +235,5 @@ IncognitoModePolicyHandler::GetFilteredUrlListPolicyValue(
- }
- 
- }  // namespace policy
-+
-+#undef ValidateHost
 diff --git a/components/policy/core/browser/url_list/url_blocklist_policy_handler.cc b/components/policy/core/browser/url_list/url_blocklist_policy_handler.cc
 index a9aca680c3..0735d53dfa 100644
 --- a/components/policy/core/browser/url_list/url_blocklist_policy_handler.cc
@@ -2544,4 +2525,132 @@ index b0dbe94e97..13dae915a3 100644
 +
 +#undef GetEvpKem
 +#undef GetJwkAlg
++#undef SynthesizeImportAlgorithmForClone
+diff --git a/components/policy/core/browser/url_list/incognito_mode_policy_handler.cc b/components/policy/core/browser/url_list/incognito_mode_policy_handler.cc
+index 3ab85842d0..39cdf94050 100644
+--- a/components/policy/core/browser/url_list/incognito_mode_policy_handler.cc
++++ b/components/policy/core/browser/url_list/incognito_mode_policy_handler.cc
+@@ -19,6 +19,8 @@
+ #include "components/strings/grit/components_strings.h"
+ #include "components/url_matcher/url_util.h"
+ 
++#define ValidateHost ValidateHost_incognito_mode_policy_handler
++
+ namespace {
+ bool IsValidAvailabilityInt(int in_value) {
+   return in_value >= 0 &&
+@@ -234,3 +236,5 @@ IncognitoModePolicyHandler::GetFilteredUrlListPolicyValue(
+ }
+ 
+ }  // namespace policy
++
++#undef ValidateHost
+diff --git a/components/accessibility_annotator/core/storage/intent_table.cc b/components/accessibility_annotator/core/storage/intent_table.cc
+index 4f859ca761..e9acd45429 100644
+--- a/components/accessibility_annotator/core/storage/intent_table.cc
++++ b/components/accessibility_annotator/core/storage/intent_table.cc
+@@ -10,6 +10,8 @@
+ #include "sql/database.h"
+ #include "sql/table_management_helpers.h"
+ 
++#define kVisitIdColumn kVisitIdColumn_intent_table
++
+ namespace accessibility_annotator {
+ 
+ namespace {
+@@ -90,3 +92,5 @@ bool IntentTable::MigrateFromCleanStateToVersion1() {
+ }
+ 
+ }  // namespace accessibility_annotator
++
++#undef kVisitIdColumn
+diff --git a/components/content_settings/browser/ui/cookie_controls_util.cc b/components/content_settings/browser/ui/cookie_controls_util.cc
+index cdd1363f10..578d572f8c 100644
+--- a/components/content_settings/browser/ui/cookie_controls_util.cc
++++ b/components/content_settings/browser/ui/cookie_controls_util.cc
+@@ -49,15 +49,15 @@ const gfx::VectorIcon& CookieControlsUtil::GetEnforcedIcon(
+     CookieControlsEnforcement enforcement) {
+   switch (enforcement) {
+     case CookieControlsEnforcement::kEnforcedByExtension:
+-      return features::IsRoundedIconsEnabled()
++      return ::features::IsRoundedIconsEnabled()
+                  ? vector_icons::kChromeExtensionIcon
+                  : vector_icons::kExtensionChromeRefreshOldIcon;
+     case CookieControlsEnforcement::kEnforcedByPolicy:
+-      return features::IsRoundedIconsEnabled()
++      return ::features::IsRoundedIconsEnabled()
+                  ? vector_icons::kDomainIcon
+                  : vector_icons::kBusinessChromeRefreshOldIcon;
+     case CookieControlsEnforcement::kEnforcedByCookieSetting:
+-      return features::IsRoundedIconsEnabled()
++      return ::features::IsRoundedIconsEnabled()
+                  ? vector_icons::kSettingsIcon
+                  : vector_icons::kSettingsChromeRefreshOldIcon;
+     case CookieControlsEnforcement::kNoEnforcement:
+diff --git a/components/page_load_metrics/browser/BUILD.gn b/components/page_load_metrics/browser/BUILD.gn
+index fc705624c5..240fd7d298 100644
+--- a/components/page_load_metrics/browser/BUILD.gn
++++ b/components/page_load_metrics/browser/BUILD.gn
+@@ -95,6 +95,11 @@ jumbo_source_set("browser") {
+     "soft_navigation_tracker.cc",
+     "soft_navigation_tracker.h",
+   ]
++  jumbo_excluded_sources = [
++    # `PageLoadType` conflicts
++    "observers/use_counter_page_load_metrics_observer.cc",
++    "observers/soft_navigation_page_load_metrics_observer.cc",
++  ]
+   configs += [
+     "//build/config/compiler:wexit_time_destructors",
+     "//build/config/compiler:wglobal_constructors",
+diff --git a/components/sessions/core/tab_restore_service_helper.cc b/components/sessions/core/tab_restore_service_helper.cc
+index 14a14d2f9c..9f674da33a 100644
+--- a/components/sessions/core/tab_restore_service_helper.cc
++++ b/components/sessions/core/tab_restore_service_helper.cc
+@@ -47,6 +47,8 @@
+ #include "ui/base/mojom/window_show_state.mojom.h"
+ #include "ui/base/window_open_disposition.h"
+ 
++#define MaybeAddSplitToGroup MaybeAddSplitToGroup_tab_restore_service_helper
++
+ namespace sessions {
+ namespace {
+ 
+@@ -1733,3 +1735,5 @@ base::Time TabRestoreServiceHelper::TimeNow() const {
+ }
+ 
+ }  // namespace sessions
++
++#undef MaybeAddSplitToGroup
+diff --git a/components/user_education/common/tutorial/tutorial.cc b/components/user_education/common/tutorial/tutorial.cc
+index 0e1dec67eb..3edfd4c031 100644
+--- a/components/user_education/common/tutorial/tutorial.cc
++++ b/components/user_education/common/tutorial/tutorial.cc
+@@ -226,7 +226,7 @@ TutorialStepBuilder::BuildMaybeShowBubbleCallback(
+             base::Unretained(tutorial_service));
+ 
+         if (is_last_step) {
+-          params.body_icon = &(features::IsRoundedIconsEnabled()
++          params.body_icon = &(::features::IsRoundedIconsEnabled()
+                                    ? vector_icons::kCelebrationIcon
+                                    : vector_icons::kCelebrationOldIcon);
+           params.body_icon_alt_text =
+diff --git a/components/webcrypto/algorithms/mlkem768_x25519.cc b/components/webcrypto/algorithms/mlkem768_x25519.cc
+index f87b14d162..d784273910 100644
+--- a/components/webcrypto/algorithms/mlkem768_x25519.cc
++++ b/components/webcrypto/algorithms/mlkem768_x25519.cc
+@@ -14,6 +14,8 @@
+ #include "third_party/blink/public/platform/web_crypto_key_algorithm.h"
+ #include "third_party/boringssl/src/include/openssl/evp.h"
+ 
++#define SynthesizeImportAlgorithmForClone SynthesizeImportAlgorithmForClone_mlkem768_x25519
++
+ namespace webcrypto {
+ 
+ namespace {
+@@ -309,3 +311,5 @@ std::unique_ptr<AlgorithmImplementation> CreateMlKem768X25519Implementation() {
+ }
+ 
+ }  // namespace webcrypto
++
 +#undef SynthesizeImportAlgorithmForClone

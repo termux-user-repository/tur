@@ -90,7 +90,7 @@ diff --git a/content/browser/BUILD.gn b/content/browser/BUILD.gn
 index 548abd4a68..1b7675f724 100644
 --- a/content/browser/BUILD.gn
 +++ b/content/browser/BUILD.gn
-@@ -6,6 +6,7 @@ import("//base/allocator/partition_allocator/partition_alloc.gni")
+@@ -6,6 +6,7 @@
  import("//build/buildflag_header.gni")
  import("//build/config/compiler/pgo/pgo.gni")
  import("//build/config/features.gni")
@@ -98,7 +98,7 @@ index 548abd4a68..1b7675f724 100644
  import("//build/config/linux/pangocairo/pangocairo.gni")
  import("//build/config/ozone.gni")
  import("//build/config/ui.gni")
-@@ -53,7 +54,116 @@ if (is_ios) {
+@@ -72,7 +73,125 @@
    import("//build/config/apple/mobile_config.gni")  # For `target_platform`
  }
  
@@ -176,6 +176,8 @@ index 548abd4a68..1b7675f724 100644
 +    "$target_gen_dir/devtools/protocol/tethering.h",
 +    "$target_gen_dir/devtools/protocol/tracing.cc",
 +    "$target_gen_dir/devtools/protocol/tracing.h",
++    "$target_gen_dir/devtools/protocol/web_mcp.cc",
++    "$target_gen_dir/devtools/protocol/web_mcp.h",
 +  ]
 +  if (!is_android) {
 +    # The WebAuthn devtools protocol API is not supported in Android yet.
@@ -210,13 +212,20 @@ index 548abd4a68..1b7675f724 100644
 +      "$target_gen_dir/devtools/protocol/native_profiling.h",
 +    ]
 +  }
++
++  if (enable_smart_card) {
++    sources += [
++      "$target_gen_dir/devtools/protocol/smart_card_emulation.cc",
++      "$target_gen_dir/devtools/protocol/smart_card_emulation.h",
++    ]
++  }
 +}
 +
 +jumbo_source_set("browser") {
    # Only the public target should depend on this. All other targets (even
    # internal content ones) should depend on the public one.
    visibility = [
-@@ -171,8 +281,6 @@ source_set("browser") {
+@@ -193,8 +312,6 @@
      "//content/browser/cache_storage:cache_storage_proto",
      "//content/browser/content_index:content_index_proto",
      "//content/browser/cookie_store:cookie_store_proto",
@@ -225,7 +234,7 @@ index 548abd4a68..1b7675f724 100644
      "//content/browser/download:proto",
      "//content/browser/file_system_access:proto",
      "//content/browser/indexed_db:internals_mojo_bindings",
-@@ -344,6 +452,7 @@ source_set("browser") {
+@@ -368,6 +485,7 @@
      "//ui/webui/resources",
      "//v8",
      "//v8:v8_version",
@@ -233,7 +242,7 @@ index 548abd4a68..1b7675f724 100644
    ]
  
    public_deps = [
-@@ -361,62 +470,6 @@ source_set("browser") {
+@@ -386,64 +504,6 @@
    ]
  
    sources = [
@@ -293,12 +302,14 @@ index 548abd4a68..1b7675f724 100644
 -    "$target_gen_dir/devtools/protocol/tethering.h",
 -    "$target_gen_dir/devtools/protocol/tracing.cc",
 -    "$target_gen_dir/devtools/protocol/tracing.h",
+-    "$target_gen_dir/devtools/protocol/web_mcp.cc",
+-    "$target_gen_dir/devtools/protocol/web_mcp.h",
      "about_url_loader_factory.cc",
      "about_url_loader_factory.h",
      "accessibility/accessibility_tree_formatter_blink.cc",
-@@ -2537,6 +2590,10 @@ source_set("browser") {
-     "worker_host/worker_script_loader_factory.cc",
-     "worker_host/worker_script_loader_factory.h",
+@@ -2596,6 +2656,10 @@
+     "worker_host/worker_util.cc",
+     "worker_host/worker_util.h",
    ]
 +  jumbo_excluded_sources = [
 +    # It requires CloneTraits<std::vector<bool>>
@@ -307,7 +318,7 @@ index 548abd4a68..1b7675f724 100644
  
    if (is_android) {
      sources += [
-@@ -2556,8 +2610,6 @@ source_set("browser") {
+@@ -2620,8 +2684,6 @@
      ]
  
      sources += [
@@ -316,7 +327,7 @@ index 548abd4a68..1b7675f724 100644
        "devtools/protocol/bluetooth_emulation_handler.cc",
        "devtools/protocol/bluetooth_emulation_handler.h",
      ]
-@@ -2595,8 +2647,6 @@ source_set("browser") {
+@@ -2659,8 +2721,6 @@
  
    if (use_viz_debugger) {
      sources += [
@@ -325,17 +336,26 @@ index 548abd4a68..1b7675f724 100644
        "devtools/protocol/visual_debugger_handler.cc",
        "devtools/protocol/visual_debugger_handler.h",
      ]
-@@ -2985,6 +3035,9 @@ source_set("browser") {
-         "media/capture/desktop_capture_device.cc",
-         "media/capture/desktop_capture_device.h",
+@@ -2739,8 +2799,6 @@
+     # TODO(crbug.com/470349523): Migrate more smart card files to use this flag.
+     defines += [ "ENABLE_SMART_CARD" ]
+     sources += [
+-      "$target_gen_dir/devtools/protocol/smart_card_emulation.cc",
+-      "$target_gen_dir/devtools/protocol/smart_card_emulation.h",
+       "devtools/protocol/smart_card_emulation_handler.cc",
+       "devtools/protocol/smart_card_emulation_handler.h",
+       "handwriting/handwriting_recognition_service_impl_cros.cc",
+@@ -3033,6 +3091,9 @@
+         "renderer_host/render_widget_host_view_tvos_uiview.h",
+         "renderer_host/render_widget_host_view_tvos_uiview.mm",
        ]
 +      jumbo_excluded_sources += [
 +        "media/capture/desktop_capture_device.cc",
 +      ]
      }
-     if (!is_android && !is_ios) {
-       sources += [
-@@ -3411,6 +3464,12 @@ source_set("browser") {
+ 
+     frameworks += [ "IOSurface.framework" ]
+@@ -3514,6 +3575,12 @@
        "web_contents/web_contents_view_android.h",
      ]
  
@@ -348,7 +368,7 @@ index 548abd4a68..1b7675f724 100644
      deps += [
        ":fontations_name_table_ffi",
        ":reflection_jni_headers",
-@@ -3443,9 +3502,6 @@ source_set("browser") {
+@@ -3546,9 +3613,6 @@
    } else {
      # Not Android.
      sources += [
@@ -358,7 +378,7 @@ index 548abd4a68..1b7675f724 100644
        "devtools/protocol/webauthn_handler.cc",
        "devtools/protocol/webauthn_handler.h",
        "media/session/audio_focus_delegate_default.cc",
-@@ -3694,8 +3750,6 @@ source_set("browser") {
+@@ -3799,8 +3863,6 @@
  
    if (use_clang_profiling_inside_sandbox && chrome_pgo_phase == 1) {
      sources += [
@@ -1018,120 +1038,6 @@ index 7517bdd84c..ca2d78e5b8 100644
    if (render_widget_helper) {
      render_widget_helper_->Init(render_process_id_);
    }
-diff --git a/content/browser/renderer_host/render_process_host_impl.cc b/content/browser/renderer_host/render_process_host_impl.cc
-index 29a6786b54..a48f3472d8 100644
---- a/content/browser/renderer_host/render_process_host_impl.cc
-+++ b/content/browser/renderer_host/render_process_host_impl.cc
-@@ -531,10 +531,10 @@ bool HasEnoughMemoryForAnotherMainFrame(RenderProcessHost* host,
-       private_memory_footprint /
-       std::max(main_frame_count, static_cast<size_t>(1));
-   uint64_t process_memory_limit = base::saturated_cast<uint64_t>(
--      features::kProcessPerSiteMainFrameTotalMemoryLimit.Get());
-+      ::features::kProcessPerSiteMainFrameTotalMemoryLimit.Get());
- 
-   double frame_size_factor =
--      features::kProcessPerSiteMainFrameSiteScalingFactor.Get();
-+      ::features::kProcessPerSiteMainFrameSiteScalingFactor.Get();
-   // Check that we have a factor of at least 1.
-   if (frame_size_factor < 1.0f) {
-     frame_size_factor = 1.0f;
-@@ -597,7 +597,7 @@ bool IsBelowReuseResourceThresholds(RenderProcessHost* host,
-     // If a threshold is specified, don't reuse `host` if it already hosts more
-     // main frames (including BFCached and prerendered) than the threshold.
-     size_t main_frame_threshold = base::checked_cast<size_t>(
--        features::kProcessPerSiteMainFrameThreshold.Get());
-+        ::features::kProcessPerSiteMainFrameThreshold.Get());
-     if (main_frame_count >= main_frame_threshold) {
-       return false;
-     }
-@@ -701,7 +701,7 @@ bool IsEmptyRendererProcessesReuseAllowed() {
-     return false;
-   }
-   return base::FeatureList::IsEnabled(
--      features::kTrackEmptyRendererProcessesForReuse);
-+      ::features::kTrackEmptyRendererProcessesForReuse);
- }
- 
- class SiteProcessCountTracker : public base::SupportsUserData::Data,
-@@ -1441,8 +1441,8 @@ size_t RenderProcessHost::GetMaxRendererProcessCount() {
-   // processes remains reasonable, and on Android the OS takes care of that.
-   // This has shown to have adversarial effects, so we fall back to desktop
-   // behavior for desktop-like form factors.
--  if (base::FeatureList::IsEnabled(features::kRendererProcessLimitOnAndroid)) {
--    return features::kRendererProcessLimitOnAndroidCount.Get();
-+  if (base::FeatureList::IsEnabled(::features::kRendererProcessLimitOnAndroid)) {
-+    return ::features::kRendererProcessLimitOnAndroidCount.Get();
-   } else {
-     return std::numeric_limits<size_t>::max();
-   }
-@@ -3327,19 +3327,19 @@ bool RenderProcessHostImpl::IsSpareProcessKeptAtAllTimes() {
-   // ensure that devices with exactly 1GB of RAM won't get included because of
-   // inaccuracies or off-by-one errors.
-   if (base::SysInfo::AmountOfPhysicalMemory().InMiB() <=
--      features::kAndroidSpareRendererMemoryThreshold.Get()) {
-+      ::features::kAndroidSpareRendererMemoryThreshold.Get()) {
-     return false;
-   }
- 
-   bool android_spare_process_override = base::FeatureList::IsEnabled(
--      features::kAndroidWarmUpSpareRendererWithTimeout);
-+      ::features::kAndroidWarmUpSpareRendererWithTimeout);
-   if (!SiteIsolationPolicy::UseDedicatedProcessesForAllSites() &&
-       !android_spare_process_override) {
-     return false;
-   }
- 
-   if (!base::FeatureList::IsEnabled(
--          features::kSpareRendererForSitePerProcess) &&
-+          ::features::kSpareRendererForSitePerProcess) &&
-       !android_spare_process_override) {
-     return false;
-   }
-@@ -3581,7 +3581,7 @@ void RenderProcessHostImpl::AppendRendererCommandLine(
-     command_line->AppendSwitch(switches::kDisallowV8FeatureFlagOverrides);
-   }
- 
--  if (features::IsTouchTextEditingRedesignEnabled()) {
-+  if (::features::IsTouchTextEditingRedesignEnabled()) {
-     command_line->AppendSwitchASCII(
-         blink::switches::kTouchTextSelectionStrategy,
-         blink::switches::kTouchTextSelectionStrategy_Direction);
-@@ -4944,7 +4944,7 @@ bool RenderProcessHost::IsProcessLimitReached() {
-     // users, as the experiment is configured with "starts_active" set to false
-     // (meaning it only collects data from users who reach this code).
- #if !BUILDFLAG(IS_ANDROID)
--    if (base::FeatureList::IsEnabled(features::kRemoveRendererProcessLimit)) {
-+    if (base::FeatureList::IsEnabled(::features::kRemoveRendererProcessLimit)) {
-       // This is used for tests. To avoid changing test behaviors, don't
-       // change the behavior when it is set.
-       if (g_max_renderer_count_override) {
-@@ -5071,7 +5071,7 @@ RenderProcessHost* RenderProcessHostImpl::GetProcessHostForSiteInstance(
-     case ProcessReusePolicy::
-         kReusePendingOrCommittedSiteWithMainFrameThreshold: {
-       CHECK(base::FeatureList::IsEnabled(
--          features::kProcessPerSiteUpToMainFrameThreshold));
-+          ::features::kProcessPerSiteUpToMainFrameThreshold));
-       [[fallthrough]];
-     }
-     case ProcessReusePolicy::kReusePrerenderingProcessForMainFrame: {
-@@ -5154,7 +5154,7 @@ RenderProcessHost* RenderProcessHostImpl::GetProcessHostForSiteInstance(
-     base::UmaHistogramBoolean(
-         "BrowserRenderProcessHost.ExistingRendererIsInitializedAndNotDead",
-         render_process_host->IsInitializedAndNotDead());
--    if (base::FeatureList::IsEnabled(features::kEnsureExistingRendererAlive)) {
-+    if (base::FeatureList::IsEnabled(::features::kEnsureExistingRendererAlive)) {
-       render_process_host->Init();
-     }
-   }
-@@ -5691,7 +5691,7 @@ void RenderProcessHostImpl::UpdateProcessPriority() {
-     }
- #if BUILDFLAG(IS_MAC)
-     if (base::FeatureList::IsEnabled(
--            features::kMacAllowBackgroundingRenderProcesses)) {
-+            ::features::kMacAllowBackgroundingRenderProcesses)) {
-       child_process_launcher_->SetProcessPriority(process_priority);
-     }
- #else   // !BUILDFLAG(IS_MAC)
 diff --git a/content/browser/renderer_host/render_view_host_impl.cc b/content/browser/renderer_host/render_view_host_impl.cc
 index 5b1453e29d..6b25f31062 100644
 --- a/content/browser/renderer_host/render_view_host_impl.cc
@@ -1381,12 +1287,11 @@ index 01563a3c60..d4098d2974 100644
    # Targets external to content should always link to the public API.
    # In addition, targets outside of the content component (shell and tests)
    # must not link to this because it will duplicate the code in the component
-@@ -184,6 +184,10 @@ source_set("common") {
+@@ -184,6 +184,9 @@ source_set("common") {
      "webid/identity_url_loader_throttle.cc",
      "webid/identity_url_loader_throttle.h",
    ]
 +  jumbo_excluded_sources = [
-+    "common_param_traits.cc",
 +    "content_param_traits.cc",
 +  ]
  
@@ -1508,10 +1413,10 @@ diff --git a/content/renderer/BUILD.gn b/content/renderer/BUILD.gn
 index 8404e4d6b8..b62b0ba706 100644
 --- a/content/renderer/BUILD.gn
 +++ b/content/renderer/BUILD.gn
-@@ -4,6 +4,7 @@
+@@ -3,6 +3,7 @@
+ # found in the LICENSE file.
  
  import("//build/config/cast.gni")
- import("//build/config/chromeos/ui_mode.gni")
 +import("//build/config/jumbo.gni")
  import("//build/config/ui.gni")
  import("//content/common/features.gni")
@@ -1632,10 +1537,10 @@ diff --git a/content/utility/BUILD.gn b/content/utility/BUILD.gn
 index 9ede7978ef..af987bb146 100644
 --- a/content/utility/BUILD.gn
 +++ b/content/utility/BUILD.gn
-@@ -3,6 +3,7 @@
+@@ -2,6 +2,7 @@
+ # Use of this source code is governed by a BSD-style license that can be
  # found in the LICENSE file.
  
- import("//build/config/chromeos/ui_mode.gni")
 +import("//build/config/jumbo.gni")
  import("//components/on_device_translation/buildflags/features.gni")
  import("//device/vr/buildflags/buildflags.gni")
@@ -1754,53 +1659,6 @@ index 77571a37e4..1d8906af14 100644
      return NavigationThrottle::PROCEED;
    }
  
---- a/content/browser/webui/web_ui_data_source_impl.cc
-+++ b/content/browser/webui/web_ui_data_source_impl.cc
-@@ -250,7 +250,7 @@
- }
- 
- void WebUIDataSourceImpl::AddLocalizedStrings(
--    base::span<const webui::LocalizedString> strings) {
-+    base::span<const ::webui::LocalizedString> strings) {
-   for (const auto& str : strings)
-     AddLocalizedString(str.name, str.id);
- }
-@@ -289,7 +289,7 @@
- }
- 
- void WebUIDataSourceImpl::AddResourcePaths(
--    base::span<const webui::ResourcePath> paths) {
-+    base::span<const ::webui::ResourcePath> paths) {
-   for (const auto& resource : paths) {
-     AddResourcePath(resource.path, resource.id);
- #if BUILDFLAG(LOAD_WEBUI_FROM_DISK)
-@@ -372,7 +372,7 @@
-   add_load_time_data_defaults_ = false;
-   std::string locale = GetContentClient()->browser()->GetApplicationLocale();
-   base::DictValue defaults;
--  webui::SetLoadTimeDataDefaults(locale, &defaults);
-+  ::webui::SetLoadTimeDataDefaults(locale, &defaults);
-   AddLocalizedStrings(defaults);
- }
- 
-@@ -420,7 +420,7 @@
-   // Set strings last so that it won't be overridden by any other resources.
-   if (use_strings_js_) {
-     std::string generated_js;
--    webui::AppendJsonJS(localized_strings_, &generated_js,
-+    ::webui::AppendJsonJS(localized_strings_, &generated_js,
-                         /*from_js_module=*/true);
-     resource_map[kStringsJsPath] = std::move(generated_js);
-   }
-@@ -533,7 +533,7 @@
-     URLDataSource::GotDataCallback callback,
-     bool from_js_module) {
-   std::string template_data;
--  webui::AppendJsonJS(localized_strings_, &template_data, from_js_module);
-+  ::webui::AppendJsonJS(localized_strings_, &template_data, from_js_module);
-   std::move(callback).Run(
-       base::MakeRefCounted<base::RefCountedString>(std::move(template_data)));
- }
 --- a/content/browser/gpu/gpu_disk_cache_factory.cc
 +++ b/content/browser/gpu/gpu_disk_cache_factory.cc
 @@ -21,7 +21,7 @@
@@ -2480,15 +2338,6 @@ index b1b189c5cd..c645eaa00c 100644
                 kLegacyOneToOneWithFrameTreeNode);
  
    // Prepare the proxies.
-@@ -1484,7 +1484,7 @@ void RenderFrameHostManager::UnloadOldFrame(
-   //
-   // This is well under the required shutdown time of the renderer process
-   // which has security implications if exceeded (https://crbug.com/1177674).
--  if (features::ShouldAckCOREarlyForViewTransition() &&
-+  if (::features::ShouldAckCOREarlyForViewTransition() &&
-       !old_render_frame_host->GetParentOrOuterDocument() &&
-       view_transition_commit_info.HasViewTransitionResources() &&
-       view_transition_commit_info.delay_layer_tree_view_deletion) {
 @@ -1693,7 +1693,7 @@ void RenderFrameHostManager::DidCreateNavigationRequest(
          frame_tree_node_->navigator().controller().GetBrowserContext();
      DeferSpeculativeRFHAction defer_action =
@@ -2687,4 +2536,218 @@ index db280b0576..66fd0c8244 100644
 +  return base::FeatureList::IsEnabled(::features::kSendGPUChannelEarly) &&
 +         (!::features::kSendGPUChannelEarlyTopChromeOnly.Get() ||
            IsForTopChromeWebUI());
+ }
+ 
+diff --git a/content/browser/renderer_host/render_frame_host_impl.cc b/content/browser/renderer_host/render_frame_host_impl.cc
+index 3f171553b2..4140d63f95 100644
+--- a/content/browser/renderer_host/render_frame_host_impl.cc
++++ b/content/browser/renderer_host/render_frame_host_impl.cc
+@@ -7406,7 +7406,7 @@ void RenderFrameHostImpl::RunBeforeUnloadConfirm(
+ 
+   // Check if this frame could legally display a dialog.
+   if (base::FeatureList::IsEnabled(
+-          features::kEnforceUserActivationForBeforeUnload) &&
++          ::features::kEnforceUserActivationForBeforeUnload) &&
+       !CouldDisplayBeforeUnloadDialog()) {
+     SendInterventionReport(
+         "BeforeUnloadNoGesture",
+@@ -16126,7 +16126,7 @@ bool RenderFrameHostImpl::DidCommitNavigationInternal(
+     if (is_synchronous_about_blank_commit &&
+         params->origin.scheme() != url::kFileScheme &&
+         (!frame_tree_->is_guest() ||
+-         !base::FeatureList::IsEnabled(features::kGuestViewMPArch)) &&
++         !base::FeatureList::IsEnabled(::features::kGuestViewMPArch)) &&
+         !params->origin.opaque() &&
+         !params->origin.CanBeDerivedFrom(last_committed_origin_.GetURL())) {
+       bad_message::ReceivedBadMessage(
+diff --git a/content/browser/renderer_host/render_process_host_impl.cc b/content/browser/renderer_host/render_process_host_impl.cc
+index 609511baae..f3970f1704 100644
+--- a/content/browser/renderer_host/render_process_host_impl.cc
++++ b/content/browser/renderer_host/render_process_host_impl.cc
+@@ -537,10 +537,10 @@ bool HasEnoughMemoryForAnotherMainFrame(RenderProcessHost* host,
+       private_memory_footprint /
+       std::max(main_frame_count, static_cast<size_t>(1));
+   uint64_t process_memory_limit = base::saturated_cast<uint64_t>(
+-      features::kProcessPerSiteMainFrameTotalMemoryLimit.Get());
++      ::features::kProcessPerSiteMainFrameTotalMemoryLimit.Get());
+ 
+   double frame_size_factor =
+-      features::kProcessPerSiteMainFrameSiteScalingFactor.Get();
++      ::features::kProcessPerSiteMainFrameSiteScalingFactor.Get();
+   // Check that we have a factor of at least 1.
+   if (frame_size_factor < 1.0f) {
+     frame_size_factor = 1.0f;
+@@ -602,7 +602,7 @@ bool IsBelowReuseResourceThresholds(RenderProcessHost* host,
+     // If a threshold is specified, don't reuse `host` if it already hosts more
+     // main frames (including BFCached and prerendered) than the threshold.
+     size_t main_frame_threshold = base::checked_cast<size_t>(
+-        features::kProcessPerSiteMainFrameThreshold.Get());
++        ::features::kProcessPerSiteMainFrameThreshold.Get());
+     if (main_frame_count >= main_frame_threshold) {
+       return false;
+     }
+@@ -706,7 +706,7 @@ bool IsEmptyRendererProcessesReuseAllowed() {
+     return false;
+   }
+   return base::FeatureList::IsEnabled(
+-      features::kTrackEmptyRendererProcessesForReuse);
++      ::features::kTrackEmptyRendererProcessesForReuse);
+ }
+ 
+ class SiteProcessCountTracker : public base::SupportsUserData::Data,
+@@ -1508,8 +1508,8 @@ size_t RenderProcessHost::GetMaxRendererProcessCount() {
+   // processes remains reasonable, and on Android the OS takes care of that.
+   // This has shown to have adversarial effects, so we fall back to desktop
+   // behavior for desktop-like form factors.
+-  if (base::FeatureList::IsEnabled(features::kRendererProcessLimitOnAndroid)) {
+-    return features::kRendererProcessLimitOnAndroidCount.Get();
++  if (base::FeatureList::IsEnabled(::features::kRendererProcessLimitOnAndroid)) {
++    return ::features::kRendererProcessLimitOnAndroidCount.Get();
+   } else {
+     return std::numeric_limits<size_t>::max();
+   }
+@@ -3498,19 +3498,19 @@ bool RenderProcessHostImpl::IsSpareProcessKeptAtAllTimes() {
+   // inaccuracies or off-by-one errors.
+   if (base::SysInfo::AmountOfTotalPhysicalMemory() <=
+       base::MiBU(base::saturated_cast<uint64_t>(
+-          features::kAndroidSpareRendererMemoryThreshold.Get()))) {
++          ::features::kAndroidSpareRendererMemoryThreshold.Get()))) {
+     return false;
+   }
+ 
+   bool android_spare_process_override = base::FeatureList::IsEnabled(
+-      features::kAndroidWarmUpSpareRendererWithTimeout);
++      ::features::kAndroidWarmUpSpareRendererWithTimeout);
+   if (!SiteIsolationPolicy::UseDedicatedProcessesForAllSites() &&
+       !android_spare_process_override) {
+     return false;
+   }
+ 
+   if (!base::FeatureList::IsEnabled(
+-          features::kSpareRendererForSitePerProcess) &&
++          ::features::kSpareRendererForSitePerProcess) &&
+       !android_spare_process_override) {
+     return false;
+   }
+@@ -3753,7 +3753,7 @@ void RenderProcessHostImpl::AppendRendererCommandLine(
+     command_line->AppendSwitch(switches::kDisallowV8FeatureFlagOverrides);
+   }
+ 
+-  if (features::IsTouchTextEditingRedesignEnabled()) {
++  if (::features::IsTouchTextEditingRedesignEnabled()) {
+     command_line->AppendSwitchASCII(
+         blink::switches::kTouchTextSelectionStrategy,
+         blink::switches::kTouchTextSelectionStrategy_Direction);
+@@ -5191,7 +5191,7 @@ bool RenderProcessHost::IsProcessLimitReached() {
+     // users, as the experiment is configured with "starts_active" set to false
+     // (meaning it only collects data from users who reach this code).
+ #if !BUILDFLAG(IS_ANDROID)
+-    if (base::FeatureList::IsEnabled(features::kRemoveRendererProcessLimit)) {
++    if (base::FeatureList::IsEnabled(::features::kRemoveRendererProcessLimit)) {
+       // This is used for tests. To avoid changing test behaviors, don't
+       // change the behavior when it is set.
+       if (g_max_renderer_count_override) {
+@@ -5321,7 +5321,7 @@ RenderProcessHost* RenderProcessHostImpl::GetProcessHostForSiteInstance(
+     case ProcessReusePolicy::
+         kReusePendingOrCommittedSiteWithMainFrameThreshold: {
+       CHECK(base::FeatureList::IsEnabled(
+-          features::kProcessPerSiteUpToMainFrameThreshold));
++          ::features::kProcessPerSiteUpToMainFrameThreshold));
+       [[fallthrough]];
+     }
+     case ProcessReusePolicy::kReusePrerenderingProcessForMainFrame: {
+@@ -5404,7 +5404,7 @@ RenderProcessHost* RenderProcessHostImpl::GetProcessHostForSiteInstance(
+     base::UmaHistogramBoolean(
+         "BrowserRenderProcessHost.ExistingRendererIsInitializedAndNotDead",
+         render_process_host->IsInitializedAndNotDead());
+-    if (base::FeatureList::IsEnabled(features::kEnsureExistingRendererAlive)) {
++    if (base::FeatureList::IsEnabled(::features::kEnsureExistingRendererAlive)) {
+       render_process_host->Init();
+     }
+   }
+@@ -5938,7 +5938,7 @@ void RenderProcessHostImpl::UpdateProcessPriority() {
+     }
+ #if BUILDFLAG(IS_MAC)
+     if (base::FeatureList::IsEnabled(
+-            features::kMacAllowBackgroundingRenderProcesses)) {
++            ::features::kMacAllowBackgroundingRenderProcesses)) {
+       child_process_launcher_->SetProcessPriority(process_priority);
+     }
+ #else   // !BUILDFLAG(IS_MAC)
+diff --git a/content/browser/webid/delegation/jwt_signer.cc b/content/browser/webid/delegation/jwt_signer.cc
+index 62ca3b9244..3d6a77867a 100644
+--- a/content/browser/webid/delegation/jwt_signer.cc
++++ b/content/browser/webid/delegation/jwt_signer.cc
+@@ -49,7 +49,7 @@ T NumBitsToBytes(T x) {
+   return (x / 8) + (7 + (x % 8)) / 8;
+ }
+ 
+-std::optional<std::string> Base64UrlDecode(const std::string_view& base64) {
++std::optional<std::string> Base64UrlDecode_jwt_signer(const std::string_view& base64) {
+   std::string str;
+   if (!base::Base64UrlDecode(
+           base64, base::Base64UrlDecodePolicy::IGNORE_PADDING, &str)) {
+@@ -58,6 +58,8 @@ std::optional<std::string> Base64UrlDecode(const std::string_view& base64) {
+   return str;
+ }
+ 
++#define Base64UrlDecode Base64UrlDecode_jwt_signer
++
+ int GetGroupDegreeInBytes(EC_KEY* ec) {
+   const EC_GROUP* group = EC_KEY_get0_group(ec);
+   return NumBitsToBytes(EC_GROUP_get_degree(group));
+@@ -338,3 +340,5 @@ Verifier CreateJwtVerifier(const Jwk& jwk, const Header& header) {
+ }
+ 
+ }  // namespace content::sdjwt
++
++#undef Base64UrlDecode
+diff --git a/content/browser/webui/web_ui_data_source_impl.cc b/content/browser/webui/web_ui_data_source_impl.cc
+index 2ef84b73ac..c1f7344178 100644
+--- a/content/browser/webui/web_ui_data_source_impl.cc
++++ b/content/browser/webui/web_ui_data_source_impl.cc
+@@ -247,7 +247,7 @@ void WebUIDataSourceImpl::AddLocalizedString(std::string_view name, int ids) {
+ }
+ 
+ void WebUIDataSourceImpl::AddLocalizedStrings(
+-    base::span<const webui::LocalizedString> strings) {
++    base::span<const ::webui::LocalizedString> strings) {
+   CHECK(!resources_frozen_);
+   for (const auto& str : strings)
+     AddLocalizedString(str.name, str.id);
+@@ -293,7 +293,7 @@ void WebUIDataSourceImpl::AddResourcePath(std::string_view path,
+ }
+ 
+ void WebUIDataSourceImpl::AddResourcePaths(
+-    base::span<const webui::ResourcePath> paths) {
++    base::span<const ::webui::ResourcePath> paths) {
+   CHECK(!resources_frozen_);
+   for (const auto& resource : paths) {
+     AddResourcePath(resource.path, resource.id);
+@@ -389,7 +389,7 @@ void WebUIDataSourceImpl::EnsureLoadTimeDataDefaultsAdded() {
+   add_load_time_data_defaults_ = false;
+   std::string locale = GetContentClient()->browser()->GetApplicationLocale();
+   base::DictValue defaults;
+-  webui::SetLoadTimeDataDefaults(locale, &defaults);
++  ::webui::SetLoadTimeDataDefaults(locale, &defaults);
+   AddLocalizedStrings(defaults);
+ }
+ 
+@@ -439,7 +439,7 @@ void WebUIDataSourceImpl::PopulateWebUIResources(
+   // Set strings last so that it won't be overridden by any other resources.
+   if (use_strings_js_) {
+     std::string generated_js;
+-    webui::AppendJsonJS(localized_strings_, &generated_js,
++    ::webui::AppendJsonJS(localized_strings_, &generated_js,
+                         /*from_js_module=*/true);
+     resource_map[kStringsJsPath] = std::move(generated_js);
+   }
+@@ -553,7 +553,7 @@ void WebUIDataSourceImpl::SendLocalizedStringsAsJSON(
+     URLDataSource::GotDataCallback callback,
+     bool from_js_module) {
+   std::string template_data;
+-  webui::AppendJsonJS(localized_strings_, &template_data, from_js_module);
++  ::webui::AppendJsonJS(localized_strings_, &template_data, from_js_module);
+   std::move(callback).Run(
+       base::MakeRefCounted<base::RefCountedString>(std::move(template_data)));
  }
