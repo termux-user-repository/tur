@@ -592,79 +592,6 @@ index 33adf34169..e882cd44c8 100644
      NOTIMPLEMENTED();
      return false;
    } else {
-diff --git a/content/browser/gpu/gpu_data_manager_impl_private.cc b/content/browser/gpu/gpu_data_manager_impl_private.cc
-index f42e684b53..d9ae84191a 100644
---- a/content/browser/gpu/gpu_data_manager_impl_private.cc
-+++ b/content/browser/gpu/gpu_data_manager_impl_private.cc
-@@ -396,7 +396,7 @@ bool SoftwareGLAllowed() {
-   const base::CommandLine* command_line =
-       base::CommandLine::ForCurrentProcess();
-   return !command_line->HasSwitch(switches::kDisableSoftwareRasterizer) &&
--         features::IsAnySoftwareGLAllowed(command_line);
-+         ::features::IsAnySoftwareGLAllowed(command_line);
- }
- 
- // These values are logged to UMA. Entries should not be renumbered and numeric
-@@ -526,7 +526,7 @@ void GpuDataManagerImplPrivate::InitializeGpuModes() {
-     BUILDFLAG(IS_CHROMEOS)
-     NOTREACHED() << "GPU acceleration is required on certain platforms!";
- #endif
--  } else if (features::IsSkiaGraphiteEnabled(command_line)) {
-+  } else if (::features::IsSkiaGraphiteEnabled(command_line)) {
-     // If Graphite is enabled, fall back to Ganesh/GL on platforms that do not
-     // support software compositing or sometimes fail dawn initialization.
-     // TODO(b/323953910): Eliminate this fallback on each platform once Graphite
-@@ -544,7 +544,7 @@ void GpuDataManagerImplPrivate::InitializeGpuModes() {
- #else
-     fallback_modes_.push_back(gpu::GpuMode::HARDWARE_GL);
-     // Prefer Vulkan over GL if enabled.
--    if (features::IsUsingVulkan()) {
-+    if (::features::IsUsingVulkan()) {
-       fallback_modes_.push_back(gpu::GpuMode::HARDWARE_VULKAN);
-     }
- #endif  // BUILDFLAG(IS_FUCHSIA)
-@@ -1244,7 +1244,7 @@ void GpuDataManagerImplPrivate::UpdateGpuFeatureInfo(
-   }
- 
-   is_gpu_rasterization_for_ui_enabled_ =
--      features::IsUiGpuRasterizationEnabled() &&
-+      ::features::IsUiGpuRasterizationEnabled() &&
-       gpu_feature_info_
-               .status_values[gpu::GPU_FEATURE_TYPE_GPU_TILE_RASTERIZATION] ==
-           gpu::kGpuFeatureStatusEnabled;
-@@ -1684,7 +1684,7 @@ void GpuDataManagerImplPrivate::FallBackToNextGpuModeDueToCrash() {
-   // If we fell back to sofware GL due to crashes and it is disabled with a
-   // feature. Fall back again.
-   if (gpu_mode_ == gpu::GpuMode::SOFTWARE_GL &&
--      !features::IsSoftwareGLFallbackDueToCrashesAllowed(
-+      !::features::IsSoftwareGLFallbackDueToCrashesAllowed(
-           base::CommandLine::ForCurrentProcess())) {
-     FallBackToNextGpuMode();
-     DCHECK_NE(gpu_mode_, gpu::GpuMode::SOFTWARE_GL);
-diff --git a/content/browser/gpu/gpu_process_host.cc b/content/browser/gpu/gpu_process_host.cc
-index 18306de948..a6fba3dad6 100644
---- a/content/browser/gpu/gpu_process_host.cc
-+++ b/content/browser/gpu/gpu_process_host.cc
-@@ -540,8 +540,8 @@
- // src/content/browser/browser_main_loop.cc once the persistent cache is used
- // for all cache types.
- void InitGpuPersistentCacheFileFactoryOnce() {
--  if ((features::kSkiaGraphiteDawnUsePersistentCache.Get() ||
--       base::FeatureList::IsEnabled(features::kGpuPersistentCache)) &&
-+  if ((::features::kSkiaGraphiteDawnUsePersistentCache.Get() ||
-+       base::FeatureList::IsEnabled(::features::kGpuPersistentCache)) &&
-       !viz::PersistentCacheSandboxedFileFactory::GetInstance()) {
-     base::FilePath cache_root_dir =
-         GetContentClient()->browser()->GetGPUPersistentCacheDirectory();
-@@ -939,7 +939,7 @@
-       viz_main_pending_remote.InitWithNewPipeAndPassReceiver());
-   viz::GpuHostImpl::InitParams params;
-   params.restart_id = host_id_;
--  params.disable_gpu_shader_disk_cache = !features::IsShaderDiskCacheEnabled(
-+  params.disable_gpu_shader_disk_cache = !::features::IsShaderDiskCacheEnabled(
-       base::CommandLine::ForCurrentProcess());
-   params.product = GetContentClient()->browser()->GetProduct();
-   params.deadline_to_synchronize_surfaces =
 diff --git a/content/browser/guest_page_holder_impl.cc b/content/browser/guest_page_holder_impl.cc
 index 6c8c488087..fb301afbf5 100644
 --- a/content/browser/guest_page_holder_impl.cc
@@ -1210,25 +1137,6 @@ index 19d74c26d3..6e8278b5ce 100644
  }  // namespace content::webid
 +
 +#undef IsFrameActive
-diff --git a/content/browser/webid/request_service.cc b/content/browser/webid/request_service.cc
-index 9798896f6f..9d9e344f73 100644
---- a/content/browser/webid/request_service.cc
-+++ b/content/browser/webid/request_service.cc
-@@ -76,6 +76,8 @@ using CompleteRequestWithErrorCallback =
-                             std::optional<content::webid::RequestIdTokenStatus>,
-                             bool)>;
- 
-+#define IsFrameActive IsFrameActive_RequestService
-+
- namespace content::webid {
- 
- using TokenResponseType = IdpNetworkRequestManager::FedCmTokenResponseType;
-@@ -2758,3 +2760,5 @@ RelyingPartyData RequestService::CreateRpData(
- }
- 
- }  // namespace content::webid
-+
-+#undef IsFrameActive
 diff --git a/content/browser/webid/webid_utils.cc b/content/browser/webid/webid_utils.cc
 index b3e36fdf7e..e98c24b049 100644
 --- a/content/browser/webid/webid_utils.cc
@@ -1624,28 +1532,6 @@ index 15f50694f0..bb203d48cb 100644
        broker_holder_.reset();
      } else {
        broker_holder_->broker_receiver().reset();
-diff --git a/content/browser/renderer_host/render_widget_host_view_base.cc b/content/browser/renderer_host/render_widget_host_view_base.cc
-index 99f590d854..016c264e0e 100644
---- a/content/browser/renderer_host/render_widget_host_view_base.cc
-+++ b/content/browser/renderer_host/render_widget_host_view_base.cc
-@@ -179,7 +179,7 @@ void RenderWidgetHostViewBase::CopyMainAndPopupFromSurface(
-     base::OnceCallback<void(const content::CopyFromSurfaceResult&)> callback) {
-   if (!main_host || !main_frame_host) {
-     if (base::FeatureList::IsEnabled(
--            features::kCopyFromSurfaceAlwaysCallCallback)) {
-+            ::features::kCopyFromSurfaceAlwaysCallCallback)) {
-       std::move(callback).Run(base::unexpected<content::CopyFromSurfaceError>(
-           content::CopyFromSurfaceError::kFrameGone));
-     }
-@@ -229,7 +229,7 @@ void RenderWidgetHostViewBase::CopyMainAndPopupFromSurface(
-          const content::CopyFromSurfaceResult& main_result) {
-         if (!popup_frame_host) {
-           if (base::FeatureList::IsEnabled(
--                  features::kCopyFromSurfaceAlwaysCallCallback)) {
-+                  ::features::kCopyFromSurfaceAlwaysCallCallback)) {
-             // There was a popup but it went away before we could capture it, so
-             // there's no need to capture more images.
-             std::move(final_callback).Run(main_result);
 diff --git a/content/browser/renderer_host/renderer_cancellation_throttle.cc b/content/browser/renderer_host/renderer_cancellation_throttle.cc
 index 77571a37e4..1d8906af14 100644
 --- a/content/browser/renderer_host/renderer_cancellation_throttle.cc
@@ -2503,63 +2389,6 @@ index 20aa9f764e..28e7b18fe3 100644
           !HasSpareRendererPriority();
  }
  
-diff --git a/content/browser/renderer_host/render_process_host_impl_receiver_bindings.cc b/content/browser/renderer_host/render_process_host_impl_receiver_bindings.cc
-index db280b0576..66fd0c8244 100644
---- a/content/browser/renderer_host/render_process_host_impl_receiver_bindings.cc
-+++ b/content/browser/renderer_host/render_process_host_impl_receiver_bindings.cc
-@@ -224,7 +224,7 @@ void RenderProcessHostImpl::RegisterMojoInterfaces() {
-       FontUniqueNameLookupService::GetTaskRunner());
- #endif
- #if BUILDFLAG(IS_WIN)
--  if (!features::IsFontDataServiceEnabled()) {
-+  if (!::features::IsFontDataServiceEnabled()) {
-     // DWriteFontProxy is superseded by FontDataService.
-     registry->AddInterface(
-         base::BindRepeating(&DWriteFontProxyImpl::Create),
-@@ -346,7 +346,7 @@ void RenderProcessHostImpl::IOThreadHostImpl::BindHostReceiver(
-   }
- 
- #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
--  if (features::IsFontDataServiceEnabled()) {
-+  if (::features::IsFontDataServiceEnabled()) {
-     if (auto font_data_receiver =
-             receiver.As<font_data_service::mojom::FontDataService>()) {
-       font_data_service::FontDataServiceImpl::ConnectToFontService(
---- a/content/browser/renderer_host/render_process_host_impl.cc
-+++ b/content/browser/renderer_host/render_process_host_impl.cc
-@@ -3608,8 +3608,8 @@
- }
- 
- bool RenderProcessHostImpl::ShouldSendGpuChannelEarly() const {
--  return base::FeatureList::IsEnabled(features::kSendGPUChannelEarly) &&
--         (!features::kSendGPUChannelEarlyTopChromeOnly.Get() ||
-+  return base::FeatureList::IsEnabled(::features::kSendGPUChannelEarly) &&
-+         (!::features::kSendGPUChannelEarlyTopChromeOnly.Get() ||
-           IsForTopChromeWebUI());
- }
- 
-diff --git a/content/browser/renderer_host/render_frame_host_impl.cc b/content/browser/renderer_host/render_frame_host_impl.cc
-index 3f171553b2..4140d63f95 100644
---- a/content/browser/renderer_host/render_frame_host_impl.cc
-+++ b/content/browser/renderer_host/render_frame_host_impl.cc
-@@ -7406,7 +7406,7 @@ void RenderFrameHostImpl::RunBeforeUnloadConfirm(
- 
-   // Check if this frame could legally display a dialog.
-   if (base::FeatureList::IsEnabled(
--          features::kEnforceUserActivationForBeforeUnload) &&
-+          ::features::kEnforceUserActivationForBeforeUnload) &&
-       !CouldDisplayBeforeUnloadDialog()) {
-     SendInterventionReport(
-         "BeforeUnloadNoGesture",
-@@ -16126,7 +16126,7 @@ bool RenderFrameHostImpl::DidCommitNavigationInternal(
-     if (is_synchronous_about_blank_commit &&
-         params->origin.scheme() != url::kFileScheme &&
-         (!frame_tree_->is_guest() ||
--         !base::FeatureList::IsEnabled(features::kGuestViewMPArch)) &&
-+         !base::FeatureList::IsEnabled(::features::kGuestViewMPArch)) &&
-         !params->origin.opaque() &&
-         !params->origin.CanBeDerivedFrom(last_committed_origin_.GetURL())) {
-       bad_message::ReceivedBadMessage(
 diff --git a/content/browser/renderer_host/render_process_host_impl.cc b/content/browser/renderer_host/render_process_host_impl.cc
 index 609511baae..f3970f1704 100644
 --- a/content/browser/renderer_host/render_process_host_impl.cc
@@ -2751,3 +2580,124 @@ index 2ef84b73ac..c1f7344178 100644
    std::move(callback).Run(
        base::MakeRefCounted<base::RefCountedString>(std::move(template_data)));
  }
+diff --git a/content/browser/renderer_host/render_frame_host_impl.cc b/content/browser/renderer_host/render_frame_host_impl.cc
+index f47d78869a..58cafb8175 100644
+--- a/content/browser/renderer_host/render_frame_host_impl.cc
++++ b/content/browser/renderer_host/render_frame_host_impl.cc
+@@ -7371,7 +7371,7 @@ void RenderFrameHostImpl::RunBeforeUnloadConfirm(
+ 
+   // Check if this frame could legally display a dialog.
+   if (base::FeatureList::IsEnabled(
+-          features::kEnforceUserActivationForBeforeUnload) &&
++          ::features::kEnforceUserActivationForBeforeUnload) &&
+       !CouldDisplayBeforeUnloadDialog()) {
+     SendInterventionReport(
+         "BeforeUnloadNoGesture",
+@@ -16166,7 +16166,7 @@ bool RenderFrameHostImpl::DidCommitNavigationInternal(
+     if (is_synchronous_about_blank_commit &&
+         params->origin.scheme() != url::kFileScheme &&
+         (!frame_tree_->is_guest() ||
+-         !base::FeatureList::IsEnabled(features::kGuestViewMPArch)) &&
++         !base::FeatureList::IsEnabled(::features::kGuestViewMPArch)) &&
+         !params->origin.opaque() &&
+         !params->origin.CanBeDerivedFrom(last_committed_origin_.GetURL())) {
+       bad_message::ReceivedBadMessage(
+diff --git a/content/browser/renderer_host/render_process_host_impl.cc b/content/browser/renderer_host/render_process_host_impl.cc
+index 252780aa05..f560250dde 100644
+--- a/content/browser/renderer_host/render_process_host_impl.cc
++++ b/content/browser/renderer_host/render_process_host_impl.cc
+@@ -1866,7 +1866,7 @@ bool RenderProcessHostImpl::Init() {
+   // `chrome://top-chrome/` with other Top Chrome WebUIs. In this case, we
+   // cannot distinguish it by lock URL and must fallback to checking if it is a
+   // Top Chrome WebUI process in general.
+-  if (features::kInitialWebUIUseSeparateProcess.Get()) {
++  if (::features::kInitialWebUIUseSeparateProcess.Get()) {
+     is_initial_web_ui = GetContentClient()->browser()->IsInitialWebUIURL(
+         GetProcessLock().GetProcessLockURL());
+   } else {
+@@ -3640,8 +3640,8 @@ bool RenderProcessHostImpl::IsForTopChromeWebUI() const {
+ }
+ 
+ bool RenderProcessHostImpl::ShouldSendGpuChannelEarly() const {
+-  return base::FeatureList::IsEnabled(features::kSendGPUChannelEarly) &&
+-         (!features::kSendGPUChannelEarlyTopChromeOnly.Get() ||
++  return base::FeatureList::IsEnabled(::features::kSendGPUChannelEarly) &&
++         (!::features::kSendGPUChannelEarlyTopChromeOnly.Get() ||
+           IsForTopChromeWebUI());
+ }
+ 
+diff --git a/content/browser/renderer_host/render_process_host_impl_receiver_bindings.cc b/content/browser/renderer_host/render_process_host_impl_receiver_bindings.cc
+index 0fb8265ec4..86d2fc97b5 100644
+--- a/content/browser/renderer_host/render_process_host_impl_receiver_bindings.cc
++++ b/content/browser/renderer_host/render_process_host_impl_receiver_bindings.cc
+@@ -234,7 +234,7 @@ void RenderProcessHostImpl::RegisterMojoInterfaces() {
+   } else {
+     // If we don't initialize DWriteFontProxy, we should have FontDataService
+     // enabled.
+-    CHECK(features::IsFontDataServiceEnabled());
++    CHECK(::features::IsFontDataServiceEnabled());
+   }
+ #endif
+ 
+@@ -351,7 +351,7 @@ void RenderProcessHostImpl::IOThreadHostImpl::BindHostReceiver(
+   }
+ 
+ #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
+-  if (features::IsFontDataServiceEnabled()) {
++  if (::features::IsFontDataServiceEnabled()) {
+     if (auto font_data_receiver =
+             receiver.As<font_data_service::mojom::FontDataService>()) {
+       font_data_service::FontDataServiceImpl::ConnectToFontService(
+diff --git a/content/browser/renderer_host/render_widget_host_view_aura.cc b/content/browser/renderer_host/render_widget_host_view_aura.cc
+index d78130d161..915bfbe38e 100644
+--- a/content/browser/renderer_host/render_widget_host_view_aura.cc
++++ b/content/browser/renderer_host/render_widget_host_view_aura.cc
+@@ -182,7 +182,7 @@ BASE_FEATURE(kDeduplicateSetInputScope, base::FEATURE_ENABLED_BY_DEFAULT);
+ const std::wstring_view kArabic101KeyboardLayoutName = L"00000401";
+ 
+ // This state helps relieve unnecessary calls to GetKeyboardLayoutName() and
+-// IsEnabled(features::kArabicIndicDigitInput) for the purposes of
++// IsEnabled(::features::kArabicIndicDigitInput) for the purposes of
+ // Arabic-Indic digit input. Declared static because keyboard layout state is
+ // per-thread and RWHVA is only allocated on the UI thread.
+ struct ArabicIndicDigitInputState {
+@@ -196,7 +196,7 @@ ArabicIndicDigitInputState arabic_indic_digit_input_state;
+ void UpdateArabicIndicDigitInputStateIfNecessary() {
+   if (!arabic_indic_digit_input_state.feature_initialized) {
+     arabic_indic_digit_input_state.feature_enabled =
+-        base::FeatureList::IsEnabled(features::kArabicIndicDigitInput);
++        base::FeatureList::IsEnabled(::features::kArabicIndicDigitInput);
+     arabic_indic_digit_input_state.feature_initialized = true;
+   }
+ 
+@@ -2480,7 +2480,7 @@ void RenderWidgetHostViewAura::OnMouseEvent(ui::MouseEvent* event) {
+   }
+ #endif
+   last_pointer_type_ =
+-      base::FeatureList::IsEnabled(features::kMouseEventPenPointerType)
++      base::FeatureList::IsEnabled(::features::kMouseEventPenPointerType)
+           ? event->pointer_details().pointer_type
+           : ui::EventPointerType::kMouse;
+   event_handler_->OnMouseEvent(event);
+diff --git a/content/browser/renderer_host/render_widget_host_view_base.cc b/content/browser/renderer_host/render_widget_host_view_base.cc
+index 9cc82d623d..2d82783e26 100644
+--- a/content/browser/renderer_host/render_widget_host_view_base.cc
++++ b/content/browser/renderer_host/render_widget_host_view_base.cc
+@@ -198,7 +198,7 @@ void RenderWidgetHostViewBase::CopyMainAndPopupFromSurface(
+     base::OnceCallback<void(const content::CopyFromSurfaceResult&)> callback) {
+   if (!main_host || !main_frame_host) {
+     if (base::FeatureList::IsEnabled(
+-            features::kCopyFromSurfaceAlwaysCallCallback)) {
++            ::features::kCopyFromSurfaceAlwaysCallCallback)) {
+       std::move(callback).Run(base::unexpected<content::CopyFromSurfaceError>(
+           content::CopyFromSurfaceError::kFrameGone));
+     }
+@@ -271,7 +271,7 @@ void RenderWidgetHostViewBase::CopyMainAndPopupFromSurface(
+             was_capturing_popup ? has_popup : !!unbounded_window;
+         if (!secondary_surface_available) {
+           if (base::FeatureList::IsEnabled(
+-                  features::kCopyFromSurfaceAlwaysCallCallback)) {
++                  ::features::kCopyFromSurfaceAlwaysCallCallback)) {
+             std::move(final_callback).Run(main_result);
+           }
+           return;

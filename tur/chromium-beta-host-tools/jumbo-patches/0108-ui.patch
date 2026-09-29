@@ -1338,8 +1338,8 @@ index 795c5b51db..4292c46627 100644
  import("//build/config/linux/pkg_config.gni")
  import("//build/config/ozone.gni")
  import("//build/config/ui.gni")
-@@ -55,7 +56,7 @@ source_set("gl_headers") {
-   public_deps = [ "//third_party/angle:includes" ]
+@@ -84,7 +85,7 @@
+   }
  }
  
 -component("gl") {
@@ -1347,26 +1347,28 @@ index 795c5b51db..4292c46627 100644
    output_name = "gl_wrapper"  # Avoid colliding with OS X"s libGL.dylib.
  
    sources = [
-@@ -356,6 +357,10 @@ component("gl") {
-     defines += [ "GL_SILENCE_DEPRECATION" ]
-   }
+@@ -188,6 +188,10 @@
+     "trace_util.h",
+   ]
  
 +  jumbo_excluded_sources = [
 +    "presenter.cc",
 +  ]
 +
-   if (is_android) {
-     sources += [
-       "android/egl_fence_utils.cc",
-@@ -437,11 +442,15 @@ if (is_mac) {
-         "//third_party/swiftshader/src/Vulkan:icd_file",
-         "//third_party/swiftshader/src/Vulkan:swiftshader_libvulkan",
-       ]
-+
-+      jumbo_excluded_sources += [
-+        "gl_angle_util_vulkan.cc",
-+      ]
-     }
+   configs += [
+     "//build/config/compiler:wexit_time_destructors",
+     "//build/config/compiler:wglobal_constructors",
+@@ -234,6 +235,9 @@
+       "gl_angle_util_vulkan.cc",
+       "gl_angle_util_vulkan.h",
+     ]
++    jumbo_excluded_sources += [
++      "gl_angle_util_vulkan.cc",
++    ]
+   }
+ 
+   if (use_ozone) {
+@@ -493,7 +501,7 @@
    }
  }
  
@@ -1375,7 +1377,7 @@ index 795c5b51db..4292c46627 100644
    testonly = true
    sources = [
      "egl_bindings_autogen_mock.cc",
-@@ -466,7 +475,7 @@ static_library("gl_unittest_utils") {
+@@ -525,7 +533,7 @@
    ]
  }
  
