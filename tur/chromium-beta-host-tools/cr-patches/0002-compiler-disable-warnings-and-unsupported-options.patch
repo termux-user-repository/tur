@@ -49,3 +49,14 @@
    }
  
    # TODO(crbug.com/354162568): Clean up and enable.
+--- a/third_party/dawn/src/utils/BUILD.gn
++++ b/third_party/dawn/src/utils/BUILD.gn
+@@ -218,8 +218,6 @@
+       # the analysis pass.
+       "-Wno-lifetime-safety",
+       "-Wno-lifetime-safety-all",
+-      "-Xclang=-fno-lifetime-safety-inference",
+-      "-Xclang=-fno-experimental-lifetime-safety-tu-analysis",
+     ]
+ 
+     # P3. Checks that could be nice but probably don't help with hardening.

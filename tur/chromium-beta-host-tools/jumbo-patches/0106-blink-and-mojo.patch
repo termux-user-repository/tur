@@ -4868,3 +4868,30 @@ index d62e98f89c..be3bf62d6e 100644
  }  // namespace blink
 +
 +#undef ForgetStream
+diff --git a/third_party/blink/renderer/core/BUILD.gn b/third_party/blink/renderer/core/BUILD.gn
+index 9198e3dc6a..26cb3e258d 100644
+--- a/third_party/blink/renderer/core/BUILD.gn
++++ b/third_party/blink/renderer/core/BUILD.gn
+@@ -470,7 +470,6 @@ jumbo_component("core") {
+     "//third_party/blink/renderer/core/url_pattern",
+     "//third_party/blink/renderer/core/xml:xpath_generated",
+   ]
+-  jumbo_excluded_sources += rebase_path([ "attribution_reporting_to_mojom.cc" ], "", "fetch")
+   jumbo_excluded_sources += rebase_path([ "frame_fetch_context.cc" ], "", "loader")
+   jumbo_excluded_sources += rebase_path([ "image_loader.cc" ], "", "loader")
+   jumbo_excluded_sources += rebase_path([ "create_window.cc" ], "", "page")
+diff --git a/third_party/blink/renderer/core/html/canvas/html_canvas_accessibility_manager.cc b/third_party/blink/renderer/core/html/canvas/html_canvas_accessibility_manager.cc
+index a28243d65a..c6845ca742 100644
+--- a/third_party/blink/renderer/core/html/canvas/html_canvas_accessibility_manager.cc
++++ b/third_party/blink/renderer/core/html/canvas/html_canvas_accessibility_manager.cc
+@@ -343,8 +343,8 @@ void HTMLCanvasAccessibilityManager::SetOCRDeadline() {
+ }
+ 
+ bool HTMLCanvasAccessibilityManager::ShouldRunOCR() const {
+-  if (features::GetCanvasAccessibilityMode() !=
+-      features::CanvasAccessibilityMode::kAdvanced) {
++  if (::features::GetCanvasAccessibilityMode() !=
++      ::features::CanvasAccessibilityMode::kAdvanced) {
+     return false;
+   }
+   if (!NeedsA11ySupport()) {
