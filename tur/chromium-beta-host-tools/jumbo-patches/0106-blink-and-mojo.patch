@@ -3971,9 +3971,9 @@ index 368305c6b0..969c6dcf2e 100644
  # found in the LICENSE file.
  
 +import("//build/config/jumbo.gni")
- import("//testing/libfuzzer/fuzzer_test.gni")
  import("//testing/test.gni")
  import("//third_party/blink/renderer/build/scripts/scripts.gni")
+ import("//third_party/blink/renderer/platform/blink_fuzzer_test.gni")
 @@ -189,6 +190,14 @@ blink_platform_sources("loader") {
    sources +=
        get_target_outputs(":make_platform_loader_generated_delivery_type_names")
@@ -4267,7 +4267,7 @@ index 36c923d28b..c168252f9b 100644
  # found in the LICENSE file.
  
 +import("//build/config/jumbo.gni")
- import("//testing/libfuzzer/fuzzer_test.gni")
+ import("//third_party/blink/renderer/platform/blink_fuzzer_test.gni")
  import("//third_party/blink/renderer/platform/platform.gni")
  import("//third_party/protobuf/proto_library.gni")
 @@ -190,7 +191,7 @@ blink_platform_sources("scheduler") {

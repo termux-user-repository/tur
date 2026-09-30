@@ -97,3 +97,16 @@ index bcddd6f8e7..210ca5e8f0 100644
  }
  
  HybridEncryptionKey::HybridEncryptionKey(base::span<const uint8_t> private_key)
+diff --git a/ui/views/controls/native/native_view_host_aura.cc b/ui/views/controls/native/native_view_host_aura.cc
+index b868790af0..e6bf3bfc9f 100644
+--- a/ui/views/controls/native/native_view_host_aura.cc
++++ b/ui/views/controls/native/native_view_host_aura.cc
+@@ -195,7 +195,7 @@ void NativeViewHostAura::ShowWidget(int x,
+       host_->native_view()->SetTransform(transform);
+       original_transform_changed_ = true;
+     }
+-    GetUILayer()->SetClipRect(clip_rect_.value_or({}));
++    GetUILayer()->SetClipRect(clip_rect_.value_or(gfx::Rect{}));
+   }
+   ApplyRoundedCorners();
+   host_->native_view()->SetBounds({x, y, native_w, native_h});

@@ -1046,25 +1046,6 @@ index 5437b02df3..89e847c933 100644
                   group_configs) {}
 +
 +#undef is_android
-diff --git a/components/omnibox/browser/autocomplete_match.cc b/components/omnibox/browser/autocomplete_match.cc
-index 5ffaeadc59..70117ff916 100644
---- a/components/omnibox/browser/autocomplete_match.cc
-+++ b/components/omnibox/browser/autocomplete_match.cc
-@@ -62,6 +62,8 @@
- #include "components/vector_icons/vector_icons.h"     // nogncheck
- #endif
- 
-+#define kIsDesktop kIsDesktop_AutoCompleteMatch
-+
- constexpr bool kIsDesktop = !BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_IOS);
- constexpr bool kIsAndroid = BUILDFLAG(IS_ANDROID);
- 
-@@ -2425,3 +2427,5 @@ void AutocompleteMatch::ValidateClassifications(
-   }
- #endif  // DCHECK_IS_ON()
- }
-+
-+#undef kIsDesktop
 diff --git a/components/omnibox/browser/autocomplete_result.cc b/components/omnibox/browser/autocomplete_result.cc
 index 91140083d5..0b2296cb23 100644
 --- a/components/omnibox/browser/autocomplete_result.cc
@@ -1957,25 +1938,6 @@ index 4bbaf4f625..2066104b3c 100644
  }
 +
 +#undef kBackoffPolicy
-diff --git a/components/supervised_user/core/browser/kids_chrome_management_url_checker_client.cc b/components/supervised_user/core/browser/kids_chrome_management_url_checker_client.cc
-index 60d2e00d65..93cb927c67 100644
---- a/components/supervised_user/core/browser/kids_chrome_management_url_checker_client.cc
-+++ b/components/supervised_user/core/browser/kids_chrome_management_url_checker_client.cc
-@@ -26,6 +26,8 @@
- #include "third_party/protobuf/src/google/protobuf/message_lite.h"
- #include "url/gurl.h"
- 
-+#define OnResponse OnResponse_KidsChromeManagementURLCheckerClient
-+
- namespace supervised_user {
- namespace {
- 
-@@ -153,3 +155,5 @@ void KidsChromeManagementURLCheckerClient::CheckURL(
-                        base::BindOnce(&OnResponse, url, std::move(callback)));
- }
- }  // namespace supervised_user
-+
-+#undef OnResponse
 diff --git a/components/supervised_user/core/browser/supervised_user_preferences.cc b/components/supervised_user/core/browser/supervised_user_preferences.cc
 index 9ce64a100a..0cf88de8cd 100644
 --- a/components/supervised_user/core/browser/supervised_user_preferences.cc
@@ -2113,29 +2075,6 @@ index 70042f630c..c66d13f065 100644
  }  // namespace sync_bookmarks
 +
 +#undef GetLocalAndAccountPermanentNodePairs
-diff --git a/components/sync_bookmarks/parent_guid_preprocessing.cc b/components/sync_bookmarks/parent_guid_preprocessing.cc
-index 33bc98a9cf..64179c2708 100644
---- a/components/sync_bookmarks/parent_guid_preprocessing.cc
-+++ b/components/sync_bookmarks/parent_guid_preprocessing.cc
-@@ -22,6 +22,10 @@
- #include "components/sync_bookmarks/synced_bookmark_tracker.h"
- #include "components/sync_bookmarks/synced_bookmark_tracker_entity.h"
- 
-+#define kBookmarkBarTag     kBookmarkBarTag_parent_guid_preprocessing
-+#define kMobileBookmarksTag kMobileBookmarksTag_parent_guid_preprocessing
-+#define kOtherBookmarksTag  kOtherBookmarksTag_parent_guid_preprocessing
-+
- namespace sync_bookmarks {
- 
- namespace {
-@@ -246,3 +250,7 @@ std::string GetGuidForSyncIdInUpdatesForTesting(  // IN-TEST
- }
- 
- }  // namespace sync_bookmarks
-+
-+#undef kBookmarkBarTag
-+#undef kMobileBookmarksTag
-+#undef kOtherBookmarksTag
 diff --git a/components/sync_bookmarks/synced_bookmark_tracker_entity.cc b/components/sync_bookmarks/synced_bookmark_tracker_entity.cc
 index 2666ba589d..7934b3d4e3 100644
 --- a/components/sync_bookmarks/synced_bookmark_tracker_entity.cc
@@ -2654,3 +2593,100 @@ index f87b14d162..d784273910 100644
  }  // namespace webcrypto
 +
 +#undef SynthesizeImportAlgorithmForClone
+diff --git a/components/performance_manager/execution_context_priority/closing_page_voter.cc b/components/performance_manager/execution_context_priority/closing_page_voter.cc
+index 1b2f363b04..13f12f952f 100644
+--- a/components/performance_manager/execution_context_priority/closing_page_voter.cc
++++ b/components/performance_manager/execution_context_priority/closing_page_voter.cc
+@@ -10,6 +10,8 @@
+ #include "components/performance_manager/public/execution_context/execution_context_registry.h"
+ #include "components/performance_manager/public/graph/graph.h"
+ 
++#define GetExecutionContext GetExecutionContext_closing_page_voter
++
+ namespace performance_manager::execution_context_priority {
+ 
+ namespace {
+@@ -105,3 +107,5 @@ void ClosingPageVoter::AdjustVotesForSubtree(const FrameNode* frame_node,
+ }
+ 
+ }  // namespace performance_manager::execution_context_priority
++
++#undef GetExecutionContext
+diff --git a/components/safe_browsing/core/browser/db/v5_store.cc b/components/safe_browsing/core/browser/db/v5_store.cc
+index 895ed53013..dedbddf469 100644
+--- a/components/safe_browsing/core/browser/db/v5_store.cc
++++ b/components/safe_browsing/core/browser/db/v5_store.cc
+@@ -15,6 +15,9 @@
+ #include "third_party/abseil-cpp/absl/cleanup/cleanup.h"
+ #include "third_party/protobuf/src/google/protobuf/io/zero_copy_stream_impl_lite.h"
+ 
++#define kApplyUpdate kApplyUpdate_v5store
++#define kResult kResult_v5store
++
+ namespace safe_browsing {
+ 
+ namespace {
+@@ -272,3 +275,6 @@ V4ToV5MigrationResult V5Store::MigrateFromV4(
+ }
+ 
+ }  // namespace safe_browsing
++
++#undef kApplyUpdate
++#undef kResult
+diff --git a/components/webcrypto/algorithms/hmac.cc b/components/webcrypto/algorithms/hmac.cc
+index 2a3bf60935..7808253ab7 100644
+--- a/components/webcrypto/algorithms/hmac.cc
++++ b/components/webcrypto/algorithms/hmac.cc
+@@ -24,6 +24,8 @@
+ #include "third_party/blink/public/platform/web_crypto_algorithm_params.h"
+ #include "third_party/blink/public/platform/web_crypto_key_algorithm.h"
+ 
++#define SynthesizeImportAlgorithmForClone SynthesizeImportAlgorithmForClone_hmac
++
+ namespace webcrypto {
+ 
+ namespace {
+@@ -368,3 +370,5 @@ std::unique_ptr<AlgorithmImplementation> CreateHmacImplementation() {
+ }
+ 
+ }  // namespace webcrypto
++
++#undef SynthesizeImportAlgorithmForClone
+diff --git a/components/supervised_user/core/browser/supervised_user_url_checker_client.cc b/components/supervised_user/core/browser/supervised_user_url_checker_client.cc
+index 67862126f1..5868a239d5 100644
+--- a/components/supervised_user/core/browser/supervised_user_url_checker_client.cc
++++ b/components/supervised_user/core/browser/supervised_user_url_checker_client.cc
+@@ -26,6 +26,8 @@
+ #include "third_party/protobuf/src/google/protobuf/message_lite.h"
+ #include "url/gurl.h"
+ 
++#define OnResponse OnResponse_supervised_user_url_checker_client
++
+ namespace supervised_user {
+ namespace {
+ 
+@@ -152,3 +154,5 @@ void SupervisedUserUrlCheckerClient::CheckURL(
+                        base::BindOnce(&OnResponse, url, std::move(callback)));
+ }
+ }  // namespace supervised_user
++
++#undef OnResponse
+diff --git a/components/omnibox/browser/autocomplete_match.cc b/components/omnibox/browser/autocomplete_match.cc
+index e7f30b541b..19f0d1bd3d 100644
+--- a/components/omnibox/browser/autocomplete_match.cc
++++ b/components/omnibox/browser/autocomplete_match.cc
+@@ -66,6 +66,8 @@
+ #include "components/vector_icons/vector_icons.h"     // nogncheck
+ #endif
+ 
++#define kIsDesktop kIsDesktop_autocomplete_match
++
+ constexpr bool kIsAndroid = BUILDFLAG(IS_ANDROID);
+ constexpr bool kIsDesktopAndroid = BUILDFLAG(IS_DESKTOP_ANDROID);
+ constexpr bool kIsDesktop =
+@@ -2541,3 +2543,5 @@ void AutocompleteMatch::ValidateClassifications(
+   }
+ #endif  // DCHECK_IS_ON()
+ }
++
++#undef kIsDesktop
