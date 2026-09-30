@@ -1,0 +1,18 @@
+diff -ur orig/meson.build mod/meson.build
+--- orig/meson.build	2024-12-03 14:28:29.271142623 +0100
++++ mod/meson.build	2025-01-20 19:58:06.225374544 +0100
+@@ -4,6 +4,9 @@
+   meson_version : '>=0.50'
+ )
+ 
++add_project_link_arguments('-L/data/data/com.termux/files/usr/lib', language: 'c')
++add_project_link_arguments('-landroid-shmem', language: 'c')
++
+ if host_machine.system() == 'darwin'
+   add_languages('objc')
+ endif
+@@ -677,3 +680,4 @@
+     requires : libraries,
+   )
+ endforeach
++

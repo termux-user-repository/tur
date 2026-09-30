@@ -1,0 +1,18 @@
+Description: Disable compiled html docs
+ EFL supports compiled html docs for the MS Windows help system.  Since these
+ aren't distributed, disable the build.
+Author: Ross Vandegrift <ross@kallisti.us>
+Forwarded: not-needed
+Last-Update: 2022-08-01
+
+--- a/doc/Doxyfile.in
++++ b/doc/Doxyfile.in
+@@ -958,7 +958,7 @@
+ # Microsoft HTML help workshop to generate a compiled HTML help file (.chm)
+ # of the generated HTML documentation.
+ 
+-GENERATE_HTMLHELP      = YES
++GENERATE_HTMLHELP      = NO
+ 
+ # If the GENERATE_HTMLHELP tag is set to YES, the CHM_FILE tag can
+ # be used to specify the file name of the resulting .chm file. You

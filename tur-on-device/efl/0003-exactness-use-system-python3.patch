@@ -1,0 +1,23 @@
+Description: Use system python3
+ Debian's python policy requires /usr/bin/python3 for installed scripts.
+Author: Ross Vandegrift <ross@kallisti.us>
+Forwarded: not-needed
+Last-Update: 2020-04-30
+---
+This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+--- a/src/bin/exactness/exactness_play.in
++++ b/src/bin/exactness/exactness_play.in
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python3
++#!/usr/bin/python3
+ 
+ import argparse
+ import subprocess
+--- a/src/bin/exactness/exactness_record.in
++++ b/src/bin/exactness/exactness_record.in
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python3
++#!/usr/bin/python3
+ 
+ import argparse
+ import subprocess
