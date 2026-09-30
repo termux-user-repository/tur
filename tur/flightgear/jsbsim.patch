@@ -1,0 +1,14 @@
+diff -ur orig/src/FDM/JSBSim/input_output/FGfdmSocket.h mod/src/FDM/JSBSim/input_output/FGfdmSocket.h
+--- orig/src/FDM/JSBSim/input_output/FGfdmSocket.h	2025-02-19 09:53:41.000000000 +0100
++++ mod/src/FDM/JSBSim/input_output/FGfdmSocket.h	2025-03-10 10:11:01.735473089 +0100
+@@ -48,6 +48,10 @@
+   #include <netdb.h>
+ #endif
+ 
++#include <netinet/in.h>
++#include <arpa/inet.h>
++#include <sys/socket.h>
++
+ /*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ FORWARD DECLARATIONS
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
