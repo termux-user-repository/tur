@@ -1,0 +1,24 @@
+`systeminfomation.fsSize()` doesn't work on Android
+
+--- a/src/classes/filesystem.class.js
++++ b/src/classes/filesystem.class.js
+@@ -504,17 +504,8 @@
+             this.space_bar.text.innerHTML = "Calculating available space...";
+             this.space_bar.bar.removeAttribute("value");
+ 
+-            window.si.fsSize().catch(() => {
+-                this.space_bar.text.innerHTML = "Could not calculate mountpoint usage.";
+-                this.space_bar.bar.value = 100;
+-            }).then(d => {
+-                d.forEach(fsBlock => {
+-                    if (path.startsWith(fsBlock.mount)) {
+-                        this.fsBlock = fsBlock;
+-                    }
+-                });
+-                this.renderDiskUsage(this.fsBlock);
+-            });
++            this.space_bar.text.innerHTML = "Could not calculate mountpoint usage.";
++            this.space_bar.bar.value = 100;
+         };
+ 
+         this.renderDiskUsage = async fsBlock => {
