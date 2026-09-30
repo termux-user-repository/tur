@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://www.chromium.org/Home
 TERMUX_PKG_DESCRIPTION="Chromium web browser"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="@licy183"
-TERMUX_PKG_VERSION=150.0.7871.186
+TERMUX_PKG_VERSION=151.0.7922.173
 TERMUX_PKG_SRCURL=https://commondatastorage.googleapis.com/chromium-browser-official/chromium-$TERMUX_PKG_VERSION-lite.tar.xz
-TERMUX_PKG_SHA256=4ff4b64971c8097631a4f17d2f7fb050e8ede62b1b3c0f1ef0a1fffcac11bbb7
+TERMUX_PKG_SHA256=87f5e2b234476acaa6304e9bcd36b509325a1844fa3c649b0da3a5f245a755f0
 TERMUX_PKG_DEPENDS="atk, cups, dbus, fontconfig, gtk3, krb5, libc++, libevdev, libxkbcommon, libminizip, libnss, libx11, mesa, openssl, pango, pipewire, pulseaudio, zlib"
 TERMUX_PKG_BUILD_DEPENDS="chromium-beta-host-tools, libffi-static"
 # TODO: Split chromium-common and chromium-headless
@@ -59,6 +59,7 @@ termux_step_pre_configure() {
 termux_step_configure() {
 	cd $TERMUX_PKG_SRCDIR
 	termux_setup_ninja
+	termux_setup_golang
 
 	# Fetch depot_tools
 	export DEPOT_TOOLS_UPDATE=0
@@ -98,8 +99,10 @@ EOF
 	./tools/clang/scripts/update.py
 
 	# Link to system tools required by the build
+	mkdir -p third_party/jdk/current/bin/
 	ln -sf $(command -v java) third_party/jdk/current/bin/
-
+	mkdir -p third_party/dawn/tools/golang/linux-amd64/bin/
+	ln -sf $(command -v go) third_party/dawn/tools/golang/linux-amd64/bin/
 	# Install nodejs
 	if [ ! -f "third_party/node/linux/node-linux-x64/bin/node" ]; then
 		./third_party/node/update_node_binaries
