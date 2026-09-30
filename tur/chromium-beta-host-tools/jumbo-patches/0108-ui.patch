@@ -647,10 +647,10 @@ index 64a92227ea..d8a6912b30 100644
  import("//mojo/public/tools/bindings/mojom.gni")
  import("//testing/test.gni")
  import("//ui/base/ui_features.gni")
-@@ -32,7 +33,7 @@ source_set("color_headers") {
+@@ -31,7 +32,7 @@ source_set("color_headers") {
+ }
  
- # Keep the deps on this target to a minimum so that chromeos/crosapi can depend
- # on it.
+ # Keep the deps on this target to a minimum so that chromeos can depend on it.
 -component("color_provider_key") {
 +jumbo_component("color_provider_key") {
    sources = [
@@ -1881,21 +1881,6 @@ index a4564d98d6..bcd069a3e0 100644
    testonly = true
    sources = [
      "examples_window_with_content.cc",
-diff --git a/ui/views/widget/desktop_aura/desktop_native_widget_aura.cc b/ui/views/widget/desktop_aura/desktop_native_widget_aura.cc
-index 47adf1b694..518d77e164 100644
---- a/ui/views/widget/desktop_aura/desktop_native_widget_aura.cc
-+++ b/ui/views/widget/desktop_aura/desktop_native_widget_aura.cc
-@@ -634,8 +634,8 @@ void DesktopNativeWidgetAura::InitNativeWidget(Widget::InitParams params) {
-           std::unique_ptr<wm::NativeCursorManager>(native_cursor_manager_));
-       cursor_manager_->SetDisplay(
-           display::Screen::Get()->GetDisplayNearestWindow(host_->window()));
--      if (features::IsSystemCursorSizeSupported() ||
--          features::ShouldUseCursorEventHook()) {
-+      if (::features::IsSystemCursorSizeSupported() ||
-+          ::features::ShouldUseCursorEventHook()) {
-         native_cursor_manager_->InitSystemCursorObservers(cursor_manager_);
-       }
-     }
 diff --git a/ui/views/widget/desktop_aura/desktop_window_tree_host_platform.cc b/ui/views/widget/desktop_aura/desktop_window_tree_host_platform.cc
 index 13fd65bff1..e2b4bc7afc 100644
 --- a/ui/views/widget/desktop_aura/desktop_window_tree_host_platform.cc

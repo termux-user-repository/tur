@@ -125,25 +125,6 @@ Enable jumbo build for almost every target in //components
  .../test_sample_json_converter.h.golden       |  3 +++
  117 files changed, 560 insertions(+), 15 deletions(-)
 
-diff --git a/components/attribution_reporting/aggregatable_trigger_data.cc b/components/attribution_reporting/aggregatable_trigger_data.cc
-index d207fed5dc..b8ec126455 100644
---- a/components/attribution_reporting/aggregatable_trigger_data.cc
-+++ b/components/attribution_reporting/aggregatable_trigger_data.cc
-@@ -20,6 +20,8 @@
- #include "components/attribution_reporting/trigger_registration_error.mojom.h"
- #include "third_party/abseil-cpp/absl/numeric/int128.h"
- 
-+#define ParseKeyPiece ParseKeyPiece_AggregatableTriggerData
-+
- namespace attribution_reporting {
- 
- namespace {
-@@ -129,3 +131,5 @@ base::DictValue AggregatableTriggerData::ToJson() const {
- }
- 
- }  // namespace attribution_reporting
-+
-+#undef ParseKeyPiece
 diff --git a/components/autofill/content/renderer/BUILD.gn b/components/autofill/content/renderer/BUILD.gn
 index 855d4ed800..cd8307ea62 100644
 --- a/components/autofill/content/renderer/BUILD.gn
@@ -1178,25 +1159,6 @@ index 8926ab1615..a6eb773ab7 100644
  }
  
  void PredictionModelDownloadManager::AddObserver(
-diff --git a/components/optimization_guide/core/model_execution/on_device_model_classifier_controller.cc b/components/optimization_guide/core/model_execution/on_device_model_classifier_controller.cc
-index 46aa0ad97f..580a189cac 100644
---- a/components/optimization_guide/core/model_execution/on_device_model_classifier_controller.cc
-+++ b/components/optimization_guide/core/model_execution/on_device_model_classifier_controller.cc
-@@ -27,6 +27,8 @@
- #include "mojo/public/cpp/base/proto_wrapper.h"
- #include "services/on_device_model/public/mojom/on_device_model.mojom.h"
- 
-+#define CloseFilesInBackground CloseFilesInBackground_on_device_model_classifier_controller
-+
- namespace optimization_guide {
- 
- namespace {
-@@ -273,3 +275,5 @@ OnDeviceModelClassifierController::GetSolution() {
- }
- 
- }  // namespace optimization_guide
-+
-+#undef CloseFilesInBackground
 diff --git a/components/password_manager/core/browser/actor_login/internal/actor_login_password_credentials_fetcher.cc b/components/password_manager/core/browser/actor_login/internal/actor_login_password_credentials_fetcher.cc
 index 3baefef84c..6bc630e266 100644
 --- a/components/password_manager/core/browser/actor_login/internal/actor_login_password_credentials_fetcher.cc
@@ -2690,3 +2652,37 @@ index e7f30b541b..19f0d1bd3d 100644
  }
 +
 +#undef kIsDesktop
+diff --git a/components/safe_browsing/core/browser/db/v5_store.cc b/components/safe_browsing/core/browser/db/v5_store.cc
+index c1266afc95..a9555227b3 100644
+--- a/components/safe_browsing/core/browser/db/v5_store.cc
++++ b/components/safe_browsing/core/browser/db/v5_store.cc
+@@ -33,6 +33,8 @@
+ 
+ #define kApplyUpdate kApplyUpdate_v5store
+ #define kResult kResult_v5store
++#define RecordApplyUpdateDuration RecordApplyUpdateDuration_v5store
++#define RecordMigrationTime RecordMigrationTime_v5store
+ 
+ namespace safe_browsing {
+ 
+@@ -806,3 +808,5 @@ V5StorePtr V5StoreFactory::CreateV5Store(
+ 
+ #undef kApplyUpdate
+ #undef kResult
++#undef RecordApplyUpdateDuration
++#undef RecordMigrationTime
+diff --git a/components/eye_dropper/BUILD.gn b/components/eye_dropper/BUILD.gn
+index 4d8cb01053..f214eb97c0 100644
+--- a/components/eye_dropper/BUILD.gn
++++ b/components/eye_dropper/BUILD.gn
+@@ -13,6 +13,10 @@ jumbo_static_library("eye_dropper") {
+     "features.cc",
+     "features.h",
+   ]
++  jumbo_excluded_sources = [
++    # Conflicts with //chrome/browser/ui:ui
++    "features.cc",
++  ]
+ 
+   deps = [
+     "//base",
