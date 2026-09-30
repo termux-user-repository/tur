@@ -1,0 +1,12 @@
+--- a/mk/install.mk
++++ b/mk/install.mk
+@@ -3,7 +3,7 @@
+ 
+ install: $(APP) $(ADDITIONAL_INSTALL_TARGETS)
+ 	install -D -m 755 $(APP) $(DESTDIR)/$(PREFIX)/bin/$(APP)
+-	mkdir -p $(DESTDIR)/$(PREFIX)/share/$(APP)
+-	cp -rpv data $(DESTDIR)/$(PREFIX)/share/$(APP)/
++	mkdir -p $(DESTDIR)/$(PREFIX)/share/games/$(APP)
++	cp -rpv data $(DESTDIR)/$(PREFIX)/share/games/$(APP)/
+ 
+ .PHONY: install
