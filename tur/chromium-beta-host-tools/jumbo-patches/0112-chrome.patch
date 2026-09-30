@@ -225,25 +225,25 @@ diff --git a/chrome/browser/devtools/BUILD.gn b/chrome/browser/devtools/BUILD.gn
 index a789faeab1..184f56b7fc 100644
 --- a/chrome/browser/devtools/BUILD.gn
 +++ b/chrome/browser/devtools/BUILD.gn
-@@ -97,6 +97,7 @@ inspector_protocol_generate("protocol_generated_sources") {
- jumbo_static_library("devtools") {
-   # Note: new sources and deps should be generally added in (!is_android) below.
-   sources = []
+@@ -108,6 +108,7 @@
+     "chrome_devtools_session_base.cc",
+     "chrome_devtools_session_base.h",
+   ]
 +  jumbo_excluded_sources = []
  
    configs += [
      "//build/config/compiler:wexit_time_destructors",
-@@ -243,6 +244,10 @@ jumbo_static_library("devtools") {
-       "//chrome/browser/ui:browser_tab_strip",
-       "//chrome/browser/ui/tabs:tab_strip_model_observer",
+@@ -381,6 +382,10 @@
+       "serialize_host_descriptions.cc",
+       "serialize_host_descriptions.h",
      ]
 +    jumbo_excluded_sources += [
 +      # kCancelButtonId also exists in devtools_ui_bindings.cc
-+      "devtools_connection_dialog.cc"
++      "devtools_connection_dialog.cc",
 +    ]
-     deps += [
-       "//chrome:extra_resources",
-       "//chrome:resources",
+     if (enable_service_discovery) {
+       sources += [
+         "device/cast_device_provider.cc",
 diff --git a/chrome/browser/devtools/device/adb/adb_device_provider.cc b/chrome/browser/devtools/device/adb/adb_device_provider.cc
 index ea43268e8b..de84916937 100644
 --- a/chrome/browser/devtools/device/adb/adb_device_provider.cc
@@ -533,25 +533,6 @@ index f2d3e673bc..4663f766e1 100644
  
  namespace {
 @@ -98,3 +100,5 @@ void ContextSignalsDecorator::OnSignalsFetched(
- }
- 
- }  // namespace enterprise_connectors
-+
-+#undef kLatencyHistogramVariant
-diff --git a/chrome/browser/enterprise/connectors/device_trust/signals/signals_service_impl.cc b/chrome/browser/enterprise/connectors/device_trust/signals/signals_service_impl.cc
-index b7cd3881c4..a47436136f 100644
---- a/chrome/browser/enterprise/connectors/device_trust/signals/signals_service_impl.cc
-+++ b/chrome/browser/enterprise/connectors/device_trust/signals/signals_service_impl.cc
-@@ -16,6 +16,8 @@
- #include "chrome/browser/enterprise/connectors/device_trust/signals/decorators/common/signals_decorator.h"
- #include "chrome/browser/enterprise/connectors/device_trust/signals/signals_filterer.h"
- 
-+#define kLatencyHistogramVariant kLatencyHistogramVariant_Full
-+
- namespace enterprise_connectors {
- 
- namespace {
-@@ -66,3 +68,5 @@ void SignalsServiceImpl::OnSignalsDecorated(
  }
  
  }  // namespace enterprise_connectors
@@ -870,7 +851,7 @@ diff --git a/chrome/browser/extensions/browser_window_util.cc b/chrome/browser/e
 index 5af8b82010..13c46f4168 100644
 --- a/chrome/browser/extensions/browser_window_util.cc
 +++ b/chrome/browser/extensions/browser_window_util.cc
-@@ -59,8 +59,8 @@ bool BrowserMatchesHelper(BrowserWindowInterface& browser,
+@@ -53,8 +53,8 @@
  
  BrowserWindowInterface* GetBrowserForTabContents(
      content::WebContents& tab_contents) {
@@ -878,18 +859,9 @@ index 5af8b82010..13c46f4168 100644
 -      tabs::TabInterface::MaybeGetFromContents(&tab_contents);
 +  ::tabs::TabInterface* tab =
 +      ::tabs::TabInterface::MaybeGetFromContents(&tab_contents);
-   if (!tab) {
-     return nullptr;
-   }
-@@ -72,7 +72,7 @@ BrowserWindowInterface* GetBrowserForTabContents(
-     if (!tab_list) {
-       continue;
-     }
--    std::vector<tabs::TabInterface*> all_tabs = tab_list->GetAllTabs();
-+    std::vector<::tabs::TabInterface*> all_tabs = tab_list->GetAllTabs();
-     if (std::ranges::contains(all_tabs, tab)) {
-       return browser;  // Found it!
-     }
+   return tab ? tab->GetBrowserWindowInterface() : nullptr;
+ }
+ 
 diff --git a/chrome/browser/extensions/extension_view_host_factory.cc b/chrome/browser/extensions/extension_view_host_factory.cc
 index 01021f4f4b..557a7e6ff4 100644
 --- a/chrome/browser/extensions/extension_view_host_factory.cc
@@ -920,18 +892,17 @@ diff --git a/chrome/browser/glic/BUILD.gn b/chrome/browser/glic/BUILD.gn
 index e8cea2242c..efae52430a 100644
 --- a/chrome/browser/glic/BUILD.gn
 +++ b/chrome/browser/glic/BUILD.gn
-@@ -285,6 +285,11 @@ jumbo_source_set("impl") {
-     "widget/browser_conditions.cc",
-     "widget/browser_conditions.h",
+@@ -285,6 +285,10 @@ jumbo_source_set("impl") {
+     "widget/glic_tab_ui.cc",
+     "widget/glic_tab_ui.h",
    ]
 +  jumbo_excluded_sources = [
 +    # Many conflictions
-+    "host/glic_ui.cc",
 +    "host/glic_cookie_synchronizer.cc",
 +  ]
  
-   if (!is_android) {
-     # TODO(b/470059315): Make these work on Android, or move them to the
+   public_deps = [
+     ":private_types",
 diff --git a/chrome/browser/glic/host/context/glic_focused_tab_manager.cc b/chrome/browser/glic/host/context/glic_focused_tab_manager.cc
 index a6bfe8e0fa..f6a9ae8f08 100644
 --- a/chrome/browser/glic/host/context/glic_focused_tab_manager.cc
@@ -1777,37 +1748,25 @@ diff --git a/chrome/browser/ui/BUILD.gn b/chrome/browser/ui/BUILD.gn
 index 4cef995ac6..2da13d8f94 100644
 --- a/chrome/browser/ui/BUILD.gn
 +++ b/chrome/browser/ui/BUILD.gn
-@@ -419,6 +419,7 @@
-     "webui/chrome_web_ui_controller_factory.cc",
-     "webui/chrome_web_ui_controller_factory.h",
+@@ -526,6 +526,7 @@
+     "tab_helpers.cc",
+     "tab_helpers.h",
    ]
 +  jumbo_excluded_sources = []
  
    defines = []
    libs = []
-@@ -3428,6 +3429,11 @@
+@@ -2340,6 +2341,10 @@
        "views/profiles/batch_upload_dialog_view.cc",
        "views/profiles/batch_upload_dialog_view.h",
      ]
 +    jumbo_excluded_sources += [
 +      # Also defined in //chrome/browser/ui/profiles:impl
-+      "profiles/batch_upload_ui_delegate.cc",
 +      "views/profiles/batch_upload_dialog_view.cc",
 +    ]
      deps += [
        "webui/signin:batch_upload",
        "webui/signin/batch_upload:mojo_bindings",
-@@ -3448,6 +3454,10 @@
-       "views/passwords/biometric_authentication_for_filling_bubble_view.cc",
-       "views/passwords/biometric_authentication_for_filling_bubble_view.h",
-     ]
-+    jumbo_excluded_sources += [
-+      # Conflict with //chrome/browser/ui/webui/signin:login_impl
-+      "webui/signin/inline_login_ui.cc",
-+    ]
-   }
- 
-   if (is_win || is_mac) {
 diff --git a/chrome/browser/ui/exclusive_access/keyboard_lock_controller.cc b/chrome/browser/ui/exclusive_access/keyboard_lock_controller.cc
 index 1b380812b5..11078b4879 100644
 --- a/chrome/browser/ui/exclusive_access/keyboard_lock_controller.cc
@@ -1852,17 +1811,17 @@ diff --git a/chrome/browser/ui/lens/BUILD.gn b/chrome/browser/ui/lens/BUILD.gn
 index 7231827a3c..ceddd80a7f 100644
 --- a/chrome/browser/ui/lens/BUILD.gn
 +++ b/chrome/browser/ui/lens/BUILD.gn
-@@ -138,6 +138,10 @@ jumbo_source_set("impl") {
-     "overlay_base_controller.cc",
+@@ -40,6 +40,10 @@
      "page_content_type_conversions.cc",
+     "page_content_type_conversions.h",
    ]
 +  jumbo_excluded_sources = [
 +    # reference to overloaded function could not be resolved; did you mean to call it?
 +    "lens_overlay_query_controller.cc",
 +  ]
- 
-   deps = [
-     ":lens",
+   public_deps = [
+     ":backend_logic_public",
+     "//base",
 diff --git a/chrome/browser/ui/lens/lens_media_link_handler.cc b/chrome/browser/ui/lens/lens_media_link_handler.cc
 index d5fd7a012e..7eaa36ef38 100644
 --- a/chrome/browser/ui/lens/lens_media_link_handler.cc
@@ -3585,34 +3544,6 @@ index 8668c71e02..ca7aafa142 100644
    }
  
    deps = [
-diff --git a/chrome/browser/password_manager/password_change/password_change_from_checkup_delegate.cc b/chrome/browser/password_manager/password_change/password_change_from_checkup_delegate.cc
-index 2d7eb185bf..d0d8f6c208 100644
---- a/chrome/browser/password_manager/password_change/password_change_from_checkup_delegate.cc
-+++ b/chrome/browser/password_manager/password_change/password_change_from_checkup_delegate.cc
-@@ -129,7 +129,7 @@ std::string GetPostSubmissionPrompt() {
- #endif
- }
- 
--std::u16string GeneratePassword(
-+std::u16string GeneratePassword_password_change_from_checkup_delegate(
-     const password_manager::PasswordForm& form,
-     password_manager::PasswordGenerationFrameHelper* generation_helper) {
-   auto iter = std::ranges::find(form.form_data.fields(),
-@@ -144,6 +144,8 @@ std::u16string GeneratePassword(
-       autofill::CalculateFieldSignatureForField(*iter), iter->max_length());
- }
- 
-+#define GeneratePassword GeneratePassword_password_change_from_checkup_delegate
-+
- bool IsTaskInterrupted(actor::ActorTask::State new_state) {
-   return (new_state == actor::ActorTask::State::kWaitingOnUser ||
-           new_state == actor::ActorTask::State::kPausedByActor ||
-@@ -486,3 +488,5 @@ void PasswordChangeFromCheckupDelegate::HandleMaybeSuccessfulPasswordChange() {
-     saved_form_manager_.reset();
-   }
- }
-+
-+#undef GeneratePassword
 diff --git a/chrome/browser/web_applications/model/web_app_icon_types.cc b/chrome/browser/web_applications/model/web_app_icon_types.cc
 index 13ec4c7137..a8689fd46c 100644
 --- a/chrome/browser/web_applications/model/web_app_icon_types.cc
@@ -4802,3 +4733,160 @@ index b45ca2c06a..e6383ed4bc 100644
    sources = [
      "ui_features.cc",
      "ui_features.h",
+diff --git a/chrome/browser/safe_browsing/download_protection/deep_scanning_request.cc b/chrome/browser/safe_browsing/download_protection/deep_scanning_request.cc
+index d01c43c31f..9f97458a68 100644
+--- a/chrome/browser/safe_browsing/download_protection/deep_scanning_request.cc
++++ b/chrome/browser/safe_browsing/download_protection/deep_scanning_request.cc
+@@ -113,7 +113,7 @@ TriggeredRule::CustomRuleMessage GetForceSaveToCloudCustomRuleMessage(
+ #if BUILDFLAG(ENTERPRISE_CLOUD_CONTENT_ANALYSIS)
+ bool CanBypassForceSaveDialogForAutomation() {
+   return base::CommandLine::ForCurrentProcess()->HasSwitch(
+-      switches::kEnableAutomation);
++      ::switches::kEnableAutomation);
+ }
+ #endif  // BUILDFLAG(ENTERPRISE_CLOUD_CONTENT_ANALYSIS)
+ 
+diff --git a/chrome/browser/password_manager/password_change/glic_password_change_actuator.cc b/chrome/browser/password_manager/password_change/glic_password_change_actuator.cc
+index 15e2ca7123..eb51efae35 100644
+--- a/chrome/browser/password_manager/password_change/glic_password_change_actuator.cc
++++ b/chrome/browser/password_manager/password_change/glic_password_change_actuator.cc
+@@ -44,6 +44,8 @@
+ #include "ui/base/resource/resource_bundle.h"
+ #include "ui/base/window_open_disposition.h"
+ 
++#define GetLoggerIfAvailable GetLoggerIfAvailable_glic_password_change_actuator
++
+ namespace {
+ 
+ using Logger = password_manager::BrowserSavePasswordProgressLogger;
+@@ -648,3 +650,5 @@ void GlicPasswordChangeActuator::NotifyStateChanged(
+   observers_.Notify(&PasswordChangeActuator::Observer::OnActuationStateChanged,
+                     new_state);
+ }
++
++#undef GetLoggerIfAvailable
+diff --git a/chrome/browser/password_manager/password_change/script_password_change_actuator.cc b/chrome/browser/password_manager/password_change/script_password_change_actuator.cc
+index a61e8fdd86..b21138e32f 100644
+--- a/chrome/browser/password_manager/password_change/script_password_change_actuator.cc
++++ b/chrome/browser/password_manager/password_change/script_password_change_actuator.cc
+@@ -30,6 +30,8 @@
+ #include "ui/base/window_open_disposition.h"
+ #include "url/gurl.h"
+ 
++#define GetLoggerIfAvailable GetLoggerIfAvailable_script_password_change_actuator
++
+ namespace {
+ 
+ using ::password_manager::BrowserSavePasswordProgressLogger;
+@@ -390,3 +392,5 @@ void ScriptPasswordChangeActuator::ResetInternalState() {
+   submission_verifier_.reset();
+   form_manager_.reset();
+ }
++
++#undef GetLoggerIfAvailable
+diff --git a/chrome/browser/password_manager/remote_actor/remote_actor_credential_permission_client.cc b/chrome/browser/password_manager/remote_actor/remote_actor_credential_permission_client.cc
+index 294e5783fd..489c6c716f 100644
+--- a/chrome/browser/password_manager/remote_actor/remote_actor_credential_permission_client.cc
++++ b/chrome/browser/password_manager/remote_actor/remote_actor_credential_permission_client.cc
+@@ -22,6 +22,8 @@
+ #include "url/gurl.h"
+ #include "url/origin.h"
+ 
++#define GetEndpointUrlBase GetEndpointUrlBase_remote_actor_credential_permission_client
++
+ namespace password_manager {
+ 
+ namespace {
+@@ -180,3 +182,5 @@ void RemoteActorCredentialPermissionClient::DeleteRequest(
+ }
+ 
+ }  // namespace password_manager
++
++#undef GetEndpointUrlBase
+diff --git a/chrome/browser/ui/tabs/recent_tabs_builder.cc b/chrome/browser/ui/tabs/recent_tabs_builder.cc
+index c4eb8624ab..899963491a 100644
+--- a/chrome/browser/ui/tabs/recent_tabs_builder.cc
++++ b/chrome/browser/ui/tabs/recent_tabs_builder.cc
+@@ -47,6 +47,10 @@
+ #include "ui/base/ui_base_features.h"
+ #include "ui/gfx/favicon_size.h"
+ 
++#define kMaxLocalEntries kMaxLocalEntries_recent_tabs_builder
++#define SortSessionsByRecency SortSessionsByRecency_recent_tabs_builder
++#define CreateFavicon CreateFavicon_recent_tabs_builder
++
+ namespace {
+ 
+ constexpr int kMaxLocalEntries = 8;
+@@ -453,3 +457,7 @@ std::vector<RecentTabItem> RecentTabsBuilder::BuildRemoteEntries(
+ 
+   return items;
+ }
++
++#undef kMaxLocalEntries
++#undef SortSessionsByRecency
++#undef CreateFavicon
+diff --git a/chrome/browser/ui/views/page_info/suspicious_site_bubble_view.cc b/chrome/browser/ui/views/page_info/suspicious_site_bubble_view.cc
+index 0bc8098a3c..c0734d0397 100644
+--- a/chrome/browser/ui/views/page_info/suspicious_site_bubble_view.cc
++++ b/chrome/browser/ui/views/page_info/suspicious_site_bubble_view.cc
+@@ -44,6 +44,8 @@
+ #include "ui/views/widget/widget.h"
+ #include "url/gurl.h"
+ 
++#define CreateLearnMoreLabel CreateLearnMoreLabel_suspicious_site_bubble_view
++
+ namespace {
+ 
+ // Parses description string containing <link>...</link> and attaches link
+@@ -288,3 +290,5 @@ PageInfoBubbleViewBase* CreateSuspiciousSiteBubbleForTesting(
+ 
+ BEGIN_METADATA(SuspiciousSiteBubbleView)
+ END_METADATA
++
++#undef CreateLearnMoreLabel
+diff --git a/chrome/renderer/actor/BUILD.gn b/chrome/renderer/actor/BUILD.gn
+index 5529c2fad0..dee5df2ce3 100644
+--- a/chrome/renderer/actor/BUILD.gn
++++ b/chrome/renderer/actor/BUILD.gn
+@@ -38,6 +38,10 @@ jumbo_source_set("actor") {
+     "type_tool.cc",
+     "type_tool.h",
+   ]
++  jumbo_excluded_sources = [
++    # Too many symbol conflictions on std::ostream<Type>
++    "journal.cc",
++  ]
+ 
+   public_deps = [
+     "//base",
+diff --git a/chrome/browser/ui/BUILD.gn b/chrome/browser/ui/BUILD.gn
+index 7c8dbc3732..d6f624d4d6 100644
+--- a/chrome/browser/ui/BUILD.gn
++++ b/chrome/browser/ui/BUILD.gn
+@@ -2925,6 +2925,10 @@ jumbo_static_library("ui") {
+       "views/web_apps/web_app_update_review_dialog.cc",
+       "views/web_apps/web_app_update_review_dialog.h",
+     ]
++    jumbo_excluded_sources += [
++      # Also defined in //chrome/browser/ui/views/web_apps/isolated_web_apps:installer_base
++      "views/web_apps/isolated_web_apps/uninstall_sub_app_identity_view.cc",
++    ]
+ 
+     sources += get_target_outputs(":webui_name_variants")
+ 
+diff --git a/chrome/browser/ui/views/web_apps/isolated_web_apps/BUILD.gn b/chrome/browser/ui/views/web_apps/isolated_web_apps/BUILD.gn
+index b58776b3ff..7556912927 100644
+--- a/chrome/browser/ui/views/web_apps/isolated_web_apps/BUILD.gn
++++ b/chrome/browser/ui/views/web_apps/isolated_web_apps/BUILD.gn
+@@ -21,6 +21,10 @@ jumbo_source_set("installer_base") {
+     "isolated_web_app_installer_view.cc",
+     "uninstall_sub_app_identity_view.cc",
+   ]
++  jumbo_excluded_sources = [
++    # Also defined in //chrome/browser/ui:ui
++    "uninstall_sub_app_identity_view.cc",
++  ]
+ 
+   public_deps = [
+     "//base",

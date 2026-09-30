@@ -4895,3 +4895,22 @@ index a28243d65a..c6845ca742 100644
      return false;
    }
    if (!NeedsA11ySupport()) {
+diff --git a/third_party/blink/renderer/core/layout/grid_lanes/layout_grid_lanes.cc b/third_party/blink/renderer/core/layout/grid_lanes/layout_grid_lanes.cc
+index 1c6e8d1ef2..1400c34bb6 100644
+--- a/third_party/blink/renderer/core/layout/grid_lanes/layout_grid_lanes.cc
++++ b/third_party/blink/renderer/core/layout/grid_lanes/layout_grid_lanes.cc
+@@ -7,6 +7,8 @@
+ #include "third_party/blink/renderer/core/layout/grid/layout_grid.h"
+ #include "third_party/blink/renderer/platform/text/writing_mode_utils.h"
+ 
++#define GetOverflowConverter GetOverflowConverter_layout_grid_lanes
++
+ namespace blink {
+ 
+ namespace {
+@@ -191,3 +193,5 @@ Vector<LayoutUnit, 1> LayoutGridLanes::TrackSizesForComputedStyle(
+ }
+ 
+ }  // namespace blink
++
++#undef GetOverflowConverter
