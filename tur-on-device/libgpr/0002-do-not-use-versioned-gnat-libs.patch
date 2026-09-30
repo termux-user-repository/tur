@@ -1,0 +1,21 @@
+--- a/src/gprlib.adb
++++ b/src/gprlib.adb
+@@ -2211,17 +2211,7 @@
+                      "no toolchain version for language " & Line (1 .. Last));
+ 
+                elsif Line (1 .. Last) = "ada" then
+-                  Get_Line (IO_File, Line, Last);
+-
+-                  if Last > 5 and then Line (1 .. 5) = GNAT_And_Space then
+-                     GNAT_Version := new String'(Line (6 .. Last));
+-                     GNAT_Version_Set := True;
+-
+-                     Free (Libgnat);
+-                     Free (Libgnarl);
+-                     Libgnat  := new String'("-lgnat-" & Line (6 .. Last));
+-                     Libgnarl := new String'("-lgnarl-" & Line (6 .. Last));
+-                  end if;
++                  Skip_Line (IO_File);
+ 
+                else
+                   Skip_Line (IO_File);
