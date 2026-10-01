@@ -1,0 +1,18 @@
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -24,13 +24,13 @@ csv = "1"
+ taflzero = { git = "https://github.com/sovelin/taflzero.git", rev = "1527cb04f54c9e956b36a54822aaf75bf1ccba55", default-features = false }
+ 
+ # client
+-[target.'cfg(not(target_os = "redox"))'.dependencies.iced]
++[target.'cfg(not(any(target_os = "redox", target_os = "android")))'.dependencies.iced]
+ version = "0.14"
+ features = ["advanced-shaping", "fira-sans", "image", "smol"]
+ optional = true
+ 
+ # client
+-[target.'cfg(target_os = "redox")'.dependencies.iced]
++[target.'cfg(any(target_os = "redox", target_os = "android"))'.dependencies.iced]
+ version = "0.14"
+ features = [
+     "tiny-skia", "crisp", "web-colors", "thread-pool", "linux-theme-detection", "x11", "wayland",
