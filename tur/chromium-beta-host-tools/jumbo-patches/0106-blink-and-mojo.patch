@@ -4914,3 +4914,22 @@ index 1c6e8d1ef2..1400c34bb6 100644
  }  // namespace blink
 +
 +#undef GetOverflowConverter
+diff --git a/third_party/blink/renderer/bindings/modules/v8/BUILD.gn b/third_party/blink/renderer/bindings/modules/v8/BUILD.gn
+index ed1acb2f99..99f5a7052a 100644
+--- a/third_party/blink/renderer/bindings/modules/v8/BUILD.gn
++++ b/third_party/blink/renderer/bindings/modules/v8/BUILD.gn
+@@ -26,6 +26,14 @@ blink_modules_sources("v8") {
+       generated_observable_array_sources_in_modules +
+       generated_sync_iterator_sources_in_modules +
+       generated_typedef_sources_in_modules + generated_union_sources_in_modules
++  jumbo_excluded_sources = [
++    # v8_password_credential.cc
++    # explicit specialization of 'blink::HashTraits<base::UnguessableToken>' after instantiation
++    "$root_gen_dir/third_party/blink/renderer/bindings/modules/v8/v8_navigator.cc",
++    # v8_document.cc
++    # explicit specialization of 'blink::HashTraits<base::UnguessableToken>' after instantiation
++    "$root_gen_dir/third_party/blink/renderer/bindings/modules/v8/v8_capture_controller.cc",
++  ]
+ 
+   deps = [
+     ":generated",
