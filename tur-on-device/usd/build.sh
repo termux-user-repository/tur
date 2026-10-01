@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="High-performance extensible software platform for collab
 TERMUX_PKG_LICENSE="Apache-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="26.08"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL="https://github.com/PixarAnimationStudios/OpenUSD/archive/refs/tags/v$TERMUX_PKG_VERSION.tar.gz"
 TERMUX_PKG_SHA256=4bccbb95cddda1dbeef2f74a08b9456352f2aa91bfd4578c0c613009c7950149
 TERMUX_PKG_DEPENDS="alembic, draco, embree, fmt, glew, imath, libc++, libx11, libxt, materialx, libandroid-glob, libtbb, opencolorio, openexr, openimageio, openshadinglanguage, opensubdiv, openvdb, ptex, pyside6, python-opengl"
