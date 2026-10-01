@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="Open standard for the exchange of rich material and look
 TERMUX_PKG_LICENSE="Apache-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="1.39.5"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL="https://github.com/AcademySoftwareFoundation/MaterialX/releases/download/v$TERMUX_PKG_VERSION/MaterialX-$TERMUX_PKG_VERSION.tar.gz"
 TERMUX_PKG_SHA256=d66c45f942472182c09e5c60461a78d52060d9143dc90f7157688c4ddbebba06
 TERMUX_PKG_DEPENDS="libc++, opencolorio, opengl, openimageio, python, zenity"
