@@ -6,7 +6,6 @@ TERMUX_PKG_VERSION="1.3.1"
 TERMUX_PKG_SRCURL="https://github.com/zitzhen/patchsplit/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz"
 TERMUX_PKG_SHA256=1bdbfc880b892acd73dca6529abd7e80a122774348e8e075e158011b52d869a2
 TERMUX_PKG_AUTO_UPDATE=true
-
 TERMUX_PKG_BUILD_IN_SRC=true
 
 termux_step_make() {
