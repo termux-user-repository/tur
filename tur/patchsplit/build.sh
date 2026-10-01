@@ -1,4 +1,4 @@
-TERMUX_PKG_HOMEPAGE=https://github.com/zitzhen/patchsplit
+TERMUX_PKG_HOMEPAGE=https://patchsplit.zitzhen.cn
 TERMUX_PKG_DESCRIPTION="A CLI tool for splitting patch files into per-commit patches"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@Iamliuxiaozhen"
