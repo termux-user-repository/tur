@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://github.com/AcademySoftwareFoundation/OpenShadingLang
 TERMUX_PKG_DESCRIPTION="Advanced shading language for production GI renderers"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="1.15.5.0"
+TERMUX_PKG_VERSION="1.15.7.0"
 TERMUX_PKG_SRCURL="https://github.com/AcademySoftwareFoundation/OpenShadingLanguage/releases/download/v$TERMUX_PKG_VERSION/OSL-$TERMUX_PKG_VERSION.tar.gz"
-TERMUX_PKG_SHA256=49bde680749d82cb501359d54bba5159b741071426a1a023f57bbee961ab71f8
+TERMUX_PKG_SHA256=cfb1bbdecab23bb0c1fd61db340a0e3bef52f2a26fd7bc2e65725a334a08095d
 TERMUX_PKG_DEPENDS="freetype, imath, libc++, libpng, libtiff, ncurses, openimageio, python, qt6-qtbase, zlib"
 # OSL does not support 32-bit
 TERMUX_PKG_EXCLUDED_ARCHES="arm, i686"
