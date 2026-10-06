@@ -1,0 +1,20 @@
+diff --git a/sources/lib/build-system/variables.dylan b/sources/lib/build-system/variables.dylan
+index 47a31dab4..c9fc62b92 100644
+--- a/sources/lib/build-system/variables.dylan
++++ b/sources/lib/build-system/variables.dylan
+@@ -12,14 +12,12 @@ define variable $personal-bin     :: false-or(<directory-locator>) = #f;
+ 
+ // We don't ensure system directories because nothing is installed there.
+ // By definition they had to have been already created
+-define variable $system-install      :: false-or(<directory-locator>) = #f;
++define variable $system-install      :: false-or(<directory-locator>) = as(<directory-locator>, "@TERMUX_PREFIX@");
+ 
+ define method configure-build-system () => ()
+   $personal-install := user-install-path();
+   $personal-bin :=
+     $personal-install & subdirectory-locator($personal-install, "bin");
+-
+-  $system-install := system-install-path() | system-release-path();
+ end method;
+ 
+ configure-build-system();
