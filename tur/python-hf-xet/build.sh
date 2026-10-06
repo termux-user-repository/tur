@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://github.com/huggingface/xet-core
 TERMUX_PKG_DESCRIPTION="Fast transfer of large files with the Hugging Face Hub"
 TERMUX_PKG_LICENSE="Apache-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="1.6.0"
+TERMUX_PKG_VERSION="1.7.0"
 TERMUX_PKG_SRCURL="https://github.com/huggingface/xet-core/releases/download/v$TERMUX_PKG_VERSION/hf_xet-$TERMUX_PKG_VERSION.tar.gz"
-TERMUX_PKG_SHA256=2e58454a340b3556dfa4972d5451aff4fba8dd42a236600ba1a1d2b1514f0fef
+TERMUX_PKG_SHA256=d406ec79053c0871817f700c2ac8c36ba0d87f9c34b7458b0f0063bb218b0466
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_DEPENDS="libc++, python"
 TERMUX_PKG_PYTHON_COMMON_BUILD_DEPS="'maturin>=1.7,<2.0'"
