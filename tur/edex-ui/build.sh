@@ -3,9 +3,11 @@ TERMUX_PKG_DESCRIPTION="A cross-platform, customizable science fiction terminal 
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="2.2.8"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=git+https://github.com/GitSquared/edex-ui
 TERMUX_PKG_SHA256=c6a8ef34890c028ee2a1e4c64485db29d4d0aedda0d63c0fc5f8572d45226b51
 TERMUX_PKG_DEPENDS="electron-deps"
+TERMUX_PKG_ANTI_BUILD_DEPENDS="electron-deps"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_NO_STATICSPLIT=true
 
@@ -38,8 +40,33 @@ termux_step_get_source() {
 	cp -Rf $TMP_CHECKOUT $TERMUX_PKG_SRCDIR
 }
 
+__tur_setup_nodejs_14() {
+	local NODEJS_VERSION=14.2.0
+	local NODEJS_FOLDER=${TERMUX_PKG_CACHEDIR}/build-tools/nodejs-${NODEJS_VERSION}
+
+	if [ ! -x "$NODEJS_FOLDER/bin/node" ]; then
+		mkdir -p "$NODEJS_FOLDER"
+		local NODEJS_TAR_FILE=$TERMUX_PKG_TMPDIR/nodejs-$NODEJS_VERSION.tar.xz
+		termux_download https://nodejs.org/dist/v${NODEJS_VERSION}/node-v${NODEJS_VERSION}-linux-x64.tar.xz \
+			"$NODEJS_TAR_FILE" \
+			468cbd92271da8c0cacaa3fa432a73a332e398bade8ad7359a94aa8ab3cc3cca
+		tar -xf "$NODEJS_TAR_FILE" -C "$NODEJS_FOLDER" --strip-components=1
+	fi
+	export PATH="$NODEJS_FOLDER/bin:$PATH"
+}
+
+__tur_setup_pypy2() {
+	termux_download \
+		https://downloads.python.org/pypy/pypy2.7-v7.3.17-linux64.tar.bz2 \
+		"$TERMUX_PKG_CACHEDIR"/pypy2.7-v7.3.17-linux64.tar.bz2 \
+		9f3497f87b3372d17e447369e0016a4bec99a6b4d2a59aba774a25bfe4353474
+	tar -C "$TERMUX_PKG_CACHEDIR" -xf "$TERMUX_PKG_CACHEDIR"/pypy2.7-v7.3.17-linux64.tar.bz2
+	export PATH="$TERMUX_PKG_CACHEDIR/pypy2.7-v7.3.17-linux64/bin:$PATH"
+}
+
 termux_step_configure() {
-	termux_setup_nodejs
+	__tur_setup_nodejs_14
+	__tur_setup_pypy2
 
 	if [ $TERMUX_ARCH = "arm" ]; then
 		electron_arch="armv7l"
