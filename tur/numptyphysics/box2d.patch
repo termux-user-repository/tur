@@ -1,0 +1,11 @@
+--- a/external/Box2D/Source/Makefile
++++ b/external/Box2D/Source/Makefile
+@@ -6,7 +6,7 @@
+ TARGETS += Gen/nds-float/lib/libbox2d.a Gen/nds-fixed/lib/libbox2d.a
+ endif
+ 
+-CXXFLAGS=	-g -O2
++CXXFLAGS ?=	-g -O2
+ 
+ SOURCES = \
+ 	./Dynamics/b2Body.cpp \
