@@ -1,0 +1,59 @@
+Description: make shader code regeneration scripts unconditional
+ The EFL tarballs ship some generated source code that the Debian
+ package should re-generate on build.  Upstream's script tries to
+ avoid regenerating the data, this makes it unconditional.
+Author: Ross Vandegrift <ross@kallisti.us>
+Origin: other
+Forwarded: not-needed
+Last-Update: 2020-10-05
+---
+This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+--- a/src/lib/ector/gl/shader/gen_shaders.sh
++++ b/src/lib/ector/gl/shader/gen_shaders.sh
+@@ -6,19 +6,6 @@
+ 
+ OUTPUT="$DIR/ector_gl_shaders.x"
+ 
+-# Skip generation if there is no diff (or no git)
+-if ! git rev-parse 2>> /dev/null >> /dev/null ; then exit 0 ; fi
+-if git diff --quiet --exit-code -- "$DIR"
+-then
+-  for f in gen_shaders.sh fragment.glsl vertex.glsl include.glsl; do
+-    if [ "$DIR/$f" -nt "$OUTPUT" ]; then
+-      touch "$OUTPUT"
+-      break
+-    fi
+-  done
+-  exit 0
+-fi
+-
+ # Write header
+ rm -f "$OUTPUT.tmp"
+ cat <<EOF >> $OUTPUT.tmp
+@@ -31,7 +18,8 @@
+   m4 "$DIR/include.glsl" "$DIR/$SHD.glsl" > "$SHD.tmp"
+ 
+   OIFS="$IFS"
+-  IFS=$'\n'
++  IFS=$'
++'
+   echo -n "static const char ${SHD}_glsl[] =" >> "$OUTPUT.tmp"
+   for LINE in `cat "$SHD.tmp"` ; do
+       printf "\n   \"$LINE\\\n\"" >> "$OUTPUT.tmp"
+--- a/src/modules/evas/engines/gl_common/shader/gen_shaders.sh
++++ b/src/modules/evas/engines/gl_common/shader/gen_shaders.sh
+@@ -13,14 +13,6 @@
+ # Skip generation if file can not be written to
+ if [ -e ${OUTPUT} ] && [ ! -w ${OUTPUT} ] ; then exit 0; fi
+ 
+-# Skip generation if there is no diff (or no git)
+-if ! git rev-parse 2>> /dev/null >> /dev/null ; then exit 0 ; fi
+-if git diff --quiet --exit-code -- "$DIR"
+-then
+-  touch "$OUTPUT"
+-  exit 0
+-fi
+-
+ exec 1<&-
+ exec 1>"$OUTPUT"
+ 

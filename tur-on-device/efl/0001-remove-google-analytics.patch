@@ -1,0 +1,27 @@
+Description: Remove remote js from html docs
+ The html docs load remote google analytics scripts.  Since this can leak local
+ user actions, remove it.
+Author: Ross Vandegrift <ross@kallisti.us>
+Origin: other
+Forwarded: not-needed
+Last-Update: 2018-10-11
+
+--- a/doc/head.html
++++ b/doc/head.html
+@@ -4,15 +4,7 @@
+ <head>
+   <title>$title</title>
+ 
+-  <!-- Global site tag (gtag.js) - Google Analytics -->
+-  <script async src="https://www.googletagmanager.com/gtag/js?id=UA-110876574-1"></script>
+-  <script>
+-    window.dataLayer = window.dataLayer || [];
+-    function gtag(){dataLayer.push(arguments);}
+-    gtag('js', new Date());
+-
+-    gtag('config', 'UA-110876574-1');
+-  </script>
++  <!-- Google Analytics js removed from Debian packages -->
+ 
+   <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+   <link rel="icon" href="favicon.png" type="image/x-icon">
