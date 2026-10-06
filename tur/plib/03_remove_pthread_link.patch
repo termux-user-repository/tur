@@ -1,0 +1,13 @@
+Description: _remove_pthread_link.diff
+ diff -Naur plib-1.8.5.orig/configure.in plib-1.8.5/configure.in
+--- plib-1.8.5.orig/configure.in	2008-04-17 20:05:09.000000000 +0100
++++ plib-1.8.5/configure.in	2008-04-17 20:04:50.000000000 +0100
+@@ -286,7 +286,7 @@
+ 
+         dnl Reasonable stuff non-windoze variants ... :-)
+ 
+-        AC_CHECK_LIB(pthread, pthread_create)
++#        AC_CHECK_LIB(pthread, pthread_create)
+         AC_CHECK_LIB(GL, glNewList)
+         if test "x$ac_cv_lib_GL_glNewList" = "xno" ; then
+                 dnl if no GL, check for MesaGL

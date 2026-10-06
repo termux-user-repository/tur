@@ -1,0 +1,104 @@
+diff -ur orig/simgear/canvas/ODGauge.cxx mod/simgear/canvas/ODGauge.cxx
+--- orig/simgear/canvas/ODGauge.cxx	2025-02-20 09:42:31.000000000 +0100
++++ mod/simgear/canvas/ODGauge.cxx	2025-03-06 10:01:58.884479363 +0100
+@@ -49,6 +49,8 @@
+ 
+ #include <cassert>
+ 
++#include <GL/gl.h>
++
+ namespace simgear
+ {
+ namespace canvas
+diff -ur orig/simgear/scene/material/Effect.cxx mod/simgear/scene/material/Effect.cxx
+--- orig/simgear/scene/material/Effect.cxx	2025-02-20 09:42:31.000000000 +0100
++++ mod/simgear/scene/material/Effect.cxx	2025-03-06 10:02:18.496140184 +0100
+@@ -81,6 +81,8 @@
+ #include <simgear/scene/util/OsgUtils.hxx>
+ #include <simgear/structure/SGExpression.hxx>
+ 
++#include <GL/gl.h>
++
+ namespace simgear
+ {
+ using namespace std;
+diff -ur orig/simgear/scene/model/SGClipGroup.cxx mod/simgear/scene/model/SGClipGroup.cxx
+--- orig/simgear/scene/model/SGClipGroup.cxx	2025-02-20 09:42:31.000000000 +0100
++++ mod/simgear/scene/model/SGClipGroup.cxx	2025-03-06 10:06:09.360152850 +0100
+@@ -34,6 +34,8 @@
+ #include <osgUtil/RenderLeaf>
+ #include <osgUtil/CullVisitor>
+ 
++#include <GL/gl.h>
++
+ class SGClipGroup::ClipRenderBin : public osgUtil::RenderBin {
+ public:
+   virtual osg::Object* cloneType() const
+diff -ur orig/simgear/scene/sky/dome.cxx mod/simgear/scene/sky/dome.cxx
+--- orig/simgear/scene/sky/dome.cxx	2025-02-20 09:42:31.000000000 +0100
++++ mod/simgear/scene/sky/dome.cxx	2025-03-06 10:10:20.859993353 +0100
+@@ -48,6 +48,7 @@
+ #include <simgear/scene/material/Effect.hxx>
+ #include <simgear/scene/material/EffectGeode.hxx>
+ 
++#include <GL/gl.h>
+ #include "dome.hxx"
+ 
+ using namespace osg;
+diff -ur orig/simgear/scene/sky/moon.cxx mod/simgear/scene/sky/moon.cxx
+--- orig/simgear/scene/sky/moon.cxx	2025-02-20 09:42:31.000000000 +0100
++++ mod/simgear/scene/sky/moon.cxx	2025-03-06 10:10:35.511749704 +0100
+@@ -48,6 +48,7 @@
+ #include <simgear/scene/model/model.hxx>
+ #include <simgear/scene/util/SGReaderWriterOptions.hxx>
+ 
++#include <GL/gl.h>
+ #include "sphere.hxx"
+ #include "moon.hxx"
+ 
+diff -ur orig/simgear/scene/sky/stars.cxx mod/simgear/scene/sky/stars.cxx
+--- orig/simgear/scene/sky/stars.cxx	2025-02-20 09:42:31.000000000 +0100
++++ mod/simgear/scene/sky/stars.cxx	2025-03-06 10:10:05.876242340 +0100
+@@ -54,6 +54,7 @@
+ #include <osg/ShadeModel>
+ #include <osg/Node>
+ 
++#include <GL/gl.h>
+ #include "stars.hxx"
+ 
+ using namespace simgear;
+diff -ur orig/simgear/scene/tgdb/SGVasiDrawable.cxx mod/simgear/scene/tgdb/SGVasiDrawable.cxx
+--- orig/simgear/scene/tgdb/SGVasiDrawable.cxx	2025-02-20 09:42:31.000000000 +0100
++++ mod/simgear/scene/tgdb/SGVasiDrawable.cxx	2025-03-06 10:13:49.612507068 +0100
+@@ -23,6 +23,7 @@
+ #  include <simgear_config.h>
+ #endif
+ 
++#include <GL/gl.h>
+ #include <simgear/compiler.h>
+ 
+ #include "SGVasiDrawable.hxx"
+diff -ur orig/simgear/scene/tgdb/ShaderGeometry.cxx mod/simgear/scene/tgdb/ShaderGeometry.cxx
+--- orig/simgear/scene/tgdb/ShaderGeometry.cxx	2025-02-20 09:42:31.000000000 +0100
++++ mod/simgear/scene/tgdb/ShaderGeometry.cxx	2025-03-06 10:23:09.319059081 +0100
+@@ -24,7 +24,7 @@
+ #include <osgDB/ParameterOutput>
+ 
+ #include "ShaderGeometry.hxx"
+-
++#include <GL/gl.h>
+ #include <algorithm>
+ 
+ using namespace osg;
+diff -ur orig/simgear/screen/tr.cxx mod/simgear/screen/tr.cxx
+--- orig/simgear/screen/tr.cxx	2025-02-20 09:42:31.000000000 +0100
++++ mod/simgear/screen/tr.cxx	2025-03-06 09:59:12.175366358 +0100
+@@ -147,7 +147,7 @@
+ #include <simgear/scene/util/project.hxx>
+ 
+ #include "tr.h"
+-
++#include <GL/gl.h>
+ 
+ #define DEFAULT_TILE_WIDTH  256
+ #define DEFAULT_TILE_HEIGHT 256
