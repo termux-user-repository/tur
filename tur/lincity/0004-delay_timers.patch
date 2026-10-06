@@ -1,0 +1,36 @@
+Index: lincity-1.13.1/splash.c
+===================================================================
+--- lincity-1.13.1.orig/splash.c	2012-02-04 22:30:12.834746189 +0200
++++ lincity-1.13.1/splash.c	2012-02-05 00:42:57.334605055 +0200
+@@ -164,7 +164,8 @@
+ si_scroll_text (void)
+ {
+   char s[LC_PATH_MAX], line1[100], line2[100], line3[100], c;
+-  int i, t, l1c = 0, l2c = 0, l3c = 0;
++  int i, l1c = 0, l2c = 0, l3c = 0;
++  long t;
+   FILE *inf1, *inf2, *inf3;
+ #ifdef LC_X11
+   XEvent xev;
+@@ -272,7 +273,7 @@
+ #endif
+       while (real_time < t)
+ 	{
+-	  lc_usleep (1);
++	  lc_usleep(1000*(t-real_time));
+ 	  get_real_time ();
+ 	}
+     }
+Index: lincity-1.13.1/main.c
+===================================================================
+--- lincity-1.13.1.orig/main.c	2012-02-05 00:41:51.094606227 +0200
++++ lincity-1.13.1/main.c	2012-02-05 10:08:23.594003906 +0200
+@@ -575,7 +575,7 @@
+ int 
+ execute_timestep (void)
+ {
+-    static int next_time_step = 0;
++    static long next_time_step = 0;
+     int real_quit_flag = 0;
+ 
+     if (market_cb_flag == 0 && help_flag == 0 

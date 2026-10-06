@@ -1,0 +1,13 @@
+Index: lincity-1.13.1/pixmap.h
+===================================================================
+--- lincity-1.13.1.orig/pixmap.h	2003-02-03 05:52:18.000000000 +0200
++++ lincity-1.13.1/pixmap.h	2015-05-10 19:55:19.079165143 +0300
+@@ -19,7 +19,7 @@
+ void initialize_pixmap (void);
+ void resize_pixmap (int new_width, int new_height);
+ int pixmap_getpixel (int x, int y);
+-inline int pixmap_index (int x, int y);
++int pixmap_index (int x, int y);
+ int pixmap_getpixel (int x, int y);
+ void pixmap_setpixel (int x, int y, int col);
+ void pixmap_hline (int x1, int y1, int x2, int col);

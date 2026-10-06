@@ -1,0 +1,14 @@
+Index: lincity-1.13.1/configure.ac
+===================================================================
+--- lincity-1.13.1.orig/configure.ac	2004-06-27 06:49:00.000000000 +0300
++++ lincity-1.13.1/configure.ac	2012-02-04 22:19:19.734757751 +0200
+@@ -31,8 +31,7 @@
+ dnl FC_EXPAND_DIR(DEFAULT_LIBDIR,"${datadir}/lincity")
+ dnl AC_DEFINE_UNQUOTED(DEFAULT_LIBDIR,"$DEFAULT_LIBDIR")
+ dnl -------------------------------------------------------
+-FC_EXPAND_DIR(DEFAULT_LIBDIR,[${datadir}/lincity])
+-AC_DEFINE_UNQUOTED(DEFAULT_LIBDIR,"$DEFAULT_LIBDIR")
++AC_DEFINE_UNQUOTED(DEFAULT_LIBDIR,"@TERMUX_PREFIX@/share/lincity")
+ 
+ dnl -------------------------------------------------------
+ dnl GCS Jan 19, 2003

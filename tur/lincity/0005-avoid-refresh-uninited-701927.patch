@@ -1,0 +1,16 @@
+Index: lincity-1.13.1/geometry.c
+===================================================================
+--- lincity-1.13.1.orig/geometry.c	2004-07-03 09:08:01.000000000 +0300
++++ lincity-1.13.1/geometry.c	2013-03-02 11:20:47.767271629 +0200
+@@ -360,7 +360,10 @@
+ 
+     /* Complete refresh of the screen required here */
+ #if !defined (SVGALIB)
+-    screen_full_refresh ();
++    /* Prevent refresh if no init done yet (happens if the WM
++     * disregards hints and resizes the splash screen).  */
++    if (monthgraph_nojobs)
++	screen_full_refresh ();
+ #endif
+ }
+ 
