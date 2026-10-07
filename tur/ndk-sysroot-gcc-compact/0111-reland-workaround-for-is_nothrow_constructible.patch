@@ -19,7 +19,7 @@
 +#if __has_builtin(__is_nothrow_constructible) && !defined(_LIBCPP_COMPILER_GCC)
 +
  template < class _Tp, class... _Args>
- struct _LIBCPP_TEMPLATE_VIS _LIBCPP_NO_SPECIALIZATIONS is_nothrow_constructible
+ struct _LIBCPP_NO_SPECIALIZATIONS is_nothrow_constructible
      : public integral_constant<bool, __is_nothrow_constructible(_Tp, _Args...)> {};
 @@ -50,6 +57,58 @@
      is_nothrow_move_constructible<_Tp>::value;
@@ -46,22 +46,22 @@
 +};
 +
 +template <class _Tp, class... _Args>
-+struct _LIBCPP_TEMPLATE_VIS _LIBCPP_NO_SPECIALIZATIONS is_nothrow_constructible
++struct _LIBCPP_NO_SPECIALIZATIONS is_nothrow_constructible
 +    : __libcpp_is_nothrow_constructible<is_constructible<_Tp, _Args...>::value,
 +                                        is_reference<_Tp>::value,
 +                                        _Tp,
 +                                        _Args...> {};
 +
 +template <class _Tp, size_t _Ns>
-+struct _LIBCPP_TEMPLATE_VIS _LIBCPP_NO_SPECIALIZATIONS is_nothrow_constructible<_Tp[_Ns]>
++struct _LIBCPP_NO_SPECIALIZATIONS is_nothrow_constructible<_Tp[_Ns]>
 +    : __libcpp_is_nothrow_constructible<is_constructible<_Tp>::value, is_reference<_Tp>::value, _Tp> {};
 +
 +template <class _Tp>
-+struct _LIBCPP_TEMPLATE_VIS _LIBCPP_NO_SPECIALIZATIONS is_nothrow_copy_constructible
++struct _LIBCPP_NO_SPECIALIZATIONS is_nothrow_copy_constructible
 +    : public is_nothrow_constructible<_Tp, __add_lvalue_reference_t<const _Tp> > {};
 +
 +template <class _Tp>
-+struct _LIBCPP_TEMPLATE_VIS _LIBCPP_NO_SPECIALIZATIONS is_nothrow_move_constructible
++struct _LIBCPP_NO_SPECIALIZATIONS is_nothrow_move_constructible
 +    : public is_nothrow_constructible<_Tp, __add_rvalue_reference_t<_Tp> > {};
 +
 +#if _LIBCPP_STD_VER >= 17
@@ -78,5 +78,5 @@
 +#endif // __has_builtin(__is_nothrow_constructible) && !defined(_LIBCPP_COMPILER_GCC)
 +
  template <class _Tp>
- struct _LIBCPP_TEMPLATE_VIS _LIBCPP_NO_SPECIALIZATIONS is_nothrow_default_constructible
+ struct _LIBCPP_NO_SPECIALIZATIONS is_nothrow_default_constructible
      : public integral_constant<bool, __is_nothrow_constructible(_Tp)> {};

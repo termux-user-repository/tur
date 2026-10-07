@@ -16,12 +16,12 @@
 +#if __has_builtin(__is_function)
 +
  template <class _Tp>
- struct _LIBCPP_TEMPLATE_VIS _LIBCPP_NO_SPECIALIZATIONS is_function : integral_constant<bool, __is_function(_Tp)> {};
+ struct _LIBCPP_NO_SPECIALIZATIONS is_function : integral_constant<bool, __is_function(_Tp)> {};
  
 +#else // __has_builtin(__is_function)
 +
 +template <class _Tp>
-+struct _LIBCPP_TEMPLATE_VIS _LIBCPP_NO_SPECIALIZATIONS is_function
++struct _LIBCPP_NO_SPECIALIZATIONS is_function
 +    : public integral_constant<bool, !(is_reference<_Tp>::value || is_const<const _Tp>::value)> {};
 +
 +#endif // __has_builtin(__is_function)
