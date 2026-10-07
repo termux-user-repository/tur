@@ -2,14 +2,11 @@ TERMUX_PKG_HOMEPAGE=https://www.chromium.org/Home
 TERMUX_PKG_DESCRIPTION="Chromium web browser"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="@licy183"
-TERMUX_PKG_VERSION=152.0.7977.82
+TERMUX_PKG_VERSION=153.0.8010.52
 TERMUX_PKG_SRCURL=https://commondatastorage.googleapis.com/chromium-browser-official/chromium-$TERMUX_PKG_VERSION-lite.tar.xz
-TERMUX_PKG_SHA256=67ac37f365dfdac763c428862e5e460e5948940b3d6f856374da2ce219981417
+TERMUX_PKG_SHA256=ed6fcbf913f12f97c619616b35fa8b56f6e61c53bdbf00cbb0e7ef839a39844a
 TERMUX_PKG_DEPENDS="atk, cups, dbus, fontconfig, gtk3, krb5, libc++, libevdev, libxkbcommon, libminizip, libnss, libx11, mesa, openssl, pango, pipewire, pulseaudio, zlib"
 TERMUX_PKG_BUILD_DEPENDS="chromium-beta-host-tools, libffi-static"
-# TODO: Split chromium-common and chromium-headless
-# TERMUX_PKG_DEPENDS+=", chromium-common"
-# TERMUX_PKG_SUGGESTS="chromium-headless, chromium-driver"
 # Chromium doesn't support i686 on Linux.
 TERMUX_PKG_EXCLUDED_ARCHES="i686"
 TERMUX_PKG_AUTO_UPDATE=false
@@ -262,6 +259,9 @@ ozone_platform_headless = true
 angle_enable_vulkan = true
 angle_enable_swiftshader = true
 angle_enable_abseil = false
+# Disable vulkan validation layers, which is almost useless
+angle_enable_vulkan_validation_layers = false
+dawn_enable_vulkan_validation_layers = false
 # Use Chrome-branded ffmpeg for more codecs
 is_component_ffmpeg = true
 ffmpeg_branding = \"Chrome\"
@@ -328,6 +328,7 @@ pdf_is_complete_lib = true
 
 termux_step_make() {
 	cd $TERMUX_PKG_BUILDDIR
+
 	# Build v8 snapshot in another action
 	time ninja -C out/Release \
 						v8_context_snapshot \
@@ -335,6 +336,7 @@ termux_step_make() {
 						run_torque \
 						generate_bytecode_builtins_list \
 						v8:run_gen-regexp-special-case
+
 	# Build generate steps in another action
 	time ninja -C out/Release \
 						generate_top_domain_list_variables_file \
@@ -343,10 +345,12 @@ termux_step_make() {
 						gen_root_store_inc \
 						generate_transport_security_state \
 						generate_top_domains_trie
+
 	# Build swiftshader in another action
 	time ninja -C out/Release \
 						third_party/swiftshader/src/Vulkan:icd_file \
 						third_party/swiftshader/src/Vulkan:swiftshader_libvulkan
+
 	# Build pdfium in another action
 	time ninja -C out/Release \
 						third_party/pdfium \
@@ -396,7 +400,7 @@ termux_step_make_install() {
 		libvulkan.so.1
 		libVkICD_mock_icd.so
 		libvk_swiftshader.so
-		libVkLayer_khronos_validation.so
+		# libVkLayer_khronos_validation.so
 		vk_swiftshader_icd.json
 
 		# FFmpeg
@@ -422,9 +426,6 @@ termux_step_post_make_install() {
 	# Remove the dummy files
 	rm $TERMUX_PREFIX/lib/lib{{pthread,resolv,ffi_pic}.a,rt.so}
 }
-
-# TODO:
-# (2) Split packages
 
 # ######################### About system libraries ############################
 # We only pick up a few libraries to let chromium link against. Others may
