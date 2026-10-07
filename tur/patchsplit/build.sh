@@ -7,7 +7,7 @@ TERMUX_PKG_SRCURL="https://github.com/zitzhen/patchsplit/archive/refs/tags/v${TE
 TERMUX_PKG_SHA256=1bdbfc880b892acd73dca6529abd7e80a122774348e8e075e158011b52d869a2
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_BUILD_IN_SRC=true
-TERMUX_PKG_DEPENDS="git"
+TERMUX_PKG_DEPENDS="curl, git"
 
 termux_step_make() {
 	termux_setup_rust
