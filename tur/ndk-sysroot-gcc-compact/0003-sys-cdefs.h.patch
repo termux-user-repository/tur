@@ -36,41 +36,32 @@ diff -uNr a/sys/cdefs.h b/sys/cdefs.h
  #if defined(__cplusplus)
  #define __BEGIN_DECLS extern "C" {
  #define __END_DECLS }
-@@ -142,12 +165,25 @@
- 
- #define __wur __attribute__((__warn_unused_result__))
+@@ -142,9 +168,16 @@
+ #define __nodiscard __attribute__((__warn_unused_result__))
+ #define __wur __nodiscard
  
 +#ifdef __clang__
- #define __errorattr(msg) __attribute__((__unavailable__(msg)))
- #define __warnattr(msg) __attribute__((__deprecated__(msg)))
- #define __warnattr_real(msg) __attribute__((__deprecated__(msg)))
  #define __enable_if(cond, msg) __attribute__((__enable_if__(cond, msg)))
  #define __clang_error_if(cond, msg) __attribute__((__diagnose_if__(cond, msg, "error")))
  #define __clang_warning_if(cond, msg) __attribute__((__diagnose_if__(cond, msg, "warning")))
 +#else
-+#  define __errorattr(msg) __attribute__((__error__(msg)))
-+#  define __warnattr(msg) __attribute__((__warning__(msg)))
-+#  define __warnattr_real __warnattr
 +/* enable_if doesn't exist on other compilers; give an error if it's used. */
 +/* diagnose_if doesn't exist either, but it's often tagged on non-clang-specific functions */
 +#  define __clang_error_if(cond, msg)
 +#  define __clang_warning_if(cond, msg)
-+
-+/* errordecls really don't work as well in clang as they do in GCC. */
-+#  define __errordecl(name, msg) extern void name(void) __errorattr(msg)
 +#endif
  
  #if defined(ANDROID_STRICT)
  /*
-@@ -251,6 +287,7 @@
+@@ -251,6 +284,7 @@
  
  #if defined(__BIONIC_FORTIFY)
  #  define __bos0(s) __bosn((s), 0)
 +#if defined(__clang__)
- #  define __pass_object_size_n(n) __attribute__((__pass_object_size__(n)))
- /*
-  * FORTIFY'ed functions all have either enable_if or pass_object_size, which
-@@ -275,6 +312,18 @@
+ #  if _FORTIFY_SOURCE >= 3
+ #    define __pass_object_size_n(n) __attribute__((__pass_dynamic_object_size__(n)))
+ #  else
+@@ -280,6 +314,18 @@
  /* Error functions don't have bodies, so they can just be static. */
  #  define __BIONIC_ERROR_FUNCTION_VISIBILITY static __unused
  #else
@@ -89,7 +80,7 @@ diff -uNr a/sys/cdefs.h b/sys/cdefs.h
  /* Further increase sharing for some inline functions */
  #  define __pass_object_size_n(n)
  #endif
-@@ -303,7 +352,16 @@
+@@ -308,7 +354,16 @@
  #  define __BIONIC_INCLUDE_FORTIFY_HEADERS 1
  #endif
  
@@ -106,19 +97,3 @@ diff -uNr a/sys/cdefs.h b/sys/cdefs.h
  
  #define __diagnose_as_builtin(...) __attribute__((__diagnose_as_builtin__(__VA_ARGS__)))
  
-@@ -323,6 +381,7 @@
- /* Used to rename functions so that the compiler emits a call to 'x' rather than the function this was applied to. */
- #define __RENAME(x) __asm__(#x)
- 
-+#if defined(__clang__)
- /*
-  * Used when we need to check for overflow when multiplying x and y. This
-  * should only be used where __builtin_umull_overflow can not work, because it makes
-@@ -331,6 +390,7 @@
-  * __builtin_umull_overflow.
-  */
- #define __unsafe_check_mul_overflow(x, y) ((__SIZE_TYPE__)-1 / (x) < (y))
-+#endif
- 
- #include <android/versioning.h>
- #include <android/api-level.h>

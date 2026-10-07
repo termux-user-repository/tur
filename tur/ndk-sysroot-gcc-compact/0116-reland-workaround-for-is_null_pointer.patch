@@ -8,7 +8,7 @@
  
  #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
  #  pragma GCC system_header
-@@ -20,16 +21,21 @@
+@@ -20,15 +21,20 @@
  _LIBCPP_BEGIN_NAMESPACE_STD
  
  template <class _Tp>
@@ -18,13 +18,12 @@
 +struct __is_nullptr_t_impl<nullptr_t> : public true_type {};
 +
 +template <class _Tp>
-+struct _LIBCPP_TEMPLATE_VIS _LIBCPP_NO_SPECIALIZATIONS __is_nullptr_t : public __is_nullptr_t_impl<__remove_cv_t<_Tp>> {};
++struct _LIBCPP_NO_SPECIALIZATIONS __is_nullptr_t : public __is_nullptr_t_impl<__remove_cv_t<_Tp>> {};
  
  #if _LIBCPP_STD_VER >= 14
  template <class _Tp>
- struct _LIBCPP_TEMPLATE_VIS _LIBCPP_NO_SPECIALIZATIONS is_null_pointer
--    : integral_constant<bool, __is_null_pointer_v<_Tp>> {};
-+    : public __is_nullptr_t_impl<__remove_cv_t<_Tp>> {};
+-struct _LIBCPP_NO_SPECIALIZATIONS is_null_pointer : integral_constant<bool, __is_null_pointer_v<_Tp>> {};
++struct _LIBCPP_NO_SPECIALIZATIONS is_null_pointer : public __is_nullptr_t_impl<__remove_cv_t<_Tp>> {};
  
  #  if _LIBCPP_STD_VER >= 17
  template <class _Tp>
@@ -49,9 +48,9 @@
 @@ -34,7 +34,7 @@
  
  template <class _Tp>
- struct _LIBCPP_TEMPLATE_VIS is_fundamental
--    : public integral_constant<bool, is_void<_Tp>::value || __is_null_pointer_v<_Tp> || is_arithmetic<_Tp>::value> {};
-+    : public integral_constant<bool, is_void<_Tp>::value || __is_nullptr_t<_Tp>::value || is_arithmetic<_Tp>::value> {};
+ struct is_fundamental
+-    : integral_constant<bool, is_void<_Tp>::value || __is_null_pointer_v<_Tp> || is_arithmetic<_Tp>::value> {};
++    : integral_constant<bool, is_void<_Tp>::value || __is_nullptr_t<_Tp>::value || is_arithmetic<_Tp>::value> {};
  
  #  if _LIBCPP_STD_VER >= 17
  template <class _Tp>

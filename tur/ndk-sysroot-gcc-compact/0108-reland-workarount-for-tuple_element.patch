@@ -32,5 +32,5 @@
 +#endif // !__has_builtin(__type_pack_element)
 +
  template <size_t _Ip, class _Tp>
- struct _LIBCPP_TEMPLATE_VIS tuple_element;
+ struct tuple_element;
  

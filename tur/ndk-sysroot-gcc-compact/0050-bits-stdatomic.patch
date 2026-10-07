@@ -21,7 +21,7 @@
  /*
   * 7.17.1 Atomic lock-free macros.
   */
-@@ -88,8 +102,13 @@
+@@ -68,8 +82,13 @@
   * 7.17.2 Initialization.
   */
  
@@ -34,11 +34,11 @@
 +#endif
  
  /*
-  * Clang and recent GCC both provide predefined macros for the memory
-@@ -139,23 +158,56 @@
+  * 7.17.3 Order and consistency.
+@@ -96,22 +115,54 @@
   */
  
- static __inline void atomic_thread_fence(memory_order __order __attribute__((__unused__))) {
+ static __inline void atomic_thread_fence(memory_order __order) {
 +#ifdef __CLANG_ATOMICS
  	__c11_atomic_thread_fence(__order);
 +#elif defined(__GNUC_ATOMICS)
@@ -48,7 +48,7 @@
 +#endif
  }
  
- static __inline void atomic_signal_fence(memory_order __order __attribute__((__unused__))) {
+ static __inline void atomic_signal_fence(memory_order __order) {
 +#ifdef __CLANG_ATOMICS
  	__c11_atomic_signal_fence(__order);
 +#elif defined(__GNUC_ATOMICS)
@@ -81,7 +81,6 @@
  /*
   * 7.17.6 Atomic integer types.
   */
- 
 +#ifndef __CLANG_ATOMICS
 +/*
 + * No native support for _Atomic(). Place object in structure to prevent
@@ -89,11 +88,10 @@
 + */
 +#define _Atomic(T)              struct { T volatile __val; }
 +#endif
-+
+ 
  typedef _Atomic(bool)			atomic_bool;
  typedef _Atomic(char)			atomic_char;
- typedef _Atomic(signed char)		atomic_schar;
-@@ -204,6 +256,7 @@
+@@ -161,6 +212,7 @@
   * Compiler-specific operations.
   */
  
@@ -101,7 +99,7 @@
  #define	atomic_compare_exchange_strong_explicit(object, expected,	\
      desired, success, failure)						\
  	__c11_atomic_compare_exchange_strong(object, expected, desired,	\
-@@ -228,11 +281,91 @@
+@@ -185,11 +237,91 @@
  	__c11_atomic_load(object, order)
  #define	atomic_store_explicit(object, desired, order)			\
  	__c11_atomic_store(object, desired, order)
@@ -193,7 +191,7 @@
  #define	atomic_compare_exchange_strong(object, expected, desired)	\
  	atomic_compare_exchange_strong_explicit(object, expected,	\
  	    desired, memory_order_seq_cst, memory_order_seq_cst)
-@@ -255,6 +388,7 @@
+@@ -212,6 +344,7 @@
  	atomic_load_explicit(object, memory_order_seq_cst)
  #define	atomic_store(object, desired)					\
  	atomic_store_explicit(object, desired, memory_order_seq_cst)
