@@ -903,3 +903,29 @@ index 8ae22f7d06..35534b94aa 100644
  }  // namespace net
 +
 +#undef kInnerReadBufferSize
+diff --git a/net/socket/tls_stream_attempt.cc b/net/socket/tls_stream_attempt.cc
+index 5641bd744d..5581b9e7c6 100644
+--- a/net/socket/tls_stream_attempt.cc
++++ b/net/socket/tls_stream_attempt.cc
+@@ -43,12 +43,14 @@ std::string_view TlsStreamAttempt::StateToString(State state) {
+ 
+ namespace {
+ 
+-bool IsEchEnabled(SSLClientContext* ssl_client_context, std::string_view host) {
++bool IsEchEnabled_tls_stream_attempt(SSLClientContext* ssl_client_context, std::string_view host) {
+   return ssl_client_context && ssl_client_context->IsEchEnabled(host);
+ }
+ 
+ }  // namespace
+ 
++#define IsEchEnabled IsEchEnabled_tls_stream_attempt
++
+ TlsStreamAttempt::TlsStreamAttempt(const StreamAttemptParams* params,
+                                    IPEndPoint ip_endpoint,
+                                    handles::NetworkHandle target_network,
+@@ -337,3 +339,5 @@ void TlsStreamAttempt::ResetStateForRestart() {
+ }
+ 
+ }  // namespace net
++
++#undef IsEchEnabled
