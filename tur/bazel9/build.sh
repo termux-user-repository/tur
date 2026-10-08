@@ -96,16 +96,23 @@ termux_step_get_source() {
 }
 
 termux_pkg_auto_update() {
-	local api_url="https://api.github.com/repos/bazelbuild/bazel/git/refs/tags"
-	local latest_refs_tags=$(
-		curl -s "$api_url" | jq -r .[].ref | cut -d'/' -f 3 |
-			grep "^9" | grep -v -E "(rc)|(pre)"
+	local api_url="https://api.github.com/repos/bazelbuild/bazel/releases?per_page=100"
+	local latest_version=$(
+		curl -fsSL "$api_url" |
+			jq -r '
+				.[] |
+				select(.draft == false and .prerelease == false) |
+				select(.tag_name | test("^9\\.[0-9]+(\\.[0-9]+)?$")) |
+				. as $release |
+				select(any(.assets[]?.name; . == ("bazel-" + $release.tag_name + "-dist.zip"))) |
+				.tag_name
+			' |
+			sort -V | tail -n1
 	)
-	if [[ -z "${latest_refs_tags}" ]]; then
-		echo "WARN: Unable to get latest refs tags from upstream. Try again later." >&2
+	if [[ -z "${latest_version}" ]]; then
+		echo "WARN: Unable to find a published Bazel 9 release with a dist archive. Try again later." >&2
 		return
 	fi
-	local latest_version=$(echo "${latest_refs_tags}" | sort -V | tail -n1)
 	termux_pkg_upgrade_version "${latest_version}"
 }
 
