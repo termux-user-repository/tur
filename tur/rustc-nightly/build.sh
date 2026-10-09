@@ -72,8 +72,8 @@ termux_step_pre_configure() {
 
 	local p="${TERMUX_PKG_BUILDER_DIR}/0001-set-TERMUX_PKG_API_LEVEL.diff"
 	echo "Applying patch: $(basename "${p}")"
-	sed "s|@TERMUX_PKG_API_LEVEL@|${TERMUX_PKG_API_LEVEL}|g" "${p}" |
-		patch --silent -p1
+	sed "s|@TERMUX_PKG_API_LEVEL@|${TERMUX_PKG_API_LEVEL}|g" "${p}" \
+		| patch --silent -p1
 
 	# assist with downstream patch methods that bulk-replace
 	# string 'com.termux' throughout the repository
@@ -83,7 +83,7 @@ termux_step_pre_configure() {
 	if [[ "$TERMUX_PREFIX" != "$original_prefix" ]]; then
 		local patch="$TERMUX_PKG_BUILDER_DIR/force-allow-edit-vendor.diff"
 		echo "Applying patch: $(basename "$patch")"
-		patch --silent -p1 <"$patch"
+		patch --silent -p1 < "$patch"
 
 		local crate=openssl-probe
 		local crate_src_dir="$(realpath "$(find "$TERMUX_PKG_SRCDIR/vendor" -name "$crate"'*' | sort | tail -n1)")"
@@ -95,9 +95,9 @@ termux_step_pre_configure() {
 
 		local dir
 		for dir in "$TERMUX_PKG_SRCDIR"/{,src/tools/cargo,src/tools/miri}; do
-			echo '' >>"$dir/Cargo.toml"
-			echo '[patch.crates-io]' >>"$dir/Cargo.toml"
-			echo "$crate = { path = \"${crate_dest_dir}\" }" >>"$dir/Cargo.toml"
+			echo '' >> "$dir/Cargo.toml"
+			echo '[patch.crates-io]' >> "$dir/Cargo.toml"
+			echo "$crate = { path = \"${crate_dest_dir}\" }" >> "$dir/Cargo.toml"
 		done
 	fi
 
@@ -165,7 +165,7 @@ termux_step_configure() {
 		-e "s|@CARGO_TARGET_NAME@|${CARGO_TARGET_NAME}|g" \
 		-e "s|@RUSTC@|${RUSTC}|g" \
 		-e "s|@CARGO@|${CARGO}|g" \
-		"${TERMUX_PKG_BUILDER_DIR}"/bootstrap.toml >bootstrap.toml
+		"${TERMUX_PKG_BUILDER_DIR}"/bootstrap.toml > bootstrap.toml
 
 	local env_host=$(printf $CARGO_TARGET_NAME | tr a-z A-Z | sed s/-/_/g)
 	export ${env_host}_OPENSSL_DIR=$TERMUX_PREFIX
@@ -175,8 +175,7 @@ termux_step_configure() {
 	# x86_64: __lttf2
 	case "${TERMUX_ARCH}" in
 	x86_64)
-		export CARGO_TARGET_${env_host}_RUSTFLAGS+=" -C link-arg=$(${CC} -print-libgcc-file-name)"
-		;;
+		export CARGO_TARGET_${env_host}_RUSTFLAGS+=" -C link-arg=$(${CC} -print-libgcc-file-name)" ;;
 	esac
 
 	# NDK r26
@@ -282,12 +281,12 @@ termux_step_make_install() {
 	while IFS= read -r _rlib; do
 		echo "${_rlib}"
 		local _included_rlib=$(echo "${_included_rlib}" | grep -v "${_rlib}")
-	done <"${TERMUX_PKG_BUILDDIR}/rustlib-rlib.txt"
+	done < "${TERMUX_PKG_BUILDDIR}/rustlib-rlib.txt"
 	echo "INFO: _so"
 	while IFS= read -r _so; do
 		echo "${_so}"
 		local _included_so=$(echo "${_included_so}" | grep -v "${_so}")
-	done <"${TERMUX_PKG_BUILDDIR}/rustlib-so.txt"
+	done < "${TERMUX_PKG_BUILDDIR}/rustlib-so.txt"
 
 	export _INCLUDED="$(echo -e "${_included}\n${_included_rlib}\n${_included_so}" | xargs -I {} echo "opt/rust-nightly/{}")"
 	echo -e "INFO: _INCLUDED:\n${_INCLUDED}"
@@ -301,12 +300,12 @@ termux_step_post_make_install() {
 	fi
 
 	mkdir -p $TERMUX_PREFIX/etc/profile.d
-	echo "#!$TERMUX_PREFIX/bin/sh" >$TERMUX_PREFIX/etc/profile.d/rust-nightly.sh
-	echo "export PATH=$RUST_NIGHTLY_PREFIX/bin:\$PATH" >>$TERMUX_PREFIX/etc/profile.d/rust-nightly.sh
+	echo "#!$TERMUX_PREFIX/bin/sh" > $TERMUX_PREFIX/etc/profile.d/rust-nightly.sh
+	echo "export PATH=$RUST_NIGHTLY_PREFIX/bin:\$PATH" >> $TERMUX_PREFIX/etc/profile.d/rust-nightly.sh
 }
 
 termux_step_create_debscripts() {
-	echo "#!$TERMUX_PREFIX/bin/sh" >postinst
-	echo "echo 'source \$PREFIX/etc/profile.d/rust-nightly.sh to use nightly'" >>postinst
-	echo "echo 'or export RUSTC=\$PREFIX/opt/rust-nightly/bin/rustc'" >>postinst
+	echo "#!$TERMUX_PREFIX/bin/sh" > postinst
+	echo "echo 'source \$PREFIX/etc/profile.d/rust-nightly.sh to use nightly'" >> postinst
+	echo "echo 'or export RUSTC=\$PREFIX/opt/rust-nightly/bin/rustc'" >> postinst
 }
