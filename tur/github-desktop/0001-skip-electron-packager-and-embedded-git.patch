@@ -1,0 +1,220 @@
+diff --git a/script/build.ts b/script/build.ts
+--- a/script/build.ts
++++ b/script/build.ts
+@@ -3,7 +3,6 @@
+ 
+ import * as path from 'path'
+ import * as cp from 'child_process'
+-import packager, { OsxNotarizeOptions } from 'electron-packager'
+ import frontMatter from 'front-matter'
+ import { externals } from '../app/webpack.common'
+ 
+@@ -21,20 +20,9 @@
+   readonly hidden: boolean
+ }
+ 
+-import {
+-  getBundleID,
+-  getCompanyName,
+-  getProductName,
+-} from '../app/package-info'
++import { getProductName } from '../app/package-info'
+ 
+-import {
+-  getChannel,
+-  getDistRoot,
+-  getExecutableName,
+-  isPublishable,
+-  getIconFileName,
+-  getDistArchitecture,
+-} from './dist-info'
++import { getChannel, getDistRoot, getDistPath, isPublishable } from './dist-info'
+ import { isGitHubActions } from './build-platforms'
+ 
+ import { updateLicenseDump } from './licenses/update-license-dump'
+@@ -54,9 +42,6 @@
+ const isDevelopmentBuild = getChannel() === 'development'
+ 
+ const projectRoot = path.join(__dirname, '..')
+-const entitlementsSuffix = isDevelopmentBuild ? '-dev' : ''
+-const entitlementsPath = `${projectRoot}/script/entitlements${entitlementsSuffix}.plist`
+-const extendInfoPath = `${projectRoot}/script/info.plist`
+ const outRoot = path.join(projectRoot, 'out')
+ 
+ console.log(`Building for ${getChannel()}…`)
+@@ -119,116 +104,12 @@
+   })
+ 
+ function packageApp() {
+-  // not sure if this is needed anywhere, so I'm just going to inline it here
+-  // for now and see what the future brings...
+-  const toPackagePlatform = (platform: NodeJS.Platform) => {
+-    if (platform === 'win32' || platform === 'darwin' || platform === 'linux') {
+-      return platform
+-    }
+-    throw new Error(
+-      `Unable to convert to platform for electron-packager: '${process.platform}`
+-    )
+-  }
+-
+-  const getPackageArch = (): 'arm64' | 'x64' | 'armv7l' => {
+-    const arch = process.env.npm_config_arch || process.arch
+-
+-    if (arch === 'arm64' || arch === 'x64') {
+-      return arch
+-    }
+-
+-    if (arch === 'arm') {
+-      return 'armv7l'
+-    }
+-
+-    throw new Error(
+-      `Building Desktop for architecture '${arch}' is not supported. Currently these architectures are supported: arm, arm64, x64`
+-    )
+-  }
+-
+-  // get notarization deets, unless we're not going to publish this
+-  const osxNotarize = isPublishableBuild ? getNotarizationOptions() : undefined
+-
+-  if (
+-    isPublishableBuild &&
+-    isGitHubActions() &&
+-    process.platform === 'darwin' &&
+-    osxNotarize === undefined
+-  ) {
+-    // we can't publish a mac build without these
+-    throw new Error(
+-      'Unable to retreive appleId and/or appleIdPassword to notarize macOS build'
+-    )
+-  }
+-
+-  // this setting only works for macOS and Windows, so let's clear it now to ensure
+-  // the app is working as expected
+-  const icon =
+-    process.platform === 'linux'
+-      ? undefined
+-      : path.join(projectRoot, 'app', 'static', 'logos', getIconFileName())
+-
+-  return packager({
+-    name: getExecutableName(),
+-    platform: toPackagePlatform(process.platform),
+-    arch: getPackageArch(),
+-    asar: false, // TODO: Probably wanna enable this down the road.
+-    out: getDistRoot(),
+-    icon,
+-    dir: outRoot,
+-    overwrite: true,
+-    tmpdir: false,
+-    derefSymlinks: false,
+-    prune: false, // We'll prune them ourselves below.
+-    ignore: [
+-      new RegExp('/node_modules/electron($|/)'),
+-      new RegExp('/node_modules/electron-packager($|/)'),
+-      new RegExp('/\\.git($|/)'),
+-      new RegExp('/node_modules/\\.bin($|/)'),
+-    ],
+-    appCopyright: `Copyright © ${new Date().getFullYear()} GitHub, Inc.`,
+-
+-    // macOS
+-    appBundleId: getBundleID(),
+-    appCategoryType: 'public.app-category.developer-tools',
+-    darwinDarkModeSupport: true,
+-    osxSign: {
+-      optionsForFile: (path: string) => ({
+-        hardenedRuntime: true,
+-        entitlements: entitlementsPath,
+-      }),
+-      type: isPublishableBuild ? 'distribution' : 'development',
+-      // For development, we will use '-' as the identifier so that codesign
+-      // will sign the app to run locally. We need to disable 'identity-validation'
+-      // or otherwise it will replace '-' with one of the regular codesigning
+-      // identities in our system.
+-      identity: isDevelopmentBuild ? '-' : undefined,
+-      identityValidation: !isDevelopmentBuild,
+-    },
+-    osxNotarize,
+-    protocols: [
+-      {
+-        name: getBundleID(),
+-        schemes: [
+-          !isDevelopmentBuild
+-            ? 'x-github-desktop-auth'
+-            : 'x-github-desktop-dev-auth',
+-          'x-github-client',
+-          'github-mac',
+-        ],
+-      },
+-    ],
+-    extendInfo: extendInfoPath,
+-
+-    // Windows
+-    win32metadata: {
+-      CompanyName: getCompanyName(),
+-      FileDescription: '',
+-      OriginalFilename: '',
+-      ProductName: getProductName(),
+-      InternalName: getProductName(),
+-    },
+-  })
++  // Termux: no electron-packager, the Electron binary is provided by the
++  // electronNN package. Only lay out the app directory (resources/app).
++  const appDir = path.join(getDistPath(), 'resources', 'app')
++  mkdirSync(path.dirname(appDir), { recursive: true })
++  copySync(outRoot, appDir)
++  return Promise.resolve([appDir])
+ }
+ 
+ function removeAndCopy(source: string, destination: string) {
+@@ -336,31 +217,13 @@
+     )
+   }
+ 
+-  console.log('  Copying git environment…')
+-  const gitDir = path.resolve(outRoot, 'git')
+-  rmSync(gitDir, { recursive: true, force: true })
+-  mkdirSync(gitDir, { recursive: true })
+-  copySync(path.resolve(projectRoot, 'app/node_modules/dugite/git'), gitDir)
+-
++  // Termux: the system git is used (LOCAL_GIT_DIRECTORY is set by the
++  // launcher), so there is no embedded git to copy. Git finds the credential
++  // helper through PATH, see the launcher script.
+   console.log('  Copying desktop credential helper…')
+-  const mingw = getDistArchitecture() === 'x64' ? 'mingw64' : 'mingw32'
+-  const gitCoreDir =
+-    process.platform === 'win32'
+-      ? path.resolve(outRoot, 'git', mingw, 'libexec', 'git-core')
+-      : path.resolve(outRoot, 'git', 'libexec', 'git-core')
+-
+-  const desktopCredentialHelperTrampolineFile =
+-    process.platform === 'win32'
+-      ? 'desktop-credential-helper-trampoline.exe'
+-      : 'desktop-credential-helper-trampoline'
+-
+-  const desktopCredentialHelperFile = `git-credential-desktop${
+-    process.platform === 'win32' ? '.exe' : ''
+-  }`
+-
+   copySync(
+-    path.resolve(trampolineSource, desktopCredentialHelperTrampolineFile),
+-    path.resolve(gitCoreDir, desktopCredentialHelperFile)
++    path.resolve(trampolineSource, 'desktop-credential-helper-trampoline'),
++    path.resolve(desktopTrampolineDir, 'git-credential-desktop')
+   )
+ 
+   if (process.platform === 'darwin') {
+@@ -430,15 +293,3 @@
+   // sweep up the choosealicense directory as the important bits have been bundled in the app
+   rmSync(chooseALicense, { recursive: true, force: true })
+ }
+-
+-function getNotarizationOptions(): OsxNotarizeOptions | undefined {
+-  const {
+-    APPLE_ID: appleId,
+-    APPLE_ID_PASSWORD: appleIdPassword,
+-    APPLE_TEAM_ID: teamId,
+-  } = process.env
+-
+-  return appleId && appleIdPassword && teamId
+-    ? { tool: 'notarytool', appleId, appleIdPassword, teamId }
+-    : undefined
+-}
