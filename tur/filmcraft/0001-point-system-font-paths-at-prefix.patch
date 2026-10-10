@@ -1,0 +1,13 @@
+diff --git a/crates/text/src/fonts.rs b/crates/text/src/fonts.rs
+index 6cceff1..379f041 100644
+--- a/crates/text/src/fonts.rs
++++ b/crates/text/src/fonts.rs
+@@ -100,7 +100,7 @@ impl DirectorySource {
+                 dirs.push(PathBuf::from(l).join("Microsoft\\Windows\\Fonts"));
+             }
+         } else if cfg!(unix) && !cfg!(target_arch = "wasm32") {
+-            dirs.extend(["/usr/share/fonts", "/usr/local/share/fonts"].map(PathBuf::from));
++            dirs.extend(["@TERMUX_PREFIX@/share/fonts", "@TERMUX_PREFIX@/local/share/fonts"].map(PathBuf::from));
+             if let Some(h) = &home {
+                 dirs.push(h.join(".local/share/fonts"));
+                 dirs.push(h.join(".fonts"));
