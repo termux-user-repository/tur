@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://www.chromium.org/Home
 TERMUX_PKG_DESCRIPTION="Chromium web browser (Host tools)"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="@licy183"
-TERMUX_PKG_VERSION=154.0.8037.92
+TERMUX_PKG_VERSION=155.0.8059.39
 TERMUX_PKG_SRCURL=https://github.com/chromium-linux-tarballs/chromium-tarballs/releases/download/$TERMUX_PKG_VERSION/chromium-$TERMUX_PKG_VERSION-linux.tar.xz
-TERMUX_PKG_SHA256=5c21ef0ab5829a54bf62c39c6cef7a816c9edf55a2442b623a161ec6fa336e37
+TERMUX_PKG_SHA256=b84bbab0eef2dd4abd73544a95f15dd2c3c815980c4fa47496f3d0ce4f8a2aa7
 TERMUX_PKG_DEPENDS="atk, cups, dbus, fontconfig, gtk3, krb5, libc++, libevdev, libxkbcommon, libminizip, libnss, libx11, mesa, openssl, pango, pipewire, pulseaudio, zlib"
 TERMUX_PKG_BUILD_DEPENDS="libffi-static"
 # TODO: Split chromium-common and chromium-headless
@@ -164,16 +164,6 @@ print(deps['src/third_party/node/node_modules']['objects'][0]['sha256sum'])
 		mv "$TERMUX_PKG_SRCDIR/third_party/node/node_modules-tmp" "$TERMUX_PKG_SRCDIR/third_party/node/node_modules"
 	fi
 
-	# Sync rollup-related native deps in devtools
-	if [ ! -d "third_party/devtools-frontend/src/node_modules/@rollup/rollup-linux-x64-gnu" ]; then
-		if [ ! -f "third_party/devtools-frontend/src/third_party/rollup_libs/rollup.linux-x64-gnu.node" ]; then
-			termux_error_exit "rollup.linux-x64-gnu.node not found"
-		fi
-		pushd third_party/devtools-frontend/src
-		python3 scripts/deps/sync_rollup_libs.py
-		popd # third_party/devtools-frontend/src
-	fi
-
 	local CARGO_TARGET_NAME="${TERMUX_ARCH}-linux-android"
 	if [[ "${TERMUX_ARCH}" == "arm" ]]; then
 		CARGO_TARGET_NAME="armv7-linux-androideabi"
@@ -319,6 +309,8 @@ exclude_unwind_tables = false
 use_jumbo_build = true
 # Compile pdfium as a static library
 pdf_is_complete_lib = true
+# Disable v8's metagen
+v8_use_metagen_instance_types = false
 " > $_common_args_file
 
 	if [ "$TERMUX_ARCH" = "arm" ]; then
