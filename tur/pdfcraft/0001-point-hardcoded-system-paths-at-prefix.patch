@@ -1,0 +1,26 @@
+diff --git a/crates/print/src/spool.rs b/crates/print/src/spool.rs
+index 86ebd9c..ca2ddd7 100644
+--- a/crates/print/src/spool.rs
++++ b/crates/print/src/spool.rs
+@@ -200,7 +200,7 @@ pub fn printer_options(printer: &str) -> Vec<PrinterOption> {
+             return Vec::new();
+         }
+         const PPD_CAP: u64 = 16 << 20;
+-        let ppd = std::fs::File::open(format!("/etc/cups/ppd/{printer}.ppd")).ok().and_then(|f| {
++        let ppd = std::fs::File::open(format!("@TERMUX_PREFIX@/etc/cups/ppd/{printer}.ppd")).ok().and_then(|f| {
+             use std::io::Read as _;
+             let mut bytes = Vec::new();
+             f.take(PPD_CAP).read_to_end(&mut bytes).ok().map(|_| bytes)
+diff --git a/crates/ui-egui/src/system_fonts.rs b/crates/ui-egui/src/system_fonts.rs
+index a7a77d7..009c480 100644
+--- a/crates/ui-egui/src/system_fonts.rs
++++ b/crates/ui-egui/src/system_fonts.rs
+@@ -50,7 +50,7 @@ fn candidates() -> Vec<PathBuf> {
+             "dejavu/DejaVuSans.ttf",
+             "dejavu-sans-fonts/DejaVuSans.ttf",
+         ];
+-        ["/usr/share/fonts", "/usr/local/share/fonts"].iter().flat_map(|dir| files.iter().map(move |f| Path::new(dir).join(f))).collect()
++        ["@TERMUX_PREFIX@/share/fonts", "@TERMUX_PREFIX@/local/share/fonts"].iter().flat_map(|dir| files.iter().map(move |f| Path::new(dir).join(f))).collect()
+     }
+ }
+ 
