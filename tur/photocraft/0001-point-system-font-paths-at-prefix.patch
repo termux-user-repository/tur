@@ -1,0 +1,113 @@
+diff --git a/crates/text/src/cjk.rs b/crates/text/src/cjk.rs
+index 9b70f23..040ad08 100644
+--- a/crates/text/src/cjk.rs
++++ b/crates/text/src/cjk.rs
+@@ -258,38 +258,38 @@ pub fn font_files(script: CjkScript) -> Vec<FontFile> {
+             Korean => "Noto Sans CJK KR",
+         };
+         let mut v: Vec<FontFile> = [
+-            "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
++            "@TERMUX_PREFIX@/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+             // FreeBSD ports (x11-fonts/noto-sans-cjk and friends) install under /usr/local.
+-            "/usr/local/share/fonts/noto/NotoSansCJK-Regular.ttc",
+-            "/usr/local/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
+-            "/usr/local/share/fonts/noto/NotoSansCJK-VF.ttc",
+-            "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
+-            "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+-            "/usr/share/fonts/google-noto-cjk/NotoSansCJK-Regular.ttc",
+-            "/usr/share/fonts/google-noto-sans-cjk-fonts/NotoSansCJK-Regular.ttc",
+-            "/usr/share/fonts/google-noto-sans-cjk-vf-fonts/NotoSansCJK-VF.ttc",
+-            "/usr/share/fonts/noto-cjk/NotoSansCJK-VF.ttc",
++            "@TERMUX_PREFIX@/local/share/fonts/noto/NotoSansCJK-Regular.ttc",
++            "@TERMUX_PREFIX@/local/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
++            "@TERMUX_PREFIX@/local/share/fonts/noto/NotoSansCJK-VF.ttc",
++            "@TERMUX_PREFIX@/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
++            "@TERMUX_PREFIX@/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
++            "@TERMUX_PREFIX@/share/fonts/google-noto-cjk/NotoSansCJK-Regular.ttc",
++            "@TERMUX_PREFIX@/share/fonts/google-noto-sans-cjk-fonts/NotoSansCJK-Regular.ttc",
++            "@TERMUX_PREFIX@/share/fonts/google-noto-sans-cjk-vf-fonts/NotoSansCJK-VF.ttc",
++            "@TERMUX_PREFIX@/share/fonts/noto-cjk/NotoSansCJK-VF.ttc",
+         ]
+         .iter()
+         .map(|p| f(p, noto))
+         .collect();
+         v.extend(match script {
+             Japanese => vec![
+-                f("/usr/share/fonts/opentype/ipafont-gothic/ipag.ttf", ""),
+-                f("/usr/share/fonts/truetype/fonts-japanese-gothic.ttf", ""),
+-                f("/usr/share/fonts/truetype/takao-gothic/TakaoPGothic.ttf", ""),
++                f("@TERMUX_PREFIX@/share/fonts/opentype/ipafont-gothic/ipag.ttf", ""),
++                f("@TERMUX_PREFIX@/share/fonts/truetype/fonts-japanese-gothic.ttf", ""),
++                f("@TERMUX_PREFIX@/share/fonts/truetype/takao-gothic/TakaoPGothic.ttf", ""),
+             ],
+             SimplifiedChinese | TraditionalChinese => vec![
+-                f("/usr/share/fonts/truetype/wqy/wqy-microhei.ttc", ""),
+-                f("/usr/share/fonts/wenquanyi/wqy-microhei/wqy-microhei.ttc", ""),
+-                f("/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc", ""),
+-                f("/usr/share/fonts/wenquanyi/wqy-zenhei/wqy-zenhei.ttc", ""),
++                f("@TERMUX_PREFIX@/share/fonts/truetype/wqy/wqy-microhei.ttc", ""),
++                f("@TERMUX_PREFIX@/share/fonts/wenquanyi/wqy-microhei/wqy-microhei.ttc", ""),
++                f("@TERMUX_PREFIX@/share/fonts/truetype/wqy/wqy-zenhei.ttc", ""),
++                f("@TERMUX_PREFIX@/share/fonts/wenquanyi/wqy-zenhei/wqy-zenhei.ttc", ""),
+             ],
+             Korean => vec![
+-                f("/usr/share/fonts/truetype/nanum/NanumGothic.ttf", ""),
+-                f("/usr/share/fonts/nanum/NanumGothic.ttf", ""),
+-                f("/usr/share/fonts/truetype/unfonts-core/UnDotum.ttf", ""),
+-                f("/usr/share/fonts/un-core/UnDotum.ttf", ""),
++                f("@TERMUX_PREFIX@/share/fonts/truetype/nanum/NanumGothic.ttf", ""),
++                f("@TERMUX_PREFIX@/share/fonts/nanum/NanumGothic.ttf", ""),
++                f("@TERMUX_PREFIX@/share/fonts/truetype/unfonts-core/UnDotum.ttf", ""),
++                f("@TERMUX_PREFIX@/share/fonts/un-core/UnDotum.ttf", ""),
+             ],
+         });
+         with_flatpak_host_fonts(v)
+@@ -304,7 +304,7 @@ fn with_flatpak_host_fonts(files: Vec<FontFile>) -> Vec<FontFile> {
+     for file in files {
+         let host = if cfg!(target_os = "linux") {
+             file.path
+-                .strip_prefix("/usr/share/fonts")
++                .strip_prefix("@TERMUX_PREFIX@/share/fonts")
+                 .ok()
+                 .map(|relative| FontFile { path: std::path::Path::new("/run/host/fonts").join(relative), family: file.family })
+         } else {
+@@ -328,8 +328,8 @@ pub fn last_resort_files() -> Vec<FontFile> {
+         vec![FontFile { path: std::path::Path::new(&dir).join("Fonts").join("ARIALUNI.TTF"), family: "" }]
+     } else {
+         with_flatpak_host_fonts(vec![
+-            f("/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf"),
+-            f("/usr/share/fonts/google-droid-sans-fonts/DroidSansFallbackFull.ttf"),
++            f("@TERMUX_PREFIX@/share/fonts/truetype/droid/DroidSansFallbackFull.ttf"),
++            f("@TERMUX_PREFIX@/share/fonts/google-droid-sans-fonts/DroidSansFallbackFull.ttf"),
+         ])
+     }
+ }
+@@ -512,11 +512,11 @@ mod flatpak_tests {
+             let files = font_files(script);
+             let native = &files[0];
+             let host = &files[1];
+-            assert_eq!(native.path, std::path::Path::new("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"));
++            assert_eq!(native.path, std::path::Path::new("@TERMUX_PREFIX@/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"));
+             assert_eq!(host.path, std::path::Path::new("/run/host/fonts/opentype/noto/NotoSansCJK-Regular.ttc"));
+             assert_eq!(host.family, families(script).iter().find(|family| family.starts_with("Noto Sans CJK")).copied().unwrap());
+             for pair in files.windows(2) {
+-                if let Ok(relative) = pair[0].path.strip_prefix("/usr/share/fonts") {
++                if let Ok(relative) = pair[0].path.strip_prefix("@TERMUX_PREFIX@/share/fonts") {
+                     assert_eq!(pair[1].path, std::path::Path::new("/run/host/fonts").join(relative));
+                     assert_eq!(pair[1].family, pair[0].family);
+                 }
+diff --git a/crates/text/src/fonts.rs b/crates/text/src/fonts.rs
+index 0db7280..9c44d09 100644
+--- a/crates/text/src/fonts.rs
++++ b/crates/text/src/fonts.rs
+@@ -533,8 +533,8 @@ fn system_font_dirs() -> Vec<std::path::PathBuf> {
+             v.push(PathBuf::from(l).join("Microsoft\\Windows\\Fonts"));
+         }
+     } else {
+-        v.push(PathBuf::from("/usr/share/fonts"));
+-        v.push(PathBuf::from("/usr/local/share/fonts"));
++        v.push(PathBuf::from("@TERMUX_PREFIX@/share/fonts"));
++        v.push(PathBuf::from("@TERMUX_PREFIX@/local/share/fonts"));
+         // Inside a Flatpak sandbox the host's system and per-user fonts are mounted here
+         // (`/usr/share/fonts` is the runtime's own small set). Missing dirs are skipped.
+         v.push(PathBuf::from("/run/host/fonts"));
