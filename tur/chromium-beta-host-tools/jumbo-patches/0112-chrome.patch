@@ -225,7 +225,16 @@ diff --git a/chrome/browser/devtools/BUILD.gn b/chrome/browser/devtools/BUILD.gn
 index a789faeab1..184f56b7fc 100644
 --- a/chrome/browser/devtools/BUILD.gn
 +++ b/chrome/browser/devtools/BUILD.gn
-@@ -108,6 +108,7 @@
+@@ -104,6 +104,8 @@
+ }
+ 
+ jumbo_source_set("devtools_contents_resizing_strategy") {
++  # Conflict with //chrome/browser/devtools:devtools
++  never_build_jumbo = true
+   public = [
+     "devtools_contents_resizing_strategy.h",
+     "devtools_dock_side.h",
+@@ -126,6 +128,7 @@
      "chrome_devtools_session_base.cc",
      "chrome_devtools_session_base.h",
    ]
@@ -233,7 +242,18 @@ index a789faeab1..184f56b7fc 100644
  
    configs += [
      "//build/config/compiler:wexit_time_destructors",
-@@ -381,6 +382,10 @@
+@@ -236,6 +239,10 @@
+       "visual_logging.cc",
+       "visual_logging.h",
+     ]
++    jumbo_excluded_sources += [
++      # Conflict with //chrome/browser/devtools:devtools_contents_resizing_strategy
++      "devtools_contents_resizing_strategy.cc",
++    ]
+     deps += [
+       "//chrome/browser:browser_features",
+       "//chrome/browser:browser_process",
+@@ -407,6 +414,10 @@
        "serialize_host_descriptions.cc",
        "serialize_host_descriptions.h",
      ]
@@ -5001,3 +5021,48 @@ index 9fc77e09a7..b41fa76422 100644
 +
 +#undef IsFuseboxEligible
 +#undef IsFuseboxEnabled
+--- a/chrome/browser/enterprise/connectors/device_trust/device_trust_service_factory.cc
++++ b/chrome/browser/enterprise/connectors/device_trust/device_trust_service_factory.cc
+@@ -48,6 +48,8 @@
+ #include "components/enterprise/device_trust/core/attestation/browser_attestation_service.h"
+ #endif  // BUILDFLAG(IS_CHROMEOS)
+ 
++#define IsProfileManaged IsProfileManaged_device_trust_service_factory
++
+ namespace {
+ bool IsProfileManaged(Profile* profile) {
+   auto* management_service =
+@@ -210,3 +212,5 @@
+ }
+ 
+ }  // namespace enterprise_connectors
++
++#undef IsProfileManaged
+--- a/chrome/browser/actor/tools/switch_tab_tool_request.cc
++++ b/chrome/browser/actor/tools/switch_tab_tool_request.cc
+@@ -17,6 +17,8 @@
+ #include "chrome/common/actor/action_result.h"
+ #include "components/sessions/core/session_id.h"
+ 
++#define GetActiveWindowId GetActiveWindowId_switch_tab_tool_request
++
+ namespace actor {
+ 
+ namespace {
+@@ -70,3 +72,5 @@
+ }
+ 
+ }  // namespace actor
++
++#undef GetActiveWindowId
+--- a/chrome/browser/password_manager/remote_actor/remote_actor_credential_sharing_service_factory.cc
++++ b/chrome/browser/password_manager/remote_actor/remote_actor_credential_sharing_service_factory.cc
+@@ -41,7 +41,7 @@
+ std::unique_ptr<KeyedService> RemoteActorCredentialSharingServiceFactory::
+     BuildServiceInstanceForBrowserContext(
+         content::BrowserContext* context) const {
+-  if (!features::RemoteActorCredentialSharingEnabled()) {
++  if (!::features::RemoteActorCredentialSharingEnabled()) {
+     return nullptr;
+   }
+   Profile* profile = Profile::FromBrowserContext(context);
