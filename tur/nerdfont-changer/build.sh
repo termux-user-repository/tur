@@ -1,9 +1,9 @@
 TERMUX_PKG_HOMEPAGE=https://github.com/GeneralKaos666/nerdfont-changer
 TERMUX_PKG_DESCRIPTION="Fullscreen TUI picker to browse and change your Termux terminal font"
 TERMUX_PKG_LICENSE="MIT"
-TERMUX_PKG_MAINTAINER="@GeneralKaos666"
+TERMUX_PKG_MAINTAINER="GeneralKaos666 <xkiller1177@gmail.com>"
 TERMUX_PKG_VERSION="0.2.0"
-TERMUX_PKG_SRCURL=https://github.com/GeneralKaos666/nerdfont-changer/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz
+TERMUX_PKG_SRCURL="https://github.com/GeneralKaos666/nerdfont-changer/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz"
 TERMUX_PKG_SHA256=b880d822e315a9a74d6fb65f04178b0df8527b631f18512f54bf84b784b1ff6f
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_BUILD_IN_SRC=true
