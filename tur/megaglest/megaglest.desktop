@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=MegaGlest
+GenericName=Real-time Strategy Game
+Comment=A free and open source 3D real-time strategy game
+Icon=megaglest
+Exec=megaglest
+Terminal=false
+Categories=Game;StrategyGame;
+Keywords=game;strategy;3D;real-time;RTS;
