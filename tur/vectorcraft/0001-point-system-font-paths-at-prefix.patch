@@ -1,0 +1,13 @@
+diff --git a/crates/text/src/fontdb.rs b/crates/text/src/fontdb.rs
+index edd3bcd..32e6b3f 100644
+--- a/crates/text/src/fontdb.rs
++++ b/crates/text/src/fontdb.rs
+@@ -978,7 +978,7 @@ pub fn system_font_dirs() -> Vec<PathBuf> {
+         #[cfg(windows)]
+         dirs.extend(registered_font_files(&dirs));
+     } else {
+-        dirs.extend(["/usr/share/fonts", "/usr/local/share/fonts"].map(Into::into));
++        dirs.extend(["@TERMUX_PREFIX@/share/fonts", "@TERMUX_PREFIX@/local/share/fonts"].map(Into::into));
+         // The XDG data folders' `fonts` (fontconfig's user folder; Flatpak, Snap, NixOS and Guix
+         // list their own data folders), relative paths ignored as the XDG spec says.
+         let xdg = |var| std::env::var_os(var).map(|v| std::env::split_paths(&v).filter(|p| p.is_absolute()).collect::<Vec<_>>()).unwrap_or_default();
