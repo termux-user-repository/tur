@@ -96,7 +96,7 @@ index 7b194eabd7..6fc6c1ae2e 100644
  import("//build/config/linux/pangocairo/pangocairo.gni")
  import("//build/config/ozone.gni")
  import("//build/config/ui.gni")
-@@ -96,7 +97,129 @@ if (is_ios) {
+@@ -98,7 +99,131 @@ if (is_ios) {
    import("//build/config/apple/mobile_config.gni")  # For `target_platform`
  }
  
@@ -140,6 +140,8 @@ index 7b194eabd7..6fc6c1ae2e 100644
 +    "$target_gen_dir/devtools/protocol/fed_cm.h",
 +    "$target_gen_dir/devtools/protocol/fetch.cc",
 +    "$target_gen_dir/devtools/protocol/fetch.h",
++    "$target_gen_dir/devtools/protocol/find_in_page.cc",
++    "$target_gen_dir/devtools/protocol/find_in_page.h",
 +    "$target_gen_dir/devtools/protocol/forward.h",
 +    "$target_gen_dir/devtools/protocol/input.cc",
 +    "$target_gen_dir/devtools/protocol/input.h",
@@ -244,7 +246,7 @@ index 7b194eabd7..6fc6c1ae2e 100644
    ]
  
    public_deps = [
-@@ -399,68 +521,6 @@ source_set("browser") {
+@@ -400,70 +524,6 @@ source_set("browser") {
    ]
  
    sources = [
@@ -270,6 +272,8 @@ index 7b194eabd7..6fc6c1ae2e 100644
 -    "$target_gen_dir/devtools/protocol/fed_cm.h",
 -    "$target_gen_dir/devtools/protocol/fetch.cc",
 -    "$target_gen_dir/devtools/protocol/fetch.h",
+-    "$target_gen_dir/devtools/protocol/find_in_page.cc",
+-    "$target_gen_dir/devtools/protocol/find_in_page.h",
 -    "$target_gen_dir/devtools/protocol/forward.h",
 -    "$target_gen_dir/devtools/protocol/input.cc",
 -    "$target_gen_dir/devtools/protocol/input.h",
@@ -313,13 +317,15 @@ index 7b194eabd7..6fc6c1ae2e 100644
      "about_url_loader_factory.cc",
      "about_url_loader_factory.h",
      "accessibility/accessibility_tree_formatter_blink.cc",
-@@ -2390,6 +2450,10 @@ source_set("browser") {
+@@ -2381,6 +2441,12 @@ source_set("browser") {
      "worker_host/worker_util.cc",
      "worker_host/worker_util.h",
    ]
 +  jumbo_excluded_sources = [
 +    # It requires CloneTraits<std::vector<bool>>
 +    "webid/document_metadata.cc",
++    # Class `ClientMetadata` conflict
++    "webid/idp_network_request_manager.cc",
 +  ]
  
    if (is_android) {
@@ -1924,7 +1930,15 @@ diff --git a/content/common/BUILD.gn b/content/common/BUILD.gn
 index c807284750..dc915caa50 100644
 --- a/content/common/BUILD.gn
 +++ b/content/common/BUILD.gn
-@@ -58,7 +58,7 @@ if (is_linux || is_chromeos) {
+@@ -3,6 +3,7 @@
+ # found in the LICENSE file.
+ 
+ import("//build/buildflag_header.gni")
++import("//build/config/jumbo.gni")
+ import("//build/config/ui.gni")
+ import("//content/public/common/zygote/features.gni")
+ import("//ipc/features.gni")
+@@ -58,7 +59,7 @@
    }
  }
  
@@ -1933,7 +1947,7 @@ index c807284750..dc915caa50 100644
    # Targets external to content should always link to the public API.
    # In addition, targets outside of the content component (shell and tests)
    # must not link to this because it will duplicate the code in the component
-@@ -192,6 +192,9 @@ source_set("common") {
+@@ -198,6 +199,9 @@
      "webid/identity_url_loader_throttle.cc",
      "webid/identity_url_loader_throttle.h",
    ]
@@ -2159,15 +2173,15 @@ index ff11e0d050..4bb49944ad 100644
  import("//components/on_device_translation/buildflags/features.gni")
  import("//device/vr/buildflags/buildflags.gni")
  import("//media/gpu/args.gni")
-@@ -11,7 +12,7 @@ import("//printing/buildflags/buildflags.gni")
+@@ -11,7 +12,7 @@
  import("//services/accessibility/buildflags.gni")
  import("//services/screen_ai/buildflags/features.gni")
  
 -source_set("utility") {
 +jumbo_source_set("utility") {
-   # Only the public target should depend on this. All other targets (even
-   # internal content ones other than test) should depend on the public one.
    visibility = [
+     ":for_content_tests",
+     "//content/app:*",
 diff --git a/content/browser/devtools/protocol/media_recorder.cc b/content/browser/devtools/protocol/media_recorder.cc
 index 44ebbcbab6..eb9cdb8700 100644
 --- a/content/browser/devtools/protocol/media_recorder.cc

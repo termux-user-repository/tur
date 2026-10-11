@@ -1,7 +1,11 @@
 From a94a2888f84a8ff550cbd96d07e918c93b4caac4 Mon Sep 17 00:00:00 2001
 From: Chongyun Lee <licy183@termux.dev>
 Date: Wed, 16 Apr 2025 01:01:04 +0800
-Subject: [PATCH] enable jumbo dawn
+Subject: [PATCH] reland jumbo 16
+
+Enable jumbo build for component(s)/source_set(s):
+
+- //third_party/dawn/src/dawn/native:sources
 
 ---
  third_party/dawn/src/dawn/native/BUILD.gn         | 8 +++++++-
