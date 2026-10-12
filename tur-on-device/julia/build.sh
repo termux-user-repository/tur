@@ -3,10 +3,11 @@ TERMUX_PKG_DESCRIPTION="High-level, high-performance dynamic language for techni
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION=1.10.12
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://github.com/JuliaLang/julia/releases/download/v${TERMUX_PKG_VERSION}/julia-${TERMUX_PKG_VERSION}-full.tar.gz
 TERMUX_PKG_SHA256=28815e9c83f23167e53bd4a79c085e6b9547ae2808acb23415ab5c558a85ceec
 TERMUX_PKG_AUTO_UPDATE=false
-TERMUX_PKG_DEPENDS="libandroid-execinfo, libcurl, libedit, libgit2, libgmp, libmpfr, libnghttp2, libopenblas, libssh2, mbedtls, pcre2, suitesparse, utf8proc, zlib, zstd"
+TERMUX_PKG_DEPENDS="libandroid-execinfo, libcurl, libedit, libgit2, libgmp, libmpfr, libnghttp2, libopenblas, libssh2, mbedtls, openspecfun, pcre2, suitesparse, utf8proc, zlib, zstd"
 TERMUX_PKG_BUILD_DEPENDS="7zip"
 TERMUX_PKG_BUILD_IN_SRC=true
 # Julia's system image (sys.so), stdlib precompiled cache images (*.so),
@@ -20,6 +21,12 @@ TERMUX_PKG_UNDEF_SYMBOLS_FILES="
 ./lib/libjulia-codegen.so*
 ./share/julia/compiled/*/*/*.so
 "
+
+termux_step_post_get_source() {
+	mkdir -p "$TERMUX_PKG_SRCDIR/stdlib/OpenSpecFun_jll/src"
+	cp "$TERMUX_PKG_BUILDER_DIR/Project.toml" "$TERMUX_PKG_SRCDIR/stdlib/OpenSpecFun_jll/"
+	cp "$TERMUX_PKG_BUILDER_DIR/OpenSpecFun_jll.jl" "$TERMUX_PKG_SRCDIR/stdlib/OpenSpecFun_jll/src/"
+}
 
 termux_step_pre_configure() {
 	if [[ "${TERMUX_ON_DEVICE_BUILD}" == "false" ]]; then
@@ -100,4 +107,10 @@ termux_step_make_install() {
 			[ -f "$l" ] && [ ! -L "$l" ] && "$_patchelf" --set-rpath '$ORIGIN:$ORIGIN/..' "$l" || true
 		done
 	fi
+
+	# Install OpenSpecFun_jll standard library shim
+	local _shim_dir="${TERMUX_PREFIX}/share/julia/stdlib/v$(echo ${TERMUX_PKG_VERSION} | cut -d. -f1-2)/OpenSpecFun_jll"
+	mkdir -p "${_shim_dir}/src"
+	cp "$TERMUX_PKG_BUILDER_DIR/Project.toml" "${_shim_dir}/"
+	cp "$TERMUX_PKG_BUILDER_DIR/OpenSpecFun_jll.jl" "${_shim_dir}/src/"
 }
