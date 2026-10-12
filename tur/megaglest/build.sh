@@ -2,10 +2,11 @@ TERMUX_PKG_HOMEPAGE=https://megaglest.org/
 TERMUX_PKG_DESCRIPTION="A free and open source 3D real-time strategy game"
 TERMUX_PKG_LICENSE="GPL-3.0"
 TERMUX_PKG_MAINTAINER="@IntinteDAO"
-TERMUX_PKG_VERSION=3.13.0
+TERMUX_PKG_VERSION="3.13.0"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=(
-	https://github.com/MegaGlest/megaglest-source/archive/refs/tags/${TERMUX_PKG_VERSION}.tar.gz
-	https://github.com/MegaGlest/megaglest-data/releases/download/${TERMUX_PKG_VERSION}/megaglest-standalone-data-${TERMUX_PKG_VERSION}.tar.xz
+	"https://github.com/MegaGlest/megaglest-source/archive/refs/tags/${TERMUX_PKG_VERSION}.tar.gz"
+	"https://github.com/MegaGlest/megaglest-data/releases/download/${TERMUX_PKG_VERSION}/megaglest-standalone-data-${TERMUX_PKG_VERSION}.tar.xz"
 )
 TERMUX_PKG_SHA256=(
 	e02e58c2329558cc5d67374b5e5f9b3cfaafc300b96feff71df8d4b0d39e1eaa
@@ -27,7 +28,16 @@ termux_step_pre_configure() {
 	LDFLAGS+=" -landroid-glob -Wl,--no-as-needed,-lOpenSLES,--as-needed"
 	CFLAGS+=" -D__OpenBSD__"
 	CXXFLAGS+=" -D__OpenBSD__"
-	TERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DLUA_MATH_LIBRARY=${TERMUX_STANDALONE_TOOLCHAIN}/sysroot/usr/lib/${TERMUX_HOST_PLATFORM}/${TERMUX_PKG_API_LEVEL}/libm.so"
+	if [[ "$TERMUX_ON_DEVICE_BUILD" == "false" ]]; then
+		local LUA_MATH_LIBRARY="${TERMUX_STANDALONE_TOOLCHAIN}/sysroot/usr/lib/${TERMUX_HOST_PLATFORM}/${TERMUX_PKG_API_LEVEL}/libm.so"
+	else
+		if [[ "$TERMUX_ARCH_BITS" == "32" ]]; then
+			local LUA_MATH_LIBRARY="/system/lib/libm.so"
+		else
+			local LUA_MATH_LIBRARY="/system/lib64/libm.so"
+		fi
+	fi
+	TERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" -DLUA_MATH_LIBRARY=$LUA_MATH_LIBRARY"
 }
 
 termux_step_post_make_install() {
