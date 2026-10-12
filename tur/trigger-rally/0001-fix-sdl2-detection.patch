@@ -21,7 +21,10 @@ This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
  # standard GNU and custom variables
  DISTNAME        := trigger-rally
  DISTVER         := 0.6.6.1
-@@ -25,8 +31,8 @@
+@@ -24,9 +30,9 @@
+ WARNINGS        ?= -Wall -Wextra -pedantic
+-OPTIMS          ?= -march=native -mtune=native -Ofast
++OPTIMS          ?=
  DMACROS         := -DNDEBUG -DUNIX -DPACKAGE_VERSION=\"$(DISTVER)\"
  INCDIRS         := -I'./include'
  CXXFLAGS        += -std=c++11 $(WARNINGS) $(OPTIMS)
