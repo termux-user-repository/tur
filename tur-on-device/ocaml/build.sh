@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="Industrial strength programming language with an emphasi
 TERMUX_PKG_LICENSE="LGPL-2.1"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="5.5.1"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL="https://github.com/ocaml/ocaml/releases/download/${TERMUX_PKG_VERSION}/ocaml-${TERMUX_PKG_VERSION}.tar.gz"
 TERMUX_PKG_SHA256=ae47728d0a876665ccc7b745e3a8d8c9ca5ba63c4f7a11d4db6cdbd1dbeef4bb
 TERMUX_PKG_DEPENDS="clang, libandroid-shmem"
