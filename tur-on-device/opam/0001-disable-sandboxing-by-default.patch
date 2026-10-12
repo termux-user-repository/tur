@@ -9,7 +9,7 @@
    in
    let config_files =
      (if no_default_config_file then []
-@@ -350,6 +350,7 @@
+@@ -368,6 +368,7 @@
        cygwin_internal cygwin_location cygwin_extra_packages
        git_location no_git_location
        () =
@@ -19,7 +19,7 @@
      (* If show option is set, dump opamrc and exit *)
 --- a/src/client/opamInitDefaults.ml
 +++ b/src/client/opamInitDefaults.ml
-@@ -139,16 +139,17 @@
+@@ -142,16 +142,17 @@
      "rsync";
    ] |> List.map OpamSysPkg.of_string
  
@@ -42,7 +42,7 @@
    I.empty |>
    I.with_repositories
      [OpamRepositoryName.of_string "default", (repository_url, None)] |>
-@@ -158,5 +159,5 @@
+@@ -161,5 +162,5 @@
    I.with_wrappers @| wrappers ~sandboxing |>
    I.with_recommended_tools @| recommended_tools |>
    I.with_required_tools @| required_tools ~sandboxing |>
