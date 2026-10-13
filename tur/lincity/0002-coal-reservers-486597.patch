@@ -1,0 +1,12 @@
+Index: lincity-1.13.1/simulate.c
+===================================================================
+--- lincity-1.13.1.orig/simulate.c	2003-07-28 08:06:11.000000000 +0300
++++ lincity-1.13.1/simulate.c	2012-02-04 20:23:58.762880388 +0200
+@@ -85,6 +85,7 @@
+     MP_GROUP(x,y) = get_group_of_type(fill);
+     if (MP_GROUP(x,y) < 0) MP_GROUP(x,y) = GROUP_BARE;
+     MP_INFO(x,y).population = 0;
++    MP_INFO(x,y).coal_reserve = 0;
+     MP_INFO(x,y).flags = 0;
+     MP_INFO(x,y).int_1 = 0;
+     MP_INFO(x,y).int_2 = 0;

@@ -1,0 +1,16 @@
+--- a/configure.ac
++++ b/configure.ac
+@@ -82,6 +82,7 @@
+ AC_SUBST(PROGS)
+ if eval "test x$with_x = xyes"; then
+   LCLIBS="$LCLIBS LCX_LIBS"
++  PROGS="$PROGS X_PROGS"
+ else
+   if eval "test x$with_x = x"; then
+     AC_CHECK_LIB(X11,XOpenDisplay, LCLIBS="$LCLIBS LCX_LIBS";
+@@ -118,3 +119,5 @@
+ AC_CONFIG_FILES([Makefile po/Makefile.in m4/Makefile modules/Makefile])
+ 
++AC_CONFIG_COMMANDS([libtool-fix], [sed -i "s/func_fatal_configuration \"unsupported hardcode properties\"/lib_linked=yes/g" libtool modules/libtool 2>/dev/null || true])
++
+ AC_OUTPUT

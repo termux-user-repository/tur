@@ -1,0 +1,10 @@
+--- a/lin-city.h
++++ b/lin-city.h
+@@ -1191,6 +1191,7 @@
+ extern void eswap32 (int *);
+ extern void eswap16 (unsigned short *);
+ extern void malloc_failure (void);
++extern void HandleError (char *, int);
+ 
+ /*
+   fileutil
