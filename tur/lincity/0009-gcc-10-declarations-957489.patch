@@ -1,0 +1,56 @@
+Index: lincity-1.13.1/screen.h
+===================================================================
+--- lincity-1.13.1.orig/screen.h	2004-06-22 16:24:19.000000000 +0300
++++ lincity-1.13.1/screen.h	2020-05-01 19:53:29.053683988 +0300
+@@ -20,7 +20,7 @@
+ extern unsigned char start_font2[4096];
+ extern unsigned char start_font3[4096];
+ 
+-int monthgraph_style;
++extern int monthgraph_style;
+ 
+ /* This is on in screen_full_refresh, used in *_refresh() */
+ extern char screen_refreshing;
+Index: lincity-1.13.1/main.c
+===================================================================
+--- lincity-1.13.1.orig/main.c	2020-05-01 19:56:21.868349891 +0300
++++ lincity-1.13.1/main.c	2020-05-01 19:58:45.127928031 +0300
+@@ -100,9 +100,7 @@
+ #endif
+ #endif
+ 
+-char *lc_save_dir;
+ char *lc_temp_file;
+-char save_names[10][42];
+ 
+ #ifdef CS_PROFILE
+ int prof_countdown = PROFILE_COUNTDOWN;
+Index: lincity-1.13.1/ldsvguts.c
+===================================================================
+--- lincity-1.13.1.orig/ldsvguts.c	2003-10-10 07:11:29.000000000 +0300
++++ lincity-1.13.1/ldsvguts.c	2020-05-01 20:00:22.808913036 +0300
+@@ -88,12 +88,6 @@
+ int verify_city (char *cname);
+ 
+ /* ---------------------------------------------------------------------- *
+- * Private Global Variables
+- * ---------------------------------------------------------------------- */
+-
+-char save_names[10][42];
+-
+-/* ---------------------------------------------------------------------- *
+  * Public functions
+  * ---------------------------------------------------------------------- */
+ void
+Index: lincity-1.13.1/ldsvgui.c
+===================================================================
+--- lincity-1.13.1.orig/ldsvgui.c	2003-10-05 08:53:32.000000000 +0300
++++ lincity-1.13.1/ldsvgui.c	2020-05-01 20:01:43.142433496 +0300
+@@ -99,7 +99,6 @@
+ char LIBDIR[256];
+ #endif
+ 
+-char *lc_save_dir;
+ char save_names[10][42];
+ 
+ /* ---------------------------------------------------------------------- *
