@@ -8,11 +8,9 @@ TERMUX_PKG_DEPENDS="zip"
 TERMUX_PKG_BUILD_IN_SRC=true
 
 termux_step_make() {
-    clang++ -std=c++17 -O2 -Wall -o epubmaker epubmaker.cpp
+clang++ -std=c++17 -O2 -Wall -o epubmaker epubmaker.cpp
 }
 
 termux_step_make_install() {
-    install -Dm755 epubmaker "$TERMUX_PREFIX/bin/epubmaker"
-
+install -Dm755 epubmaker "$TERMUX_PREFIX/bin/epubmaker"
 }
-
