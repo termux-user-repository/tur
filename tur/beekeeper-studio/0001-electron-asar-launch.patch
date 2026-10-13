@@ -1,0 +1,47 @@
+diff --git a/apps/studio/src/common/bksConfig/mainBksConfig.ts b/apps/studio/src/common/bksConfig/mainBksConfig.ts
+index a66266e..6951103 100644
+--- a/apps/studio/src/common/bksConfig/mainBksConfig.ts
++++ b/apps/studio/src/common/bksConfig/mainBksConfig.ts
+@@ -141,7 +141,7 @@ export function checkDeprecations(
+   return results;
+ }
+ 
+-const bundledConfigPath = path.join(process.resourcesPath);
++const bundledConfigPath = path.join(process.env.BKS_RESOURCES_PATH || process.resourcesPath);
+ 
+ function copyBundledConfig(file: ConfigFileName, dest: string) {
+   log.info(`Copying bundled config ${file} to ${dest}.`);
+diff --git a/apps/studio/src/common/platform_info/mainPlatformInfo.ts b/apps/studio/src/common/platform_info/mainPlatformInfo.ts
+index 540cfc9..379a636 100644
+--- a/apps/studio/src/common/platform_info/mainPlatformInfo.ts
++++ b/apps/studio/src/common/platform_info/mainPlatformInfo.ts
+@@ -46,7 +46,10 @@ export function mainPlatformInfo(): IPlatformInfo {
+   const e = require('electron')
+   const platform = p.env.OS_OVERRIDE ? p.env.OS_OVERRIDE : p.platform
+   const testMode = p.env.TEST_MODE ? true : false
+-  const isDevEnv = testMode ? false : !e.app.isPackaged;
++  // Termux runs app.asar through the shared electron binary, so isPackaged
++  // is always false there and resourcesPath points to electron's own dir
++  const resourcesOverride = p.env.BKS_RESOURCES_PATH
++  const isDevEnv = testMode ? false : (!e.app.isPackaged && !resourcesOverride);
+   const isWindows = platform === 'win32'
+   const isMac = platform === 'darwin'
+   const isArm = p.arch.startsWith('arm')
+@@ -63,7 +66,7 @@ export function mainPlatformInfo(): IPlatformInfo {
+   // as instant client not available there
+   const oracleSupported = true
+ 
+-  const resourcesPath = isDevEnv ? resolve('./extra_resources') : resolve(p.resourcesPath)
++  const resourcesPath = isDevEnv ? resolve('./extra_resources') : resolve(resourcesOverride || p.resourcesPath)
+   let userDirectory = testMode ? './tmp' : e.app.getPath("userData")
+   const downloadsDirectory = testMode ? './tmp' : e.app.getPath('downloads')
+   const homeDirectory = testMode ? './tmp' : e.app.getPath('home')
+@@ -75,7 +78,7 @@ export function mainPlatformInfo(): IPlatformInfo {
+ 
+   const sessionType = p.env.XDG_SESSION_TYPE
+ 
+-  const slice = isDevEnv ? 2 : 1
++  const slice = (isDevEnv || p.defaultApp) ? 2 : 1
+   const parsedArgs = yargs(p.argv.slice(slice))
+   const appVersion = testMode ? '0.0.0' : e.app.getVersion()
+ 
