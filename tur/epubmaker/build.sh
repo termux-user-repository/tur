@@ -13,5 +13,6 @@ termux_step_make() {
 
 termux_step_make_install() {
     install -Dm755 epubmaker "$TERMUX_PREFIX/bin/epubmaker"
+
 }
 
