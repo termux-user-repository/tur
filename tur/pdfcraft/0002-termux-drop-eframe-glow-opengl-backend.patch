@@ -1,5 +1,5 @@
 diff --git a/apps/pdfcraft/Cargo.toml b/apps/pdfcraft/Cargo.toml
-index a65a2ec..a419de8 100644
+index a0f051c..eef397c 100644
 --- a/apps/pdfcraft/Cargo.toml
 +++ b/apps/pdfcraft/Cargo.toml
 @@ -16,7 +16,7 @@ rustls-native-certs = "0.8"
@@ -12,10 +12,10 @@ index a65a2ec..a419de8 100644
  serde_json = { workspace = true }
  # Records from every crate go to standard error and the log file (src/logging.rs).
 diff --git a/apps/pdfcraft/src/main.rs b/apps/pdfcraft/src/main.rs
-index 3134770..fd4bbca 100644
+index c66d2c6..e4d8a44 100644
 --- a/apps/pdfcraft/src/main.rs
 +++ b/apps/pdfcraft/src/main.rs
-@@ -173,7 +173,7 @@ fn main() -> eframe::Result {
+@@ -197,7 +197,7 @@ fn main() -> eframe::Result {
      let apple_events = apple_events::AppleEvents::install();
      // Set once the app is created, which is after the renderer has started.
      let started = Rc::new(Cell::new(false));
@@ -24,7 +24,7 @@ index 3134770..fd4bbca 100644
      let result = eframe::run_native(
          "PdfCraft",
          native_options(integrated, first),
-@@ -193,7 +193,7 @@ fn main() -> eframe::Result {
+@@ -218,7 +218,7 @@ fn main() -> eframe::Result {
              log::error!("the GPU renderer (wgpu) didn't start: {e}. Starting with OpenGL instead; set PDFCRAFT_RENDERER=gl to skip wgpu.");
              eframe::run_native(
                  "PdfCraft",
@@ -33,3 +33,12 @@ index 3134770..fd4bbca 100644
                  app_creator(
                      launch,
                      started,
+@@ -753,7 +753,7 @@ mod tests {
+         assert!(!retry_with_gl(RendererChoice::Gl, false));
+         // Each run states its renderer rather than relying on eframe's default.
+         assert_eq!(native_options(false, eframe::Renderer::Wgpu).renderer, eframe::Renderer::Wgpu);
+-        assert_eq!(native_options(false, eframe::Renderer::Glow).renderer, eframe::Renderer::Glow);
++        assert_eq!(native_options(false, eframe::Renderer::Wgpu).renderer, eframe::Renderer::Wgpu);
+     }
+ 
+     #[test]
