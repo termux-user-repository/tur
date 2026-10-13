@@ -44,7 +44,7 @@ diff --git a/src/jitlayers.cpp b/src/jitlayers.cpp
 index 319641aa85..d60bc123c9 100644
 --- a/src/jitlayers.cpp
 +++ b/src/jitlayers.cpp
-@@ -1395,6 +1395,148 @@ JuliaOJIT::PipelineT::PipelineT(orc::ObjectLayer &BaseLayer, TargetMachine &TM,
+@@ -1395,6 +1395,156 @@ JuliaOJIT::PipelineT::PipelineT(orc::ObjectLayer &BaseLayer, TargetMachine &TM,
  int64_t ___asan_globals_registered;
  #endif
  
@@ -189,11 +189,19 @@ index 319641aa85..d60bc123c9 100644
 +}
 +#endif
 +
++extern "C" {
++double __powidf2(double, int);
++float __powisf2(float, int);
++#if defined(_CPU_AARCH64_) || defined(_CPU_X86_64_)
++long double __powitf2(long double, int);
++#endif
++}
++
 +
  JuliaOJIT::JuliaOJIT()
    : TM(createTargetMachine()),
      DL(jl_create_datalayout(*TM)),
-@@ -1521,6 +1663,58 @@ JuliaOJIT::JuliaOJIT()
+@@ -1521,6 +1671,63 @@ JuliaOJIT::JuliaOJIT()
      cantFail(GlobalJD.define(orc::symbolAliases(jl_crt)));
  #endif
  
@@ -245,6 +253,11 @@ index 319641aa85..d60bc123c9 100644
 +    crt_builtins[mangle("__truncdfhf2")] = JITEvaluatedSymbol::fromPointer((void*)&julia__truncdfhf2, JITSymbolFlags::Exported);
 +    crt_builtins[mangle("__gnu_h2f_ieee")] = JITEvaluatedSymbol::fromPointer((void*)&julia__gnu_h2f_ieee, JITSymbolFlags::Exported);
 +    crt_builtins[mangle("__extendhfsf2")] = JITEvaluatedSymbol::fromPointer((void*)&julia__gnu_h2f_ieee, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__powidf2")] = JITEvaluatedSymbol::fromPointer((void*)&__powidf2, JITSymbolFlags::Exported);
++    crt_builtins[mangle("__powisf2")] = JITEvaluatedSymbol::fromPointer((void*)&__powisf2, JITSymbolFlags::Exported);
++#if defined(_CPU_AARCH64_) || defined(_CPU_X86_64_)
++    crt_builtins[mangle("__powitf2")] = JITEvaluatedSymbol::fromPointer((void*)&__powitf2, JITSymbolFlags::Exported);
++#endif
 +    if (!crt_builtins.empty())
 +        cantFail(GlobalJD.define(orc::absoluteSymbols(crt_builtins)));
 +
