@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://getartcraft.com/apps/designcraft
 TERMUX_PKG_DESCRIPTION="An open-source, clean-room reimplementation of Adobe InDesign in pure Rust"
 TERMUX_PKG_LICENSE="MIT, Apache-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="0.7.1"
+TERMUX_PKG_VERSION="0.8.0"
 TERMUX_PKG_SRCURL="https://github.com/storytold/designcraft/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz"
-TERMUX_PKG_SHA256=395ecade50f8ff802ef2df347ed0a89667f7a3134ca94479cfe5235294f193c8
+TERMUX_PKG_SHA256=e47b926827dd6c8db2dc7d2af7914fa270d5d5ef05896f80ecee442d9e391ea8
 TERMUX_PKG_DEPENDS="libx11, libxcb, libxcursor, libxi, libxrandr, libxkbcommon, vulkan-loader-android, hicolor-icon-theme"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_AUTO_UPDATE=true
@@ -37,7 +37,7 @@ termux_step_pre_configure() {
 		0.20.*) patch -p1 -d "$d" <"$TERMUX_PKG_BUILDER_DIR/smithay-client-toolkit-0.20.0-no-shm.diff" ;;
 		esac
 	done
-	find vendor/eframe vendor/egui-winit vendor/arboard vendor/rfd vendor/winit \
+	find vendor/winit vendor/eframe vendor/egui-winit vendor/arboard vendor/rfd \
 		vendor/wgpu vendor/wgpu-hal vendor/x11rb-protocol vendor/xkbcommon-dl \
 		vendor/wayland-cursor vendor/smithay-client-toolkit* -type f -print0 |
 		xargs -0 sed -i \
@@ -47,9 +47,8 @@ termux_step_pre_configure() {
 			-e "s|libxkbcommon-x11.so.0|libxkbcommon-x11.so|g" \
 			-e "s|libxcb.so.1|libxcb.so|g"
 
-	echo "" >>Cargo.toml
-	echo '[patch.crates-io]' >>Cargo.toml
-	for crate in eframe egui-winit arboard rfd winit wgpu wgpu-hal x11rb-protocol xkbcommon-dl wayland-cursor; do
+	sed -i 's|winit = { git = .* }|winit = { path = "./vendor/winit" }|' Cargo.toml
+	for crate in eframe egui-winit arboard rfd wgpu wgpu-hal x11rb-protocol xkbcommon-dl wayland-cursor; do
 		echo "$crate = { path = \"./vendor/$crate\" }" >>Cargo.toml
 	done
 	i=0
