@@ -1,9 +1,9 @@
 diff --git a/apps/pdfcraft/Cargo.toml b/apps/pdfcraft/Cargo.toml
-index a0f051c..eef397c 100644
+index 4a185d1..02f0b12 100644
 --- a/apps/pdfcraft/Cargo.toml
 +++ b/apps/pdfcraft/Cargo.toml
-@@ -16,7 +16,7 @@ rustls-native-certs = "0.8"
- pdfcraft-ui-egui = { workspace = true }
+@@ -18,7 +18,7 @@ pdfcraft-ui-egui = { workspace = true }
+ pdfcraft-engine = { workspace = true }
  # wgpu draws; OpenGL (glow) is the fallback when wgpu can't start on an old or unusual GPU or
  # driver (#461, #435, #392), and can be chosen with PDFCRAFT_RENDERER=gl.
 -eframe = { workspace = true, features = ["default_fonts", "wgpu", "glow", "accesskit", "wayland", "x11", "persistence", "links"] }
@@ -12,10 +12,10 @@ index a0f051c..eef397c 100644
  serde_json = { workspace = true }
  # Records from every crate go to standard error and the log file (src/logging.rs).
 diff --git a/apps/pdfcraft/src/main.rs b/apps/pdfcraft/src/main.rs
-index c66d2c6..e4d8a44 100644
+index a1d2ad9..cb01314 100644
 --- a/apps/pdfcraft/src/main.rs
 +++ b/apps/pdfcraft/src/main.rs
-@@ -197,7 +197,7 @@ fn main() -> eframe::Result {
+@@ -230,7 +230,7 @@ fn main() -> eframe::Result {
      let apple_events = apple_events::AppleEvents::install();
      // Set once the app is created, which is after the renderer has started.
      let started = Rc::new(Cell::new(false));
@@ -23,22 +23,31 @@ index c66d2c6..e4d8a44 100644
 +    let first = if choice == RendererChoice::Gl { eframe::Renderer::Wgpu } else { eframe::Renderer::Wgpu };
      let result = eframe::run_native(
          "PdfCraft",
-         native_options(integrated, first),
-@@ -218,7 +218,7 @@ fn main() -> eframe::Result {
+         native_options(launch.integrated, launch.window_controls.is_some(), first),
+@@ -251,7 +251,7 @@ fn main() -> eframe::Result {
              log::error!("the GPU renderer (wgpu) didn't start: {e}. Starting with OpenGL instead; set PDFCRAFT_RENDERER=gl to skip wgpu.");
              eframe::run_native(
                  "PdfCraft",
--                native_options(integrated, eframe::Renderer::Glow),
-+                native_options(integrated, eframe::Renderer::Wgpu),
+-                native_options(launch.integrated, launch.window_controls.is_some(), eframe::Renderer::Glow),
++                native_options(launch.integrated, launch.window_controls.is_some(), eframe::Renderer::Wgpu),
                  app_creator(
                      launch,
                      started,
-@@ -753,7 +753,7 @@ mod tests {
+@@ -816,14 +816,14 @@ mod tests {
          assert!(!retry_with_gl(RendererChoice::Gl, false));
          // Each run states its renderer rather than relying on eframe's default.
-         assert_eq!(native_options(false, eframe::Renderer::Wgpu).renderer, eframe::Renderer::Wgpu);
--        assert_eq!(native_options(false, eframe::Renderer::Glow).renderer, eframe::Renderer::Glow);
-+        assert_eq!(native_options(false, eframe::Renderer::Wgpu).renderer, eframe::Renderer::Wgpu);
+         assert_eq!(native_options(false, false, eframe::Renderer::Wgpu).renderer, eframe::Renderer::Wgpu);
+-        assert_eq!(native_options(false, false, eframe::Renderer::Glow).renderer, eframe::Renderer::Glow);
++        assert_eq!(native_options(false, false, eframe::Renderer::Wgpu).renderer, eframe::Renderer::Wgpu);
+     }
+ 
+     #[test]
+     fn the_desktop_frame_is_turned_off_only_when_the_app_draws_one() {
+         use super::native_options;
+-        assert_eq!(native_options(false, false, eframe::Renderer::Glow).viewport.decorations, None);
+-        assert_eq!(native_options(false, true, eframe::Renderer::Glow).viewport.decorations, Some(false));
++        assert_eq!(native_options(false, false, eframe::Renderer::Wgpu).viewport.decorations, None);
++        assert_eq!(native_options(false, true, eframe::Renderer::Wgpu).viewport.decorations, Some(false));
      }
  
      #[test]
