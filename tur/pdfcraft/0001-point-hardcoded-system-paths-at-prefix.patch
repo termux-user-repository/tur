@@ -25,10 +25,10 @@ index 5ac6aad..8401452 100644
      #[cfg(not(all(unix, not(target_arch = "wasm32"))))]
      {
 diff --git a/crates/ui-egui/src/system_fonts.rs b/crates/ui-egui/src/system_fonts.rs
-index 3a44e03..0a68bb3 100644
+index 3083fc5..dd50798 100644
 --- a/crates/ui-egui/src/system_fonts.rs
 +++ b/crates/ui-egui/src/system_fonts.rs
-@@ -181,7 +181,7 @@ fn windows_fonts() -> PathBuf {
+@@ -222,7 +222,7 @@ fn windows_fonts() -> PathBuf {
  }
  
  fn unix_fonts(files: &'static [&'static str]) -> Vec<PathBuf> {
