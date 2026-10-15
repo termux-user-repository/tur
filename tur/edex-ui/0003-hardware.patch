@@ -1,0 +1,49 @@
+`systeminfomation.system()` and `systeminfomation.chassis()` will call `dmesg`
+which doesn't work on Android without root
+
+--- a/src/classes/hardwareInspector.class.js
++++ b/src/classes/hardwareInspector.class.js
+@@ -29,13 +29,37 @@
+         }, 20000);
+     }
+     updateInfo() {
+-        window.si.system().then(d => {
+-            window.si.chassis().then(e => {
+-                document.getElementById("mod_hardwareInspector_manufacturer").innerText = this._trimDataString(d.manufacturer);
+-                document.getElementById("mod_hardwareInspector_model").innerText = this._trimDataString(d.model, d.manufacturer, e.type);
+-                document.getElementById("mod_hardwareInspector_chassis").innerText = e.type;
++        const execPromise = function(command) {
++            const exec = require('child_process').exec;
++            return new Promise(function(resolve, reject) {
++                exec(command, (error, stdout, _) => {
++                    if (error) {
++                        reject(error);
++                        return;
++                    }
++                    var out = stdout.trim();
++                    if (out !== "") {
++                        resolve(out);
++                    }
++                    reject("Empty output");
++                });
+             });
+-        });
++        }
++        execPromise('getprop ro.product.manufacturer').then(stdout => {
++            document.getElementById("mod_hardwareInspector_manufacturer").innerText = this._trimDataString(stdout);
++        }).catch(e => {
++            electron.ipcRenderer.send("log", "note", "Hardware: Error parsing manufacturer");
++            electron.ipcRenderer.send("log", "debug", `Error: ${e}`);
++            document.getElementById("mod_hardwareInspector_manufacturer").innerText = "Unknown";
++        })
++        execPromise('getprop ro.product.model').then(stdout => {
++            document.getElementById("mod_hardwareInspector_model").innerText = this._trimDataString(stdout);
++        }).catch(e => {
++            electron.ipcRenderer.send("log", "note", "Hardware: Error parsing model");
++            electron.ipcRenderer.send("log", "debug", `Error: ${e}`);
++            document.getElementById("mod_hardwareInspector_model").innerText = "Unknown";
++        })
++        document.getElementById("mod_hardwareInspector_chassis").innerText = "Unknown";
+     }
+     _trimDataString(str, ...filters) {
+         return str.trim().split(" ").filter(word => {
