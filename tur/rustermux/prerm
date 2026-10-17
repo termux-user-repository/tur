@@ -1,0 +1,14 @@
+#!/data/data/com.termux/files/usr/bin/bash
+set -e
+
+PREFIX="/data/data/com.termux/files/usr"
+
+# Clean up maturin diversion on package removal
+if [ "$1" = "remove" ] || [ "$1" = "purge" ]; then
+	if command -v dpkg-divert >/dev/null 2>&1; then
+		if dpkg-divert --list "$PREFIX/bin/maturin" 2>/dev/null | grep -q "maturin-real"; then
+			rm -f "$PREFIX/bin/maturin"
+			dpkg-divert --package rustermux --rename --remove "$PREFIX/bin/maturin" 2>/dev/null || true
+		fi
+	fi
+fi
