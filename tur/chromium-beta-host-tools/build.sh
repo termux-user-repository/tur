@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://www.chromium.org/Home
 TERMUX_PKG_DESCRIPTION="Chromium web browser (Host tools)"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="@licy183"
-TERMUX_PKG_VERSION=156.0.8078.12
+TERMUX_PKG_VERSION=157.0.8103.6
 TERMUX_PKG_SRCURL="https://github.com/chromium-linux-tarballs/chromium-tarballs/releases/download/$TERMUX_PKG_VERSION/chromium-$TERMUX_PKG_VERSION-linux.tar.xz"
-TERMUX_PKG_SHA256=b96c59fda51c1a81e5b2a2cbd8acbe8b91f253dda1cea33e21d01689fb89d143
+TERMUX_PKG_SHA256=6ab4b3a6d7f687ae80858d5a688ffeb97a3b04164d0121f92544bd239fccf3fe
 TERMUX_PKG_DEPENDS="atk, cups, dbus, fontconfig, gtk3, krb5, libc++, libevdev, libxkbcommon, libminizip, libnss, libx11, mesa, openssl, pango, pipewire, pulseaudio, zlib"
 TERMUX_PKG_BUILD_DEPENDS="libffi-static"
 # TODO: Split chromium-common and chromium-headless
@@ -30,7 +30,7 @@ termux_pkg_auto_update() {
 	fi
 
 	local tmpdir="$(mktemp -d)"
-	curl -sLo "${tmpdir}/tmpfile" "https://commondatastorage.googleapis.com/chromium-browser-official/chromium-$latest_version-lite.tar.xz"
+	curl -sLo "${tmpdir}/tmpfile" "https://github.com/chromium-linux-tarballs/chromium-tarballs/releases/download/$latest_version/chromium-$latest_version-linux.tar.xz"
 	local sha="$(sha256sum "${tmpdir}/tmpfile" | cut -d ' ' -f 1)"
 	rm -fr "${tmpdir}"
 	printf '%s\n' 'INFO: Generated checksums:' "${sha}"
@@ -55,7 +55,7 @@ termux_pkg_auto_update() {
 		return
 	fi
 
-	termux_error_exit "ERROR: current version '${TERMUX_PKG_VERSION}', latest version '${latest_version}'."
+	termux_pkg_upgrade_version "${latest_version}"
 }
 
 termux_step_post_get_source() {
@@ -86,7 +86,7 @@ termux_step_post_get_source() {
 		$SYSTEM_LIBRARIES
 
 	# Remove the source file to keep more space
-	rm -f "$TERMUX_PKG_CACHEDIR/chromium-$TERMUX_PKG_VERSION-lite.tar.xz"
+	rm -f "$TERMUX_PKG_CACHEDIR/chromium-$TERMUX_PKG_VERSION-linux.tar.xz"
 }
 
 termux_step_configure() {
@@ -310,7 +310,7 @@ use_jumbo_build = true
 # Compile pdfium as a static library
 pdf_is_complete_lib = true
 # Disable v8's metagen
-v8_use_metagen_instance_types = false
+v8_use_metagen = false
 " > $_common_args_file
 
 	if [ "$TERMUX_ARCH" = "arm" ]; then
@@ -372,6 +372,7 @@ termux_step_make() {
 						character_data \
 						gen_root_store_inc \
 						generate_transport_security_state \
+						generate_transport_security_state_pins \
 						generate_top_domains_trie
 
 	# Build swiftshader
