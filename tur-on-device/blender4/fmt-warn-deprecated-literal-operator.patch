@@ -1,0 +1,11 @@
+--- a/extern/fmtlib/include/fmt/format.h
++++ b/extern/fmtlib/include/fmt/format.h
+@@ -4426,7 +4426,7 @@
+   return detail::udl_arg<char_t, sizeof(Str.data) / sizeof(char_t), Str>();
+ }
+ #  else
+-constexpr auto operator"" _a(const char* s, size_t) -> detail::udl_arg<char> {
++constexpr auto operator""_a(const char* s, size_t) -> detail::udl_arg<char> {
+   return {s};
+ }
+ #  endif
