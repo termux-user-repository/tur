@@ -4,9 +4,9 @@ TERMUX_PKG_DESCRIPTION="Python 3 programming language intended to enable clear p
 TERMUX_PKG_LICENSE="custom"
 TERMUX_PKG_LICENSE_FILE="LICENSE"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="3.13.13"
+TERMUX_PKG_VERSION="3.13.16"
 TERMUX_PKG_SRCURL=https://www.python.org/ftp/python/${TERMUX_PKG_VERSION}/Python-${TERMUX_PKG_VERSION}.tar.xz
-TERMUX_PKG_SHA256=2ab91ff401783ccca64f75d10c882e957bdfd60e2bf5a72f8421793729b78a71
+TERMUX_PKG_SHA256=f4b1bfb3c79b5bb11b8d228a12504163b4c0dab4d679828d8f5f26b6cb6ab35d
 TERMUX_PKG_AUTO_UPDATE=false
 TERMUX_PKG_DEPENDS="gdbm, libandroid-posix-semaphore, libandroid-support, libbz2, libcrypt, libexpat, libffi, liblzma, libsqlite, ncurses, ncurses-ui-libs, openssl, readline, zlib"
 TERMUX_PKG_BUILD_DEPENDS="tk"
@@ -71,7 +71,7 @@ termux_step_host_build() {
 }
 
 termux_step_post_get_source() {
-	patch="$TERMUX_PKG_BUILDER_DIR/0012-hardcode-android-api-level.diff"
+	patch="$TERMUX_PKG_BUILDER_DIR/0011-hardcode-android-api-level.diff"
 	echo "Applying patch: $(basename "$patch")"
 	test -f "$patch" && sed \
 		-e "s%\@TERMUX_PKG_API_LEVEL\@%${TERMUX_PKG_API_LEVEL}%g" \
