@@ -1,17 +1,14 @@
-# shellcheck shell=bash
-# shellcheck disable=SC2034
 TERMUX_PKG_HOMEPAGE="https://github.com/SSL-ACTX/rustermux"
 TERMUX_PKG_DESCRIPTION="Official GNU Rustup toolchain on Android Termux via Glibc"
 TERMUX_PKG_LICENSE="MIT, Apache-2.0"
-TERMUX_PKG_MAINTAINER="Seuriin <https://github.com/SSL-ACTX>"
+TERMUX_PKG_MAINTAINER="Seuriin <seuriin@gmail.com>"
 TERMUX_PKG_VERSION="1.1.0"
 TERMUX_PKG_SRCURL="https://github.com/SSL-ACTX/rustermux/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz"
 TERMUX_PKG_SHA256="a1c9dc4d796a0c994a481c9bf22ee5318ceb36de4121e503c8888b1b138a5aaa"
-TERMUX_PKG_DEPENDS="glibc, glibc-runner, patchelf-glibc, binutils-glibc, gcc-glibc, ca-certificates-glibc, curl, file"
-TERMUX_PKG_RECOMMENDS="sccache, mold"
+TERMUX_PKG_DEPENDS="binutils-glibc, ca-certificates-glibc, curl, file, gcc-glibc, glibc, glibc-runner, patchelf-glibc"
+TERMUX_PKG_RECOMMENDS="mold, sccache"
 TERMUX_PKG_PROVIDES="rust, cargo"
-TERMUX_PKG_CONFLICTS=""
-TERMUX_PKG_PLATFORM_INDEPENDENT=false
+TERMUX_PKG_CONFLICTS="rust, rust-nightly"
 
 termux_step_make_install() {
 	mkdir -p "$TERMUX_PREFIX/share/rustermux"
