@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://github.com/storytold/vectorcraft
 TERMUX_PKG_DESCRIPTION="An open-source, clean-room reimplementation of Adobe Illustrator in pure Rust"
 TERMUX_PKG_LICENSE="MIT, Apache-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="0.11.0"
+TERMUX_PKG_VERSION="0.12.0"
 TERMUX_PKG_SRCURL="https://github.com/storytold/vectorcraft/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz"
-TERMUX_PKG_SHA256=b851d229437c47c1a8722bfbdee75837e490a0919468d8a89071493b8aa2cf98
+TERMUX_PKG_SHA256=266cc34c93b68d3bec847452674fce99b5695e2f233451957eef8ce39a5ce325
 TERMUX_PKG_DEPENDS="libx11, libxcb, libxcursor, libxi, libxrandr, libxkbcommon, vulkan-loader-android, hicolor-icon-theme"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_AUTO_UPDATE=true
@@ -47,8 +47,6 @@ termux_step_pre_configure() {
 			-e "s|libxkbcommon-x11.so.0|libxkbcommon-x11.so|g" \
 			-e "s|libxcb.so.1|libxcb.so|g"
 
-	echo "" >>Cargo.toml
-	echo '[patch.crates-io]' >>Cargo.toml
 	for crate in eframe egui-winit arboard rfd winit wgpu wgpu-hal x11rb-protocol xkbcommon-dl wayland-cursor; do
 		echo "$crate = { path = \"./vendor/$crate\" }" >>Cargo.toml
 	done
