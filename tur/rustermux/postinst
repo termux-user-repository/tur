@@ -1,0 +1,21 @@
+#!/data/data/com.termux/files/usr/bin/bash
+set -e
+
+PREFIX="/data/data/com.termux/files/usr"
+
+# Divert maturin binary so pkg install maturin never overrides the patched wrapper
+if command -v dpkg-divert >/dev/null 2>&1; then
+	if ! dpkg-divert --list "$PREFIX/bin/maturin" 2>/dev/null | grep -q "maturin-real"; then
+		[ -f "$PREFIX/bin/maturin-real" ] && rm -f "$PREFIX/bin/maturin-real"
+		dpkg-divert --package rustermux --divert "$PREFIX/bin/maturin-real" --rename "$PREFIX/bin/maturin" 2>/dev/null || true
+	fi
+	cp "$PREFIX/bin/maturin-wrapper" "$PREFIX/bin/maturin"
+	chmod +x "$PREFIX/bin/maturin"
+fi
+
+if [ -t 1 ]; then
+	echo ""
+	echo -e "\033[1m\033[92mRustermux package installed successfully!\033[0m"
+	echo "Run 'rustermux' to setup or sync your GNU Rustup toolchains."
+	echo ""
+fi
