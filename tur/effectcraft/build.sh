@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://github.com/storytold/effectcraft
 TERMUX_PKG_DESCRIPTION="Native open-source motion-graphics and effects editor in pure Rust (eframe/wgpu)"
 TERMUX_PKG_LICENSE="MIT, Apache-2.0"
 TERMUX_PKG_MAINTAINER="@termux"
-TERMUX_PKG_VERSION="0.10.0"
+TERMUX_PKG_VERSION="0.11.1"
 TERMUX_PKG_SRCURL="https://github.com/storytold/effectcraft/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz"
-TERMUX_PKG_SHA256=bb7487b28b08e440128d5e4f6261ae43ad44c323bcc3f4b9bc0a09d1209bedb8
+TERMUX_PKG_SHA256=fb70627d112825cd0412d37784b55ae8b87f128abfab30b26a7759a42518015a
 TERMUX_PKG_DEPENDS="libx11, libxcb, libxcursor, libxi, libxrandr, libxkbcommon, vulkan-loader-android, hicolor-icon-theme, alsa-lib, alsa-plugins"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_AUTO_UPDATE=true
@@ -49,8 +49,6 @@ termux_step_pre_configure() {
 			-e "s|libxkbcommon-x11.so.0|libxkbcommon-x11.so|g" \
 			-e "s|libxcb.so.1|libxcb.so|g"
 
-	echo "" >>Cargo.toml
-	echo '[patch.crates-io]' >>Cargo.toml
 	for crate in eframe egui-winit arboard rfd cpal winit wgpu wgpu-hal x11rb-protocol xkbcommon-dl wayland-cursor; do
 		echo "$crate = { path = \"./vendor/$crate\" }" >>Cargo.toml
 	done
