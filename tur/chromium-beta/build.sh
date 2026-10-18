@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://www.chromium.org/Home
 TERMUX_PKG_DESCRIPTION="Chromium web browser"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="@licy183"
-TERMUX_PKG_VERSION=156.0.8078.12
+TERMUX_PKG_VERSION=157.0.8103.6
 TERMUX_PKG_SRCURL="https://github.com/chromium-linux-tarballs/chromium-tarballs/releases/download/$TERMUX_PKG_VERSION/chromium-$TERMUX_PKG_VERSION-linux.tar.xz"
-TERMUX_PKG_SHA256=b96c59fda51c1a81e5b2a2cbd8acbe8b91f253dda1cea33e21d01689fb89d143
+TERMUX_PKG_SHA256=6ab4b3a6d7f687ae80858d5a688ffeb97a3b04164d0121f92544bd239fccf3fe
 TERMUX_PKG_DEPENDS="atk, cups, dbus, fontconfig, gtk3, krb5, libc++, libevdev, libxkbcommon, libminizip, libnss, libx11, mesa, openssl, pango, pipewire, pulseaudio, zlib"
 TERMUX_PKG_BUILD_DEPENDS="chromium-beta-host-tools, libffi-static"
 # Chromium doesn't support i686 on Linux.
@@ -277,7 +277,7 @@ use_jumbo_build = true
 # Compile pdfium as a static library
 pdf_is_complete_lib = true
 # Disable v8's metagen
-v8_use_metagen_instance_types = false
+v8_use_metagen = false
 " > $_common_args_file
 
 	if [ "$TERMUX_ARCH" = "arm" ]; then
@@ -364,7 +364,6 @@ termux_step_make_install() {
 		chrome_crashpad_handler
 		headless_shell
 		chromedriver
-		generate_colors_info
 
 		# Resource files
 		chrome_100_percent.pak
