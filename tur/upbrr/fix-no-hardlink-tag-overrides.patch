@@ -1,0 +1,39 @@
+diff --git a/internal/metadata/overrides.go b/internal/metadata/overrides.go
+index ddac446c..25adeee7 100644
+--- a/internal/metadata/overrides.go
++++ b/internal/metadata/overrides.go
+@@ -119,6 +119,16 @@ func ensureDefaultTagOverrides(dbPath string, defaults []byte) (string, error) {
+ 		return "", fmt.Errorf("metadata: resolve default tag overrides path: %w", err)
+ 	}
+ 
++	info, err := os.Stat(tagsPath)
++	if err == nil {
++		if !info.Mode().IsRegular() {
++			return "", fmt.Errorf("metadata: existing tag overrides path is not a regular file: %s", tagsPath)
++		}
++		return tagsPath, nil
++	} else if !errors.Is(err, fs.ErrNotExist) {
++		return "", fmt.Errorf("metadata: inspect existing tag overrides: %w", err)
++	}
++
+ 	file, err := os.CreateTemp(filepath.Dir(tagsPath), ".tags-*.tmp")
+ 	if err != nil {
+ 		return "", fmt.Errorf("metadata: create temporary default tag overrides: %w", err)
+@@ -136,16 +146,7 @@ func ensureDefaultTagOverrides(dbPath string, defaults []byte) (string, error) {
+ 		return "", fmt.Errorf("metadata: close temporary default tag overrides: %w", err)
+ 	}
+ 
+-	if err := os.Link(tempPath, tagsPath); errors.Is(err, fs.ErrExist) {
+-		info, statErr := os.Stat(tagsPath)
+-		if statErr != nil {
+-			return "", fmt.Errorf("metadata: inspect existing tag overrides: %w", statErr)
+-		}
+-		if !info.Mode().IsRegular() {
+-			return "", fmt.Errorf("metadata: existing tag overrides path is not a regular file: %s", tagsPath)
+-		}
+-		return tagsPath, nil
+-	} else if err != nil {
++	if err := os.Rename(tempPath, tagsPath); err != nil {
+ 		return "", fmt.Errorf("metadata: publish default tag overrides: %w", err)
+ 	}
+ 	return tagsPath, nil
