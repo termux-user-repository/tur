@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="The modern download automation tool for torrents and use
 TERMUX_PKG_LICENSE="GPL-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="1.88.0"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL="https://github.com/autobrr/autobrr/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz"
 TERMUX_PKG_SHA256=3ce8dc28511b87c05d051e81dd32fffb74e804b67b33d3a6d22e6a94217355f3
 TERMUX_PKG_BUILD_DEPENDS="nodejs"
