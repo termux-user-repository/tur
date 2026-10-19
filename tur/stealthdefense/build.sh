@@ -1,7 +1,7 @@
 TERMUX_PKG_HOMEPAGE=https://github.com/aleksandergrambelik-png/StealthDefense
 TERMUX_PKG_DESCRIPTION="Minimalist Honeypot & Tarpit Defense (Pure Java)"
 TERMUX_PKG_LICENSE="GPL-3.0"
-TERMUX_PKG_MAINTAINER="@aleksandergrambelik-png"
+TERMUX_PKG_MAINTAINER="Aleksander <aleksandergrambelik@gmail.com>"
 TERMUX_PKG_VERSION=2.6
 TERMUX_PKG_SRCURL=https://github.com/aleksandergrambelik-png/StealthDefense/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz
 TERMUX_PKG_DEPENDS="openjdk-17"
