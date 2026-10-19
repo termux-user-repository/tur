@@ -6,9 +6,7 @@ TERMUX_PKG_VERSION=2.6
 TERMUX_PKG_SRCURL="https://github.com/aleksandergrambelik-png/StealthDefense/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz"
 TERMUX_PKG_DEPENDS="openjdk-17"
 TERMUX_PKG_BUILD_IN_SRC=true
-
 TERMUX_PKG_SHA256=9cd7df72f8d87db49dfee1a6426db19975d5c98e2943d7089a9db4f865498953
-
 termux_step_make() {
     $TERMUX_PREFIX/bin/javac -d . StealthDefense.java
 }
