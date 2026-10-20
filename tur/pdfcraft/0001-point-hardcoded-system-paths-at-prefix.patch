@@ -12,7 +12,7 @@ index f4945f7..433c058 100644
              dirs.extend([home.join(".local/share/fonts"), home.join(".fonts")]);
          }
 diff --git a/crates/print/src/spool.rs b/crates/print/src/spool.rs
-index 5ac6aad..8401452 100644
+index cf1c0cb..a41121a 100644
 --- a/crates/print/src/spool.rs
 +++ b/crates/print/src/spool.rs
 @@ -12,7 +12,7 @@ pub use craft_print::{
@@ -25,15 +25,28 @@ index 5ac6aad..8401452 100644
      #[cfg(not(all(unix, not(target_arch = "wasm32"))))]
      {
 diff --git a/crates/ui-egui/src/system_fonts.rs b/crates/ui-egui/src/system_fonts.rs
-index 3083fc5..dd50798 100644
+index 606fa92..dff7856 100644
 --- a/crates/ui-egui/src/system_fonts.rs
 +++ b/crates/ui-egui/src/system_fonts.rs
-@@ -222,7 +222,7 @@ fn windows_fonts() -> PathBuf {
+@@ -313,7 +313,7 @@ fn unix_fonts(files: &'static [&'static str]) -> Vec<PathBuf> {
+ 
+ fn unix_candidates(files: &[&str], installed: &[PathBuf]) -> Vec<PathBuf> {
+     let mut paths: Vec<_> =
+-        ["/usr/share/fonts", "/usr/local/share/fonts"].iter().flat_map(|dir| files.iter().map(move |f| Path::new(dir).join(f))).collect();
++        ["@TERMUX_PREFIX@/share/fonts", "@TERMUX_PREFIX@/local/share/fonts"].iter().flat_map(|dir| files.iter().map(move |f| Path::new(dir).join(f))).collect();
+     // Fontconfig may point into /nix/store or a user's font directory. Keep the existing
+     // candidate names and their preference order; this does not select arbitrary fonts.
+     for file in files {
+diff --git a/crates/ui-egui/src/system_fonts/fontconfig.rs b/crates/ui-egui/src/system_fonts/fontconfig.rs
+index dbec74e..10919ad 100644
+--- a/crates/ui-egui/src/system_fonts/fontconfig.rs
++++ b/crates/ui-egui/src/system_fonts/fontconfig.rs
+@@ -94,7 +94,7 @@ pub(super) fn config_path() -> PathBuf {
+         return file;
+     }
+     let dir =
+-        std::env::var_os("FONTCONFIG_PATH").and_then(|paths| std::env::split_paths(&paths).next()).unwrap_or_else(|| PathBuf::from("/etc/fonts"));
++        std::env::var_os("FONTCONFIG_PATH").and_then(|paths| std::env::split_paths(&paths).next()).unwrap_or_else(|| PathBuf::from("@TERMUX_PREFIX@/etc/fonts"));
+     dir.join(file)
  }
  
- fn unix_fonts(files: &'static [&'static str]) -> Vec<PathBuf> {
--    ["/usr/share/fonts", "/usr/local/share/fonts"].iter().flat_map(|dir| files.iter().map(move |f| Path::new(dir).join(f))).collect()
-+    ["@TERMUX_PREFIX@/share/fonts", "@TERMUX_PREFIX@/local/share/fonts"].iter().flat_map(|dir| files.iter().map(move |f| Path::new(dir).join(f))).collect()
- }
- 
- fn read(path: &Path, probe: char, max: u64) -> Option<Arc<FontData>> {
