@@ -1,0 +1,4 @@
+Name: rish
+Link: bin/rish
+Alternative: libexec/rish-shizuku.sh
+Priority: 50
