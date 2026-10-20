@@ -1,13 +1,13 @@
 diff --git a/crates/fonts/src/fontdb.rs b/crates/fonts/src/fontdb.rs
-index 4177f94..80efb9c 100644
+index f65dd70..2fbdc7e 100644
 --- a/crates/fonts/src/fontdb.rs
 +++ b/crates/fonts/src/fontdb.rs
-@@ -608,7 +608,7 @@ pub fn system_font_dirs() -> Vec<std::path::PathBuf> {
-             dirs.push(std::path::PathBuf::from(l).join("Microsoft\\Windows\\Fonts"));
-         }
-     } else {
--        dirs.extend(["/usr/share/fonts", "/usr/local/share/fonts"].map(Into::into));
-+        dirs.extend(["@TERMUX_PREFIX@/share/fonts", "@TERMUX_PREFIX@/local/share/fonts"].map(Into::into));
-         if let Some(h) = &home {
-             dirs.push(h.join(".fonts"));
-             dirs.push(h.join(".local/share/fonts"));
+@@ -785,7 +785,7 @@ pub fn system_font_dirs() -> Vec<std::path::PathBuf> {
+ }
+ 
+ fn unix_font_dirs(home: Option<&std::path::Path>, xdg_data_home: Option<&std::path::Path>) -> Vec<std::path::PathBuf> {
+-    let mut dirs: Vec<std::path::PathBuf> = ["/usr/share/fonts", "/usr/local/share/fonts"].map(Into::into).into();
++    let mut dirs: Vec<std::path::PathBuf> = ["@TERMUX_PREFIX@/share/fonts", "@TERMUX_PREFIX@/local/share/fonts"].map(Into::into).into();
+     if let Some(home) = home {
+         dirs.push(home.join(".fonts"));
+     }
