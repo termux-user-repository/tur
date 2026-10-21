@@ -1,0 +1,13 @@
+diff --git a/build.js b/build.js
+index 6a472a9b..74ff88d4 100644
+--- a/build.js
++++ b/build.js
+@@ -75,7 +75,7 @@ function createElectronPlugin() {
+                 if (result.errors.length > 0) return;
+ 
+                 if (!electron_process) {
+-                    electron_process = spawn('electron', ['.', '--remote-debugging-port=9223'], {
++                    electron_process = spawn('electron42', ['.', '--remote-debugging-port=9223'], {
+                         stdio: 'inherit',
+                         shell: true,
+                     });
