@@ -1,0 +1,12 @@
+{
+	global:
+		# HAL entry point (kept: the same .so stays usable as a HAL module).
+		HMI;
+		# Generic ICD entry points for application hot-loading
+		# (dlopen + vk_icdGetInstanceProcAddr negotiation).
+		vk_icdGetInstanceProcAddr;
+		vk_icdGetPhysicalDeviceProcAddr;
+		vk_icdNegotiateLoaderICDInterfaceVersion;
+	local:
+		*;
+};

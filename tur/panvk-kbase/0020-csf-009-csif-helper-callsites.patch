@@ -1,0 +1,102 @@
+From: panvk-kbase-android worker <panvk-worker@localhost>
+Subject: [PATCH csf 009] panvk: route csif/flush-id sites via kbase helpers
+
+Purpose: Call panvk_get_csif_props()/panvk_get_flush_id() (which select
+ the kbase GLB interface / USER registers on /dev/mali* devices) at the
+ remaining direct panthor_kmod_* call sites: cmd_draw, exception_handler
+ (the vkCreateDevice crash: garbage cs_reg_count blew up the tiler-OOM
+ handler builder), utrace, cmd_buffer, gpu_queue (4 sites). These hunks
+ contain no 'kbase' string so the 006 extractor missed them. The utrace
+ clone-allocator refactor drift is deliberately NOT taken (one line only).
+Source/Reference: https://github.com/wonderkast02/panvk-g720-kbase-csf
+ branch android-candidate-beta-1.9.4 (call-site lines only).
+Tested GPU: Poco X6 Pro / G615 (fixes vkCreateDevice crash).
+Tested Kbase UAPI: CSF 1.21.
+Mesa base range: 26.3.0-devel (pinned 5a07217f).
+Dependencies: 006 (helpers defined in panvk_device.h).
+Validation test: Gates D+E (vkCreateDevice + compute 10/10).
+
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+@@ -104,7 +104,7 @@
+                                       uint32_t *dump_region_size)
+ {
+    const struct drm_panthor_csif_info *csif_info =
+-      panthor_kmod_get_csif_props(dev->kmod.dev);
++      panvk_get_csif_props(dev);
+ 
+    struct cs_builder b;
+    struct cs_builder_conf conf = {
+--- a/src/panfrost/vulkan/csf/panvk_vX_exception_handler.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_exception_handler.c
+@@ -183,7 +183,7 @@
+    const uint32_t fbd_size = get_fbd_size(has_zs_ext, rt_count);
+ 
+    const struct drm_panthor_csif_info *csif_info =
+-      panthor_kmod_get_csif_props(dev->kmod.dev);
++      panvk_get_csif_props(dev);
+ 
+    struct cs_builder b;
+    struct cs_builder_conf conf = {
+--- a/src/panfrost/vulkan/csf/panvk_vX_utrace.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_utrace.c
+@@ -273,7 +273,7 @@
+                                           struct panvk_utrace_clone_cs_ctx *ctx)
+ {
+    const struct drm_panthor_csif_info *csif_info =
+-      panthor_kmod_get_csif_props(dev->kmod.dev);
++      panvk_get_csif_props(dev);
+    const struct cs_builder_conf builder_conf = {
+       .nr_registers = csif_info->cs_reg_count,
+       .nr_kernel_registers = MAX2(csif_info->unpreserved_cs_reg_count, 4),
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_buffer.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_buffer.c
+@@ -833,7 +833,7 @@
+    };
+ 
+    const struct drm_panthor_csif_info *csif_info =
+-      panthor_kmod_get_csif_props(dev->kmod.dev);
++      panvk_get_csif_props(dev);
+ 
+    for (uint32_t i = 0; i < ARRAY_SIZE(cmdbuf->state.cs); i++) {
+       struct cs_builder *b = &cmdbuf->state.cs[i].builder;
+--- a/src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c
+@@ -1585,7 +1585,7 @@
+ 
+    struct cs_builder b;
+    const struct drm_panthor_csif_info *csif_info =
+-      panthor_kmod_get_csif_props(dev->kmod.dev);
++      panvk_get_csif_props(dev);
+ 
+    struct cs_buffer root_cs = {
+       .cpu = panvk_priv_mem_host_addr(subq->req_resource.buf),
+--- a/src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c
+@@ -1775,7 +1775,7 @@
+       .queue_index = subqueue,
+       .stream_size = cs_root_chunk_size(&b),
+       .stream_addr = cs_root_chunk_gpu_addr(&b),
+-      .latest_flush = panthor_kmod_get_flush_id(dev->kmod.dev),
++      .latest_flush = panvk_get_flush_id(dev),
+       .syncs = DRM_PANTHOR_OBJ_ARRAY(1, &syncop),
+    };
+    struct drm_panthor_group_submit gsubmit = {
+@@ -2446,7 +2446,7 @@
+       return;
+ 
+    struct panvk_device *dev = submit->dev;
+-   uint32_t flush_id = panthor_kmod_get_flush_id(dev->kmod.dev);
++   uint32_t flush_id = panvk_get_flush_id(dev);
+ 
+    u_foreach_bit(i, submit->req_resource_subqueue_mask) {
+       struct panvk_subqueue *subq = &submit->queue->subqueues[i];
+@@ -2537,7 +2537,7 @@
+       }
+ 
+       if (util_bitcount(submit->utrace.queue_mask) > 0)
+-         flush_id = panthor_kmod_get_flush_id(dev->kmod.dev);
++         flush_id = panvk_get_flush_id(dev);
+ 
+       u_foreach_bit(j, submit->utrace.queue_mask) {
+          struct u_trace *ut = &cmdbuf->utrace.uts[j];

@@ -1,0 +1,285 @@
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: 2026-10-11
+Subject: [PATCH jm-v9 019] panvk: v9 fillModeNonSolid via the gpu_prerast polygon-mode kernel biblioklept
+
+Purpose: Expose fillModeNonSolid on v9 JM with a GPU path.
+Port of the csf-v11 gpu_prerast polygon variant onto the v9 JM chain:
+when polygonMode is LINE or POINT (and no GS is bound), the lowered VS
+writes the clip positions to the arena, a GPU_POLYGON compute job applies
+culling/facing and emits an index list of edges or points into
+POLY_INDEX_OFFSET plus an indirect draw command, and the tiler draws that
+as LINES/POINTS with primitive restart. Indirect draws patch the polygon
+job grid through the gs_job slot of panlib_v9_prerast_indirect. Viewport
+select stays on the VS path (poly mode skips v9_prerast_draw_viewports).
+Source/Reference: csf-v11 gpu_prerast polygon mode (MIT), JimVulkan
+polygon-mode GS (MIT, design reference)
+Tested GPU: build-checked (universal Android build v6-v14); G615 (v11) PanProbe regression with the universal .so; device run on Mali-G57 MC2 (gpu_id 0x90930010) pending, see worklogs/v9-jm/PROGRESS.md
+Tested Kbase UAPI: JM 11.38
+Mesa base range: 5a07217f + g615-v11-csf series + jm-v9 001-018
+Dependencies: jm-v9 011, 012, 014, 017
+Validation test: PanProbe polygon_mode (pending G57)
+
+---
+diff --git a/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c
+index 0f0a236..e9b9baf 100644
+--- a/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c
+@@ -2596,6 +2596,16 @@ v9_prerast_xfb_active(const struct panvk_cmd_buffer *cmdbuf)
+           panvk_gpu_prerast_has_xfb(&last->gpu_prerast.xfb);
+ }
+ 
++/* Polygon mode of a draw without a GS, see gpu_prerast_poly_mode(). */
++static enum panvk_gpu_prerast_poly_mode
++v9_prerast_poly_mode(const struct panvk_cmd_buffer *cmdbuf,
++                     const struct panvk_draw_info *info)
++{
++   return cmdbuf->state.gfx.gs.shader
++             ? PANVK_GPU_PRERAST_POLY_NONE
++             : panvk_per_arch(gpu_prerast_poly_mode)(cmdbuf, info);
++}
++
+ static bool
+ v9_prerast_needed(const struct panvk_cmd_buffer *cmdbuf,
+                   const struct panvk_draw_info *info)
+@@ -2603,7 +2613,8 @@ v9_prerast_needed(const struct panvk_cmd_buffer *cmdbuf,
+    return !info->gpu_prerast_generated &&
+           (cmdbuf->state.gfx.gs.shader ||
+            panvk_prerast_viewport_shader(&cmdbuf->state.gfx) ||
+-           v9_prerast_xfb_active(cmdbuf));
++           v9_prerast_xfb_active(cmdbuf) ||
++           v9_prerast_poly_mode(cmdbuf, info) != PANVK_GPU_PRERAST_POLY_NONE);
+ }
+ 
+ /* VS stores and atomics run once per vertex through gpu_prerast, like CSF
+@@ -2751,6 +2762,7 @@ v9_prerast_prepare_vs_descs(struct panvk_cmd_buffer *cmdbuf,
+  * prepares the job, the caller adds it. */
+ struct v9_prerast_vs_job {
+    uint64_t params;
++   struct panvk_gpu_prerast_params *params_cpu;
+    uint64_t push;
+    struct pan_ptr job;
+ };
+@@ -2787,6 +2799,7 @@ v9_prerast_vs(struct panvk_cmd_buffer *cmdbuf,
+       return false;
+ 
+    out->params = params.gpu;
++   out->params_cpu = params.cpu;
+    out->push = push.gpu;
+    out->job = v9_prerast_job(cmdbuf, lowered,
+                              cmdbuf->state.gfx.vs.desc.res_table, push.gpu,
+@@ -2923,6 +2936,60 @@ v9_prerast_gs_prologue(struct panvk_cmd_buffer *cmdbuf,
+          arena + PANVK_GPU_PRERAST_GS_STRIP_OFFSET);
+ }
+ 
++/* fillModeNonSolid, the polygon kernel of CSF gpu_prerast_vs(): one
++ * invocation per lowered VS record, turning each triangle of the records
++ * into PANVK_GPU_PRERAST_POLY_INDICES_PER_PRIM line or point indices (culled
++ * like the rasterizer would) at arena + PANVK_GPU_PRERAST_POLY_INDEX_OFFSET,
++ * and writing the draw command. The command lives in per-draw memory,
++ * zeroed by a fill job first: an indirect draw past its count or empty runs
++ * no kernel. Fills the poly params, prepares the job (added by the caller
++ * after the lowered VS job) and returns the draw command, 0 on failure. */
++static uint64_t
++v9_prerast_poly(struct panvk_cmd_buffer *cmdbuf,
++                const struct panvk_draw_info *src, uint64_t arena,
++                const struct v9_prerast_vs_job *vs,
++                enum panvk_gpu_prerast_poly_mode mode, struct pan_ptr *job)
++{
++   const struct vk_dynamic_graphics_state *dyns =
++      &cmdbuf->vk.dynamic_graphics_state;
++   const struct panvk_shader_variant *polygon = panvk_shader_gpu_prerast_variant(
++      cmdbuf->state.gfx.vs.shader, PANVK_VS_VARIANT_GPU_POLYGON);
++   const bool indirect = src->indirect.buffer_dev_addr != 0;
++   struct pan_ptr draw = panvk_cmd_alloc_dev_mem(
++      cmdbuf, desc, sizeof(VkDrawIndexedIndirectCommand), 16);
++   struct pan_ptr push;
++
++   if (!draw.gpu ||
++       panvk_per_arch(cmd_prepare_gfx_push_uniforms)(cmdbuf, polygon, &push,
++                                                     1) != VK_SUCCESS)
++      return 0;
++   if (shader_uses_sysval(polygon, graphics, gpu_prerast_params))
++      *(uint64_t *)((uint8_t *)push.cpu +
++                    shader_remapped_sysval_offset(
++                       polygon, sysval_offset(graphics, gpu_prerast_params))) =
++         vs->params;
++
++   struct panvk_gpu_prerast_params *p = vs->params_cpu;
++   p->poly.indices = arena + PANVK_GPU_PRERAST_POLY_INDEX_OFFSET;
++   p->poly.draw = draw.gpu;
++   p->poly.mode = mode;
++   p->poly.prim = src->prim;
++   p->poly.cull = dyns->rs.cull_mode;
++   p->poly.front_ccw = dyns->rs.front_face == VK_FRONT_FACE_COUNTER_CLOCKWISE;
++   p->poly.flip_y = dyns->vp.viewports[0].height < 0.0f;
++
++   *job = v9_prerast_job(cmdbuf, polygon, cmdbuf->state.gfx.vs.desc.res_table,
++                         push.gpu, indirect ? 1 : src->vertex.count,
++                         indirect ? 1 : src->instance.count, 1, indirect);
++   if (!job->gpu)
++      return 0;
++
++   struct panvk_precomp_ctx ctx = panvk_per_arch(precomp_cs)(cmdbuf);
++   panlib_fill_scalar(&ctx, panlib_1d(sizeof(VkDrawIndexedIndirectCommand) / 4),
++                      PANLIB_BARRIER_JM_BARRIER, draw.gpu, 0);
++   return draw.gpu;
++}
++
+ /* panlib_xfb_capture() over the records the lowered VS or GS left, CSF
+  * gpu_prerast_xfb() without the conditional rendering part (v9 has no
+  * VK_EXT_conditional_rendering). */
+@@ -2984,11 +3051,13 @@ v9_prerast_xfb(struct panvk_cmd_buffer *cmdbuf,
+  * IDs of instance 0, ~0 at restarts) with the passthrough VS, gen_draw is
+  * the VkDrawIndexedIndirectCommand panlib_v9_prerast_indirect() wrote for an
+  * indirect draw, 0 for a direct one. GS: the strips with the GS passthrough,
+- * gen_draw is the GS kernel's draw command. */
++ * gen_draw is the GS kernel's draw command. Polygon mode: the line or point
++ * indices of v9_prerast_poly(), gen_draw is its draw command. */
+ static void
+ v9_prerast_draw_generated(struct panvk_cmd_buffer *cmdbuf,
+                           const struct panvk_draw_info *src, uint64_t arena,
+-                          uint64_t gen_draw)
++                          uint64_t gen_draw,
++                          enum panvk_gpu_prerast_poly_mode poly)
+ {
+    struct panvk_draw_info generated = *src;
+ 
+@@ -3029,6 +3098,18 @@ v9_prerast_draw_generated(struct panvk_cmd_buffer *cmdbuf,
+       generated.instance.count = 1;
+       cmdbuf->state.gfx.sysvals.gpu_prerast_records =
+          arena + PANVK_GPU_PRERAST_GS_RECORD_OFFSET;
++   } else if (poly != PANVK_GPU_PRERAST_POLY_NONE) {
++      generated.prim = poly == PANVK_GPU_PRERAST_POLY_POINT ? MESA_PRIM_POINTS
++                                                            : MESA_PRIM_LINES;
++      generated.index.buffer_dev_addr =
++         arena + PANVK_GPU_PRERAST_POLY_INDEX_OFFSET;
++      generated.index.buffer_size = PANVK_GPU_PRERAST_MAX_INVOCATIONS *
++                                    PANVK_GPU_PRERAST_POLY_INDICES_PER_PRIM *
++                                    sizeof(uint32_t);
++      generated.index.restart_enable = true;
++      generated.vertex.count = 1;
++      generated.instance.base = 0;
++      generated.instance.count = 1;
+    }
+    gfx_state_set_dirty(cmdbuf, VS);
+    gfx_state_set_dirty(cmdbuf, VS_PUSH_UNIFORMS);
+@@ -3043,7 +3124,8 @@ static uint64_t
+ v9_prerast_indirect(struct panvk_cmd_buffer *cmdbuf,
+                     const struct panvk_draw_info *src,
+                     const struct v9_prerast_vs_job *vs,
+-                    const struct v9_prerast_gs_job *gs, uint64_t chunk)
++                    const struct v9_prerast_gs_job *gs, uint64_t chunk,
++                    uint64_t poly_job)
+ {
+    const struct panvk_shader *shader = cmdbuf->state.gfx.vs.shader;
+    const struct panvk_shader_variant *lowered =
+@@ -3106,6 +3188,13 @@ v9_prerast_indirect(struct panvk_cmd_buffer *cmdbuf,
+       /* The GS slots bound the draw too, see gpu_prerast_can_lower(). */
+       a->capacity = MIN2(a->capacity,
+                          panvk_gpu_prerast_gs_cap_slots(gsi) / gsi->invocations);
++   } else if (poly_job) {
++      /* No GS with a polygon mode: the GS job slot sizes the polygon kernel
++       * job like the lowered VS one (z = 1). gs_counts takes the {vertex,
++       * instance} counts the kernel already wrote to the params. */
++      a->gs_job = poly_job;
++      a->gs_counts = a->counts;
++      a->gs_invocations = 1;
+    }
+    if (shader_uses_sysval(lowered, graphics, vs.first_vertex))
+       a->first_vertex_sysval =
+@@ -3320,14 +3409,20 @@ v9_prerast_draw_one(struct panvk_cmd_buffer *cmdbuf,
+       return;
+ 
+    const bool has_gs = cmdbuf->state.gfx.gs.shader != NULL;
++   const enum panvk_gpu_prerast_poly_mode poly = v9_prerast_poly_mode(cmdbuf, src);
+    struct v9_prerast_vs_job vs;
+    struct v9_prerast_gs_job gs;
+-   uint64_t gen_draw = 0;
++   struct pan_ptr poly_job = {0};
++   uint64_t gen_draw = 0, poly_draw = 0;
+    if (!v9_prerast_vs(cmdbuf, src, arena, &vs) ||
+        (has_gs && !v9_prerast_gs(cmdbuf, src, arena, &gs)) ||
++       (poly != PANVK_GPU_PRERAST_POLY_NONE &&
++        !(poly_draw = v9_prerast_poly(cmdbuf, src, arena, &vs, poly,
++                                      &poly_job))) ||
+        (src->indirect.buffer_dev_addr &&
+         !(gen_draw = v9_prerast_indirect(cmdbuf, src, &vs,
+-                                         has_gs ? &gs : NULL, chunk)))) {
++                                         has_gs ? &gs : NULL, chunk,
++                                         poly_job.gpu)))) {
+       vk_command_buffer_set_error(&cmdbuf->vk, VK_ERROR_OUT_OF_DEVICE_MEMORY);
+       return;
+    }
+@@ -3337,6 +3432,10 @@ v9_prerast_draw_one(struct panvk_cmd_buffer *cmdbuf,
+       v9_prerast_add_job(cmdbuf, &gs.job);
+       gen_draw = gs.draw;
+    }
++   if (poly != PANVK_GPU_PRERAST_POLY_NONE) {
++      v9_prerast_add_job(cmdbuf, &poly_job);
++      gen_draw = poly_draw;
++   }
+ 
+    /* Captured once per draw: multiview and transform feedback are
+     * exclusive, a layered draw captures layer 0. */
+@@ -3347,14 +3446,16 @@ v9_prerast_draw_one(struct panvk_cmd_buffer *cmdbuf,
+    if (cmdbuf->vk.dynamic_graphics_state.rs.rasterizer_discard_enable)
+       return;
+ 
+-   if (v9_multi_viewport(cmdbuf))
++   /* A polygon-mode draw has no viewport runs, as on CSF: its passthrough
++    * still picks the viewport per vertex. */
++   if (v9_multi_viewport(cmdbuf) && poly == PANVK_GPU_PRERAST_POLY_NONE)
+       v9_prerast_draw_viewports(
+          cmdbuf, src, arena,
+          has_gs ? gs.draw
+                 : vs.params + offsetof(struct panvk_gpu_prerast_params,
+                                        vertex_count));
+    else
+-      v9_prerast_draw_generated(cmdbuf, src, arena, gen_draw);
++      v9_prerast_draw_generated(cmdbuf, src, arena, gen_draw, poly);
+ }
+ 
+ /* Fans over the arena: chunks of hub + window vertices, like CSF
+@@ -3874,7 +3975,8 @@ v9_tess_draw(struct panvk_cmd_buffer *cmdbuf,
+       /* VS over the chunk, sized by its patch job. */
+       struct v9_prerast_vs_job vsj;
+       ok = v9_prerast_vs(cmdbuf, &vs_src, arena, &vsj) &&
+-           v9_prerast_indirect(cmdbuf, &vs_src, &vsj, NULL, TD(chunk_vertex));
++           v9_prerast_indirect(cmdbuf, &vs_src, &vsj, NULL, TD(chunk_vertex),
++                               0);
+       if (!ok)
+          break;
+       v9_prerast_add_job(cmdbuf, &vsj.job);
+@@ -3931,6 +4033,10 @@ v9_tess_draw(struct panvk_cmd_buffer *cmdbuf,
+ static void
+ v9_cmd_draw_layer(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info *info)
+ {
++   /* The tess and gpu_prerast paths call get_fs() too. */
++   cmdbuf->state.gfx.fs.required =
++      fs_required(&cmdbuf->state.gfx, &cmdbuf->vk.dynamic_graphics_state);
++
+    if (info->prim == MESA_PRIM_PATCHES) {
+       v9_tess_draw(cmdbuf, info);
+       return;
+@@ -3948,8 +4054,6 @@ v9_cmd_draw_layer(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info *info)
+       return;
+ 
+ 
+-   cmdbuf->state.gfx.fs.required =
+-      fs_required(&cmdbuf->state.gfx, &cmdbuf->vk.dynamic_graphics_state);
+    const struct panvk_shader_variant *fs = panvk_shader_only_variant(get_fs(cmdbuf));
+ 
+    if (!cmdbuf->cur_batch)
+diff --git a/src/panfrost/vulkan/panvk_vX_physical_device.c b/src/panfrost/vulkan/panvk_vX_physical_device.c
+index 0a9fd1f..e26b03c 100644
+--- a/src/panfrost/vulkan/panvk_vX_physical_device.c
++++ b/src/panfrost/vulkan/panvk_vX_physical_device.c
+@@ -326,7 +326,7 @@ panvk_per_arch(get_physical_device_features)(
+       .drawIndirectFirstInstance = true,
+       .depthClamp = true,
+       .depthBiasClamp = true,
+-      .fillModeNonSolid = PAN_ARCH >= 10,
++      .fillModeNonSolid = PAN_ARCH >= 9,
+       .depthBounds = PAN_ARCH >= 9,
+       .wideLines = true,
+       .largePoints = true,

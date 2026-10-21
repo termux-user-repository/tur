@@ -1,0 +1,58 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: Tue, 6 Oct 2026 00:30:00 +0530
+Subject: [PATCH] panvk/kbase: log device decisions at INFO for tester uploads
+
+Tester uploads from devices we do not own could not show gpu_id, the raw
+TEXTURE_FEATURES mask, the BC emulation decision or why a GPU was
+rejected: "Unknown gpu_id" is vk_errorf text, which release builds drop
+unless a debug messenger exists (vk_log.c:114).
+
+Log once per physical device at INFO (logcat tag MESA, or MESA_LOG=file):
+- gpu_id, variant, arch, model and raw TEXTURE_FEATURES[0..3]
+- BC emulation on/off and the native compressed-format mask
+- "Unknown gpu_id" also via mesa_loge
+
+EXEC_INIT logging is left out: jm-v9/004-005 rewrite that block.
+Applies after 110, which already logs the kbase uAPI version, page size
+and the queue-group / tiler-heap layouts; android/014 logs the gralloc
+mapper backend. Logging only; no behaviour change.
+---
+diff --git a/src/panfrost/vulkan/panvk_physical_device.c b/src/panfrost/vulkan/panvk_physical_device.c
+index 6190464..cbe3dbe 100644
+--- a/src/panfrost/vulkan/panvk_physical_device.c
++++ b/src/panfrost/vulkan/panvk_physical_device.c
+@@ -1309,7 +1309,22 @@ panvk_physical_device_init_kbase(struct panvk_physical_device *device,
+ 
+    unsigned arch = pan_arch(device->kmod.dev->props.gpu_id);
+ 
++   /* Release builds drop vk_errorf text without a debug messenger; log the
++    * device facts testers' uploads need straight to the Mesa log. */
++   mesa_logi("panvk: gpu_id %#" PRIx64 " variant %#x arch v%u model %s "
++             "texture_features %#x %#x %#x %#x",
++             device->kmod.dev->props.gpu_id,
++             device->kmod.dev->props.gpu_variant, arch,
++             device->model ? device->model->name : "unknown",
++             device->kmod.dev->props.texture_features[0],
++             device->kmod.dev->props.texture_features[1],
++             device->kmod.dev->props.texture_features[2],
++             device->kmod.dev->props.texture_features[3]);
++
+    if (!device->model) {
++      mesa_loge("panvk: Unknown gpu_id (%#" PRIx64 ") or variant (%#x)",
++                device->kmod.dev->props.gpu_id,
++                device->kmod.dev->props.gpu_variant);
+       result = panvk_errorf(instance, VK_ERROR_INCOMPATIBLE_DRIVER,
+                             "Unknown gpu_id (%#" PRIx64 ") or variant (%#x)",
+                             device->kmod.dev->props.gpu_id,
+@@ -1348,6 +1363,10 @@ panvk_physical_device_init_kbase(struct panvk_physical_device *device,
+    device->formats.all = pan_format_table(arch);
+    device->formats.blendable = pan_blendable_format_table(arch);
+ 
++   mesa_logi("panvk: BC emulation %s (native compressed mask %#x)",
++             panvk_bc_emul_enabled(device) ? "on" : "off",
++             pan_query_compressed_formats(&device->kmod.dev->props));
++
+    unsigned core_count =
+       pan_query_core_count(&device->kmod.dev->props);
+ 

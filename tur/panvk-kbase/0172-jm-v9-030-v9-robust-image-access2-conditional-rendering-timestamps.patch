@@ -1,0 +1,704 @@
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: 2026-10-11
+Subject: [PATCH jm-v9 030] panvk: v9 robustImageAccess2, conditional rendering and GPU timestamps biblioklept
+
+Purpose: PanProbe vkd3d_reqs, robust_image_access2 (skip),
+tess_cond_state and bc_perf failed on the G57.
+- robustImageAccess2: v9 LD_TEX returns the same wrong OOB alpha as v10;
+  the csf-v11/184 GPU alpha fix-up (bi_lower_robust_image_alpha_v10) now
+  also runs for gpu_arch 9 and the feature is exposed for PAN_ARCH >= 9.
+- VK_EXT_conditional_rendering on JM, GPU only: a 1-thread compute job
+  (panlib_v9_cond_render) before each draw/dispatch under conditional
+  rendering reads the predicate and turns that draw's jobs into NULL jobs
+  when it must be skipped. Batches of a command buffer are reset before
+  any is submitted so resubmits are safe. Meta save/restore of the
+  cond_render state is enabled for v9.
+- Timestamps: CmdWriteTimestamp2 was a stub and timestampValidBits 0. A
+  WRITE_VALUE SYSTEM_TIMESTAMP job plus an availability write; the GPU
+  counter only runs while the atom carries BASE_JD_REQ_PERMON (from
+  malisx2). CmdCopyQueryPoolResults with WAIT now closes the batch.
+deqp-vk on G57: conditional_rendering.* 352 pass, pipeline.monolithic.
+timestamp.* 236 pass, robustness2 storage_image subset 840 pass, 0 fail.
+Shared-code changes are PAN_ARCH >= 9 / gpu_arch == 9 gates only; v10+
+behaviour is unchanged.
+---
+
+diff --git a/src/panfrost/compiler/bifrost/bifrost_nir.c b/src/panfrost/compiler/bifrost/bifrost_nir.c
+index c840d88..4cab1df 100644
+--- a/src/panfrost/compiler/bifrost/bifrost_nir.c
++++ b/src/panfrost/compiler/bifrost/bifrost_nir.c
+@@ -1010,7 +1010,10 @@ bifrost_postprocess_nir(nir_shader *nir,
+                nir_metadata_none, &robust_modes);
+    }
+ 
+-   if (gpu_arch == 10 && (inputs->robust_modes & nir_var_image))
++   /* v9 (G57) LD_TEX returns the same wrong OOB alpha as v10, and its
++    * Texture descriptor and pixel format layouts are the same. */
++   if ((gpu_arch == 9 || gpu_arch == 10) &&
++       (inputs->robust_modes & nir_var_image))
+       NIR_PASS(_, nir, nir_shader_intrinsics_pass,
+                bi_lower_robust_image_alpha_v10, nir_metadata_control_flow,
+                NULL);
+diff --git a/src/panfrost/lib/kmod/kbase_kmod.h b/src/panfrost/lib/kmod/kbase_kmod.h
+index 42da782..4020bcc 100644
+--- a/src/panfrost/lib/kmod/kbase_kmod.h
++++ b/src/panfrost/lib/kmod/kbase_kmod.h
+@@ -29,6 +29,8 @@ struct base_external_resource {
+ #define BASE_JD_REQ_T                  (1u << 2)
+ #define BASE_JD_REQ_CF                 (1u << 3)
+ #define BASE_JD_REQ_V                  (1u << 4)
++/* Keeps the GPU timestamp counter running while the atom runs (JM). */
++#define BASE_JD_REQ_PERMON             (1u << 7)
+ #define BASE_JD_REQ_EXTERNAL_RESOURCES (1u << 8)
+ #define BASE_JD_REQ_ONLY_COMPUTE       (1u << 10)
+ 
+diff --git a/src/panfrost/libpan/draw_helper.cl b/src/panfrost/libpan/draw_helper.cl
+index c5699a8..ea82b45 100644
+--- a/src/panfrost/libpan/draw_helper.cl
++++ b/src/panfrost/libpan/draw_helper.cl
+@@ -1793,4 +1793,34 @@ panlib_v9_vp_partition(global const struct panlib_vp_run_header *header,
+       first += k;
+    }
+ }
++
++/* VK_EXT_conditional_rendering on v9 JM: queued before the jobs of a draw or
++ * dispatch recorded inside a conditional rendering block. *list_ptr points
++ * to { count, (job header address, recorded job type) x count }. Each job
++ * gets its recorded type back when the predicate passes, so a resubmitted
++ * command buffer is right whatever the previous run did, and a NULL type
++ * when it fails. */
++KERNEL(1)
++panlib_v9_cond_render(global uint32_t *pred, uint32_t inverted,
++                      global uint64_t *list_ptr)
++{
++   const bool run = (*pred != 0) != (inverted != 0);
++   global uint64_t *list = (global uint64_t *)*list_ptr;
++   if (!list)
++      return;
++
++   const uint64_t count = list[0];
++
++   for (uint64_t i = 0; i < count; i++) {
++      global struct mali_job_header_packed *hdr =
++         (global struct mali_job_header_packed *)list[1 + 2 * i];
++      pan_unpack(hdr, JOB_HEADER, unpacked_hdr)
++         ;
++      pan_pack(hdr, JOB_HEADER, cfg) {
++         memcpy(&cfg, &unpacked_hdr, sizeof(cfg));
++         cfg.type = run ? (enum mali_job_type)list[2 + 2 * i]
++                        : MALI_JOB_TYPE_NULL;
++      }
++   }
++}
+ #endif
+diff --git a/src/panfrost/libpan/query_pool.cl b/src/panfrost/libpan/query_pool.cl
+index f1387c1..d817c73 100644
+--- a/src/panfrost/libpan/query_pool.cl
++++ b/src/panfrost/libpan/query_pool.cl
+@@ -163,6 +163,7 @@ panlib_copy_query_result(uint64_t pool_addr, global uint32_t *available_addr,
+       case VK_QUERY_TYPE_OCCLUSION:
+ #if PAN_ARCH == 9
+       case VK_QUERY_TYPE_PRIMITIVES_GENERATED_EXT:
++      case VK_QUERY_TYPE_TIMESTAMP:
+ #endif
+          write_occlusion_query_result(dst, 0, flags, report_addr, report_count);
+          break;
+diff --git a/src/panfrost/vulkan/jm/panvk_cmd_buffer.h b/src/panfrost/vulkan/jm/panvk_cmd_buffer.h
+index df33360..9ccd4ca 100644
+--- a/src/panfrost/vulkan/jm/panvk_cmd_buffer.h
++++ b/src/panfrost/vulkan/jm/panvk_cmd_buffer.h
+@@ -37,6 +37,8 @@ struct panvk_batch {
+ #if PAN_ARCH == 9
+    /* MALLOC_VERTEX jobs, the GPU writes their vertex array pointer. */
+    struct util_dynarray malloc_vertex_jobs;
++   /* The vertex/tiler chain writes SYSTEM_TIMESTAMP values. */
++   bool timestamps;
+ #endif
+    struct util_dynarray event_ops;
+    struct pan_jc vtc_jc;
+@@ -95,9 +97,29 @@ struct panvk_cmd_buffer {
+       struct panvk_cmd_graphics_state gfx;
+       struct panvk_cmd_compute_state compute;
+       struct panvk_push_constant_state push_constants;
++#if PAN_ARCH == 9
++      struct {
++         bool enabled;
++         /* Saved by meta, secondaries replay into the primary on JM. */
++         bool inherited;
++         bool inverted;
++         uint64_t addr;
++      } cond_render;
++#endif
+    } state;
+ };
+ 
++#if PAN_ARCH == 9
++/* A draw or dispatch recorded while conditional rendering is active: the
++ * predicate job queued before its jobs (see cmd_cond_render_begin). */
++struct panvk_cond_render_mark {
++   struct panvk_batch *batch;
++   struct mali_job_header_packed *job;
++   uint64_t *list;
++   unsigned index;
++};
++#endif
++
+ VK_DEFINE_HANDLE_CASTS(panvk_cmd_buffer, vk.base, VkCommandBuffer,
+                        VK_OBJECT_TYPE_COMMAND_BUFFER)
+ 
+@@ -143,6 +165,13 @@ struct panvk_batch *
+ 
+ void panvk_per_arch(cmd_close_batch)(struct panvk_cmd_buffer *cmdbuf);
+ 
++#if PAN_ARCH == 9
++void panvk_per_arch(cmd_cond_render_begin)(struct panvk_cmd_buffer *cmdbuf,
++                                           struct panvk_cond_render_mark *m);
++void panvk_per_arch(cmd_cond_render_end)(struct panvk_cmd_buffer *cmdbuf,
++                                         struct panvk_cond_render_mark *m);
++#endif
++
+ VkResult panvk_per_arch(cmd_alloc_fb_desc)(struct panvk_cmd_buffer *cmdbuf);
+ 
+ VkResult panvk_per_arch(cmd_alloc_tls_desc)(struct panvk_cmd_buffer *cmdbuf,
+diff --git a/src/panfrost/vulkan/jm/panvk_vX_cmd_dispatch.c b/src/panfrost/vulkan/jm/panvk_vX_cmd_dispatch.c
+index 038634e..7fb5a6a 100644
+--- a/src/panfrost/vulkan/jm/panvk_vX_cmd_dispatch.c
++++ b/src/panfrost/vulkan/jm/panvk_vX_cmd_dispatch.c
+@@ -356,7 +356,14 @@ panvk_per_arch(CmdDispatchBase)(VkCommandBuffer commandBuffer,
+       .wg_base = {baseGroupX, baseGroupY, baseGroupZ},
+       .direct.wg_count = {groupCountX, groupCountY, groupCountZ},
+    };
++#if PAN_ARCH == 9
++   struct panvk_cond_render_mark cond;
++   panvk_per_arch(cmd_cond_render_begin)(cmdbuf, &cond);
++#endif
+    cmd_dispatch(cmdbuf, &info);
++#if PAN_ARCH == 9
++   panvk_per_arch(cmd_cond_render_end)(cmdbuf, &cond);
++#endif
+ }
+ 
+ VKAPI_ATTR void VKAPI_CALL
+@@ -369,5 +376,12 @@ panvk_per_arch(CmdDispatchIndirect)(VkCommandBuffer commandBuffer,
+    struct panvk_dispatch_info info = {
+       .indirect.buffer_dev_addr = buffer_gpu,
+    };
++#if PAN_ARCH == 9
++   struct panvk_cond_render_mark cond;
++   panvk_per_arch(cmd_cond_render_begin)(cmdbuf, &cond);
++#endif
+    cmd_dispatch(cmdbuf, &info);
++#if PAN_ARCH == 9
++   panvk_per_arch(cmd_cond_render_end)(cmdbuf, &cond);
++#endif
+ }
+diff --git a/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c
+index c5605c5..a826db4 100644
+--- a/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c
+@@ -4297,9 +4297,166 @@ v9_attachmentless_samples(struct panvk_cmd_buffer *cmdbuf)
+    render->fb.layout.sample_count = 0;
+ }
+ 
++/* VK_EXT_conditional_rendering on JM. A job chain has no predication, so a
++ * draw or dispatch recorded in a conditional rendering block is preceded by
++ * a panlib_v9_cond_render job that reads the predicate and gives each job of
++ * the draw its recorded type (passes) or NULL (fails). The jobs are only
++ * known after the draw is recorded: cmd_cond_render_end() walks the
++ * vertex/tiler chains from the predicate job, makes the jobs of its batch
++ * depend on it (the predicate job also suppresses prefetch, as the indirect
++ * patch jobs do), and hands it the list. Jobs in batches the draw opened run
++ * in later atoms. Pipeline state is emitted per draw on JM, so a skipped
++ * draw consumes nothing later draws need. */
++void
++panvk_per_arch(cmd_cond_render_begin)(struct panvk_cmd_buffer *cmdbuf,
++                                      struct panvk_cond_render_mark *m)
++{
++   *m = (struct panvk_cond_render_mark){0};
++   if (!cmdbuf->state.cond_render.enabled)
++      return;
++
++   struct pan_ptr list_ptr =
++      panvk_cmd_alloc_dev_mem(cmdbuf, desc, sizeof(uint64_t), 8);
++   if (!list_ptr.gpu)
++      return;
++   *(uint64_t *)list_ptr.cpu = 0;
++
++   if (cmdbuf->cur_batch &&
++       cmdbuf->cur_batch->vtc_jc.job_index + 2 >= UINT16_MAX) {
++      panvk_per_arch(cmd_close_batch)(cmdbuf);
++      panvk_per_arch(cmd_open_batch)(cmdbuf);
++   }
++
++   struct panvk_precomp_ctx ctx = panvk_per_arch(precomp_cs)(cmdbuf);
++   panlib_v9_cond_render(&ctx, panlib_1d(1),
++                         PANLIB_BARRIER_JM_SUPPRESS_PREFETCH,
++                         cmdbuf->state.cond_render.addr,
++                         cmdbuf->state.cond_render.inverted, list_ptr.gpu);
++
++   m->batch = cmdbuf->cur_batch;
++   m->job = m->batch->vtc_jc.prev_job;
++   m->index = m->batch->vtc_jc.job_index;
++   m->list = list_ptr.cpu;
++}
++
++/* Job descriptors all come from desc_pool. */
++static struct mali_job_header_packed *
++v9_job_cpu(struct panvk_cmd_buffer *cmdbuf, uint64_t gpu)
++{
++   struct list_head *lists[] = {&cmdbuf->desc_pool.bos,
++                                &cmdbuf->desc_pool.big_bos};
++
++   for (unsigned l = 0; l < ARRAY_SIZE(lists); l++) {
++      list_for_each_entry(struct panvk_priv_bo, bo, lists[l], node) {
++         if (gpu >= bo->addr.dev &&
++             gpu < bo->addr.dev + pan_kmod_bo_size(bo->bo))
++            return (void *)((uint8_t *)bo->addr.host + (gpu - bo->addr.dev));
++      }
++   }
++
++   return NULL;
++}
++
++/* Appends (address, type) of the chain jobs from next on. pred_index != 0:
++ * same chain as the predicate job, add a dependency on it. */
++static void
++v9_cond_render_collect(struct panvk_cmd_buffer *cmdbuf,
++                       struct util_dynarray *jobs, uint64_t next,
++                       unsigned pred_index)
++{
++   while (next) {
++      struct mali_job_header_packed *hdr = v9_job_cpu(cmdbuf, next);
++      assert(hdr);
++      if (!hdr)
++         return;
++
++      pan_unpack(hdr, JOB_HEADER, h);
++      util_dynarray_append(jobs, next);
++      util_dynarray_append(jobs, (uint64_t)h.type);
++
++      if (pred_index) {
++         if (!h.dependency_1)
++            h.dependency_1 = pred_index;
++         else if (!h.dependency_2)
++            h.dependency_2 = pred_index;
++         else if (h.dependency_1 < pred_index && h.dependency_2 < pred_index)
++            h.barrier = true;
++
++         pan_pack(hdr, JOB_HEADER, cfg) {
++            cfg = h;
++         }
++      }
++
++      next = h.next;
++   }
++}
++
++void
++panvk_per_arch(cmd_cond_render_end)(struct panvk_cmd_buffer *cmdbuf,
++                                    struct panvk_cond_render_mark *m)
++{
++   if (!m->batch)
++      return;
++
++   struct util_dynarray jobs = UTIL_DYNARRAY_INIT;
++   pan_unpack(m->job, JOB_HEADER, pred);
++   v9_cond_render_collect(cmdbuf, &jobs, pred.next, m->index);
++
++   /* The draw closed the predicate job's batch: add the batches after it. */
++   if (m->batch != cmdbuf->cur_batch) {
++      for (struct list_head *n = m->batch->node.next; n != &cmdbuf->batches;
++           n = n->next) {
++         struct panvk_batch *b = list_entry(n, struct panvk_batch, node);
++         v9_cond_render_collect(cmdbuf, &jobs, b->vtc_jc.first_job, 0);
++      }
++      if (cmdbuf->cur_batch)
++         v9_cond_render_collect(cmdbuf, &jobs,
++                                cmdbuf->cur_batch->vtc_jc.first_job, 0);
++   }
++
++   const uint32_t n = util_dynarray_num_elements(&jobs, uint64_t);
++   struct pan_ptr list =
++      panvk_cmd_alloc_dev_mem(cmdbuf, desc, (1 + n) * sizeof(uint64_t), 8);
++   if (list.gpu) {
++      uint64_t *l = list.cpu;
++      l[0] = n / 2;
++      if (n)
++         memcpy(&l[1], jobs.data, n * sizeof(uint64_t));
++      *m->list = list.gpu;
++   }
++
++   util_dynarray_fini(&jobs);
++}
++
++VKAPI_ATTR void VKAPI_CALL
++panvk_per_arch(CmdBeginConditionalRendering2EXT)(
++   VkCommandBuffer commandBuffer,
++   const VkConditionalRenderingBeginInfo2EXT *pConditionalRenderingBegin)
++{
++   VK_FROM_HANDLE(panvk_cmd_buffer, cmdbuf, commandBuffer);
++
++   cmdbuf->state.cond_render.enabled = true;
++   cmdbuf->state.cond_render.addr =
++      pConditionalRenderingBegin->addressRange.address;
++   cmdbuf->state.cond_render.inverted =
++      pConditionalRenderingBegin->flags &
++      VK_CONDITIONAL_RENDERING_INVERTED_BIT_EXT;
++}
++
++VKAPI_ATTR void VKAPI_CALL
++panvk_per_arch(CmdEndConditionalRenderingEXT)(VkCommandBuffer commandBuffer)
++{
++   VK_FROM_HANDLE(panvk_cmd_buffer, cmdbuf, commandBuffer);
++
++   cmdbuf->state.cond_render.enabled = false;
++}
++
+ static void
+ v9_cmd_draw(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info *info)
+ {
++   struct panvk_cond_render_mark cond;
++   panvk_per_arch(cmd_cond_render_begin)(cmdbuf, &cond);
++
+    v9_attachmentless_samples(cmdbuf);
+ 
+    uint32_t view_mask = cmdbuf->state.gfx.render.view_mask;
+@@ -4339,6 +4496,8 @@ v9_cmd_draw(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info *info)
+ 
+    cmdbuf->state.gfx.pstats_query = pstats;
+    cmdbuf->state.gfx.prims_generated_query.ptr = prims_generated;
++
++   panvk_per_arch(cmd_cond_render_end)(cmdbuf, &cond);
+ }
+ 
+ VKAPI_ATTR void VKAPI_CALL
+@@ -4665,5 +4824,9 @@ panvk_per_arch(CmdEndRendering)(VkCommandBuffer commandBuffer)
+       panvk_per_arch(cmd_close_batch)(cmdbuf);
+       cmdbuf->cur_batch = NULL;
+       panvk_per_arch(cmd_meta_resolve_attachments)(cmdbuf);
++#if PAN_ARCH == 9
++      /* Outside the pass, timestamp and occlusion queries take one slot. */
++      cmdbuf->state.gfx.render.view_mask = 0;
++#endif
+    }
+ }
+diff --git a/src/panfrost/vulkan/jm/panvk_vX_cmd_query.c b/src/panfrost/vulkan/jm/panvk_vX_cmd_query.c
+index 76714f0..0abd9ad 100644
+--- a/src/panfrost/vulkan/jm/panvk_vX_cmd_query.c
++++ b/src/panfrost/vulkan/jm/panvk_vX_cmd_query.c
+@@ -124,7 +124,39 @@ panvk_per_arch(CmdWriteTimestamp2)(VkCommandBuffer commandBuffer,
+    UNUSED VK_FROM_HANDLE(panvk_cmd_buffer, cmd, commandBuffer);
+    UNUSED VK_FROM_HANDLE(panvk_query_pool, pool, queryPool);
+ 
++#if PAN_ARCH == 9
++   /* Barrier write jobs: after every earlier job of the chain, the GPU
++    * system timestamp (as gallium JM), then the availability. With
++    * multiview, every view's query gets the timestamp (view_mask is reset at
++    * the end of the render pass on v9). */
++   const uint32_t view_mask = cmd->state.gfx.render.view_mask;
++   const uint32_t count = MIN2(view_mask ? util_bitcount(view_mask) : 1,
++                               pool->vk.query_count - query);
++
++   /* The fragment job of a render pass batch is a later atom than its
++    * vertex/tiler chain, so split the batch: the timestamp then follows all
++    * work recorded before it, whatever the stage. Also split before the
++    * 16-bit job index runs out. */
++   if (cmd->cur_batch &&
++       (cmd->cur_batch->fb.desc.gpu ||
++        cmd->cur_batch->vtc_jc.job_index + 2 * count >= UINT16_MAX)) {
++      panvk_per_arch(cmd_close_batch)(cmd);
++      panvk_per_arch(cmd_open_batch)(cmd);
++   }
++
++   bool had_batch;
++   struct panvk_batch *batch = open_batch(cmd, &had_batch);
++   batch->timestamps = true;
++   for (uint32_t q = query; q < query + count; q++) {
++      panvk_emit_write_job(cmd, batch, MALI_WRITE_VALUE_TYPE_SYSTEM_TIMESTAMP,
++                           panvk_query_report_dev_addr(pool, q), 0);
++      panvk_emit_write_job(cmd, batch, MALI_WRITE_VALUE_TYPE_IMMEDIATE_32,
++                           panvk_query_available_dev_addr(pool, q), 1);
++   }
++   close_batch(cmd, had_batch);
++#else
+    panvk_stub();
++#endif
+ }
+ 
+ #if PAN_ARCH == 9
+@@ -359,7 +391,13 @@ panvk_per_arch(CmdCopyQueryPoolResults)(
+ 
+    /* XXX: Do we really need that barrier when EndQuery already handle it? */
+    if ((flags & VK_QUERY_RESULT_WAIT_BIT) && cmd->cur_batch != NULL) {
++#if PAN_ARCH == 9
++      /* close_batch(cmd, true) is a no-op: really end the batch, so the copy
++       * runs after the query writes (e.g. timestamps) recorded in it. */
++      panvk_per_arch(cmd_close_batch)(cmd);
++#else
+       close_batch(cmd, true);
++#endif
+    }
+ 
+    uint64_t dst_addr = panvk_buffer_gpu_ptr(dst_buffer, dstOffset);
+diff --git a/src/panfrost/vulkan/jm/panvk_vX_gpu_queue.c b/src/panfrost/vulkan/jm/panvk_vX_gpu_queue.c
+index 0900a0c..e207ff2 100644
+--- a/src/panfrost/vulkan/jm/panvk_vX_gpu_queue.c
++++ b/src/panfrost/vulkan/jm/panvk_vX_gpu_queue.c
+@@ -99,20 +99,24 @@ note_submitted(struct panvk_gpu_queue *queue, uint64_t atom)
+ #endif
+ }
+ 
+-static uint64_t
+-panvk_queue_submit_batch(struct panvk_gpu_queue *queue,
+-                         struct panvk_cmd_buffer *cmdbuf,
+-                         struct panvk_batch *batch, struct pan_kmod_bo **bos,
+-                         unsigned nr_bos, uint64_t *out_frag_atom)
++/* A timestamp must follow the fragment work of the previous batches, so such
++ * a batch never takes the PANVK_OVERLAP path. */
++static inline bool
++batch_has_timestamps(const struct panvk_batch *batch)
+ {
+-   struct panvk_device *dev = to_panvk_device(queue->vk.base.device);
+-   struct panvk_physical_device *phys_dev =
+-      to_panvk_physical_device(dev->vk.physical);
+-   uint64_t vtc_atom = 0, frag_atom = 0;
+-   (void)0;
++#if PAN_ARCH == 9
++   return batch->timestamps;
++#else
++   return false;
++#endif
++}
+ 
+-   /* Reset the batch if it's already been issued */
+-   if (batch->issued) {
++/* Reset a batch that has already been issued. */
++static void
++panvk_reset_issued_batch(struct panvk_cmd_buffer *cmdbuf,
++                         struct panvk_batch *batch)
++{
++   {
+       util_dynarray_foreach(&batch->jobs, void *, job)
+          memset((*job), 0, 4 * 4);
+ 
+@@ -147,13 +151,37 @@ panvk_queue_submit_batch(struct panvk_gpu_queue *queue,
+       panvk_pool_flush_maps(&cmdbuf->desc_pool);
+    }
+ 
++   batch->issued = false;
++}
++
++static uint64_t
++panvk_queue_submit_batch(struct panvk_gpu_queue *queue,
++                         struct panvk_cmd_buffer *cmdbuf,
++                         struct panvk_batch *batch, struct pan_kmod_bo **bos,
++                         unsigned nr_bos, uint64_t *out_frag_atom)
++{
++   struct panvk_device *dev = to_panvk_device(queue->vk.base.device);
++   struct panvk_physical_device *phys_dev =
++      to_panvk_physical_device(dev->vk.physical);
++   uint64_t vtc_atom = 0, frag_atom = 0;
++   (void)0;
++
++   /* Reset the batch if it's already been issued */
++   if (batch->issued)
++      panvk_reset_issued_batch(cmdbuf, batch);
++
+    /* Flush pending synchronization requests before submitting the job, to
+     * make sure things are GPU-visible. */
+    pan_kmod_flush_bo_map_syncs(dev->kmod.dev);
+ 
+    if (batch->vtc_jc.first_job) {
++      uint32_t vtc_core_req = (BASE_JD_REQ_CS | BASE_JD_REQ_T | BASE_JD_REQ_V);
++#if PAN_ARCH == 9
++      /* Without PERMON kbase leaves the GPU timestamp counter stopped. */
++      if (batch->timestamps)
++         vtc_core_req |= BASE_JD_REQ_PERMON;
++#endif
+          if (unlikely(!queue->warmed_up)) {
+-         uint32_t vtc_core_req = (BASE_JD_REQ_CS | BASE_JD_REQ_T | BASE_JD_REQ_V);
+             /* The first vertex/tiler/compute chain must be submitted too
+              * (it can be a buffer upload the app relies on). Submit it
+              * synchronously, the same way the first fragment job is. */
+@@ -166,9 +194,9 @@ panvk_queue_submit_batch(struct panvk_gpu_queue *queue,
+             vtc_atom = 0; /* already waited for */
+             queue->warmed_up = true;
+          } else {
+-         uint32_t vtc_core_req = (BASE_JD_REQ_CS | BASE_JD_REQ_T | BASE_JD_REQ_V);
+             const bool v67_ov = panvk_overlap_enabled() && batch->frag_jc.first_job &&
+-                                !queue->in_dep && queue->frag_warmed_up; /* v67b */
++                                !queue->in_dep && queue->frag_warmed_up && /* v67b */
++                                !batch_has_timestamps(batch);
+             const uint64_t dep0 =
+                 v67_ov ? queue->half_frag_atom[batch->heap_half & 1] : /* v67b */
+                 (queue->last_any_atom ? queue->last_any_atom : queue->last_frag_atom);
+@@ -425,6 +453,17 @@ panvk_per_arch(gpu_queue_submit)(struct vk_queue *vk_queue, struct vk_queue_subm
+       struct panvk_cmd_buffer *cmdbuf =
+          container_of(submit->command_buffers[j], struct panvk_cmd_buffer, vk);
+ 
++#if PAN_ARCH == 9
++      /* A conditional rendering predicate job rewrites job headers of the
++       * later batches of its draw (cmd_cond_render_end()). Reset (CPU write
++       * plus cache flush) every batch before any of them runs, so that no
++       * flush lands after a predicate job wrote a header. */
++      list_for_each_entry(struct panvk_batch, batch, &cmdbuf->batches, node) {
++         if (batch->issued)
++            panvk_reset_issued_batch(cmdbuf, batch);
++      }
++#endif
++
+       list_for_each_entry(struct panvk_batch, batch, &cmdbuf->batches, node) {
+          /* FIXME: should be done at the batch level */
+          unsigned nr_bos = panvk_pool_num_bos(&cmdbuf->desc_pool) +
+diff --git a/src/panfrost/vulkan/panvk_physical_device.c b/src/panfrost/vulkan/panvk_physical_device.c
+index 5cee274..6369027 100644
+--- a/src/panfrost/vulkan/panvk_physical_device.c
++++ b/src/panfrost/vulkan/panvk_physical_device.c
+@@ -1567,7 +1567,7 @@ panvk_GetPhysicalDeviceQueueFamilyProperties2(
+             some CTS tests */
+          .queueCount = arch >= 10 ? 2 : 1,
+          .timestampValidBits =
+-            arch >= 10 &&
++            arch >= 9 &&
+                   physical_device->kmod.dev->props.gpu_can_query_timestamp
+                ? 64
+                : 0,
+diff --git a/src/panfrost/vulkan/panvk_vX_cmd_meta.c b/src/panfrost/vulkan/panvk_vX_cmd_meta.c
+index 7b7d3cf..bb299e0 100644
+--- a/src/panfrost/vulkan/panvk_vX_cmd_meta.c
++++ b/src/panfrost/vulkan/panvk_vX_cmd_meta.c
+@@ -105,7 +105,7 @@ meta_compute_start(struct panvk_cmd_buffer *cmdbuf,
+    save_ctx->push_constants = cmdbuf->state.push_constants;
+    save_ctx->cs.shader = cmdbuf->state.compute.shader;
+    save_ctx->cs.desc = cmdbuf->state.compute.cs.desc;
+-#if PAN_ARCH >= 10
++#if PAN_ARCH >= 9
+    save_ctx->cond_render_enabled = cmdbuf->state.cond_render.enabled;
+    save_ctx->cond_render_inherited = cmdbuf->state.cond_render.inherited;
+    cmdbuf->state.cond_render.enabled = false;
+@@ -150,7 +150,7 @@ meta_compute_end(struct panvk_cmd_buffer *cmdbuf,
+ 
+    cmdbuf->state.compute.shader = save_ctx->cs.shader;
+    cmdbuf->state.compute.cs.desc = save_ctx->cs.desc;
+-#if PAN_ARCH >= 10
++#if PAN_ARCH >= 9
+    cmdbuf->state.cond_render.enabled = save_ctx->cond_render_enabled;
+    cmdbuf->state.cond_render.inherited = save_ctx->cond_render_inherited;
+ #endif
+@@ -203,7 +203,7 @@ meta_gfx_start(struct panvk_cmd_buffer *cmdbuf,
+    gfx_state_set_dirty(cmdbuf, OQ);
+ 
+    cmdbuf->state.gfx.vk_meta = true;
+-#if PAN_ARCH >= 10
++#if PAN_ARCH >= 9
+    save_ctx->cond_render_enabled = cmdbuf->state.cond_render.enabled;
+    save_ctx->cond_render_inherited = cmdbuf->state.cond_render.inherited;
+    cmdbuf->state.cond_render.enabled = false;
+@@ -290,7 +290,7 @@ meta_gfx_end(struct panvk_cmd_buffer *cmdbuf,
+    gfx_state_set_dirty(cmdbuf, RENDER_STATE);
+ 
+    cmdbuf->state.gfx.vk_meta = false;
+-#if PAN_ARCH >= 10
++#if PAN_ARCH >= 9
+    cmdbuf->state.cond_render.enabled = save_ctx->cond_render_enabled;
+    cmdbuf->state.cond_render.inherited = save_ctx->cond_render_inherited;
+ #endif
+@@ -353,7 +353,7 @@ panvk_per_arch(CmdClearAttachments)(VkCommandBuffer commandBuffer,
+    }
+ 
+    meta_gfx_start(cmdbuf, &save);
+-#if PAN_ARCH >= 10
++#if PAN_ARCH >= 9
+    /* CmdClearAttachments IS affected by conditional rendering, so restore
+     * the state that meta_gfx_start disabled.
+     */
+diff --git a/src/panfrost/vulkan/panvk_vX_physical_device.c b/src/panfrost/vulkan/panvk_vX_physical_device.c
+index e26b03c..2e0e5c5 100644
+--- a/src/panfrost/vulkan/panvk_vX_physical_device.c
++++ b/src/panfrost/vulkan/panvk_vX_physical_device.c
+@@ -148,7 +148,7 @@ panvk_per_arch(get_physical_device_extensions)(
+       .EXT_buffer_device_address = true,
+       .EXT_calibrated_timestamps =
+          device->kmod.dev->props.gpu_can_query_timestamp,
+-      .EXT_conditional_rendering = PAN_ARCH >= 10,
++      .EXT_conditional_rendering = PAN_ARCH >= 9,
+       .EXT_color_write_enable = true,
+       .EXT_conservative_rasterization = PAN_ARCH >= 11,
+       .EXT_custom_border_color = true,
+@@ -594,8 +594,8 @@ panvk_per_arch(get_physical_device_features)(
+       .indirectMemoryCopy = PAN_ARCH >= 10,
+ 
+       /* VK_EXT_conditional_rendering */
+-      .conditionalRendering = PAN_ARCH >= 10,
+-      .inheritedConditionalRendering = PAN_ARCH >= 10,
++      .conditionalRendering = PAN_ARCH >= 9,
++      .inheritedConditionalRendering = PAN_ARCH >= 9,
+ 
+       /* VK_EXT_custom_border_color */
+       .customBorderColors = true,
+@@ -649,9 +649,11 @@ panvk_per_arch(get_physical_device_features)(
+ 
+       /* VK_KHR_robustness2 */
+       /* v9/v10 texel buffers get software bounds checks
+-       * (bi_lower_robust_texel_buf), the rest is the same Valhall path. */
++       * (bi_lower_robust_texel_buf) and OOB storage image loads a GPU alpha
++       * fix-up (bi_lower_robust_image_alpha_v10), the rest is the same
++       * Valhall path. */
+       .robustBufferAccess2 = PAN_ARCH >= 9,
+-      .robustImageAccess2 = PAN_ARCH >= 10,
++      .robustImageAccess2 = PAN_ARCH >= 9,
+       .nullDescriptor = PAN_ARCH >= 9,
+ 
+       /* VK_EXT_shader_tile_image */
+@@ -1029,9 +1031,9 @@ panvk_per_arch(get_physical_device_properties)(
+       .storageImageSampleCounts = VK_SAMPLE_COUNT_1_BIT,
+       .maxSampleMaskWords = 1,
+       .timestampComputeAndGraphics =
+-         PAN_ARCH >= 10 && device->kmod.dev->props.gpu_can_query_timestamp,
++         PAN_ARCH >= 9 && device->kmod.dev->props.gpu_can_query_timestamp,
+       .timestampPeriod =
+-         PAN_ARCH >= 10 ? panvk_get_gpu_system_timestamp_period(device) : 0,
++         PAN_ARCH >= 9 ? panvk_get_gpu_system_timestamp_period(device) : 0,
+       .maxClipDistances = PAN_ARCH >= 9 ? 8 : 0,
+       .maxCullDistances = PAN_ARCH >= 9 ? 8 : 0,
+       .maxCombinedClipAndCullDistances = PAN_ARCH >= 9 ? 8 : 0,
+diff --git a/src/panfrost/vulkan/panvk_vX_query_pool.c b/src/panfrost/vulkan/panvk_vX_query_pool.c
+index f2be393..343d3a6 100644
+--- a/src/panfrost/vulkan/panvk_vX_query_pool.c
++++ b/src/panfrost/vulkan/panvk_vX_query_pool.c
+@@ -67,6 +67,12 @@ panvk_per_arch(CreateQueryPool)(VkDevice _device,
+       reports_per_query = PANVK_SUBQUEUE_COUNT + 1;
+       break;
+    }
++#elif PAN_ARCH == 9
++   case VK_QUERY_TYPE_TIMESTAMP: {
++      /* One WRITE_VALUE SYSTEM_TIMESTAMP report. */
++      reports_per_query = 1;
++      break;
++   }
+ #endif
+ #if PAN_ARCH >= 9
+    case VK_QUERY_TYPE_PRIMITIVES_GENERATED_EXT: {
+@@ -316,6 +322,9 @@ panvk_per_arch(GetQueryPoolResults)(VkDevice _device, VkQueryPool queryPool,
+             break;
+          }
+ #endif
++#if PAN_ARCH == 9
++         case VK_QUERY_TYPE_TIMESTAMP:
++#endif
+ #if PAN_ARCH >= 9
+          case VK_QUERY_TYPE_PRIMITIVES_GENERATED_EXT: {
+             if (write_results)
+diff --git a/src/panfrost/vulkan/panvk_vX_shader.c b/src/panfrost/vulkan/panvk_vX_shader.c
+index 53778f6..6c65ebe 100644
+--- a/src/panfrost/vulkan/panvk_vX_shader.c
++++ b/src/panfrost/vulkan/panvk_vX_shader.c
+@@ -3425,7 +3425,7 @@ panvk_compile_shader(struct panvk_device *dev,
+       robust_modes |= nir_var_mem_ubo;
+    if (info->robustness->storage_buffers != VK_PIPELINE_ROBUSTNESS_BUFFER_BEHAVIOR_DISABLED_EXT)
+       robust_modes |= nir_var_mem_ssbo;
+-   /* v10 image loads need a shader fix-up for robustImageAccess2. */
++   /* v9/v10 image loads need a shader fix-up for robustImageAccess2. */
+    if (info->robustness->images ==
+        VK_PIPELINE_ROBUSTNESS_IMAGE_BEHAVIOR_ROBUST_IMAGE_ACCESS_2_EXT)
+       robust_modes |= nir_var_image;

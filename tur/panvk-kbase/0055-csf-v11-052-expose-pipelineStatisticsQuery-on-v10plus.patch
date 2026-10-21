@@ -1,0 +1,25 @@
+From: abhay-byte <zenithblue.dev@gmail.com>
+Subject: [PATCH csf-v11 052] panvk: expose pipelineStatisticsQuery on v10+
+Generated-by: LLM
+
+Purpose: Advertise the implemented query feature; biblioklept
+Source/Reference: local fix, work/mesa ba6e2fbcdcb
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/051
+Validation test: pipeline statistics smoke 12/12; integrated build NINJA_RC=0
+
+diff --git a/src/panfrost/vulkan/panvk_vX_physical_device.c b/src/panfrost/vulkan/panvk_vX_physical_device.c
+index 499e13d4413..f51d215217d 100644
+--- a/src/panfrost/vulkan/panvk_vX_physical_device.c
++++ b/src/panfrost/vulkan/panvk_vX_physical_device.c
+@@ -329,7 +329,7 @@ panvk_per_arch(get_physical_device_features)(
+       .textureCompressionBC = has_texture_compression_bc(device) ||
+                               panvk_bc_emul_enabled(device),
+       .occlusionQueryPrecise = true,
+-      .pipelineStatisticsQuery = false,
++      .pipelineStatisticsQuery = PAN_ARCH >= 10,
+       /* On v13+, the hardware isn't speculatively referencing to invalid
+          indices anymore. */
+       .vertexPipelineStoresAndAtomics =

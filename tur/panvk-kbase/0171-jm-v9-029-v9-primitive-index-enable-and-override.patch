@@ -1,0 +1,34 @@
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: 2026-10-11
+Subject: [PATCH jm-v9 029] panvk: v9 enable and override the primitive index when shaders use it biblioklept
+
+Purpose: PanProbe vs_viewport_index E/F/G failed on the G57.
+Root cause (002, exposed by 012/014/015): the v9 MALLOC_VERTEX primitive
+descriptor never set primitive_index_enable/override. The FS read an
+unenabled primitive index, and with the TES viewport passthrough writing
+PRIMITIVE_ID the G57 dropped every primitive whose ID was not 0.
+Fix: enable when the FS reads or the raster shader writes the ID, override
+when the raster shader writes it (CSF rule, Noysz 0067). v9 only.
+---
+
+diff --git a/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c
+index c5605c5..c9e910e 100644
+--- a/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c
+@@ -2370,6 +2370,16 @@ v9_emit_malloc_vertex_job(struct panvk_cmd_buffer *cmdbuf,
+          cfg.index_type = MALI_INDEX_TYPE_NONE;
+       cfg.primitive_restart = info->index.restart_enable;
+       cfg.secondary_shader = secondary_shader;
++      /* gl_PrimitiveID (Noysz 0067, CSF): the HW primitive index for the
++       * FS, overridden by the value the raster VS writes (GS, TES or
++       * viewport passthrough). A written ID needs the override even when
++       * the FS does not read it: without it the G57 drops every primitive
++       * whose ID is not 0 (TES viewport-select draws of 2+ patches). */
++      const bool writes_prim_id =
++         (vs->info.outputs_written & VARYING_BIT_PRIMITIVE_ID) != 0;
++      cfg.primitive_index_enable =
++         writes_prim_id || (fs && fs->info.fs.reads_primitive_id);
++      cfg.primitive_index_override = writes_prim_id;
+    }
+    pan_section_pack(job.cpu, MALLOC_VERTEX_JOB, INSTANCE_COUNT, cfg) {
+       cfg.count = info->instance.count;

@@ -1,0 +1,61 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: Tue, 6 Oct 2026 18:00:00 +0530
+Subject: [PATCH] panvk: enable vertexPipelineStoresAndAtomics on v13 and v14
+ by default biblioklept
+
+v10-v12 expose vertexPipelineStoresAndAtomics since 078 (memory-writing
+pre-rasterization stages run through gpu_prerast). v13+ kept the
+upstream drirc opt-in, so DXVK capped v13/v14 at FL11_0. On v13+ the
+hardware no longer speculatively references invalid indices and the
+compiler already lowers IDVS VS atomics (bifrost_nir_lower_vs_atomics),
+so the upstream IDVS path is used there (078 only reroutes v10-v12).
+
+Make pan_enable_vertex_pipeline_stores_atomics default true for v10-v14;
+pan_enable_vertex_pipeline_stores_atomics=false (drirc or environment)
+turns it off on every arch. v9 JM stays off.
+
+Generated-by: LLM
+Purpose: DXVK FL11_1 on v10-v14
+Tested GPU: none (v13/v14 not hardware-tested; v10-v12 path unchanged)
+Dependencies: csf-v11/078
+---
+diff --git a/src/panfrost/vulkan/panvk_drirc_gen.py b/src/panfrost/vulkan/panvk_drirc_gen.py
+index 3f91aa5..abd061d 100644
+--- a/src/panfrost/vulkan/panvk_drirc_gen.py
++++ b/src/panfrost/vulkan/panvk_drirc_gen.py
+@@ -28,9 +28,10 @@ def declare_options():
+             "Bitmask of shader cores that may be used for fragment jobs. "
+             "If unset, defaults to scheduling across all available cores.",
+             c_name="fragment_core_mask"),
+-        B("pan_enable_vertex_pipeline_stores_atomics", False,
+-          "Enable vertexPipelineStoresAndAtomics on v13+ (This cannot work on older "
+-          "generation because of speculative behaviors around vertices)",
++        B("pan_enable_vertex_pipeline_stores_atomics", True,
++          "Enable vertexPipelineStoresAndAtomics on v10+ (v10-v12 run memory-writing "
++          "pre-rasterization stages through gpu_prerast, v13+ through IDVS; "
++          "set false to disable)",
+           c_name="enable_vertex_pipeline_stores_atomics"),
+         B("pan_force_enable_shader_atomics", False,
+           "Enable fragmentStoresAndAtomics and vertexPipelineStoresAndAtomics on any "
+diff --git a/src/panfrost/vulkan/panvk_vX_physical_device.c b/src/panfrost/vulkan/panvk_vX_physical_device.c
+index d4f2b7f..83d4f67 100644
+--- a/src/panfrost/vulkan/panvk_vX_physical_device.c
++++ b/src/panfrost/vulkan/panvk_vX_physical_device.c
+@@ -341,10 +341,11 @@ panvk_per_arch(get_physical_device_features)(
+       .pipelineStatisticsQuery = PAN_ARCH >= 10,
+       /* On v13+, the hardware isn't speculatively referencing to invalid
+          indices anymore. On v10-v12, pre-rasterization stages that write
+-         memory run through gpu_prerast compute instead of IDVS. */
++         memory run through gpu_prerast compute instead of IDVS. On by default
++         on v10+ (DXVK FL11_1); pan_enable_vertex_pipeline_stores_atomics=false
++         turns it off. */
+       .vertexPipelineStoresAndAtomics =
+-         (PAN_ARCH >= 10 && PAN_ARCH < 13) ||
+-         (PAN_ARCH >= 13 && instance->drirc.misc.enable_vertex_pipeline_stores_atomics) ||
++         (PAN_ARCH >= 10 && instance->drirc.misc.enable_vertex_pipeline_stores_atomics) ||
+          instance->drirc.misc.force_enable_shader_atomics,
+       .fragmentStoresAndAtomics = true,
+       .shaderTessellationAndGeometryPointSize = PAN_ARCH >= 10,
+-- 
+2.45.0

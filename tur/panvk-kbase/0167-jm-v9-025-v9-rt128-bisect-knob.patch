@@ -1,0 +1,93 @@
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: 2026-10-11
+Subject: [PATCH jm-v9 025] panvk: v9 PANVK_V9_RT128 bisect knob for 128-bit render targets biblioklept
+
+Purpose: Bisect the PanProbe bc_decode failure on the G57 (vk_meta blit
+into an RGBA32F image) without rebuilding.
+Code review found no v9-specific bug for one single-sampled RGBA32F
+target: pan_fb.c (panvk) and pan_desc.c (gallium, which renders RAW128
+correctly on G57 in Mesa CI) emit the same tile size (256 px), colour
+allocation (4 KiB), RAW128 internal/writeback formats, strides and
+internal buffer offset; malisx2 selects the same. PANVK_V9_RT128 takes a
+comma list:
+- tile: an eighth of the colour tile budget (64-pixel tiles at 16 B/px);
+- noround: round_to_fb_precision off for 128-bit RTs;
+- raw: raw conversion in the opaque/fixed-function BLEND of 128-bit RTs.
+Unset, nothing changes. Steps are in worklogs/v9-jm/PROGRESS.md.
+Source/Reference: none (panvk-local)
+Tested GPU: build-checked (universal Android build v6-v14); G615 (v11) unaffected (v9-only code)
+Tested Kbase UAPI: JM 11.38 (pending)
+Mesa base range: 5a07217f + g615-v11-csf series + jm-v9 001-024
+Dependencies: none
+Validation test: PanProbe bc_decode on a G57 with each knob (pending)
+
+---
+ src/panfrost/vulkan/panvk_vX_blend.c    | 17 +++++++++++++++++
+ src/panfrost/vulkan/panvk_vX_cmd_draw.c | 12 ++++++++++++
+ 2 files changed, 29 insertions(+)
+
+diff --git a/src/panfrost/vulkan/panvk_vX_blend.c b/src/panfrost/vulkan/panvk_vX_blend.c
+index 0dc7296..25ae021 100644
+--- a/src/panfrost/vulkan/panvk_vX_blend.c
++++ b/src/panfrost/vulkan/panvk_vX_blend.c
+@@ -21,6 +21,11 @@
+ #include "panvk_meta.h"
+ #include "panvk_shader.h"
+ 
++#if PAN_ARCH == 9
++#include "util/u_debug.h"
++DEBUG_GET_ONCE_OPTION(v9_rt128, "PANVK_V9_RT128", NULL)
++#endif
++
+ struct panvk_blend_shader_key {
+    enum panvk_meta_object_key_type type;
+    struct pan_blend_shader_key info;
+@@ -185,6 +190,18 @@ emit_blend_desc(const struct pan_blend_state *state, uint8_t rt_idx,
+          }
+ #endif
+ 
++#if PAN_ARCH == 9
++         /* Bisect knob for the v9 bc_decode blit into RGBA32F
++          * (worklogs/v9-jm/PROGRESS.md): 128-bit RTs only. */
++         if (util_format_get_blocksizebits(rt->format) == 128) {
++            const char *dbg = debug_get_option_v9_rt128();
++            if (dbg && strstr(dbg, "noround"))
++               cfg.round_to_fb_precision = false;
++            if (dbg && strstr(dbg, "raw"))
++               cfg.internal.fixed_function.conversion.raw = true;
++         }
++#endif
++
+          cfg.internal.fixed_function.rt = rt_idx;
+ 
+ #if PAN_ARCH < 9
+diff --git a/src/panfrost/vulkan/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/panvk_vX_cmd_draw.c
+index b2b80c8..deabfc7 100644
+--- a/src/panfrost/vulkan/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/panvk_vX_cmd_draw.c
+@@ -13,6 +13,11 @@
+ #include "pan_desc.h"
+ #include "pan_util.h"
+ 
++#if PAN_ARCH == 9
++#include "util/u_debug.h"
++DEBUG_GET_ONCE_OPTION(v9_rt128, "PANVK_V9_RT128", NULL)
++#endif
++
+ static enum pan_fb_load_op
+ get_att_fb_load_op(const VkRenderingAttachmentInfo *att)
+ {
+@@ -624,6 +629,13 @@ panvk_per_arch(cmd_init_render_state)(struct panvk_cmd_buffer *cmdbuf,
+       .tile_z_budget_B =
+          pan_query_optimal_z_tib_size(PAN_ARCH, phys_dev->model),
+    };
++#if PAN_ARCH == 9
++   /* Bisect knob for the bc_decode RGBA32F blit: an eighth of the colour
++    * budget (64-pixel tiles at 16 B/px). */
++   const char *rt128_dbg = debug_get_option_v9_rt128();
++   if (rt128_dbg && strstr(rt128_dbg, "tile"))
++      render->fb.layout.tile_rt_budget_B /= 8;
++#endif
+    /* In case ms2ss is enabled, use the provided sample count.
+     * All attachments need to have sample count == 1 or the provided value.
+     * But, if all attachments have 1, we would end up choosing the wrong value

@@ -1,0 +1,52 @@
+From: abhay-byte <zenithblue.dev@gmail.com>
+Subject: [PATCH csf-v11 045] panvk: order compute after gpu_prerast
+Generated-by: LLM
+
+Purpose: Make compute a consumer of GPU prerast output whenever its arena exists; biblioklept
+Source/Reference: local fix, work/mesa b9b2e41d5a9
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/044
+Validation test: integrated build NINJA_RC=0; geometry smoke 23/23 without PANVK_DEBUG (not isolated per patch)
+
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_buffer.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_buffer.c
+index 5d5ce885531..d91d759ea62 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_buffer.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_buffer.c
+@@ -322,7 +322,7 @@ panvk_per_arch(EndCommandBuffer)(VkCommandBuffer commandBuffer)
+ static void
+ add_execution_dependency(uint32_t wait_masks[static PANVK_SUBQUEUE_COUNT],
+                          VkPipelineStageFlags2 src_stages,
+-                         VkPipelineStageFlags2 dst_stages)
++                         VkPipelineStageFlags2 dst_stages, bool gpu_prerast)
+ {
+    /* convert stages to subqueues */
+    uint32_t src_subqueues = 0;
+@@ -338,12 +338,14 @@ add_execution_dependency(uint32_t wait_masks[static PANVK_SUBQUEUE_COUNT],
+    /* gpu_prerast runs the lowered VS on the COMPUTE subqueue, which reads
+     * indirect params, vertex inputs and VS resources.  Make it a consumer of
+     * those stages so GPU-written inputs are visible before the dispatch. */
+-   if (PANVK_DEBUG(GPU_PRERAST) &&
++   if (gpu_prerast &&
+        (dst_stages & (VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT |
+                       VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT |
+                       VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT |
+                       VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT |
+                       VK_PIPELINE_STAGE_2_PRE_RASTERIZATION_SHADERS_BIT |
++                      VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT |
++                      VK_PIPELINE_STAGE_2_GEOMETRY_SHADER_BIT |
+                       VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT)))
+       dst_subqueues |= BITFIELD_BIT(PANVK_SUBQUEUE_COMPUTE);
+ 
+@@ -465,7 +467,9 @@ collect_cs_deps(struct panvk_cmd_buffer *cmdbuf, const VkDependencyInfo *info,
+ {
+    struct panvk_device *dev = to_panvk_device(cmdbuf->vk.base.device);
+    uint32_t wait_masks[PANVK_SUBQUEUE_COUNT] = {0};
+-   add_execution_dependency(wait_masks, src.stages, dst.stages);
++   add_execution_dependency(
++      wait_masks, src.stages, dst.stages,
++      panvk_priv_mem_check_alloc(dev->gpu_prerast_arena));
+ 
+    if (cmdbuf->state.gfx.render.tiler || inherits_render_ctx(cmdbuf)) {
+       if (info->dependencyFlags & VK_DEPENDENCY_BY_REGION_BIT) {

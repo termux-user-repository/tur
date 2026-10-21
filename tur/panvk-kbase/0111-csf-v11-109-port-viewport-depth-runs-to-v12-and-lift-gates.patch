@@ -1,0 +1,144 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: Mon, 5 Oct 2026 23:30:00 +0530
+Subject: [PATCH] panvk: port viewport depth runs to v12+ and lift
+ depthBounds/shaderOutputViewportIndex gates
+
+089/090 split GS and VS/TES viewport selections into ordered viewport
+runs and gave each run its viewport's depth clamp through the IDVS
+LOW_DEPTH_CLAMP/HIGH_DEPTH_CLAMP registers. v12+ has no such registers:
+the clamp is the Viewport descriptor Min/Max Depth (words 2/3), which
+prepare_vp() loads into the IDVS VIEWPORT_LOW register pair (SR 46/47).
+So v12-v14 disabled the run split, drew every viewport with the union
+depth range (gs_viewport_depth FAIL on Mali-G720) and kept
+shaderOutputViewportIndex off.
+
+Write the per-run clamp to SR 46/47 on v12+, enable the run split on
+all CSF archs and report shaderOutputViewportIndex there. The VIEWPORT
+x/y words stay at the framebuffer box prepare_vp() set for the indexed
+case, and the VP_VIEWPORTS dirty bit restores the register after the
+runs, as on v11.
+
+The depthBounds FS emulation (092) is arch-neutral (LD_TILE + sample
+mask, DCD shader depth read); report it on v12+ too.
+
+v10/v11 object code is unchanged apart from __LINE__ constants.
+Not run on v12/v13 hardware.
+---
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+index 8c905bd..d01faed 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+@@ -4369,6 +4369,16 @@ gpu_prerast_vp_runs(struct panvk_cmd_buffer *cmdbuf,
+    struct cs_index caddr = cs_scratch_reg64(b, 10);
+    struct cs_index left = cs_scratch_reg32(b, 12);
+    struct cs_index word = cs_scratch_reg32(b, 13);
++#if PAN_ARCH < 12
++   struct cs_index z_lo = cs_sr_reg32(b, IDVS, LOW_DEPTH_CLAMP);
++   struct cs_index z_hi = cs_sr_reg32(b, IDVS, HIGH_DEPTH_CLAMP);
++#else
++   /* v12+ packs the clamp into VIEWPORT words 2/3 (Min/Max Depth), the
++    * VIEWPORT_LOW pair. prepare_vp() set words 0/1 to the framebuffer.
++    */
++   struct cs_index z_lo = cs_reg32(b, MALI_IDVS_SR_VIEWPORT_LOW);
++   struct cs_index z_hi = cs_reg32(b, MALI_IDVS_SR_VIEWPORT_LOW + 1);
++#endif
+
+    cs_move64_to(b, addr, header);
+    cs_load32_to(b, left, addr,
+@@ -4385,7 +4395,6 @@ gpu_prerast_vp_runs(struct panvk_cmd_buffer *cmdbuf,
+
+    cs_add_imm64(b, addr, addr, PANLIB_VP_RUN_HEADER_BYTES);
+    cs_while(b, MALI_CS_CONDITION_GREATER, left) {
+-#if PAN_ARCH < 12
+       cs_load32_to(b, word, addr, offsetof(struct panlib_vp_run, viewport));
+       cs_wait_slot(b, SB_ID(LS));
+       cs_move64_to(b, caddr, clamps);
+@@ -4397,19 +4406,15 @@ gpu_prerast_vp_runs(struct panvk_cmd_buffer *cmdbuf,
+       cs_wait_slot(b, SB_ID(LS));
+       /* IDVS registers are read-only outside the staging context. */
+       cs_update_vt_ctx(b) {
+-         cs_move32_to(b, cs_sr_reg32(b, IDVS, LOW_DEPTH_CLAMP), 0);
+-         cs_add_imm32(b, cs_sr_reg32(b, IDVS, LOW_DEPTH_CLAMP), word, 0);
++         cs_move32_to(b, z_lo, 0);
++         cs_add_imm32(b, z_lo, word, 0);
+       }
+       cs_load32_to(b, word, caddr, offsetof(struct panlib_vp_clamp, z_max));
+       cs_wait_slot(b, SB_ID(LS));
+       cs_update_vt_ctx(b) {
+-         cs_move32_to(b, cs_sr_reg32(b, IDVS, HIGH_DEPTH_CLAMP), 0);
+-         cs_add_imm32(b, cs_sr_reg32(b, IDVS, HIGH_DEPTH_CLAMP), word, 0);
++         cs_move32_to(b, z_hi, 0);
++         cs_add_imm32(b, z_hi, word, 0);
+       }
+-#else
+-      (void)caddr;
+-      (void)clamps;
+-#endif
+
+       cs_load32_to(b, word, addr, offsetof(struct panlib_vp_run, first_index));
+       cs_wait_slot(b, SB_ID(LS));
+@@ -4499,12 +4504,6 @@ gpu_prerast_draw_generated(struct panvk_cmd_buffer *cmdbuf,
+
+    const struct panvk_shader *vps =
+       panvk_prerast_viewport_shader(&cmdbuf->state.gfx);
+-#if PAN_ARCH >= 12
+-    /* v12 packs the depth clamp into the viewport register. A run split
+-     * there would change the index buffer and still clamp to viewport 0.
+-     */
+-    vps = NULL;
+-#endif
+     /* A polygon-mode draw has no run list: its passthrough still picks the
+      * viewport per vertex, but depth clamp and clip use the union range.
+      */
+@@ -4706,9 +4705,6 @@ gpu_prerast_vp_prepare(struct panvk_cmd_buffer *cmdbuf, uint64_t arena,
+                        const struct panvk_draw_info *source,
+                        struct panlib_vp_runs_launch_args *args)
+ {
+-#if PAN_ARCH >= 12
+-   return false;
+-#else
+    const struct panvk_shader *gs = cmdbuf->state.gfx.gs.shader;
+    const struct panvk_shader *vps =
+       panvk_prerast_viewport_shader(&cmdbuf->state.gfx);
+@@ -4825,7 +4821,6 @@ gpu_prerast_vp_prepare(struct panvk_cmd_buffer *cmdbuf, uint64_t arena,
+       .per_instance = per_instance,
+    };
+    return true;
+-#endif
+ }
+
+ static void
+@@ -5490,7 +5485,7 @@ gpu_prerast_chunk_loop(struct panvk_cmd_buffer *cmdbuf,
+    const struct panlib_vp_runs_launch_args *vp_launch = NULL;
+    if (gpu_prerast_vp_prepare(cmdbuf, arena, &chunk, &vp_args))
+       vp_launch = &vp_args;
+-   else if (PAN_ARCH < 12 && panvk_prerast_viewport_shader(&cmdbuf->state.gfx) &&
++   else if (panvk_prerast_viewport_shader(&cmdbuf->state.gfx) &&
+             (gs || poly_mode == PANVK_GPU_PRERAST_POLY_NONE))
+       return;
+
+diff --git a/src/panfrost/vulkan/panvk_vX_physical_device.c b/src/panfrost/vulkan/panvk_vX_physical_device.c
+index 658ae9b..31166af 100644
+--- a/src/panfrost/vulkan/panvk_vX_physical_device.c
++++ b/src/panfrost/vulkan/panvk_vX_physical_device.c
+@@ -327,7 +327,7 @@ panvk_per_arch(get_physical_device_features)(
+       .depthClamp = true,
+       .depthBiasClamp = true,
+       .fillModeNonSolid = PAN_ARCH >= 10,
+-      .depthBounds = PAN_ARCH >= 10 && PAN_ARCH < 12,
++      .depthBounds = PAN_ARCH >= 10,
+       .wideLines = true,
+       .largePoints = true,
+       .alphaToOne = PAN_ARCH >= 10,
+@@ -440,7 +440,7 @@ panvk_per_arch(get_physical_device_features)(
+       .vulkanMemoryModel = true,
+       .vulkanMemoryModelDeviceScope = true,
+       .vulkanMemoryModelAvailabilityVisibilityChains = true,
+-      .shaderOutputViewportIndex = PAN_ARCH >= 10 && PAN_ARCH < 12,
++      .shaderOutputViewportIndex = PAN_ARCH >= 10,
+       .shaderOutputLayer = PAN_ARCH >= 10,
+       .subgroupBroadcastDynamicId = true,
+
+--
+2.51.0

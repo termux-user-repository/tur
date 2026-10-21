@@ -1,0 +1,146 @@
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: 2026-10-11
+Subject: [PATCH jm-v9 008] panvk/jm: apply vkCmdSetEvent when the GPU work before it completes biblioklept
+
+Purpose: Port the part of Noysz 0068 (async kbase JM submit) that our
+kbase JM layer lacked. 001/002 already submit asynchronously: kbase
+pre_dep chains (vertex/tiler -> fragment DATA dependency, ORDER on the
+previous atom), no CPU wait per job chain, fences and semaphores resolved
+lazily from atom numbers. What 0068 also does is apply vkCmdSetEvent when
+the group completes. Here a SET took effect at submit time, so
+vkGetEventStatus could report SET before the GPU had finished the work
+recorded before the vkCmdSetEvent. The event now records the batch's last
+atom (or the queue's last atom for a batch without jobs);
+vkGetEventStatus polls it with a zero timeout. vkCmdWaitEvents only spins
+on events set from the host: a pending vkCmdSetEvent on this queue is
+ordered before the waiting batch by the atom dependencies. Not ported from
+0068: one JOB_SUBMIT for all atoms of a vkQueueSubmit (needs a multi-atom
+submit in 001) and the X11 present-thread fence wait (common WSI, all
+archs).
+Source/Reference: https://github.com/Noysz/panvk-g99-jm (commit 6ce0d46e419a, MIT; patches/0068-v9-kbase-async-submit, event part)
+Tested GPU: build-checked; device run on Mali-G57 MC2 (Lenovo TB336FU, gpu_id 0x90930010) pending, see worklogs/v9-jm/PROGRESS.md
+Tested Kbase UAPI: JM 11.38
+Mesa base range: 5a07217f + g615-v11-csf series + jm-v9 001-006
+Dependencies: jm-v9/001 (kbase_kmod_wait_atom), jm-v9/002
+Validation test: PanProbe; CTS dEQP-VK.synchronization.basic.event.* (pending)
+
+---
+diff --git a/src/panfrost/vulkan/jm/panvk_event.h b/src/panfrost/vulkan/jm/panvk_event.h
+index 91bea83..3f832c6 100644
+--- a/src/panfrost/vulkan/jm/panvk_event.h
++++ b/src/panfrost/vulkan/jm/panvk_event.h
+@@ -14,6 +14,9 @@
+ struct panvk_event {
+    struct vk_object_base base;
+    bool signaled;
++   /* kbase atom of the work a vkCmdSetEvent() follows: the event becomes
++    * signaled once that atom has completed. */
++   uint64_t signal_atom;
+ };
+ 
+ VK_DEFINE_NONDISP_HANDLE_CASTS(panvk_event, base, VkEvent, VK_OBJECT_TYPE_EVENT)
+diff --git a/src/panfrost/vulkan/jm/panvk_vX_event.c b/src/panfrost/vulkan/jm/panvk_vX_event.c
+index 3ff8e58..d401cf8 100644
+--- a/src/panfrost/vulkan/jm/panvk_vX_event.c
++++ b/src/panfrost/vulkan/jm/panvk_vX_event.c
+@@ -7,6 +7,7 @@
+ #include "panvk_entrypoints.h"
+ #include "panvk_event.h"
+ 
++#include "kmod/kbase_kmod.h"
+ #include "vk_log.h"
+ 
+ VKAPI_ATTR VkResult VKAPI_CALL
+@@ -43,8 +44,15 @@ panvk_per_arch(DestroyEvent)(VkDevice _device, VkEvent _event,
+ VKAPI_ATTR VkResult VKAPI_CALL
+ panvk_per_arch(GetEventStatus)(VkDevice _device, VkEvent _event)
+ {
++   VK_FROM_HANDLE(panvk_device, device, _device);
+    VK_FROM_HANDLE(panvk_event, event, _event);
+ 
++   if (!event->signaled && event->signal_atom &&
++       kbase_kmod_wait_atom(device->kmod.dev, event->signal_atom, 0)) {
++      event->signaled = true;
++      event->signal_atom = 0;
++   }
++
+    return event->signaled ? VK_EVENT_SET : VK_EVENT_RESET;
+ }
+ 
+@@ -54,6 +62,7 @@ panvk_per_arch(SetEvent)(VkDevice _device, VkEvent _event)
+    VK_FROM_HANDLE(panvk_event, event, _event);
+ 
+    event->signaled = true;
++   event->signal_atom = 0;
+ 
+    return VK_SUCCESS;
+ }
+@@ -64,6 +73,7 @@ panvk_per_arch(ResetEvent)(VkDevice _device, VkEvent _event)
+    VK_FROM_HANDLE(panvk_event, event, _event);
+ 
+    event->signaled = false;
++   event->signal_atom = 0;
+ 
+    return VK_SUCCESS;
+ }
+diff --git a/src/panfrost/vulkan/jm/panvk_vX_gpu_queue.c b/src/panfrost/vulkan/jm/panvk_vX_gpu_queue.c
+index f5e4f06..447de37 100644
+--- a/src/panfrost/vulkan/jm/panvk_vX_gpu_queue.c
++++ b/src/panfrost/vulkan/jm/panvk_vX_gpu_queue.c
+@@ -242,8 +242,10 @@ panvk_queue_submit_batch(struct panvk_gpu_queue *queue,
+ }
+ 
+ /* kbase has no kernel wait primitive for VkEvent (see panvk_event.h), so
+- * events are tracked as a plain host-side flag and waited on with a
+- * simple spin. */
++ * events are tracked as a host-side flag plus the kbase atom of the work a
++ * vkCmdSetEvent() follows. A wait spins only on events set from the host:
++ * a pending vkCmdSetEvent() on this queue is ordered before the waiting
++ * batch by the atom dependencies. */
+ static void
+ panvk_wait_event_ops(struct panvk_batch *batch)
+ {
+@@ -251,21 +253,30 @@ panvk_wait_event_ops(struct panvk_batch *batch)
+       if (op->type != PANVK_EVENT_OP_WAIT)
+          continue;
+ 
+-      while (!op->event->signaled)
++      while (!op->event->signaled && !op->event->signal_atom)
+          usleep(100);
+    }
+ }
+ 
++/* vkCmdSetEvent() takes effect when the GPU has completed the work recorded
++ * before it (atom), not at submit time: vkGetEventStatus() polls the atom.
++ * atom == 0 means that work already completed. */
+ static void
+-panvk_apply_event_ops(struct panvk_batch *batch)
++panvk_apply_event_ops(struct panvk_batch *batch, uint64_t atom)
+ {
+    util_dynarray_foreach(&batch->event_ops, struct panvk_cmd_event_op, op) {
+       switch (op->type) {
+       case PANVK_EVENT_OP_SET:
+-         op->event->signaled = true;
++         if (op->event->signaled)
++            break;
++         if (atom)
++            op->event->signal_atom = atom;
++         else
++            op->event->signaled = true;
+          break;
+       case PANVK_EVENT_OP_RESET:
+          op->event->signaled = false;
++         op->event->signal_atom = 0;
+          break;
+       case PANVK_EVENT_OP_WAIT:
+          /* Handled before submission in panvk_wait_event_ops(). */
+@@ -438,7 +449,8 @@ panvk_per_arch(gpu_queue_submit)(struct vk_queue *vk_queue, struct vk_queue_subm
+             }
+          }
+ 
+-         panvk_apply_event_ops(batch);
++         panvk_apply_event_ops(batch, last_atom ? last_atom
++                                                : queue->last_submitted_atom);
+       }
+    }
+ 

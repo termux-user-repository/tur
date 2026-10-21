@@ -1,0 +1,612 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: Tue, 6 Oct 2026 00:30:00 +0530
+Subject: [PATCH] kbase: select CSF uAPI layouts by version, support 16 KiB
+ pages, fall back from MEM_ALLOC_EX
+
+CS_QUEUE_GROUP_CREATE: the candidate list comes from the uAPI version
+(32-byte _1_6 nr 42 on every CSF uAPI, 40-byte _1_18 nr 58 on 1.7+,
+112-byte nr 58 on 1.19+, cs_fault_report_enable on 1.25+). 1.25+ keeps
+112 first (G720); older uAPIs keep the device-proven 32-byte request
+first (G615, 1.21). The other layouts are tried only on EINVAL/ENOTTY.
+The kernel keeps _1_6/_1_18 as compat handlers that build the same
+request.
+
+CS_TILER_HEAP_INIT: 16-byte _1_13 first, then the 24-byte layout
+(buf_desc_va = 0) on 1.14+ as the EINVAL/ENOTTY fallback. The kernel
+1_13 handler passes buf_desc_va = 0 too.
+
+16 KiB pages: kbase counts va_pages, alias lengths, the special mmap
+handles and the 3 CS USER_IO pages in kernel PAGE_SIZE units. Use
+sysconf(_SC_PAGESIZE) for them, including the USER_IO input/output page
+offsets. EXEC_VA/JIT zone sizes and the JM host import are in
+jm-v9/005, because jm-v9 is applied after csf-v11.
+
+MEM_ALLOC_EX: on ENOTTY/EINVAL before any allocation has succeeded,
+fall back to legacy MEM_ALLOC, then stick to the first path that
+works. The kernel implements MEM_ALLOC as ALLOC_EX with
+fixed_address 0. v14 G1-Ultra (Linux 6.12) rejects ALLOC_EX with ENOTTY.
+
+Each device logs these lines once: "kbase: queue_group_create
+layout=%u bytes", "kbase: tiler_heap_init layout=%u bytes" and
+"kbase: mem_alloc via ALLOC_EX|ALLOC". The uAPI version line is now
+INFO and carries page_size.
+
+Purpose: kbase CSF uAPI compatibility across r3x-r5x kernels, 16 KiB page kernels and kernels without MEM_ALLOC_EX; biblioklept
+Source/Reference: public mali_kbase_csf_ioctl.h, mali_kbase_ioctl.h, mali_kbase_core_linux.c, mali_kbase_mem_linux.c, mali_base_kernel.h (android.googlesource.com kernel/google-modules/gpu: android-gs-raviole-5.10-android13 = 1.10, android-gs-pantah-5.10-android14 = 1.14, android-gs-caimito-6.1-android15 = 1.24; github.com/rockchip-linux/kernel develop-6.1 = 1.30, develop-5.10 = 1.31)
+Tested GPU: Mali-G57 MC2 (v9 JM, shared kmod paths): deqp memory.allocation.basic 102/102, page_size=4096. CSF paths not run on hardware.
+Tested Kbase UAPI: JM 11.38
+Mesa base range: 5a07217f
+Dependencies: csf-v11/109, jm-v9/004 (series order)
+Validation test: host assert test of kbase_csf_group_create_layouts / kbase_csf_tiler_heap_init_layouts (worklogs/driver-remaining/110-kbase-csf-uapi-layouts.md); universal Android ICD v9-v14 build
+---
+ include/drm-uapi/mali_kbase_ioctl.h          |  21 ++
+ src/panfrost/lib/kmod/kbase_kmod.c           | 287 ++++++++++++++++++---------
+ src/panfrost/lib/kmod/kbase_kmod.h           |  42 ++++
+ src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c |  12 +-
+ 4 files changed, 264 insertions(+), 98 deletions(-)
+
+diff --git a/include/drm-uapi/mali_kbase_ioctl.h b/include/drm-uapi/mali_kbase_ioctl.h
+index bac721e..3c6f4d2 100644
+--- a/include/drm-uapi/mali_kbase_ioctl.h
++++ b/include/drm-uapi/mali_kbase_ioctl.h
+@@ -577,6 +577,26 @@ struct kbase_ioctl_kcpu_queue_enqueue {
+ #define KBASE_IOCTL_KCPU_QUEUE_ENQUEUE \
+    _IOW(KBASE_IOCTL_TYPE, 47, struct kbase_ioctl_kcpu_queue_enqueue)
+ 
++/* Legacy 16-byte layout; uAPI 1.14+ keeps it as a compat case that passes
++ * buf_desc_va = 0. */
++union kbase_ioctl_cs_tiler_heap_init_1_13 {
++   struct {
++      __u32 chunk_size;
++      __u32 initial_chunks;
++      __u32 max_chunks;
++      __u16 target_in_flight;
++      __u8 group_id;
++      __u8 padding;
++   } in;
++   struct {
++      __u64 gpu_heap_va;
++      __u64 first_chunk_va;
++   } out;
++};
++#define KBASE_IOCTL_CS_TILER_HEAP_INIT_1_13 \
++   _IOWR(KBASE_IOCTL_TYPE, 48, union kbase_ioctl_cs_tiler_heap_init_1_13)
++
++/* uAPI 1.14+: adds the buffer descriptor VA (24 bytes). */
+ union kbase_ioctl_cs_tiler_heap_init {
+    struct {
+       __u32 chunk_size;
+@@ -585,6 +605,7 @@ union kbase_ioctl_cs_tiler_heap_init {
+       __u16 target_in_flight;
+       __u8 group_id;
+       __u8 padding;
++      __u64 buf_desc_va;
+    } in;
+    struct {
+       __u64 gpu_heap_va;
+diff --git a/src/panfrost/lib/kmod/kbase_kmod.c b/src/panfrost/lib/kmod/kbase_kmod.c
+index 68aed39..b7194a6 100644
+--- a/src/panfrost/lib/kmod/kbase_kmod.c
++++ b/src/panfrost/lib/kmod/kbase_kmod.c
+@@ -98,6 +98,17 @@ struct kbase_kmod_dev {
+     * reading every GPU subqueue context on every submission. */
+    uint32_t csf_error;
+ 
++   /* CS_QUEUE_GROUP_CREATE / CS_TILER_HEAP_INIT layout (ioctl size in
++    * bytes) that the kernel accepted first; 0 until then. */
++   uint32_t group_create_layout;
++   uint32_t heap_init_layout;
++
++   /* Allocation ioctl that first succeeded (KBASE_MEM_ALLOC_PATH_*); 0
++    * until then. */
++   uint32_t mem_alloc_path;
++#define KBASE_MEM_ALLOC_PATH_EX     1
++#define KBASE_MEM_ALLOC_PATH_LEGACY 2
++
+    /* A persistent kernel CPU queue turns GPU timeline writes into pollable
+     * sync_file fences.  At most one CQS wait is pending on this queue. */
+    struct {
+@@ -171,6 +182,24 @@ kbase_kmod_supports_dmabuf(const struct pan_kmod_dev *dev)
+    return kbase_dev->dma_heap_fd >= 0;
+ }
+ 
++uint64_t
++kbase_kmod_page_size(void)
++{
++   static uint64_t page_size;
++
++   if (!page_size) {
++      long ps = sysconf(_SC_PAGESIZE);
++      page_size = ps > 0 ? (uint64_t)ps : 4096;
++   }
++   return page_size;
++}
++
++/* The uAPI headers spell the special mmap handles with a 4 KiB page shift;
++ * the kernel compares them in its own PAGE_SHIFT units.  Single-page
++ * mmap()/munmap() lengths of 4096 need no scaling: the kernel rounds the
++ * length up to PAGE_SIZE. */
++#define KBASE_MMAP_HANDLE(h) (((h) >> 12) * kbase_kmod_page_size())
++
+ /* -------------------------------------------------------------------------
+  * GPU properties blob parsing helpers
+  * ---------------------------------------------------------------------- */
+@@ -514,74 +543,95 @@ kbase_kmod_get_flush_id(const struct pan_kmod_dev *dev)
+  * CSF queue group / queue / tiler heap primitives
+  * ---------------------------------------------------------------------- */
+ 
+-int
+-kbase_kmod_csf_group_create(struct pan_kmod_dev *dev, uint32_t cs_queue_count,
+-                            uint32_t *group_handle)
++/* Endpoint masks/maxes match what panfork uses on all CSF parts: a single
++ * tiler unit, all fragment/compute endpoints.  Priority 0 is
++ * BASE_QUEUE_GROUP_PRIORITY_HIGH: resist CSG rotation so the Pixel kbase
++ * off-slot heap-reclaim shrinker cannot empty our tiler heaps under memory
++ * pressure.  Tiler heap growth is serviced by the kernel OOM path, so no
++ * CSI exception handler is requested (BASE_CSF_TILER_OOM_EXCEPTION_FLAG was
++ * tried and is ineffective: the group is terminated on an unhandled OOM
++ * regardless).  csi_handlers/dvs_buf stay 0 in every layout, so the kernel
++ * compat handlers build the same request whichever layout is used. */
++#define KBASE_GROUP_CREATE_IN(cs_count)                                        \
++   .tiler_mask = 1, .fragment_mask = ~0ull, .compute_mask = ~0ull,            \
++   .cs_min = (cs_count), .priority = 0, .tiler_max = 1, .fragment_max = 64,   \
++   .compute_max = 64
++
++static int
++kbase_csf_group_create_ioctl(int fd, unsigned layout, bool fault_report,
++                             uint32_t cs_queue_count, uint32_t *group_handle)
+ {
++   STATIC_ASSERT(sizeof(union kbase_ioctl_cs_queue_group_create_1_6) == 32);
+    STATIC_ASSERT(sizeof(union kbase_ioctl_cs_queue_group_create_1_18) == 40);
+    STATIC_ASSERT(sizeof(union kbase_ioctl_cs_queue_group_create) == 112);
+ 
+-   /* Endpoint masks/maxes match what panfork uses on all CSF parts:
+-    * a single tiler unit, all fragment/compute endpoints.  Tiler heap growth
+-    * is serviced by the kernel OOM path, so no application CSI exception
+-    * handler is requested (BASE_CSF_TILER_OOM_EXCEPTION_FLAG was tried and
+-    * confirmed ineffective on this kernel: the group is terminated on an
+-    * unhandled OOM regardless).  On uAPI 1.25+ use the current ioctl layout
+-    * to ask the kernel to report recoverable CS faults through read(). */
+-   if (pan_kmod_driver_version_at_least(&dev->driver, 1, 25)) {
++   if (layout == 112) {
++      /* uAPI 1.25+: ask for recoverable CS faults through read(). */
+       union kbase_ioctl_cs_queue_group_create req = {
+-         .in = {
+-            .tiler_mask = 1,
+-            .fragment_mask = ~0ull,
+-            .compute_mask = ~0ull,
+-            .cs_min = cs_queue_count,
+-            .priority = 0, /* BASE_QUEUE_GROUP_PRIORITY_HIGH: resist CSG rotation so the
+-                              * Pixel kbase off-slot heap-reclaim shrinker cannot
+-                              * empty our tiler heaps under memory pressure. */
+-            .tiler_max = 1,
+-            .fragment_max = 64,
+-            .compute_max = 64,
+-            .cs_fault_report_enable = 1,
+-         },
++         .in = { KBASE_GROUP_CREATE_IN(cs_queue_count),
++                 .cs_fault_report_enable = fault_report },
+       };
++      if (ioctl(fd, KBASE_IOCTL_CS_QUEUE_GROUP_CREATE, &req))
++         return -1;
++      *group_handle = req.out.group_handle;
++   } else if (layout == 40) {
++      union kbase_ioctl_cs_queue_group_create_1_18 req = {
++         .in = { KBASE_GROUP_CREATE_IN(cs_queue_count) },
++      };
++      if (ioctl(fd, KBASE_IOCTL_CS_QUEUE_GROUP_CREATE_1_18, &req))
++         return -1;
++      *group_handle = req.out.group_handle;
++   } else {
++      union kbase_ioctl_cs_queue_group_create_1_6 req = {
++         .in = { KBASE_GROUP_CREATE_IN(cs_queue_count) },
++      };
++      if (ioctl(fd, KBASE_IOCTL_CS_QUEUE_GROUP_CREATE_1_6, &req))
++         return -1;
++      *group_handle = req.out.group_handle;
++   }
++   return 0;
++}
+ 
+-      if (ioctl(dev->fd, KBASE_IOCTL_CS_QUEUE_GROUP_CREATE, &req) == 0) {
+-         *group_handle = req.out.group_handle;
+-         mesa_logd("kbase: created CSF group %u with CS fault reporting",
+-                   *group_handle);
++int
++kbase_kmod_csf_group_create(struct pan_kmod_dev *dev, uint32_t cs_queue_count,
++                            uint32_t *group_handle)
++{
++   struct kbase_kmod_dev *kbase_dev =
++      container_of(dev, struct kbase_kmod_dev, base);
++   const bool fault_report =
++      pan_kmod_driver_version_at_least(&dev->driver, 1, 25);
++   unsigned layouts[3], n;
++   int err = 0;
++
++   layouts[0] = p_atomic_read(&kbase_dev->group_create_layout);
++   n = layouts[0] ? 1
++                  : kbase_csf_group_create_layouts(dev->driver.version.major,
++                                                   dev->driver.version.minor,
++                                                   layouts);
++
++   for (unsigned i = 0; i < n; i++) {
++      if (kbase_csf_group_create_ioctl(dev->fd, layouts[i], fault_report,
++                                       cs_queue_count, group_handle) == 0) {
++         if (p_atomic_cmpxchg(&kbase_dev->group_create_layout, 0,
++                              layouts[i]) == 0)
++            mesa_logi("kbase: queue_group_create layout=%u bytes",
++                      layouts[i]);
+          return 0;
+       }
+ 
+-      mesa_logw("kbase: current CS_QUEUE_GROUP_CREATE failed: %s; "
+-                "falling back to the 1.6 ABI",
+-                strerror(errno));
+-   }
+-
+-   /* The legacy request remains the compatibility fallback and leaves tiler
+-    * OOM handling in the kernel, matching panfork's working CSF path. */
+-   union kbase_ioctl_cs_queue_group_create_1_6 req = {
+-      .in = {
+-         .tiler_mask = 1,
+-         .fragment_mask = ~0ull,
+-         .compute_mask = ~0ull,
+-         .cs_min = cs_queue_count,
+-         .priority = 0, /* BASE_QUEUE_GROUP_PRIORITY_HIGH: resist CSG rotation so the
+-                              * Pixel kbase off-slot heap-reclaim shrinker cannot
+-                              * empty our tiler heaps under memory pressure. */
+-         .tiler_max = 1,
+-         .fragment_max = 64,
+-         .compute_max = 64,
+-      },
+-   };
+-
+-   if (ioctl(dev->fd, KBASE_IOCTL_CS_QUEUE_GROUP_CREATE_1_6, &req)) {
+-      mesa_loge("kbase: KBASE_IOCTL_CS_QUEUE_GROUP_CREATE failed: %s",
+-                strerror(errno));
+-      return -1;
++      /* Only a rejected layout (unknown ioctl size/nr, or a field the
++       * kernel refuses) is worth retrying with another layout. */
++      err = errno;
++      if (err != EINVAL && err != ENOTTY)
++         break;
++      if (i + 1 < n)
++         mesa_logw("kbase: CS_QUEUE_GROUP_CREATE layout=%u bytes failed: %s",
++                   layouts[i], strerror(err));
+    }
+ 
+-   *group_handle = req.out.group_handle;
+-   return 0;
++   mesa_loge("kbase: KBASE_IOCTL_CS_QUEUE_GROUP_CREATE failed: %s",
++             strerror(err));
++   return -1;
+ }
+ 
+ static void
+@@ -728,7 +778,7 @@ kbase_kmod_csf_queue_bind(struct pan_kmod_dev *dev, uint32_t group_handle,
+       goto err_term_queue;
+    }
+ 
+-   void *user_io = mmap(NULL, BASEP_QUEUE_NR_MMAP_USER_PAGES * 4096,
++   void *user_io = mmap(NULL, BASEP_QUEUE_NR_MMAP_USER_PAGES * kbase_kmod_page_size(),
+                         PROT_READ | PROT_WRITE, MAP_SHARED, dev->fd,
+                         bind.out.mmap_handle);
+    if (user_io == MAP_FAILED) {
+@@ -754,7 +804,7 @@ kbase_kmod_csf_queue_term(struct pan_kmod_dev *dev, uint64_t ringbuf_va,
+                           void *user_io)
+ {
+    if (user_io)
+-      munmap(user_io, BASEP_QUEUE_NR_MMAP_USER_PAGES * 4096);
++      munmap(user_io, BASEP_QUEUE_NR_MMAP_USER_PAGES * kbase_kmod_page_size());
+ 
+    struct kbase_ioctl_cs_queue_terminate term = {
+       .buffer_gpu_addr = ringbuf_va,
+@@ -1097,27 +1147,56 @@ kbase_kmod_csf_tiler_heap_create(struct pan_kmod_dev *dev,
+                                  uint64_t *heap_ctx_va,
+                                  uint64_t *first_chunk_va)
+ {
+-   /* The uAPI group_id is the physical memory group used for allocations,
+-    * not the CS queue group handle. */
+-   union kbase_ioctl_cs_tiler_heap_init req = {
+-      .in = {
+-         .chunk_size = chunk_size,
+-         .initial_chunks = initial_chunks,
+-         .max_chunks = max_chunks,
+-         .target_in_flight = MIN2(target_in_flight, UINT16_MAX),
+-         .group_id = mem_group_id,
+-      },
+-   };
++   STATIC_ASSERT(sizeof(union kbase_ioctl_cs_tiler_heap_init_1_13) == 16);
++   STATIC_ASSERT(sizeof(union kbase_ioctl_cs_tiler_heap_init) == 24);
++   struct kbase_kmod_dev *kbase_dev =
++      container_of(dev, struct kbase_kmod_dev, base);
++   unsigned layouts[2], n;
++   int err = 0;
++
++   layouts[0] = p_atomic_read(&kbase_dev->heap_init_layout);
++   n = layouts[0] ? 1
++                  : kbase_csf_tiler_heap_init_layouts(
++                       dev->driver.version.major, dev->driver.version.minor,
++                       layouts);
++
++   for (unsigned i = 0; i < n; i++) {
++      /* The uAPI group_id is the physical memory group used for
++       * allocations, not the CS queue group handle.  buf_desc_va = 0 is
++       * what the kernel's 1.13 compat handler passes. */
++      union kbase_ioctl_cs_tiler_heap_init req = {
++         .in = {
++            .chunk_size = chunk_size,
++            .initial_chunks = initial_chunks,
++            .max_chunks = max_chunks,
++            .target_in_flight = MIN2(target_in_flight, UINT16_MAX),
++            .group_id = mem_group_id,
++         },
++      };
++      const unsigned long cmd = layouts[i] == 24
++                                   ? KBASE_IOCTL_CS_TILER_HEAP_INIT
++                                   : KBASE_IOCTL_CS_TILER_HEAP_INIT_1_13;
++
++      /* Both layouts share the in/out prefix, so one buffer serves both. */
++      if (ioctl(dev->fd, cmd, &req) == 0) {
++         if (p_atomic_cmpxchg(&kbase_dev->heap_init_layout, 0, layouts[i]) == 0)
++            mesa_logi("kbase: tiler_heap_init layout=%u bytes", layouts[i]);
++         *heap_ctx_va = req.out.gpu_heap_va;
++         *first_chunk_va = req.out.first_chunk_va;
++         return 0;
++      }
+ 
+-   if (ioctl(dev->fd, KBASE_IOCTL_CS_TILER_HEAP_INIT, &req)) {
+-      mesa_loge("kbase: KBASE_IOCTL_CS_TILER_HEAP_INIT failed: %s",
+-                strerror(errno));
+-      return -1;
++      err = errno;
++      if (err != EINVAL && err != ENOTTY)
++         break;
++      if (i + 1 < n)
++         mesa_logw("kbase: CS_TILER_HEAP_INIT layout=%u bytes failed: %s",
++                   layouts[i], strerror(err));
+    }
+ 
+-   *heap_ctx_va = req.out.gpu_heap_va;
+-   *first_chunk_va = req.out.first_chunk_va;
+-   return 0;
++   mesa_loge("kbase: KBASE_IOCTL_CS_TILER_HEAP_INIT failed: %s",
++             strerror(err));
++   return -1;
+ }
+ 
+ void
+@@ -1137,7 +1216,7 @@ uint64_t
+ kbase_kmod_alias_create(struct pan_kmod_dev *dev, uint64_t bo_va,
+                         uint64_t size, uint32_t nents)
+ {
+-   const uint64_t page_size = 4096;
++   const uint64_t page_size = kbase_kmod_page_size();
+    uint64_t total = size * nents;
+    struct base_mem_aliasing_info ai[4];
+ 
+@@ -1247,8 +1326,9 @@ kbase_kmod_dev_create(int fd, uint32_t flags,
+       return NULL;
+    }
+ 
+-   mesa_logd("kbase: %s driver, uAPI version %d.%d",
+-             is_csf ? "CSF" : "JM", ver.major, ver.minor);
++   mesa_logi("kbase: %s driver, uAPI version %d.%d, page_size=%u",
++             is_csf ? "CSF" : "JM", ver.major, ver.minor,
++             (unsigned)kbase_kmod_page_size());
+ 
+    /* Set context creation flags.  Zero for maximum compatibility; this also
+     * creates the kernel-side context. */
+@@ -1261,7 +1341,7 @@ kbase_kmod_dev_create(int fd, uint32_t flags,
+    /* Map the tracking page.  The kernel requires this before any memory
+     * operation. */
+    void *tracking_page = mmap(NULL, 4096, PROT_NONE, MAP_SHARED, fd,
+-                              BASE_MEM_MAP_TRACKING_HANDLE);
++                              KBASE_MMAP_HANDLE(BASE_MEM_MAP_TRACKING_HANDLE));
+    if (tracking_page == MAP_FAILED) {
+       mesa_loge("kbase: mmap(BASE_MEM_MAP_TRACKING_HANDLE) failed: %s",
+                 strerror(errno));
+@@ -1359,7 +1439,7 @@ kbase_kmod_dev_create(int fd, uint32_t flags,
+        * makes FLUSH_CACHE2 waits more conservative. */
+       kbase_dev->user_reg_page =
+          mmap(NULL, 4096, PROT_READ, MAP_SHARED, fd,
+-              BASEP_MEM_CSF_USER_REG_PAGE_HANDLE);
++              KBASE_MMAP_HANDLE(BASEP_MEM_CSF_USER_REG_PAGE_HANDLE));
+       if (kbase_dev->user_reg_page == MAP_FAILED) {
+          mesa_logw("kbase: mmap of the CSF USER register page failed: %s",
+                    strerror(errno));
+@@ -1543,7 +1623,7 @@ kbase_kmod_import_dmabuf(struct pan_kmod_dev *dev,
+ {
+    struct kbase_kmod_dev *kbase_dev =
+       container_of(dev, struct kbase_kmod_dev, base);
+-   const uint64_t page_size = 4096;
++   const uint64_t page_size = kbase_kmod_page_size();
+    struct kbase_kmod_bo *kbase_bo =
+       pan_kmod_dev_alloc(dev, sizeof(*kbase_bo));
+    if (!kbase_bo)
+@@ -1660,7 +1740,7 @@ kbase_kmod_bo_alloc_dmabuf(struct pan_kmod_dev *dev, uint64_t size,
+ {
+    struct kbase_kmod_dev *kbase_dev =
+       container_of(dev, struct kbase_kmod_dev, base);
+-   const uint64_t page_size = 4096;
++   const uint64_t page_size = kbase_kmod_page_size();
+    struct dma_heap_allocation_data alloc = {
+       .len = ALIGN_POT(size, page_size),
+       .fd_flags = O_RDWR | O_CLOEXEC,
+@@ -1691,7 +1771,7 @@ kbase_kmod_bo_alloc(struct pan_kmod_dev *dev,
+                        PAN_KMOD_BO_FLAG_CSF_EVENT)))
+       return kbase_kmod_bo_alloc_dmabuf(dev, size, kmod_flags);
+ 
+-   const uint64_t page_size = 4096;
++   const uint64_t page_size = kbase_kmod_page_size();
+    uint64_t va_pages = (size + page_size - 1) / page_size;
+ 
+    struct kbase_kmod_bo *kbase_bo =
+@@ -1719,8 +1799,17 @@ kbase_kmod_bo_alloc(struct pan_kmod_dev *dev,
+                         : MIN2(extension, va_pages);
+    }
+ 
++   /* MEM_ALLOC_EX (nr 59, 64 bytes) exists on CSF uAPI 1.9+ and the kernel
++    * implements legacy MEM_ALLOC (nr 5) as ALLOC_EX with fixed_address 0, so
++    * both build the same request.  Some vendor CSF kernels (v14 G1-Ultra,
++    * Linux 6.12) reject ALLOC_EX with ENOTTY: fall back to MEM_ALLOC until
++    * one path has succeeded, then stick to it. */
++   uint32_t path = p_atomic_read(&kbase_dev->mem_alloc_path);
++   bool done = false;
++
+    if (kbase_dev->is_csf &&
+-       pan_kmod_driver_version_at_least(&dev->driver, 1, 9)) {
++       pan_kmod_driver_version_at_least(&dev->driver, 1, 9) &&
++       path != KBASE_MEM_ALLOC_PATH_LEGACY) {
+       /* Match current Arm userspace on modern CSF kernels.  Besides keeping
+        * the allocation ABI aligned with kbase, this leaves room for fixed-VA
+        * and future allocation parameters without another backend split. */
+@@ -1733,15 +1822,26 @@ kbase_kmod_bo_alloc(struct pan_kmod_dev *dev,
+          },
+       };
+ 
+-      if (ioctl(dev->fd, KBASE_IOCTL_MEM_ALLOC_EX, &req)) {
+-         mesa_loge("kbase: KBASE_IOCTL_MEM_ALLOC_EX failed: %s",
+-                   strerror(errno));
+-         goto err_free_bo;
++      if (ioctl(dev->fd, KBASE_IOCTL_MEM_ALLOC_EX, &req) == 0) {
++         if (p_atomic_cmpxchg(&kbase_dev->mem_alloc_path, 0,
++                              KBASE_MEM_ALLOC_PATH_EX) == 0)
++            mesa_logi("kbase: mem_alloc via ALLOC_EX");
++         alloc_flags = req.out.flags;
++         alloc_gpu_va = req.out.gpu_va;
++         done = true;
++      } else {
++         const int err = errno;
++         if (path || (err != ENOTTY && err != EINVAL)) {
++            mesa_loge("kbase: KBASE_IOCTL_MEM_ALLOC_EX failed: %s",
++                      strerror(err));
++            goto err_free_bo;
++         }
++         mesa_logw("kbase: KBASE_IOCTL_MEM_ALLOC_EX failed: %s; "
++                   "trying KBASE_IOCTL_MEM_ALLOC", strerror(err));
+       }
++   }
+ 
+-      alloc_flags = req.out.flags;
+-      alloc_gpu_va = req.out.gpu_va;
+-   } else {
++   if (!done) {
+       union kbase_ioctl_mem_alloc req = {
+          .in = {
+             .va_pages = va_pages,
+@@ -1755,6 +1855,9 @@ kbase_kmod_bo_alloc(struct pan_kmod_dev *dev,
+          mesa_loge("kbase: KBASE_IOCTL_MEM_ALLOC failed: %s", strerror(errno));
+          goto err_free_bo;
+       }
++      if (p_atomic_cmpxchg(&kbase_dev->mem_alloc_path, 0,
++                           KBASE_MEM_ALLOC_PATH_LEGACY) == 0)
++         mesa_logi("kbase: mem_alloc via ALLOC");
+ 
+       alloc_flags = req.out.flags;
+       alloc_gpu_va = req.out.gpu_va;
+diff --git a/src/panfrost/lib/kmod/kbase_kmod.h b/src/panfrost/lib/kmod/kbase_kmod.h
+index ed96ac4..8397d69 100644
+--- a/src/panfrost/lib/kmod/kbase_kmod.h
++++ b/src/panfrost/lib/kmod/kbase_kmod.h
+@@ -41,6 +41,48 @@ bool kbase_kmod_supports_dmabuf(const struct pan_kmod_dev *dev);
+ int kbase_kmod_csf_group_create(struct pan_kmod_dev *dev,
+                                 uint32_t cs_queue_count,
+                                 uint32_t *group_handle);
++
++/* kbase counts va_pages, alias lengths and mmap handle offsets in kernel
++ * (CPU) pages: 4 KiB or 16 KiB.  Cached sysconf(_SC_PAGESIZE). */
++uint64_t kbase_kmod_page_size(void);
++
++/* CSF uAPI layouts, named by ioctl size in bytes (public
++ * mali_kbase_csf_ioctl.h, r3x-r5x):
++ *  CS_QUEUE_GROUP_CREATE: 32 = _1_6 (nr 42, all CSF uAPIs),
++ *    40 = _1_18 (nr 58, 1.7+; csi_handlers 1.12+), 112 = current (nr 58,
++ *    1.19+; cs_fault_report_enable 1.25+).
++ *  CS_TILER_HEAP_INIT: 16 = _1_13 (all), 24 = + buf_desc_va (1.14+).
++ * Newer kernels keep the older layouts as compat cases, so the
++ * device-proven layout goes first and the others are tried on
++ * EINVAL/ENOTTY in the order returned. */
++static inline unsigned
++kbase_csf_group_create_layouts(unsigned major, unsigned minor,
++                               unsigned out[3])
++{
++   const unsigned v = major * 1000 + minor;
++   unsigned n = 0;
++
++   if (v >= 1025)
++      out[n++] = 112;
++   out[n++] = 32;
++   if (v >= 1019 && v < 1025)
++      out[n++] = 112;
++   if (v >= 1007)
++      out[n++] = 40;
++   return n;
++}
++
++static inline unsigned
++kbase_csf_tiler_heap_init_layouts(unsigned major, unsigned minor,
++                                  unsigned out[2])
++{
++   unsigned n = 0;
++
++   out[n++] = 16;
++   if (major * 1000 + minor >= 1014)
++      out[n++] = 24;
++   return n;
++}
+ void kbase_kmod_csf_group_destroy(struct pan_kmod_dev *dev,
+                                   uint32_t group_handle);
+ 
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c b/src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c
+index 80089bb..37d1fc5 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c
+@@ -343,7 +343,7 @@ kbase_log_subqueue_state(struct panvk_gpu_queue *queue, uint32_t subqueue,
+    volatile uint32_t *stream_progress =
+       (volatile uint32_t *)((volatile uint8_t *)cell +
+                             KBASE_SEQNO_STREAM_PROGRESS_OFFSET);
+-   const uint8_t *output_page = (uint8_t *)subq->kbase.user_io + 8192;
++   const uint8_t *output_page = (uint8_t *)subq->kbase.user_io + 2 * kbase_kmod_page_size();
+    uint64_t extract =
+       *(volatile uint64_t *)(output_page + CS_USER_IO_OUTPUT_CS_EXTRACT);
+    uint32_t active =
+@@ -434,7 +434,7 @@ kbase_subqueue_reserve_ring(struct panvk_gpu_queue *queue,
+ {
+    struct panvk_device *dev = to_panvk_device(queue->vk.base.device);
+    struct panvk_subqueue *subq = &queue->subqueues[subqueue];
+-   const uint8_t *output_page = (uint8_t *)subq->kbase.user_io + 8192;
++   const uint8_t *output_page = (uint8_t *)subq->kbase.user_io + 2 * kbase_kmod_page_size();
+    uint64_t extract = *(volatile uint64_t *)(output_page +
+                                              CS_USER_IO_OUTPUT_CS_EXTRACT);
+    uint32_t offset = subq->kbase.insert % KBASE_RINGBUF_SIZE;
+@@ -738,7 +738,7 @@ kbase_subqueue_publish(struct panvk_gpu_queue *queue, uint32_t subqueue)
+ {
+    struct panvk_device *dev = to_panvk_device(queue->vk.base.device);
+    struct panvk_subqueue *subq = &queue->subqueues[subqueue];
+-   uint8_t *input_page = (uint8_t *)subq->kbase.user_io + 4096;
++   uint8_t *input_page = (uint8_t *)subq->kbase.user_io + kbase_kmod_page_size();
+ 
+    /* kbase_subqueue_emit_job() has already cleaned the CPU-written ring
+     * cachelines and completed that clean with kbase_gpu_wmb().  Do not issue
+@@ -752,7 +752,7 @@ kbase_subqueue_publish(struct panvk_gpu_queue *queue, uint32_t subqueue)
+     * CS_ACTIVE again after ringing it; if a suspend raced the write, the
+     * scheduler kick below safely resumes the group. */
+    kbase_gpu_wmb();
+-   uint8_t *output_page = (uint8_t *)subq->kbase.user_io + 8192;
++   uint8_t *output_page = (uint8_t *)subq->kbase.user_io + 2 * kbase_kmod_page_size();
+    volatile uint32_t *active =
+       (volatile uint32_t *)(output_page + CS_USER_IO_OUTPUT_CS_ACTIVE);
+ 
+@@ -790,8 +790,8 @@ kbase_subqueue_wait_seqno(struct panvk_gpu_queue *queue, uint32_t subqueue,
+    volatile uint32_t *stream_progress =
+       (volatile uint32_t *)((volatile uint8_t *)cell +
+                             KBASE_SEQNO_STREAM_PROGRESS_OFFSET);
+-   const uint8_t *input_page = (uint8_t *)subq->kbase.user_io + 4096;
+-   const uint8_t *output_page = (uint8_t *)subq->kbase.user_io + 8192;
++   const uint8_t *input_page = (uint8_t *)subq->kbase.user_io + kbase_kmod_page_size();
++   const uint8_t *output_page = (uint8_t *)subq->kbase.user_io + 2 * kbase_kmod_page_size();
+    uint64_t target_insert = subq->kbase.insert;
+    uint64_t seqno_addr = kbase_subqueue_seqno_dev_addr(queue, subqueue);
+    int64_t start = os_time_get_nano();

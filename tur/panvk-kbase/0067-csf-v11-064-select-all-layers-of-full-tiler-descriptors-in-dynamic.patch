@@ -1,0 +1,26 @@
+From: abhay-byte <zenithblue.dev@gmail.com>
+Subject: [PATCH csf-v11 064] panvk/csf: select all layers of full tiler descriptors in dynamic fullscreen runs
+Generated-by: LLM
+
+Purpose: TBD; biblioklept
+Source/Reference: TBD, work/mesa e2fde360503
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/063
+Validation test: TBD
+
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+index 23cdf6c7bda..2df4a505331 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+@@ -4779,7 +4779,8 @@ cmd_run_fullscreen(struct panvk_cmd_buffer *cmdbuf, uint64_t dcd,
+ 
+       cs_add_imm64(b, tiler_ctx_tmp, tiler_ctx_addr, 0);
+ 
+-      set_run_fullscreen_tiler_flags(b, MAX_LAYERS_PER_TILER_DESC, 0);
++      set_run_fullscreen_tiler_flags(b, 0,
++                                     BITFIELD_MASK(MAX_LAYERS_PER_TILER_DESC));
+ 
+       cs_while(b, MALI_CS_CONDITION_GREATER, td_count) {
+          cs_add_imm32(b, td_count, td_count, -1);

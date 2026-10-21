@@ -1,0 +1,1198 @@
+From c9edb433e064803fef92d488c7e66d078c06cde0 Mon Sep 17 00:00:00 2001
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: Sat, 3 Oct 2026 08:38:20 +0530
+Subject: [PATCH] panvk: draw GS viewport selections as ordered runs
+ biblioklept
+
+GS viewport-index selection was emulated with FS clipping and a GPU
+geometric clipper. Replace it with GPU-built ordered viewport runs
+(libpan vp_runs.cl): each run of consecutive primitives sharing a
+viewport is drawn as its own IDVS draw, with that viewport's hardware
+LOW/HIGH_DEPTH_CLAMP computed by the shared native helper
+(panvk_viewport_depth_range). The run list is built after each GS chunk,
+before TESS_READY, so tess-fed GS draws replay it per chunk. Overflow
+discards the draw rather than keeping a prefix. v12 keeps the old path
+since its depth clamp lives in the viewport register. Adds a host test
+for the run builder.
+
+Generated-by: LLM
+---
+ src/panfrost/libpan/draw_helper.cl          |   3 +
+ src/panfrost/libpan/draw_helper_vp.h        |  54 +++
+ src/panfrost/libpan/tests/vp_runs.c         | 346 +++++++++++++++++
+ src/panfrost/libpan/vp_runs.cl              | 192 ++++++++++
+ src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c | 392 ++++++++++++++++++--
+ src/panfrost/vulkan/panvk_cmd_draw.h        |   2 +
+ src/panfrost/vulkan/panvk_gpu_prerast.h     |   2 +-
+ 7 files changed, 957 insertions(+), 34 deletions(-)
+ create mode 100644 src/panfrost/libpan/draw_helper_vp.h
+ create mode 100644 src/panfrost/libpan/tests/vp_runs.c
+ create mode 100644 src/panfrost/libpan/vp_runs.cl
+
+diff --git a/src/panfrost/libpan/draw_helper.cl b/src/panfrost/libpan/draw_helper.cl
+index 9f5185142da..a0510b628f6 100644
+--- a/src/panfrost/libpan/draw_helper.cl
++++ b/src/panfrost/libpan/draw_helper.cl
+@@ -11,6 +11,7 @@
+ #include "poly/cl/restart.h"
+ #include "poly/cl/tessellator.h"
+ #include "draw_helper.h"
++#include "draw_helper_vp.h"
+ #include "tess_draw.h"
+ #include "libpan_xfb.h"
+ 
+@@ -594,6 +595,8 @@ panlib_xfb_byte_count_draw(constant uint32_t *counter, uint32_t counter_offset,
+    draw[2] = 0;
+    draw[3] = first_instance;
+ }
++
++#include "vp_runs.cl"
+ #endif
+ 
+ #if (PAN_ARCH == 6 || PAN_ARCH == 7)
+diff --git a/src/panfrost/libpan/draw_helper_vp.h b/src/panfrost/libpan/draw_helper_vp.h
+new file mode 100644
+index 00000000000..b155e73ca89
+--- /dev/null
++++ b/src/panfrost/libpan/draw_helper_vp.h
+@@ -0,0 +1,54 @@
++/*
++ * Copyright 2026 Abhay Byte
++ * SPDX-License-Identifier: MIT
++ */
++
++#pragma once
++
++#include <stdbool.h>
++#include <stdint.h>
++
++#define PANLIB_VP_RUN_HEADER_BYTES 12u
++#define PANLIB_VP_RUN_BYTES 12u
++#define PANLIB_VP_MAX_VIEWPORTS 16u
++#define PANLIB_VP_RESTART 0xffffffffu
++#define PANLIB_VP_MAX_INPUT_INDICES (1u << 24)
++#define PANLIB_VP_MAX_OUT_INDICES (1u << 24)
++#define PANLIB_VP_MAX_RUNS ((UINT32_MAX - PANLIB_VP_RUN_HEADER_BYTES) / PANLIB_VP_RUN_BYTES)
++
++struct panlib_vp_run {
++   uint32_t viewport;
++   uint32_t first_index;
++   uint32_t index_count;
++};
++
++struct panlib_vp_run_header {
++   uint32_t index_count;
++   uint32_t run_count;
++   uint32_t overflow;
++};
++
++/* Selected-viewport depth clamp, two little-endian floats. The run loop
++ * walks this with an immediate subtract: v11 cannot add a shifted
++ * viewport to a base address.
++ */
++struct panlib_vp_clamp {
++   float z_min;
++   float z_max;
++};
++
++/* The kernel argument struct is emitted by the libpan shader generator
++ * from panlib_vp_runs_launch. outputs_written is the GS mask before the
++ * passthrough drops the viewport bit.
++ */
++
++static inline bool
++panlib_vp_run_bytes(uint32_t run_capacity, uint64_t *bytes)
++{
++   if (run_capacity > PANLIB_VP_MAX_RUNS)
++      return false;
++
++   *bytes = PANLIB_VP_RUN_HEADER_BYTES +
++            (uint64_t)run_capacity * PANLIB_VP_RUN_BYTES;
++   return true;
++}
+diff --git a/src/panfrost/libpan/tests/vp_runs.c b/src/panfrost/libpan/tests/vp_runs.c
+new file mode 100644
+index 00000000000..f17c9c78181
+--- /dev/null
++++ b/src/panfrost/libpan/tests/vp_runs.c
+@@ -0,0 +1,346 @@
++/*
++ * Host emulation of panlib_vp_runs. Same .cl body.
++ * Topology and the packed-slot rank are the production helpers.
++ * libcl headers shadow libc, so they are not on the include path.
++ * OpenCL address-space words are empty here.
++ *
++ *   gcc -std=c11 -Wall -Werror -o /tmp/vp-runs \
++ *     src/panfrost/libpan/tests/vp_runs.c \
++ *     -Isrc/panfrost/libpan -Iinclude -Isrc -Isrc/panfrost \
++ *     && /tmp/vp-runs
++ */
++#include <stdbool.h>
++#include <stdint.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++
++#define global
++#define constant
++#define kernel
++#define __global
++#define __constant
++#define __kernel
++#define __attribute__(x)
++typedef unsigned int uint;
++
++#define UTIL_ARCH_LITTLE_ENDIAN 1
++#define UTIL_ARCH_BIG_ENDIAN 0
++#include "util/bitscan.h"
++#include "compiler/shader_enums.h"
++#include "poly/prim.h"
++
++#define PANLIB_VP_HOST 1
++#include "draw_helper_vp.h"
++#include "vp_runs.cl"
++
++#undef kernel
++#undef global
++
++#define CHECK(c)                                                               \
++   do {                                                                        \
++      if (!(c)) {                                                              \
++         fprintf(stderr, "vp_runs: %s\n", #c);                                 \
++         return 1;                                                             \
++      }                                                                        \
++   } while (0)
++
++#define STRIDE 512u
++
++static uint64_t
++outputs_with_viewport(void)
++{
++   return ((1ull << VARYING_SLOT_VIEWPORT) - 1) | VARYING_BIT_VIEWPORT;
++}
++
++static uint32_t
++vp_slot(void)
++{
++   return util_bitcount64(outputs_with_viewport() &
++                          BITFIELD64_MASK(VARYING_SLOT_VIEWPORT));
++}
++
++static void
++put_vp(uint32_t *rec, uint32_t id, uint32_t vp)
++{
++   rec[id * (STRIDE / 4) + vp_slot() * 4] = vp;
++   rec[id * (STRIDE / 4)] = 7;
++}
++
++static void
++call(const uint32_t *idx, uint32_t nidx, const uint32_t *rec, uint64_t outputs,
++     uint32_t vp_count, uint32_t prim, uint32_t prov_last, uint32_t icap,
++     uint32_t rcap, uint32_t *out, struct panlib_vp_run_header *hdr)
++{
++   memset(hdr, 0xa5, sizeof(*hdr) + 8 * sizeof(struct panlib_vp_run));
++   memset(out, 0xa5, 64 * sizeof(uint32_t));
++   panlib_vp_runs(idx, nidx, rec, STRIDE, outputs, vp_count, prim, prov_last,
++                  icap, rcap, out, hdr);
++}
++
++static int
++one_mode(uint32_t *rec, uint32_t prim, uint32_t prov_last, uint32_t nprim,
++         const uint32_t *expect_idx, const uint32_t *expect_vp)
++{
++   uint32_t idx[16];
++   uint32_t out[64];
++   struct {
++      struct panlib_vp_run_header h;
++      struct panlib_vp_run r[8];
++   } buf;
++   uint32_t nidx = prim == MESA_PRIM_POINTS ? nprim :
++                   prim == MESA_PRIM_LINES  ? nprim * 2 :
++                                              2 + nprim;
++
++   for (uint32_t i = 0; i < nidx; i++)
++      idx[i] = 10 + i;
++
++   call(idx, nidx, rec, outputs_with_viewport(), 4, prim, prov_last, 64, 8,
++        out, &buf.h);
++   CHECK(!buf.h.overflow);
++   CHECK(buf.h.index_count == nidx);
++   CHECK(buf.h.run_count >= 1);
++   for (uint32_t i = 0; i < nidx; i++)
++      CHECK(out[i] == expect_idx[i]);
++
++   uint32_t covered = 0;
++   for (uint32_t r = 0; r < buf.h.run_count; r++) {
++      CHECK(buf.r[r].first_index == covered);
++      CHECK(buf.r[r].viewport == expect_vp[r]);
++      covered += buf.r[r].index_count;
++   }
++   CHECK(covered == nidx);
++   return 0;
++}
++
++int
++main(void)
++{
++   CHECK(sizeof(struct panlib_vp_run_header) == PANLIB_VP_RUN_HEADER_BYTES);
++   CHECK(sizeof(struct panlib_vp_run) == PANLIB_VP_RUN_BYTES);
++   CHECK(util_bitcount64(outputs_with_viewport() &
++                         BITFIELD64_MASK(VARYING_SLOT_VIEWPORT)) ==
++         VARYING_SLOT_VIEWPORT);
++
++   uint64_t bytes = 0;
++   CHECK(panlib_vp_run_bytes(0, &bytes) && bytes == PANLIB_VP_RUN_HEADER_BYTES);
++   CHECK(panlib_vp_run_bytes(PANLIB_VP_MAX_RUNS, &bytes));
++   CHECK(!panlib_vp_run_bytes(PANLIB_VP_MAX_RUNS + 1, &bytes));
++   CHECK(bytes == PANLIB_VP_RUN_HEADER_BYTES + (uint64_t)PANLIB_VP_MAX_RUNS * 12);
++
++   uint32_t *rec = calloc(40, STRIDE);
++   CHECK(rec);
++   memset(rec, 0, 32 * STRIDE);
++   /* records 10..: viewports 0,0,1,1,1 then 2,9 */
++   put_vp(rec, 10, 0);
++   put_vp(rec, 11, 0);
++   put_vp(rec, 12, 1);
++   put_vp(rec, 13, 1);
++   put_vp(rec, 14, 1);
++   put_vp(rec, 15, 2);
++   put_vp(rec, 16, 9);
++
++   uint32_t out[64];
++   struct {
++      struct panlib_vp_run_header h;
++      struct panlib_vp_run r[8];
++   } buf;
++   uint64_t outs = outputs_with_viewport();
++
++   /* points: each point is its own run, 9 clamps to last viewport */
++   {
++      uint32_t idx[] = {10, 12, 16};
++      call(idx, 3, rec, outs, 4, MESA_PRIM_POINTS, 0, 64, 8, out, &buf.h);
++      CHECK(!buf.h.overflow && buf.h.run_count == 3 && buf.h.index_count == 3);
++      CHECK(buf.r[0].viewport == 0 && buf.r[1].viewport == 1 &&
++            buf.r[2].viewport == 3);
++      CHECK(out[0] == 10 && out[1] == 12 && out[2] == 16);
++   }
++
++   /* lines, list: (10,11) vp0, (12,13) vp1. Provoking last. */
++   {
++      uint32_t ei[] = {10, 11, 12, 13};
++      uint32_t ev[] = {0, 1};
++      CHECK(one_mode(rec, MESA_PRIM_LINES, 1, 2, ei, ev) == 0);
++   }
++
++   /* line strip, provoking last: (10,11) vp0, (11,12) vp1 */
++   {
++      uint32_t idx[] = {10, 11, 12};
++      call(idx, 3, rec, outs, 4, MESA_PRIM_LINE_STRIP, 1, 64, 8, out, &buf.h);
++      CHECK(!buf.h.overflow && buf.h.run_count == 2);
++      CHECK(buf.r[0].viewport == 0 && buf.r[0].index_count == 2);
++      CHECK(buf.r[1].viewport == 1 && buf.r[1].first_index == 2);
++      CHECK(out[2] == 11 && out[3] == 12);
++   }
++
++   /* triangles, list, one prim, provoking last is record 12 */
++   {
++      uint32_t ei[] = {10, 11, 12};
++      uint32_t ev[] = {1};
++      CHECK(one_mode(rec, MESA_PRIM_TRIANGLES, 1, 1, ei, ev) == 0);
++   }
++
++   /* triangle strip, provoking last, odd primitive swaps */
++   {
++      uint32_t idx[] = {10, 11, 12, 13, 14};
++      call(idx, 5, rec, outs, 4, MESA_PRIM_TRIANGLE_STRIP, 1, 64, 8, out,
++           &buf.h);
++      CHECK(!buf.h.overflow && buf.h.index_count == 9 && buf.h.run_count == 1);
++      CHECK(buf.r[0].viewport == 1 && buf.r[0].index_count == 9);
++      CHECK(out[0] == 10 && out[1] == 11 && out[2] == 12);
++      CHECK(out[3] == 12 && out[4] == 11 && out[5] == 13);
++      CHECK(out[6] == 12 && out[7] == 13 && out[8] == 14);
++   }
++
++   /* provoking first splits the strip: vp0 then vp1 */
++   {
++      uint32_t idx[] = {10, 11, 12, 13, 14};
++      call(idx, 5, rec, outs, 4, MESA_PRIM_TRIANGLE_STRIP, 0, 64, 8, out,
++           &buf.h);
++      CHECK(buf.h.run_count == 2);
++      CHECK(buf.r[0].viewport == 0 && buf.r[0].index_count == 6);
++      CHECK(buf.r[1].viewport == 1 && buf.r[1].first_index == 6 &&
++            buf.r[1].index_count == 3);
++      CHECK(out[3] == 11 && out[4] == 13 && out[5] == 12);
++   }
++
++   /* restart drops the tail of a strip and starts another */
++   {
++      uint32_t idx[] = {10, 11, 12, PANLIB_VP_RESTART, 15, 16};
++      call(idx, 6, rec, outs, 4, MESA_PRIM_LINE_STRIP, 1, 64, 8, out, &buf.h);
++      CHECK(!buf.h.overflow && buf.h.index_count == 6 && buf.h.run_count == 3);
++      CHECK(buf.r[0].viewport == 0 && out[0] == 10 && out[1] == 11);
++      CHECK(buf.r[1].viewport == 1 && out[2] == 11 && out[3] == 12);
++      CHECK(buf.r[2].viewport == 3 && out[4] == 15 && out[5] == 16);
++   }
++
++   /* no viewport output: every provoking vertex is viewport 0, one run */
++   {
++      uint32_t idx[] = {10, 12, 16};
++      call(idx, 3, rec, 0, 4, MESA_PRIM_POINTS, 0, 64, 8, out, &buf.h);
++      CHECK(buf.h.run_count == 1 && buf.r[0].viewport == 0 &&
++            buf.r[0].index_count == 3);
++   }
++
++   /* exact index cap merges into the open run; one past fails closed */
++   {
++      uint32_t idx[] = {10, 11, 12, 13};
++      call(idx, 4, rec, outs, 4, MESA_PRIM_TRIANGLE_STRIP, 1, 6, 1, out,
++           &buf.h);
++      CHECK(!buf.h.overflow && buf.h.index_count == 6 && buf.h.run_count == 1);
++      call(idx, 4, rec, outs, 4, MESA_PRIM_TRIANGLE_STRIP, 1, 5, 8, out,
++           &buf.h);
++      CHECK(buf.h.overflow == 1 && buf.h.index_count == 0 &&
++            buf.h.run_count == 0);
++   }
++
++   /* exact run cap, then one past: different viewports cannot merge */
++   {
++      uint32_t idx[] = {10, 12};
++      call(idx, 2, rec, outs, 4, MESA_PRIM_POINTS, 0, 64, 2, out, &buf.h);
++      CHECK(!buf.h.overflow && buf.h.run_count == 2);
++      call(idx, 2, rec, outs, 4, MESA_PRIM_POINTS, 0, 64, 1, out, &buf.h);
++      CHECK(buf.h.overflow == 1 && buf.h.index_count == 0 &&
++            buf.h.run_count == 0);
++   }
++
++   /* empty input and a restart-only buffer are valid empty draws */
++   {
++      call(NULL, 0, rec, outs, 4, MESA_PRIM_POINTS, 0, 64, 8, out, &buf.h);
++      CHECK(!buf.h.overflow && buf.h.index_count == 0 && buf.h.run_count == 0);
++      uint32_t holes[] = {PANLIB_VP_RESTART, PANLIB_VP_RESTART};
++      call(holes, 2, rec, outs, 4, MESA_PRIM_TRIANGLE_STRIP, 1, 64, 8, out,
++           &buf.h);
++      CHECK(!buf.h.overflow && buf.h.index_count == 0 && buf.h.run_count == 0);
++   }
++
++   /* zero capacities: nothing emitted is fine, one primitive is overflow */
++   {
++      uint32_t idx[] = {10};
++      call(idx, 0, rec, outs, 4, MESA_PRIM_POINTS, 0, 0, 0, out, &buf.h);
++      CHECK(!buf.h.overflow && buf.h.index_count == 0);
++      call(idx, 1, rec, outs, 4, MESA_PRIM_POINTS, 0, 0, 0, out, &buf.h);
++      CHECK(buf.h.overflow == 1 && buf.h.index_count == 0 &&
++            buf.h.run_count == 0);
++   }
++
++   /* absent viewport, record_stride 0: one run, viewport 0, no record read */
++   {
++      uint32_t idx[] = {10, 11, 12};
++      memset(&buf, 0, sizeof(buf));
++      panlib_vp_runs(idx, 3, NULL, 0, 0, 4, MESA_PRIM_POINTS, 0, 64, 8, out,
++                     &buf.h);
++      CHECK(!buf.h.overflow && buf.h.run_count == 1 && buf.r[0].viewport == 0 &&
++            buf.r[0].index_count == 3);
++   }
++
++   /* sparse mask: only viewport bit set, so the slot rank is 0 */
++   {
++      uint32_t idx[] = {0};
++      rec[0] = 2;
++      call(idx, 1, rec, VARYING_BIT_VIEWPORT, 4, MESA_PRIM_POINTS, 0, 64, 8,
++           out, &buf.h);
++      CHECK(!buf.h.overflow && buf.h.run_count == 1 && buf.r[0].viewport == 2);
++      rec[0] = 7;
++   }
++
++   /* quads are not a GS output mode */
++   {
++      uint32_t idx[] = {10, 11, 12, 13};
++      call(idx, 4, rec, outs, 4, MESA_PRIM_QUADS, 1, 64, 8, out, &buf.h);
++      CHECK(buf.h.overflow == 1 && buf.h.index_count == 0 &&
++            buf.h.run_count == 0);
++   }
++
++   /* restart inside a triangle strip: odd primitive after the cut */
++   {
++      uint32_t idx[] = {10, 11, 12, 13, PANLIB_VP_RESTART, 12, 13, 14};
++      call(idx, 8, rec, outs, 4, MESA_PRIM_TRIANGLE_STRIP, 1, 64, 8, out,
++           &buf.h);
++      /* First segment: even (10,11,12), odd swapped (12,11,13).
++       * Restart resets parity, so the next segment starts even again.
++       */
++      CHECK(!buf.h.overflow && buf.h.index_count == 9 && buf.h.run_count == 1);
++      CHECK(out[0] == 10 && out[1] == 11 && out[2] == 12);
++      CHECK(out[3] == 12 && out[4] == 11 && out[5] == 13);
++      CHECK(out[6] == 12 && out[7] == 13 && out[8] == 14);
++      CHECK(buf.r[0].viewport == 1);
++   }
++
++   /* canaries past the written indices and past the one run stay put */
++   {
++      uint32_t idx[] = {10};
++      memset(out, 0xa5, 64 * sizeof(uint32_t));
++      memset(&buf, 0xa5, sizeof(buf));
++      panlib_vp_runs(idx, 1, rec, STRIDE, outs, 4, MESA_PRIM_POINTS, 0, 64, 8,
++                     out, &buf.h);
++      CHECK(!buf.h.overflow && buf.h.index_count == 1 && buf.h.run_count == 1);
++      CHECK(out[0] == 10 && out[1] == 0xa5a5a5a5u);
++      CHECK(buf.r[1].viewport == 0xa5a5a5a5u);
++   }
++
++   /* limits: an output capacity past the documented bound discards the draw */
++   {
++      uint32_t idx[] = {10};
++      call(idx, 1, rec, outs, 4, MESA_PRIM_POINTS, 0,
++           PANLIB_VP_MAX_OUT_INDICES + 1, 1, out, &buf.h);
++      CHECK(buf.h.overflow == 1 && buf.h.index_count == 0 &&
++            buf.h.run_count == 0);
++      call(idx, PANLIB_VP_MAX_INPUT_INDICES + 1, rec, outs, 4, MESA_PRIM_POINTS,
++           0, 64, 1, out, &buf.h);
++      CHECK(buf.h.overflow == 1 && buf.h.run_count == 0);
++   }
++
++   /* A count past the output capacity discards the draw. */
++   {
++      uint32_t idx[] = {10, 11, 12};
++      call(idx, 3, rec, outs, 4, MESA_PRIM_POINTS, 0, 2, 8, out, &buf.h);
++      CHECK(buf.h.overflow == 1 && buf.h.index_count == 0 &&
++            buf.h.run_count == 0);
++   }
++
++   free(rec);
++   printf("vp_runs ok\n");
++   return 0;
++}
+diff --git a/src/panfrost/libpan/vp_runs.cl b/src/panfrost/libpan/vp_runs.cl
+new file mode 100644
+index 00000000000..74753673464
+--- /dev/null
++++ b/src/panfrost/libpan/vp_runs.cl
+@@ -0,0 +1,192 @@
++#ifdef PANLIB_VP_HOST
++#define VP_GLOBAL
++#define VP_CONST const
++#else
++#define VP_GLOBAL global
++#define VP_CONST global const
++#endif
++
++static bool
++vp_add_u32(uint32_t a, uint32_t b, uint32_t *out)
++{
++   if (a > UINT32_MAX - b)
++      return false;
++   *out = a + b;
++   return true;
++}
++
++/* Provoking vertex's packed slot, clamped into the active table.
++ * Missing slot is viewport 0. count is at least 1.
++ */
++static uint32_t
++vp_prim_viewport(VP_CONST uint32_t *records, uint32_t record_stride,
++                 uint32_t vp_slot, bool has_vp, uint32_t provoking,
++                 uint32_t count)
++{
++   uint32_t vp = 0;
++
++   if (has_vp) {
++      VP_CONST uint32_t *rec =
++         (VP_CONST uint32_t *)((VP_CONST char *)records +
++                               (uint64_t)provoking * record_stride);
++      vp = rec[vp_slot * 4];
++   }
++   return vp < count ? vp : count - 1;
++}
++
++/* A new run needs a free slot. A merge into the open run does not.
++ * Either way the primitive's vertices must fit. Failure discards later.
++ */
++static bool
++vp_emit(VP_GLOBAL uint32_t *out_indices, VP_GLOBAL struct panlib_vp_run *runs,
++        uint32_t *nidx, uint32_t *nrun, uint32_t index_cap, uint32_t run_cap,
++        uint32_t vp, uint32_t k, const uint32_t *vtx)
++{
++   uint32_t next;
++   bool merge = *nrun && runs[*nrun - 1].viewport == vp &&
++                runs[*nrun - 1].first_index + runs[*nrun - 1].index_count == *nidx;
++
++   if (!vp_add_u32(*nidx, k, &next) || next > index_cap)
++      return false;
++   if (!merge && (*nrun >= run_cap || !vp_add_u32(*nrun, 1, &next)))
++      return false;
++
++   if (merge)
++      runs[*nrun - 1].index_count += k;
++   else {
++      runs[*nrun].viewport = vp;
++      runs[*nrun].first_index = *nidx;
++      runs[*nrun].index_count = k;
++      (*nrun)++;
++   }
++   for (uint32_t v = 0; v < k; v++)
++      out_indices[(*nidx)++] = vtx[v];
++   return true;
++}
++
++static bool
++vp_prim(VP_CONST uint32_t *in_indices, VP_CONST uint32_t *records,
++        uint32_t record_stride, uint32_t vp_slot, bool has_vp, uint32_t count,
++        uint32_t prim, bool provoking_last, uint32_t p, uint32_t num_prims,
++        uint32_t base, VP_GLOBAL uint32_t *out_indices,
++        VP_GLOBAL struct panlib_vp_run *runs, uint32_t *nidx, uint32_t *nrun,
++        uint32_t index_cap, uint32_t run_cap)
++{
++   uint32_t k = mesa_vertices_per_prim((enum mesa_prim)prim);
++   uint32_t vtx[3];
++   uint32_t prov = provoking_last ? k - 1 : 0;
++
++   if (k == 0 || k > 3)
++      return false;
++
++   for (uint32_t v = 0; v < k; v++) {
++      uint32_t at;
++      if (!vp_add_u32(base, poly_vertex_id_for_topology((enum mesa_prim)prim,
++                                                     !provoking_last, p, v,
++                                                     num_prims),
++                      &at))
++         return false;
++      vtx[v] = in_indices[at];
++   }
++   return vp_emit(out_indices, runs, nidx, nrun, index_cap, run_cap,
++                  vp_prim_viewport(records, record_stride, vp_slot, has_vp,
++                                   vtx[prov], count),
++                  k, vtx);
++}
++
++static void
++panlib_vp_runs(VP_CONST uint32_t *in_indices, uint32_t index_count,
++               VP_CONST uint32_t *records, uint32_t record_stride,
++               uint64_t outputs_written, uint32_t viewport_count,
++               uint32_t prim, uint32_t provoking_last, uint32_t index_capacity,
++               uint32_t run_capacity, VP_GLOBAL uint32_t *out_indices,
++               VP_GLOBAL struct panlib_vp_run_header *header)
++{
++   bool has_vp = (outputs_written & VARYING_BIT_VIEWPORT) != 0;
++   uint32_t vp_slot = util_bitcount64(outputs_written &
++                                      BITFIELD64_MASK(VARYING_SLOT_VIEWPORT));
++   uint32_t count = viewport_count ? viewport_count : 1;
++   uint32_t slot_bytes;
++   bool overflow = false;
++   bool accepted = prim == MESA_PRIM_POINTS || prim == MESA_PRIM_LINES ||
++                   prim == MESA_PRIM_LINE_STRIP || prim == MESA_PRIM_TRIANGLES ||
++                   prim == MESA_PRIM_TRIANGLE_STRIP;
++
++   if (count > PANLIB_VP_MAX_VIEWPORTS)
++      count = PANLIB_VP_MAX_VIEWPORTS;
++   /* Empty input is a valid empty draw. Stride is checked only when a
++    * viewport slot is actually read. record_stride 0 is fine if aligned
++    * and the slot is absent.
++    */
++   if (!accepted || index_count > PANLIB_VP_MAX_INPUT_INDICES ||
++       index_count > index_capacity ||
++       index_capacity > PANLIB_VP_MAX_OUT_INDICES ||
++       run_capacity > PANLIB_VP_MAX_RUNS || (record_stride & 3) ||
++       (has_vp && (!vp_add_u32(vp_slot * 16, 4, &slot_bytes) ||
++                   slot_bytes > record_stride)))
++      overflow = true;
++
++   VP_GLOBAL struct panlib_vp_run *runs =
++      (VP_GLOBAL struct panlib_vp_run *)(header + 1);
++   uint32_t nidx = 0, nrun = 0;
++   bool prov_last = provoking_last != 0;
++   uint32_t needle = 0;
++
++   while (needle < index_count && !overflow) {
++      uint32_t next = index_count;
++
++      for (uint32_t i = needle; i < index_count; i++) {
++         if (in_indices[i] == PANLIB_VP_RESTART) {
++            next = i;
++            break;
++         }
++      }
++
++      uint32_t len = next - needle;
++      uint32_t prims =
++         u_decomposed_prims_for_vertices((enum mesa_prim)prim, (int)len);
++
++      for (uint32_t p = 0; p < prims && !overflow; p++) {
++         overflow = !vp_prim(in_indices, records, record_stride, vp_slot,
++                             has_vp, count, prim, prov_last, p, prims,
++                             needle, out_indices, runs, &nidx, &nrun,
++                             index_capacity, run_capacity);
++      }
++      if (!vp_add_u32(next, 1, &needle))
++         overflow = true;
++   }
++
++   /* Fail closed: a partial draw is not a draw. */
++   header->index_count = overflow ? 0 : nidx;
++   header->run_count = overflow ? 0 : nrun;
++   header->overflow = overflow ? 1 : 0;
++}
++
++#ifndef PANLIB_VP_HOST
++/* counts points at the GS draw word: the number of indices the GS kernel
++ * restart-filled. Slots past it are untouched and must not be read.
++ */
++KERNEL(1)
++panlib_vp_runs_launch(uint64_t in_indices, uint64_t records,
++                     uint64_t out_indices, uint64_t header,
++                     uint64_t outputs_written, uint64_t counts,
++                     uint32_t record_stride, uint32_t viewport_count,
++                     uint32_t prim, uint32_t provoking_last,
++                     uint32_t index_bound, uint32_t index_capacity,
++                     uint32_t run_capacity)
++{
++   uint32_t n = *((global const uint32_t *)counts);
++
++   /* A count past the filled region means the draw word is not the one
++    * this allocation was sized for. Force the walker's overflow path.
++    */
++   if (n > index_bound)
++      n = PANLIB_VP_MAX_INPUT_INDICES + 1;
++   panlib_vp_runs((global const uint32_t *)in_indices, n,
++                  (global const uint32_t *)records, record_stride,
++                  outputs_written, viewport_count, prim, provoking_last,
++                  index_capacity, run_capacity,
++                  (global uint32_t *)out_indices,
++                  (global struct panlib_vp_run_header *)header);
++}
++#endif
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+index 0e9bc667b35..2f06e59a365 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+@@ -45,6 +45,7 @@
+ #include "pan_props.h"
+ #include "pan_samples.h"
+ #include "pan_shader.h"
++#include "libpan/draw_helper_vp.h"
+ 
+ #include "util/bitscan.h"
+ #include "vk_format.h"
+@@ -893,8 +894,8 @@ panvk_full_fb_box(const struct panvk_cmd_buffer *cmdbuf,
+ }
+ 
+ static void
+-panvk_prerast_depth_union(const struct panvk_cmd_buffer *cmdbuf,
+-                          float *z_min, float *z_max)
++panvk_viewport_depth_range(const struct panvk_cmd_buffer *cmdbuf,
++                           unsigned index, float *z_min, float *z_max)
+ {
+    const struct vk_viewport_state *vp = &cmdbuf->vk.dynamic_graphics_state.vp;
+ 
+@@ -906,25 +907,30 @@ panvk_prerast_depth_union(const struct panvk_cmd_buffer *cmdbuf,
+ 
+    const struct vk_rasterization_state *rs =
+       &cmdbuf->vk.dynamic_graphics_state.rs;
++   float sz, oz;
++
++   panvk_viewport_z_coeffs(vp, rs, index, &sz, &oz);
++   float a = vp->depth_clip_negative_one_to_one ? oz - sz : oz;
++   float b = oz + sz;
++   *z_min = MIN2(a, b);
++   *z_max = MAX2(a, b);
++}
++
++static void
++panvk_prerast_depth_union(const struct panvk_cmd_buffer *cmdbuf,
++                          float *z_min, float *z_max)
++{
++   const struct vk_viewport_state *vp = &cmdbuf->vk.dynamic_graphics_state.vp;
+    unsigned n = vp->viewport_count ? vp->viewport_count : 1;
+ 
+    n = MIN2(n, ARRAY_SIZE(vp->viewports));
+-   for (unsigned i = 0; i < n; i++) {
+-      float sz, oz;
+-      float a, b, lo, hi;
+-
+-      panvk_viewport_z_coeffs(vp, rs, i, &sz, &oz);
+-      a = vp->depth_clip_negative_one_to_one ? oz - sz : oz;
+-      b = oz + sz;
+-      lo = MIN2(a, b);
+-      hi = MAX2(a, b);
+-      if (i == 0) {
+-         *z_min = lo;
+-         *z_max = hi;
+-      } else {
+-         *z_min = MIN2(*z_min, lo);
+-         *z_max = MAX2(*z_max, hi);
+-      }
++   panvk_viewport_depth_range(cmdbuf, 0, z_min, z_max);
++   for (unsigned i = 1; i < n; i++) {
++      float lo, hi;
++
++      panvk_viewport_depth_range(cmdbuf, i, &lo, &hi);
++      *z_min = MIN2(*z_min, lo);
++      *z_max = MAX2(*z_max, hi);
+    }
+ }
+ 
+@@ -1033,9 +1039,7 @@ prepare_vp(struct panvk_cmd_buffer *cmdbuf)
+             cfg.max_x = CLAMP(maxx, 0, UINT16_MAX);
+             cfg.max_y = CLAMP(maxy, 0, UINT16_MAX);
+ 
+-            panvk_depth_range(&cmdbuf->state.gfx,
+-                              &cmdbuf->vk.dynamic_graphics_state.vp,
+-                              &z_min, &z_max);
++            panvk_viewport_depth_range(cmdbuf, 0, &z_min, &z_max);
+          }
+          cfg.min_depth = z_min;
+          cfg.max_depth = z_max;
+@@ -1130,9 +1134,7 @@ prepare_vp(struct panvk_cmd_buffer *cmdbuf)
+       if (indexed)
+          panvk_prerast_depth_union(cmdbuf, &z_min, &z_max);
+       else
+-         panvk_depth_range(&cmdbuf->state.gfx,
+-                           &cmdbuf->vk.dynamic_graphics_state.vp, &z_min,
+-                           &z_max);
++         panvk_viewport_depth_range(cmdbuf, 0, &z_min, &z_max);
+       cs_move32_to(b, cs_sr_reg32(b, IDVS, LOW_DEPTH_CLAMP), fui(z_min));
+       cs_move32_to(b, cs_sr_reg32(b, IDVS, HIGH_DEPTH_CLAMP), fui(z_max));
+    }
+@@ -3254,10 +3256,12 @@ launch_draw(struct panvk_cmd_buffer *cmdbuf,
+ 
+    cs_update_vt_ctx(b) {
+       cs_move32_to(b, cs_sr_reg32(b, IDVS, GLOBAL_ATTRIBUTE_OFFSET), 0);
+-      cs_move32_to(b, cs_sr_reg32(b, IDVS, INDEX_COUNT), draw->vertex.count);
++      if (!draw->index_sr_set) {
++         cs_move32_to(b, cs_sr_reg32(b, IDVS, INDEX_COUNT), draw->vertex.count);
++         cs_move32_to(b, cs_sr_reg32(b, IDVS, INDEX_OFFSET), draw->index.offset);
++      }
+       cs_move32_to(b, cs_sr_reg32(b, IDVS, INSTANCE_COUNT),
+                    draw->instance.count);
+-      cs_move32_to(b, cs_sr_reg32(b, IDVS, INDEX_OFFSET), draw->index.offset);
+       cs_move32_to(b, cs_sr_reg32(b, IDVS, VERTEX_OFFSET), draw->vertex.base);
+       /* NIR expects zero-based instance ID, but even if it did have an
+        * intrinsic to load the absolute instance ID, we'd want to keep it
+@@ -3623,9 +3627,12 @@ launch_indirect_draw(struct panvk_cmd_buffer *cmdbuf,
+ 
+ static void panvk_cmd_draw(struct panvk_cmd_buffer *cmdbuf,
+                            struct panvk_draw_info draw);
++static void launch_draw(struct panvk_cmd_buffer *cmdbuf,
++                        const struct panvk_draw_info *draw);
+ static void gpu_prerast_draw_generated(
+    struct panvk_cmd_buffer *cmdbuf, const struct panvk_draw_info *source,
+-   uint64_t arena, enum panvk_gpu_prerast_poly_mode poly_mode);
++   uint64_t arena, enum panvk_gpu_prerast_poly_mode poly_mode,
++   const struct panlib_vp_runs_launch_args *vp_launch);
+ 
+ static void
+ gpu_prerast_wait_compute(struct panvk_cmd_buffer *cmdbuf)
+@@ -4287,16 +4294,97 @@ gpu_prerast_draw(struct panvk_cmd_buffer *cmdbuf,
+       gpu_prerast_xfb(cmdbuf, source, arena, PANLIB_BARRIER_CSF_SYNC);
+ 
+    gpu_prerast_wait_compute(cmdbuf);
+-   gpu_prerast_draw_generated(cmdbuf, source, arena, poly_mode);
++   gpu_prerast_draw_generated(cmdbuf, source, arena, poly_mode, NULL);
+    gpu_prerast_release_arena(cmdbuf, arena);
+    return true;
+ }
+ 
++/* One IDVS draw per viewport run, in the order the helper emitted them.
++ * The clamp table is walked by subtracting 8 from its address until the
++ * viewport count hits zero: v11 cannot add a shifted index to a base.
++ * Scratch 0..7 and 14..16 belong to launch_draw and conditional render.
++ * ponytail: serial. A wider draw wants the xfb_scan split already named
++ * on panlib_vp_runs.
++ */
++static void
++gpu_prerast_vp_runs(struct panvk_cmd_buffer *cmdbuf,
++                    struct panvk_draw_info *draw, uint64_t header,
++                    uint64_t clamps)
++{
++   struct cs_builder *b =
++      panvk_get_cs_builder(cmdbuf, PANVK_SUBQUEUE_VERTEX_TILER);
++   struct cs_index addr = cs_scratch_reg64(b, 8);
++   struct cs_index caddr = cs_scratch_reg64(b, 10);
++   struct cs_index left = cs_scratch_reg32(b, 12);
++   struct cs_index word = cs_scratch_reg32(b, 13);
++
++   cs_move64_to(b, addr, header);
++   cs_load32_to(b, left, addr,
++                offsetof(struct panlib_vp_run_header, run_count));
++   cs_load32_to(b, word, addr,
++                offsetof(struct panlib_vp_run_header, overflow));
++   cs_wait_slot(b, SB_ID(LS));
++
++   /* Overflow discards the draw. A prefix would be a different primitive
++    * stream than the one the GS emitted.
++    */
++   cs_if(b, MALI_CS_CONDITION_NEQUAL, word)
++      cs_move32_to(b, left, 0);
++
++   cs_add_imm64(b, addr, addr, PANLIB_VP_RUN_HEADER_BYTES);
++   cs_while(b, MALI_CS_CONDITION_GREATER, left) {
++#if PAN_ARCH < 12
++      cs_load32_to(b, word, addr, offsetof(struct panlib_vp_run, viewport));
++      cs_wait_slot(b, SB_ID(LS));
++      cs_move64_to(b, caddr, clamps);
++      cs_while(b, MALI_CS_CONDITION_NEQUAL, word) {
++         cs_add_imm64(b, caddr, caddr, sizeof(struct panlib_vp_clamp));
++         cs_add_imm32(b, word, word, -1);
++      }
++      cs_load32_to(b, word, caddr, offsetof(struct panlib_vp_clamp, z_min));
++      cs_wait_slot(b, SB_ID(LS));
++      /* IDVS registers are read-only outside the staging context. */
++      cs_update_vt_ctx(b) {
++         cs_move32_to(b, cs_sr_reg32(b, IDVS, LOW_DEPTH_CLAMP), 0);
++         cs_add_imm32(b, cs_sr_reg32(b, IDVS, LOW_DEPTH_CLAMP), word, 0);
++      }
++      cs_load32_to(b, word, caddr, offsetof(struct panlib_vp_clamp, z_max));
++      cs_wait_slot(b, SB_ID(LS));
++      cs_update_vt_ctx(b) {
++         cs_move32_to(b, cs_sr_reg32(b, IDVS, HIGH_DEPTH_CLAMP), 0);
++         cs_add_imm32(b, cs_sr_reg32(b, IDVS, HIGH_DEPTH_CLAMP), word, 0);
++      }
++#else
++      (void)caddr;
++      (void)clamps;
++#endif
++
++      cs_load32_to(b, word, addr, offsetof(struct panlib_vp_run, first_index));
++      cs_wait_slot(b, SB_ID(LS));
++      cs_update_vt_ctx(b) {
++         cs_move32_to(b, cs_sr_reg32(b, IDVS, INDEX_OFFSET), 0);
++         cs_add_imm32(b, cs_sr_reg32(b, IDVS, INDEX_OFFSET), word, 0);
++      }
++      cs_load32_to(b, word, addr, offsetof(struct panlib_vp_run, index_count));
++      cs_wait_slot(b, SB_ID(LS));
++      cs_update_vt_ctx(b) {
++         cs_move32_to(b, cs_sr_reg32(b, IDVS, INDEX_COUNT), 0);
++         cs_add_imm32(b, cs_sr_reg32(b, IDVS, INDEX_COUNT), word, 0);
++      }
++      draw->index_sr_set = true;
++      launch_draw(cmdbuf, draw);
++
++      cs_add_imm32(b, left, left, -1);
++      cs_add_imm64(b, addr, addr, PANLIB_VP_RUN_BYTES);
++   }
++}
++
+ /* Draws what gpu_prerast_vs() and gpu_prerast_gs_run() left in the arena. */
+ static void
+ gpu_prerast_draw_generated(struct panvk_cmd_buffer *cmdbuf,
+                            const struct panvk_draw_info *source, uint64_t arena,
+-                           enum panvk_gpu_prerast_poly_mode poly_mode)
++                           enum panvk_gpu_prerast_poly_mode poly_mode,
++                           const struct panlib_vp_runs_launch_args *vp_launch)
+ {
+    const struct panvk_shader *gs = cmdbuf->state.gfx.gs.shader;
+    uint64_t indices = arena + PANVK_GPU_PRERAST_INDEX_OFFSET;
+@@ -4357,6 +4445,137 @@ gpu_prerast_draw_generated(struct panvk_cmd_buffer *cmdbuf,
+    }
+     generated.gpu_prerast_generated = true;
+ 
++#if PAN_ARCH >= 12
++    /* v12 packs the depth clamp into the viewport register. A run split
++     * there would change the index buffer and still clamp to viewport 0.
++     */
++    gs = NULL;
++#endif
++    if (gs && (vp_launch ||
++               panvk_prerast_viewport_shader(&cmdbuf->state.gfx))) {
++       const struct panvk_gpu_prerast_gs_info *gsi = &gs->gpu_prerast.gs;
++        const uint32_t slots =
++           vp_launch ? 1 : panvk_gpu_prerast_gs_cap_slots(gsi);
++        uint32_t index_count = 0;
++        const bool count_ok = vp_launch ||
++           (slots && gsi->index_stride &&
++            !__builtin_mul_overflow(slots, gsi->index_stride, &index_count));
++        /* A triangle strip expands to 3 indices per primitive. The output
++         * buffer has to hold that, not the input count.
++         */
++        const uint32_t out_count =
++           gsi->output_prim == MESA_PRIM_TRIANGLE_STRIP && index_count > 2
++              ? (index_count - 2) * 3
++              : index_count;
++        const uint32_t run_capacity =
++           count_ok ? MIN2(out_count, PANLIB_VP_MAX_RUNS) : 0;
++        uint64_t run_bytes = 0;
++        uint64_t index_bytes = 0;
++
++        /* Fail closed before any raster work. A short buffer would keep a
++         * prefix of the primitive stream.
++         */
++        if (!vp_launch &&
++            (!count_ok || index_count > PANLIB_VP_MAX_INPUT_INDICES ||
++             out_count > PANLIB_VP_MAX_OUT_INDICES ||
++             !panlib_vp_run_bytes(run_capacity, &run_bytes) ||
++             !panvk_gpu_prerast_checked_size(out_count, sizeof(uint32_t), 4,
++                                             &index_bytes))) {
++          mesa_loge_once(
++             "panvk: viewport run list does not fit, draw discarded");
++          vk_command_buffer_set_error(&cmdbuf->vk,
++                                      VK_ERROR_OUT_OF_DEVICE_MEMORY);
++          return;
++       }
++
++        struct pan_ptr runs = {0}, out = {0};
++
++       if (!vp_launch) {
++          runs = panvk_cmd_alloc_dev_mem(cmdbuf, desc, run_bytes, 16);
++          out = panvk_cmd_alloc_dev_mem(cmdbuf, desc, index_bytes, 16);
++       }
++       if (!vp_launch && (!runs.gpu || !out.gpu)) {
++          vk_command_buffer_set_error(&cmdbuf->vk,
++                                      VK_ERROR_OUT_OF_DEVICE_MEMORY);
++          return;
++       }
++
++        struct panlib_vp_runs_launch_args owned, *use = &owned;
++
++       if (vp_launch)
++          use = (struct panlib_vp_runs_launch_args *)vp_launch;
++       else
++          owned = (struct panlib_vp_runs_launch_args) {
++           .in_indices = arena + PANVK_GPU_PRERAST_GS_INDEX_OFFSET,
++           .records = arena + PANVK_GPU_PRERAST_GS_RECORD_OFFSET,
++           .out_indices = out.gpu,
++           .header = runs.gpu,
++           .outputs_written = gsi->outputs_written,
++           /* First word of the GS draw is the restart-filled index count. */
++           .counts = arena + PANVK_GPU_PRERAST_GS_DRAW_OFFSET,
++           .record_stride = gsi->record_stride,
++           .viewport_count =
++              cmdbuf->vk.dynamic_graphics_state.vp.viewport_count,
++           .prim = gsi->output_prim,
++           .provoking_last =
++              cmdbuf->vk.dynamic_graphics_state.rs.provoking_vertex ==
++              VK_PROVOKING_VERTEX_MODE_LAST_VERTEX_EXT,
++           .index_bound = index_count,
++           .index_capacity = out_count,
++           .run_capacity = run_capacity,
++        };
++        uint32_t vp_count = use->viewport_count ? use->viewport_count : 1;
++
++        generated.index.buffer_dev_addr = use->out_indices;
++        generated.index.buffer_size =
++           (uint64_t)use->index_capacity * sizeof(uint32_t);
++        generated.index.offset = 0;
++        generated.vertex.count = 0;
++        generated.indirect.buffer_dev_addr = 0;
++        generated.index.restart_enable = false;
++        generated.prim = gsi->output_prim == MESA_PRIM_POINTS ? MESA_PRIM_POINTS
++                         : gsi->output_prim == MESA_PRIM_LINE_STRIP
++                            ? MESA_PRIM_LINES
++                            : MESA_PRIM_TRIANGLES;
++
++         /* vp_launch set: the producer loop already dispatches this.
++          * A launch here is recorded after that loop, past TESS_FREE.
++          */
++         if (!vp_launch) {
++            struct panvk_precomp_ctx ctx = panvk_per_arch(precomp_cs)(cmdbuf);
++
++            panlib_vp_runs_launch_struct(&ctx, panlib_1d(1),
++                                         PANLIB_BARRIER_CSF_SYNC, *use);
++            gpu_prerast_wait_compute(cmdbuf);
++         }
++        gfx_state_set_dirty(cmdbuf, VS);
++       gfx_state_set_dirty(cmdbuf, VS_PUSH_UNIFORMS);
++       if (prepare_draw(cmdbuf, &generated) != VK_SUCCESS)
++          return;
++       struct panlib_vp_clamp clamps_cpu[PANLIB_VP_MAX_VIEWPORTS];
++       vp_count = MIN2(vp_count, PANLIB_VP_MAX_VIEWPORTS);
++       for (uint32_t i = 0; i < vp_count; i++) {
++          panvk_viewport_depth_range(cmdbuf, i, &clamps_cpu[i].z_min,
++                                     &clamps_cpu[i].z_max);
++       }
++
++       const size_t clamps_size = vp_count * sizeof(clamps_cpu[0]);
++       struct pan_ptr cptr =
++          panvk_cmd_alloc_dev_mem(cmdbuf, desc, clamps_size, 8);
++       if (!cptr.gpu) {
++          vk_command_buffer_set_error(&cmdbuf->vk,
++                                      VK_ERROR_OUT_OF_DEVICE_MEMORY);
++          return;
++       }
++       memcpy(cptr.cpu, clamps_cpu, clamps_size);
++       gpu_prerast_vp_runs(cmdbuf, &generated, use->header, cptr.gpu);
++       BITSET_SET(cmdbuf->vk.dynamic_graphics_state.dirty,
++                  MESA_VK_DYNAMIC_VP_VIEWPORTS);
++       gfx_state_set_dirty(cmdbuf, VS);
++       gfx_state_set_dirty(cmdbuf, VS_PUSH_UNIFORMS);
++       return;
++    }
++
+     gfx_state_set_dirty(cmdbuf, VS);
+     gfx_state_set_dirty(cmdbuf, VS_PUSH_UNIFORMS);
+     panvk_cmd_draw(cmdbuf, generated);
+@@ -4487,9 +4706,74 @@ gpu_prerast_cond_render_pass(struct panvk_cmd_buffer *cmdbuf,
+  * iteration. The vertex/tiler iteration then draws that range. Nothing is
+  * dropped: the loop runs until every patch and index is drawn.
+  */
++static bool
++gpu_prerast_vp_prepare(struct panvk_cmd_buffer *cmdbuf, uint64_t arena,
++                       struct panlib_vp_runs_launch_args *args)
++{
++#if PAN_ARCH >= 12
++   return false;
++#else
++   const struct panvk_shader *gs = cmdbuf->state.gfx.gs.shader;
++
++   if (!gs || !panvk_prerast_viewport_shader(&cmdbuf->state.gfx))
++      return false;
++
++   const struct panvk_gpu_prerast_gs_info *gsi = &gs->gpu_prerast.gs;
++   const uint32_t slots = panvk_gpu_prerast_gs_cap_slots(gsi);
++   uint32_t index_count = 0;
++   const bool count_ok =
++      slots && gsi->index_stride &&
++      !__builtin_mul_overflow(slots, gsi->index_stride, &index_count);
++   const uint32_t out_count =
++      gsi->output_prim == MESA_PRIM_TRIANGLE_STRIP && index_count > 2
++         ? (index_count - 2) * 3
++         : index_count;
++   const uint32_t run_capacity =
++      count_ok ? MIN2(out_count, PANLIB_VP_MAX_RUNS) : 0;
++   uint64_t run_bytes = 0, index_bytes = 0;
++
++   if (!count_ok || index_count > PANLIB_VP_MAX_INPUT_INDICES ||
++       out_count > PANLIB_VP_MAX_OUT_INDICES ||
++       !panlib_vp_run_bytes(run_capacity, &run_bytes) ||
++       !panvk_gpu_prerast_checked_size(out_count, sizeof(uint32_t), 4,
++                                       &index_bytes)) {
++      vk_command_buffer_set_error(&cmdbuf->vk, VK_ERROR_OUT_OF_DEVICE_MEMORY);
++      return false;
++   }
++
++   struct pan_ptr runs = panvk_cmd_alloc_dev_mem(cmdbuf, desc, run_bytes, 16);
++   struct pan_ptr out = panvk_cmd_alloc_dev_mem(cmdbuf, desc, index_bytes, 16);
++
++   if (!runs.gpu || !out.gpu) {
++      vk_command_buffer_set_error(&cmdbuf->vk, VK_ERROR_OUT_OF_DEVICE_MEMORY);
++      return false;
++   }
++
++   *args = (struct panlib_vp_runs_launch_args) {
++      .in_indices = arena + PANVK_GPU_PRERAST_GS_INDEX_OFFSET,
++      .records = arena + PANVK_GPU_PRERAST_GS_RECORD_OFFSET,
++      .out_indices = out.gpu,
++      .header = runs.gpu,
++      .outputs_written = gsi->outputs_written,
++      .counts = arena + PANVK_GPU_PRERAST_GS_DRAW_OFFSET,
++      .record_stride = gsi->record_stride,
++      .viewport_count = cmdbuf->vk.dynamic_graphics_state.vp.viewport_count,
++      .prim = gsi->output_prim,
++      .provoking_last =
++         cmdbuf->vk.dynamic_graphics_state.rs.provoking_vertex ==
++         VK_PROVOKING_VERTEX_MODE_LAST_VERTEX_EXT,
++      .index_bound = index_count,
++      .index_capacity = out_count,
++      .run_capacity = run_capacity,
++   };
++   return true;
++#endif
++}
++
+ static void
+ gpu_prerast_tess(struct panvk_cmd_buffer *cmdbuf,
+-                 const struct panvk_draw_info *draw)
++                 const struct panvk_draw_info *draw,
++                 const struct panlib_vp_runs_launch_args *vp_launch)
+ {
+    struct panvk_device *dev = to_panvk_device(cmdbuf->vk.base.device);
+    const struct vk_dynamic_graphics_state *dyns =
+@@ -4862,10 +5146,45 @@ gpu_prerast_tess(struct panvk_cmd_buffer *cmdbuf,
+                prerast_arena + PANVK_GPU_PRERAST_INDEX_OFFSET,
+                TD(gs_prim_base), PANVK_CSF_BARRIER_WAIT);
+          }
+-         if (xfb) {
++          if (xfb) {
+             gpu_prerast_xfb(cmdbuf, &out, prerast_arena, PANLIB_BARRIER_NONE);
+             cs_wait_slots(b, dev->csf.sb.all_iters_mask);
+          }
++          /* Before TESS_READY. Queued after the loop it would sit behind
++           * the next TESS_FREE wait, and the vertex side waits for it
++           * before signalling that.
++           */
++          if (vp_launch) {
++             struct cs_index pred =
++                gpu_prerast_load_flag(b, pass_mem.gpu);
++             /* pred is scratch 0. gpu_prerast_load_flag keeps its pointer
++              * in scratch 2, so the header address starts at 4.
++              */
++             struct cs_index zero = cs_scratch_reg32(b, 6);
++             struct cs_index hdr = cs_scratch_reg64(b, 8);
++
++             cs_if(b, MALI_CS_CONDITION_EQUAL, pred) {
++                cs_move32_to(b, zero, 0);
++                cs_move64_to(b, hdr, vp_launch->header);
++                for (unsigned i = 0;
++                     i < sizeof(struct panlib_vp_run_header) / sizeof(uint32_t);
++                     i++)
++                   cs_store32(b, zero, hdr, i * sizeof(uint32_t));
++                cs_flush_stores(b);
++             }
++             /* The loop body is recorded once and the GPU replays it, so
++              * this is one dispatch per chunk, after that chunk's GS and
++              * before TESS_READY.
++              */
++             cs_if(b, MALI_CS_CONDITION_NEQUAL, pred) {
++                struct panvk_precomp_ctx vp_ctx =
++                   panvk_per_arch(precomp_cs)(cmdbuf);
++
++                panlib_vp_runs_launch_struct(&vp_ctx, panlib_1d(1),
++                                             PANLIB_BARRIER_NONE, *vp_launch);
++             }
++             cs_wait_slots(b, dev->csf.sb.all_iters_mask);
++          }
+          cmdbuf->state.gfx.vs.shader = vs;
+          gfx_state_set_dirty(cmdbuf, VS);
+          gfx_state_set_dirty(cmdbuf, VS_PUSH_UNIFORMS);
+@@ -4902,7 +5221,7 @@ gpu_prerast_tess(struct panvk_cmd_buffer *cmdbuf,
+          cs_if(vt, MALI_CS_CONDITION_NEQUAL, pred) {
+             if (nested)
+                gpu_prerast_draw_generated(cmdbuf, &raster, prerast_arena,
+-                                          poly_mode);
++                                          poly_mode, vp_launch);
+             else
+                panvk_cmd_draw(cmdbuf, raster);
+          }
+@@ -5128,7 +5447,14 @@ panvk_cmd_draw(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info draw)
+       return;
+ 
+    if (!draw.gpu_prerast_generated && draw.prim == MESA_PRIM_PATCHES) {
+-      gpu_prerast_tess(cmdbuf, &draw);
++      struct panlib_vp_runs_launch_args vp_args;
++      uint64_t prerast = panvk_priv_mem_dev_addr(
++         to_panvk_device(cmdbuf->vk.base.device)->gpu_prerast_arena);
++      const struct panlib_vp_runs_launch_args *vp = NULL;
++
++      if (gpu_prerast_vp_prepare(cmdbuf, prerast, &vp_args))
++         vp = &vp_args;
++      gpu_prerast_tess(cmdbuf, &draw, vp);
+       return;
+    }
+ 
+diff --git a/src/panfrost/vulkan/panvk_cmd_draw.h b/src/panfrost/vulkan/panvk_cmd_draw.h
+index 5baa459a753..b5438b83ae0 100644
+--- a/src/panfrost/vulkan/panvk_cmd_draw.h
++++ b/src/panfrost/vulkan/panvk_cmd_draw.h
+@@ -522,6 +522,8 @@ struct panvk_draw_info {
+ 
+    enum mesa_prim prim;
+    bool gpu_prerast_generated;
++   /* INDEX_COUNT and INDEX_OFFSET were loaded from a GPU run header. */
++   bool index_sr_set;
+    /* Already counted by a pipeline statistics query (split chunks). */
+    bool pstats_counted;
+    /* The primitives generated query was updated by the tessellation kernels. */
+diff --git a/src/panfrost/vulkan/panvk_gpu_prerast.h b/src/panfrost/vulkan/panvk_gpu_prerast.h
+index da3b68a0332..1eeeda04553 100644
+--- a/src/panfrost/vulkan/panvk_gpu_prerast.h
++++ b/src/panfrost/vulkan/panvk_gpu_prerast.h
+@@ -15,7 +15,7 @@
+ #include "util/macros.h"
+ #include "vulkan/vulkan_core.h"
+ 
+-#define PANVK_GPU_PRERAST_ABI_VERSION 7
++#define PANVK_GPU_PRERAST_ABI_VERSION 9
+ #define PANVK_GPU_PRERAST_MAX_EXECUTION_BYTES (256ull * 1024 * 1024)
+ #define PANVK_GPU_PRERAST_VS_REGION_END (32ull * 1024 * 1024)
+ #define PANVK_GPU_PRERAST_GS_INDEX_OFFSET PANVK_GPU_PRERAST_VS_REGION_END
+-- 
+2.55.0
+

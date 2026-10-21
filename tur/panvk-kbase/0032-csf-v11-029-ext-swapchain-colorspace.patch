@@ -1,0 +1,24 @@
+From: Valentine Burley <valentine.burley@collabora.com>
+Subject: [PATCH csf-v11 029] panvk: Advertise VK_EXT_swapchain_colorspace
+
+Purpose: advertise VK_EXT_swapchain_colorspace (device-proven)
+Source/Reference: upstream Mesa commit eef8db800ac (author preserved)
+Backport-of: eef8db800ac
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/028
+Validation test: tests/dxvk/vulkan/backport-ext/wsi_ext.c (WSI_EXT_FAILS=0)
+
+diff --git a/src/panfrost/vulkan/panvk_instance.c b/src/panfrost/vulkan/panvk_instance.c
+index 88f89cdf76e6a154b85f29a62482a4938cb2a213..0f5cafc5e436eb1ed01ca0e8b435a92fd2ea97b7 100644
+--- a/src/panfrost/vulkan/panvk_instance.c
++++ b/src/panfrost/vulkan/panvk_instance.c
+@@ -114,6 +114,7 @@ static const struct vk_instance_extension_table panvk_instance_extensions = {
+    .KHR_surface = true,
+    .KHR_surface_maintenance1 = true,
+    .EXT_surface_maintenance1 = true,
++   .EXT_swapchain_colorspace = true,
+ #endif
+ #ifdef VK_USE_PLATFORM_DISPLAY_KHR
+    .KHR_display = true,

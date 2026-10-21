@@ -1,0 +1,113 @@
+From 215539975662446ec01d8da2cbb3d77f1fe13676 Mon Sep 17 00:00:00 2001
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: Sat, 3 Oct 2026 12:02:43 +0530
+Subject: [PATCH 3/3] panvk: give attachment-less secondaries a context with
+ their sample count biblioklept
+
+variableMultisampleRate only worked in primaries: a secondary ran in
+whatever context the primary had, so its draws used the primary's sample
+count. A secondary records the rasterizationSamples of its draws, and
+vkCmdExecuteCommands makes the primary split its render context when the
+count differs, or create it with that count. A primary that suspended and
+resumed a pass in the same command buffer splits too, as it knows the count
+of its context. A secondary that draws with several counts and a context
+inherited from another command buffer still keep one count; the first is
+logged.
+
+Generated-by: LLM
+---
+ src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c | 44 ++++++++++++++++++---
+ src/panfrost/vulkan/panvk_cmd_draw.h        |  7 ++++
+ 2 files changed, 45 insertions(+), 6 deletions(-)
+
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+index 7f765a2c507..da41abcabf9 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+@@ -3049,12 +3049,19 @@ prepare_draw(struct panvk_cmd_buffer *cmdbuf,
+        */
+       if (!cmdbuf->state.gfx.render.bound_attachments) {
+          assert(rasterization_samples > 0);
+-         /* ponytail: only split a render context this command buffer owns;
+-          * inherited contexts (secondaries, cross-cmdbuf resume) keep the
+-          * sample count they were created with.
++         /* Secondaries cannot change the context they run in, see
++          * vmr_samples. A primary can when it knows the count of its context:
++          * its own, or one it suspended and resumed. A context from another
++          * command buffer has fb->sample_count 0 and keeps its count.
+           */
+-         if (!inherits_render_ctx(cmdbuf) && fb->sample_count != 0 &&
+-             fb->sample_count != rasterization_samples) {
++         if (cmdbuf->vk.level == VK_COMMAND_BUFFER_LEVEL_SECONDARY) {
++            if (!cmdbuf->state.gfx.render.vmr_samples)
++               cmdbuf->state.gfx.render.vmr_samples = rasterization_samples;
++            else if (cmdbuf->state.gfx.render.vmr_samples !=
++                     rasterization_samples)
++               cmdbuf->state.gfx.render.vmr_mixed = true;
++         } else if (fb->sample_count != 0 &&
++                    fb->sample_count != rasterization_samples) {
+             result = split_render_ctx(cmdbuf);
+             if (result != VK_SUCCESS)
+                return result;
+@@ -5753,7 +5760,30 @@ panvk_per_arch(cmd_prepare_exec_cmd_for_draws)(
+    if (!(secondary->flags & VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT))
+       return VK_SUCCESS;
+ 
+-   if (!inherits_render_ctx(primary)) {
++   /* An attachment-less secondary runs in a context with its sample count.
++    * The primary gives it one, splitting the current context when it is known
++    * to have another count (see prepare_draw). Without that the secondary's
++    * draws would run with the count of whatever the primary had.
++    */
++   bool new_ctx = false;
++   const uint32_t sec_samples = secondary->state.gfx.render.vmr_samples;
++   if (sec_samples && !primary->state.gfx.render.bound_attachments) {
++      const struct pan_fb_layout *fb = &primary->state.gfx.render.fb.layout;
++
++      if (secondary->state.gfx.render.vmr_mixed)
++         mesa_logw("panvk: secondary command buffer with several "
++                   "rasterizationSamples values, all run with %u samples",
++                   sec_samples);
++      if (fb->sample_count != 0 && fb->sample_count != sec_samples) {
++         VkResult result = split_render_ctx(primary);
++         if (result != VK_SUCCESS)
++            return result;
++         new_ctx = true;
++      }
++      primary->state.gfx.render.fb.nr_samples = sec_samples;
++   }
++
++   if (new_ctx || !inherits_render_ctx(primary)) {
+       enum u_tristate first_provoking_vertex =
+          secondary->state.gfx.render.first_provoking_vertex;
+       set_provoking_vertex_mode(primary, first_provoking_vertex);
+@@ -6011,6 +6041,8 @@ panvk_per_arch(cmd_inherit_render_state)(
+       return;
+ 
+    assert(pBeginInfo->pInheritanceInfo);
++   cmdbuf->state.gfx.render.vmr_samples = 0;
++   cmdbuf->state.gfx.render.vmr_mixed = false;
+    char gcbiar_data[VK_GCBIARR_DATA_SIZE(MAX_RTS)];
+    const VkRenderingInfo *resume_info =
+       vk_get_command_buffer_inheritance_as_rendering_resume(cmdbuf->vk.level,
+diff --git a/src/panfrost/vulkan/panvk_cmd_draw.h b/src/panfrost/vulkan/panvk_cmd_draw.h
+index 8fc677e1e59..d88b68478a9 100644
+--- a/src/panfrost/vulkan/panvk_cmd_draw.h
++++ b/src/panfrost/vulkan/panvk_cmd_draw.h
+@@ -109,6 +109,13 @@ struct panvk_rendering_state {
+     * inherited context, and the primary command buffer needs to know. */
+    bool invalidate_inherited_ctx;
+ 
++   /* Attachment-less secondary: rasterizationSamples of its first draw, the
++    * count the primary has to give the inherited context. A secondary is one
++    * CS stream, it cannot change the context in the middle: later draws with
++    * another count set vmr_mixed. */
++   uint8_t vmr_samples;
++   bool vmr_mixed;
++
+    /* True if the last render pass was suspended. */
+    bool suspended;
+ 
+-- 
+2.55.0
+

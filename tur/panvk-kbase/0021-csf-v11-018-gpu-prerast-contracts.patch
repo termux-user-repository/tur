@@ -1,0 +1,1365 @@
+From: panvk-kbase-android worker <panvk-worker@localhost>
+Subject: [PATCH csf-v11 018] panvk: GPU prerast VS records to IDVS/FS slice
+Generated-by: LLM
+
+Purpose: Prove GPU VS -> records -> generated index/indirect -> passthrough IDVS VS -> FS.
+Source/Reference: Mesa poly at 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf, csf-v11, src/poly
+Validation test: tests/dxvk/vulkan/test_gpu_prerast_contracts.py
+
+diff --git a/src/panfrost/compiler/bifrost/bifrost_compile.c b/src/panfrost/compiler/bifrost/bifrost_compile.c
+index 7322b40..d7adf88 100644
+--- a/src/panfrost/compiler/bifrost/bifrost_compile.c
++++ b/src/panfrost/compiler/bifrost/bifrost_compile.c
+@@ -1497,7 +1497,7 @@ bi_emit_intrinsic(bi_builder *b, nir_intrinsic_instr *instr)
+       break;
+ 
+    case nir_intrinsic_load_attr_pan:
+-      assert(stage == MESA_SHADER_VERTEX);
++      assert(stage == MESA_SHADER_VERTEX || stage == MESA_SHADER_COMPUTE);
+       bi_emit_load_attr(b, instr);
+       break;
+ 
+diff --git a/src/panfrost/compiler/pan_nir.h b/src/panfrost/compiler/pan_nir.h
+index 2f917d5..7c870ef 100644
+--- a/src/panfrost/compiler/pan_nir.h
++++ b/src/panfrost/compiler/pan_nir.h
+@@ -243,6 +243,7 @@ bool pan_nir_lower_var_special_pan(nir_shader *shader);
+ bool pan_nir_lower_noperspective_vs(nir_shader *shader);
+ 
+ bool pan_nir_lower_vs_inputs(nir_shader *shader, uint64_t gpu_id);
++bool pan_nir_lower_vs_inputs_poly(nir_shader *shader, uint64_t gpu_id);
+ 
+ bool pan_nir_lower_vs_outputs(nir_shader *shader, uint64_t gpu_id,
+                               const struct pan_varying_layout *varying_layout,
+diff --git a/src/panfrost/compiler/pan_nir_lower_vs_inputs.c b/src/panfrost/compiler/pan_nir_lower_vs_inputs.c
+index a6815b3..a73dd26 100644
+--- a/src/panfrost/compiler/pan_nir_lower_vs_inputs.c
++++ b/src/panfrost/compiler/pan_nir_lower_vs_inputs.c
+@@ -13,7 +13,8 @@ lower_vs_input_intr(nir_builder *b, nir_intrinsic_instr *intr, void *data)
+       return false;
+ 
+    b->cursor = nir_before_instr(&intr->instr);
+-   nir_def *vtx_id = nir_load_raw_vertex_id(b);
++   bool poly = *(bool *)data;
++   nir_def *vtx_id = poly ? nir_load_vertex_id(b) : nir_load_raw_vertex_id(b);
+    nir_def *ins_id = nir_load_instance_id(b);
+    nir_def *offset = intr->src[0].ssa;
+ 
+@@ -51,7 +52,17 @@ lower_vs_input_intr(nir_builder *b, nir_intrinsic_instr *intr, void *data)
+ bool
+ pan_nir_lower_vs_inputs(nir_shader *shader, uint64_t gpu_id)
+ {
++   bool poly = false;
+    return nir_shader_intrinsics_pass(shader, lower_vs_input_intr,
+-                                    nir_metadata_control_flow,
+-                                    (void *)&gpu_id);
++                                     nir_metadata_control_flow,
++                                     &poly);
++}
++
++bool
++pan_nir_lower_vs_inputs_poly(nir_shader *shader, uint64_t gpu_id)
++{
++   bool poly = true;
++   return nir_shader_intrinsics_pass(shader, lower_vs_input_intr,
++                                     nir_metadata_control_flow,
++                                     &poly);
+ }
+diff --git a/src/panfrost/vulkan/csf/panvk_gpu_prerast.c b/src/panfrost/vulkan/csf/panvk_gpu_prerast.c
+new file mode 100644
+index 0000000..2c13681
+--- /dev/null
++++ b/src/panfrost/vulkan/csf/panvk_gpu_prerast.c
+@@ -0,0 +1,106 @@
++/*
++ * Copyright 2026 Abhay Byte
++ * SPDX-License-Identifier: MIT
++ */
++
++#include "panvk_gpu_prerast.h"
++#include "panvk_cmd_buffer.h"
++#include "panvk_cmd_draw.h"
++
++struct panvk_gpu_prerast_draw
++panvk_per_arch(gpu_prerast_draw_info)(const struct panvk_draw_info *draw)
++{
++   return (struct panvk_gpu_prerast_draw){
++      .index_buffer = draw->index.buffer_dev_addr,
++      .indirect_buffer = draw->indirect.buffer_dev_addr,
++      .indirect_count_buffer = draw->indirect.count_buffer_dev_addr,
++      .index_buffer_size = draw->index.buffer_size,
++      .index_offset = draw->index.offset,
++      .index_size = draw->index.index_size,
++      .vertex_offset = draw->vertex.base,
++      .vertex_count = draw->vertex.count,
++      .first_instance = draw->instance.base,
++      .instance_count = draw->instance.count,
++      .draw_count = draw->indirect.draw_count,
++      .indirect_stride = draw->indirect.stride,
++      .prim = draw->prim,
++      .primitive_restart = draw->index.restart_enable,
++   };
++}
++
++VkResult
++panvk_per_arch(gpu_prerast_validate_execution)(
++   const struct panvk_cmd_buffer *cmdbuf,
++   const struct panvk_gpu_prerast_execution *exec)
++{
++   if (exec->abi_version != PANVK_GPU_PRERAST_ABI_VERSION ||
++       exec->record_stride < 16 ||
++       !exec->record_count || !exec->record_stride)
++      return VK_ERROR_UNKNOWN;
++
++   uint64_t record_bytes;
++   if (!panvk_gpu_prerast_checked_size(exec->record_count,
++                                        exec->record_stride, 64,
++                                        &record_bytes) ||
++       record_bytes > PANVK_GPU_PRERAST_MAX_EXECUTION_BYTES)
++      return VK_ERROR_OUT_OF_DEVICE_MEMORY;
++
++   return VK_SUCCESS;
++}
++
++bool
++panvk_per_arch(gpu_prerast_can_lower)(
++   const struct panvk_cmd_buffer *cmdbuf, const struct panvk_draw_info *draw,
++   const struct panvk_gpu_prerast_shader *shader)
++{
++    if (!PANVK_DEBUG(GPU_PRERAST) || shader->has_side_effects ||
++        !shader->lowered_vs_compiled || !shader->passthrough_vs_compiled ||
++        (draw->indirect.buffer_dev_addr && draw->indirect.draw_count > 1) ||
++        draw->indirect.count_buffer_dev_addr)
++       return false;
++
++    if (!draw->indirect.buffer_dev_addr) {
++       if (!draw->vertex.count || !draw->instance.count)
++          return true;
++       if ((uint64_t)draw->vertex.count * draw->instance.count >
++           PANVK_GPU_PRERAST_MAX_INVOCATIONS)
++          return false;
++    }
++
++   switch (draw->prim) {
++   case MESA_PRIM_POINTS:
++   case MESA_PRIM_LINES:
++   case MESA_PRIM_LINE_STRIP:
++   case MESA_PRIM_TRIANGLES:
++   case MESA_PRIM_TRIANGLE_STRIP:
++   case MESA_PRIM_TRIANGLE_FAN:
++      return true;
++   default:
++      return false;
++   }
++}
++
++const struct panvk_gpu_prerast_contract
++panvk_per_arch(gpu_prerast_contract) = {
++   .side_effect_policy = PANVK_GPU_PRERAST_SIDE_EFFECT_SINGLE_EXECUTION,
++   .scratch_lifetime = PANVK_GPU_PRERAST_LIFETIME_SUBMISSION,
++   .render_scope = PANVK_GPU_PRERAST_INTERNAL_JOB_SPLIT,
++   .output_order = PANVK_GPU_PRERAST_ORDER_ORIGINAL_PRIMITIVE,
++   .state_isolation = PANVK_GPU_PRERAST_STATE_SAVED_AND_DIRTIED,
++   .sync = {
++      .producer_stages = VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT |
++                         VK_PIPELINE_STAGE_2_TESSELLATION_CONTROL_SHADER_BIT |
++                         VK_PIPELINE_STAGE_2_TESSELLATION_EVALUATION_SHADER_BIT |
++                         VK_PIPELINE_STAGE_2_GEOMETRY_SHADER_BIT,
++      .producer_access = VK_ACCESS_2_SHADER_READ_BIT |
++                         VK_ACCESS_2_SHADER_WRITE_BIT,
++      .internal_consumer_stages = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT |
++                                  VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT |
++                                  VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT,
++      .internal_consumer_access = VK_ACCESS_2_SHADER_READ_BIT |
++                                  VK_ACCESS_2_SHADER_WRITE_BIT |
++                                  VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT |
++                                  VK_ACCESS_2_INDEX_READ_BIT |
++                                  VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT,
++   },
++};
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+index 289b9e6..fdf8c36 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+@@ -21,6 +21,7 @@
+ #include "panvk_cmd_buffer.h"
+ #include "panvk_cmd_desc_state.h"
+ #include "panvk_cmd_draw.h"
++#include "panvk_gpu_prerast.h"
+ #include "panvk_cmd_frame_shaders.h"
+ #include "panvk_cmd_meta.h"
+ #include "panvk_cmd_precomp.h"
+@@ -2840,8 +2841,10 @@ static VkResult
+ prepare_draw(struct panvk_cmd_buffer *cmdbuf,
+              const struct panvk_draw_info *draw)
+ {
+-   const struct panvk_shader_variant *vs =
+-      panvk_shader_hw_variant(cmdbuf->state.gfx.vs.shader);
++   const struct panvk_shader_variant *vs = draw->gpu_prerast_generated
++      ? panvk_shader_gpu_prerast_variant(cmdbuf->state.gfx.vs.shader,
++                                         PANVK_VS_VARIANT_GPU_PASSTHROUGH)
++      : panvk_shader_hw_variant(cmdbuf->state.gfx.vs.shader);
+    const struct panvk_shader_variant *fs =
+       panvk_shader_only_variant(get_fs(cmdbuf));
+    ASSERTED bool idvs = vs->info.vs.idvs;
+@@ -2849,6 +2852,13 @@ prepare_draw(struct panvk_cmd_buffer *cmdbuf,
+ 
+    assert(vs);
+ 
++    if (!draw->gpu_prerast_generated) {
++       assert(panvk_gpu_prerast_select(
++                 cmdbuf->state.gfx.vs.shader->gpu_prerast.requirements,
++                 cmdbuf->state.gfx.vs.shader->gpu_prerast.lowered_vs_compiled) ==
++              PANVK_PRERAST_HW_IDVS);
++    }
++
+    /* FIXME: support non-IDVS. */
+    assert(idvs);
+ 
+@@ -3286,12 +3296,14 @@ patch_vs_attribs(struct panvk_cmd_buffer *cmdbuf,
+ 
+ static void
+ launch_indirect_draw(struct panvk_cmd_buffer *cmdbuf,
+-                     const struct panvk_draw_info *draw)
++                      const struct panvk_draw_info *draw)
+ {
+    const struct cs_tracing_ctx *tracing_ctx =
+       &cmdbuf->state.cs[PANVK_SUBQUEUE_VERTEX_TILER].tracing;
+-   const struct panvk_shader_variant *vs =
+-      panvk_shader_hw_variant(cmdbuf->state.gfx.vs.shader);
++   const struct panvk_shader_variant *vs = draw->gpu_prerast_generated
++      ? panvk_shader_gpu_prerast_variant(cmdbuf->state.gfx.vs.shader,
++                                         PANVK_VS_VARIANT_GPU_PASSTHROUGH)
++      : panvk_shader_hw_variant(cmdbuf->state.gfx.vs.shader);
+    struct cs_builder *b =
+       panvk_get_cs_builder(cmdbuf, PANVK_SUBQUEUE_VERTEX_TILER);
+ 
+@@ -3453,11 +3465,250 @@ launch_indirect_draw(struct panvk_cmd_buffer *cmdbuf,
+    }
+ }
+ 
++static void panvk_cmd_draw(struct panvk_cmd_buffer *cmdbuf,
++                           struct panvk_draw_info draw);
++
++static void
++gpu_prerast_wait_compute(struct panvk_cmd_buffer *cmdbuf)
++{
++   struct cs_builder *b =
++      panvk_get_cs_builder(cmdbuf, PANVK_SUBQUEUE_VERTEX_TILER);
++   struct cs_index sync_addr = cs_scratch_reg64(b, 0);
++   struct cs_index sync_point = cs_scratch_reg64(b, 2);
++
++   cs_load64_to(b, sync_addr, cs_subqueue_ctx_reg(b),
++                offsetof(struct panvk_cs_subqueue_context, syncobjs));
++   cs_add_imm64(b, sync_addr, sync_addr,
++                PANVK_SUBQUEUE_COMPUTE * sizeof(struct panvk_cs_sync64));
++   cs_add_imm64(b, sync_point,
++                cs_progress_seqno_reg(b, PANVK_SUBQUEUE_COMPUTE),
++                cmdbuf->state.cs[PANVK_SUBQUEUE_COMPUTE].relative_sync_point);
++   panvk_instr_sync64_wait(cmdbuf, PANVK_SUBQUEUE_VERTEX_TILER, false,
++                           MALI_CS_CONDITION_GREATER, sync_point, sync_addr);
++}
++
++static void
++gpu_prerast_release_arena(struct panvk_cmd_buffer *cmdbuf, uint64_t arena)
++{
++   struct panvk_device *dev = to_panvk_device(cmdbuf->vk.base.device);
++   struct cs_builder *b =
++      panvk_get_cs_builder(cmdbuf, PANVK_SUBQUEUE_VERTEX_TILER);
++   struct cs_index addr = cs_scratch_reg64(b, 0);
++   struct cs_index one = cs_scratch_reg32(b, 2);
++
++   cs_wait_slots(b, dev->csf.sb.all_iters_mask);
++   cs_move64_to(b, addr, arena + offsetof(struct panvk_gpu_prerast_arena,
++                                          available));
++   cs_move32_to(b, one, 1);
++   cs_sync32_add(b, true, MALI_CS_SYNC_SCOPE_CSG, one, addr, cs_now());
++}
++
++static bool
++gpu_prerast_draw(struct panvk_cmd_buffer *cmdbuf,
++                 const struct panvk_draw_info *source)
++{
++   struct panvk_device *dev = to_panvk_device(cmdbuf->vk.base.device);
++   struct panvk_shader *shader = cmdbuf->state.gfx.vs.shader;
++   if (!panvk_per_arch(gpu_prerast_can_lower)(cmdbuf, source,
++                                               &shader->gpu_prerast))
++      return false;
++
++   panvk_per_arch(cmd_prepare_draw_sysvals)(
++      cmdbuf, source, panvk_shader_only_variant(get_fs(cmdbuf)));
++
++   uint64_t arena = panvk_priv_mem_dev_addr(dev->gpu_prerast_arena);
++   uint64_t params = arena + PANVK_GPU_PRERAST_PARAMS_OFFSET;
++   uint64_t records = arena + PANVK_GPU_PRERAST_RECORD_OFFSET;
++   uint64_t indices = arena + PANVK_GPU_PRERAST_INDEX_OFFSET;
++   uint64_t generated_draw = arena + PANVK_GPU_PRERAST_DRAW_OFFSET;
++   struct cs_builder *compute =
++      panvk_get_cs_builder(cmdbuf, PANVK_SUBQUEUE_COMPUTE);
++   struct cs_index addr = cs_scratch_reg64(compute, 0);
++   struct cs_index value = cs_scratch_reg32(compute, 2);
++   struct cs_index draw_params = cs_scratch_reg64(compute, 4);
++
++   cs_move64_to(compute, addr,
++                arena + offsetof(struct panvk_gpu_prerast_arena, available));
++   cs_move32_to(compute, value, 0);
++   cs_sync32_wait(compute, false, MALI_CS_CONDITION_GREATER, value, addr);
++   cs_move32_to(compute, value, -1);
++   cs_sync32_add(compute, true, MALI_CS_SYNC_SCOPE_CSG, value, addr, cs_now());
++
++   uint32_t vertex_count = source->vertex.count;
++   uint32_t instance_count = source->instance.count;
++   uint32_t first_instance = source->instance.base;
++   struct cs_index count_reg = cs_scratch_reg32(compute, 6);
++   struct cs_index instance_reg = cs_scratch_reg32(compute, 7);
++   struct cs_index first_index_reg = cs_scratch_reg32(compute, 8);
++   struct cs_index vertex_base_reg = cs_scratch_reg32(compute, 9);
++   struct cs_index first_instance_reg = cs_scratch_reg32(compute, 10);
++   if (source->indirect.buffer_dev_addr) {
++      cs_move64_to(compute, draw_params, source->indirect.buffer_dev_addr);
++      cs_load32_to(compute, count_reg, draw_params, 0);
++      cs_load32_to(compute, instance_reg, draw_params, 4);
++      if (source->index.index_size) {
++         cs_load32_to(compute, first_index_reg, draw_params, 8);
++         cs_load32_to(compute, vertex_base_reg, draw_params, 12);
++         cs_load32_to(compute, first_instance_reg, draw_params, 16);
++      } else {
++         cs_load32_to(compute, vertex_base_reg, draw_params, 8);
++         cs_load32_to(compute, first_instance_reg, draw_params, 12);
++         cs_move32_to(compute, first_index_reg, 0);
++      }
++      cs_move64_to(compute, draw_params, params);
++      cs_store32(compute, count_reg, draw_params,
++                 offsetof(struct panvk_gpu_prerast_params, vertex_count));
++      cs_store32(compute, instance_reg, draw_params,
++                 offsetof(struct panvk_gpu_prerast_params, instance_count));
++      cs_store32(compute, count_reg, draw_params,
++                 offsetof(struct panvk_gpu_prerast_params, vertex.verts_per_instance));
++      cs_store32(compute, first_index_reg, draw_params,
++                 offsetof(struct panvk_gpu_prerast_params, index_offset));
++      cs_store32(compute, first_instance_reg, draw_params,
++                 offsetof(struct panvk_gpu_prerast_params, first_instance));
++   }
++
++   cs_move64_to(compute, draw_params, generated_draw);
++   if (source->indirect.buffer_dev_addr) {
++      cs_store32(compute, count_reg, draw_params, 0);
++      cs_store32(compute, instance_reg, draw_params, 4);
++      cs_move32_to(compute, value, 0);
++      cs_store32(compute, value, draw_params, 8);
++      cs_store32(compute, first_instance_reg, draw_params, 12);
++      cs_store32(compute, value, draw_params, 16);
++   } else {
++      cs_move32_to(compute, value, vertex_count);
++      cs_store32(compute, value, draw_params, 0);
++      cs_move32_to(compute, value, instance_count);
++      cs_store32(compute, value, draw_params, 4);
++      cs_move32_to(compute, value, 0);
++      cs_store32(compute, value, draw_params, 8);
++      cs_move32_to(compute, value, first_instance);
++      cs_store32(compute, value, draw_params, 12);
++      cs_move32_to(compute, value, 0);
++      cs_store32(compute, value, draw_params, 16);
++   }
++
++   struct pan_ptr push;
++   const struct panvk_shader_variant *lowered = panvk_shader_gpu_prerast_variant(
++      shader, PANVK_VS_VARIANT_GPU_LOWERED);
++    if (panvk_per_arch(cmd_prepare_gfx_push_uniforms)(cmdbuf, lowered, &push, 1)
++        != VK_SUCCESS)
++       return true;
++    uint64_t *fau = push.cpu;
++    if (shader_uses_sysval(lowered, graphics, gpu_prerast_params)) {
++       uint32_t params_off = shader_remapped_sysval_offset(
++          lowered, sysval_offset(graphics, gpu_prerast_params));
++       *(uint64_t *)((uint8_t *)fau + params_off) = params;
++    }
++    if (shader_uses_sysval(lowered, graphics, gpu_prerast_records)) {
++       uint32_t records_off = shader_remapped_sysval_offset(
++          lowered, sysval_offset(graphics, gpu_prerast_records));
++       *(uint64_t *)((uint8_t *)fau + records_off) = records;
++    }
++    cmdbuf->state.gfx.sysvals.gpu_prerast_params = params;
++    cmdbuf->state.gfx.sysvals.gpu_prerast_records = records;
++    if (source->indirect.buffer_dev_addr) {
++       cs_move64_to(compute, addr, push.gpu);
++       if (shader_uses_sysval(lowered, graphics, vs.first_vertex))
++          cs_store32(compute, vertex_base_reg, addr,
++                     shader_remapped_sysval_offset(
++                        lowered, sysval_offset(graphics, vs.first_vertex)));
++       if (shader_uses_sysval(lowered, graphics, vs.base_instance))
++          cs_store32(compute, first_instance_reg, addr,
++                     shader_remapped_sysval_offset(
++                        lowered, sysval_offset(graphics, vs.base_instance)));
++       cs_flush_stores(compute);
++    }
++
++   cs_move64_to(compute, draw_params, params);
++#define STORE_PARAM32(field, imm) do {                                         \
++   cs_move32_to(compute, value, (imm));                                        \
++   cs_store32(compute, value, draw_params,                                     \
++              offsetof(struct panvk_gpu_prerast_params, field));               \
++} while (0)
++#define STORE_PARAM64(field, imm) do {                                         \
++   cs_move64_to(compute, addr, (imm));                                         \
++   cs_store64(compute, addr, draw_params,                                      \
++              offsetof(struct panvk_gpu_prerast_params, field));               \
++} while (0)
++   STORE_PARAM64(vertex.index_buffer, source->index.buffer_dev_addr);
++   STORE_PARAM32(vertex.index_size_B, source->index.index_size);
++    STORE_PARAM32(vertex.index_buffer_range_el,
++                  source->index.index_size
++                     ? source->index.buffer_size / source->index.index_size : 0);
++    if (!source->indirect.buffer_dev_addr) {
++       STORE_PARAM32(index_offset, source->index.offset);
++       STORE_PARAM32(vertex.verts_per_instance, vertex_count);
++       STORE_PARAM32(vertex_count, vertex_count);
++       STORE_PARAM32(instance_count, instance_count);
++       STORE_PARAM32(first_instance, first_instance);
++    }
++   STORE_PARAM64(vertex.output_buffer, records);
++   STORE_PARAM64(vertex.outputs, shader->gpu_prerast.io.outputs_written);
++   STORE_PARAM64(generated_indices, indices);
++   STORE_PARAM64(generated_draw, generated_draw);
++   STORE_PARAM32(restart_index,
++                 source->index.index_size == 1 ? UINT8_MAX :
++                 source->index.index_size == 2 ? UINT16_MAX : UINT32_MAX);
++   STORE_PARAM32(primitive_restart, source->index.restart_enable);
++   cs_flush_stores(compute);
++#undef STORE_PARAM32
++#undef STORE_PARAM64
++
++   uint64_t dispatch_params = arena + PANVK_GPU_PRERAST_DISPATCH_OFFSET;
++   if (source->indirect.buffer_dev_addr) {
++      cs_move64_to(compute, draw_params, dispatch_params);
++      cs_store32(compute, count_reg, draw_params, 0);
++      cs_store32(compute, instance_reg, draw_params, 4);
++      cs_move32_to(compute, value, 1);
++      cs_store32(compute, value, draw_params, 8);
++      cs_flush_stores(compute);
++   }
++
++   struct panvk_dispatch_info dispatch = {
++      .direct.wg_count = {vertex_count, instance_count, 1},
++      .barrier = PANVK_CSF_BARRIER_SYNC,
++   };
++   if (source->indirect.buffer_dev_addr)
++      dispatch.indirect.buffer_dev_addr = dispatch_params;
++   launch_gfx_cs(cmdbuf, lowered, &cmdbuf->state.gfx.vs.desc,
++                 push.gpu, &dispatch);
++   gpu_prerast_wait_compute(cmdbuf);
++
++   struct panvk_draw_info generated = *source;
++   generated.index.buffer_dev_addr = indices;
++   generated.index.buffer_size =
++      PANVK_GPU_PRERAST_MAX_INVOCATIONS * sizeof(uint32_t);
++   generated.index.index_size = 4;
++   generated.index.offset = 0;
++   generated.index.restart_enable = source->index.restart_enable;
++   generated.vertex.base = 0;
++   generated.vertex.count = 0;
++   generated.instance.base = source->instance.base;
++   generated.instance.count = source->instance.count;
++   generated.indirect.buffer_dev_addr = generated_draw;
++   generated.indirect.count_buffer_dev_addr = 0;
++   generated.indirect.draw_count = 1;
++   generated.indirect.stride = sizeof(struct poly_indirect_draw);
++    generated.gpu_prerast_generated = true;
++
++    gfx_state_set_dirty(cmdbuf, VS);
++    gfx_state_set_dirty(cmdbuf, VS_PUSH_UNIFORMS);
++    panvk_cmd_draw(cmdbuf, generated);
++    gpu_prerast_release_arena(cmdbuf, arena);
++    gfx_state_set_dirty(cmdbuf, VS);
++    gfx_state_set_dirty(cmdbuf, VS_PUSH_UNIFORMS);
++    return true;
++}
++
+ static void
+ panvk_cmd_draw(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info draw)
+ {
+-   const struct panvk_shader_variant *vs =
+-      panvk_shader_hw_variant(cmdbuf->state.gfx.vs.shader);
++   const struct panvk_shader_variant *vs = draw.gpu_prerast_generated
++      ? panvk_shader_gpu_prerast_variant(cmdbuf->state.gfx.vs.shader,
++                                         PANVK_VS_VARIANT_GPU_PASSTHROUGH)
++      : panvk_shader_hw_variant(cmdbuf->state.gfx.vs.shader);
+    VkResult result;
+ 
+    /* If there's no vertex shader, we can skip the draw. */
+@@ -3487,6 +3738,9 @@ panvk_cmd_draw(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info draw)
+    if (result != VK_SUCCESS)
+       return;
+ 
++   if (!draw.gpu_prerast_generated && gpu_prerast_draw(cmdbuf, &draw))
++      return;
++
+    /* For indirect draws, we need to patch the descriptors we just emitted */
+    if (draw.indirect.buffer_dev_addr)
+       patch_vs_attribs(cmdbuf, &draw);
+diff --git a/src/panfrost/vulkan/meson.build b/src/panfrost/vulkan/meson.build
+index 7c87fe4..ba83014 100644
+--- a/src/panfrost/vulkan/meson.build
++++ b/src/panfrost/vulkan/meson.build
+@@ -102,6 +102,7 @@ jm_files = [
+ csf_archs = [10, 11, 12, 13, 14]
+ csf_inc_dir = ['csf']
+ csf_files = [
++  'csf/panvk_gpu_prerast.c',
+   'csf/panvk_vX_cmd_buffer.c',
+   'csf/panvk_vX_cmd_cond_render.c',
+   'csf/panvk_vX_cmd_dispatch.c',
+diff --git a/src/panfrost/vulkan/panvk_cmd_draw.h b/src/panfrost/vulkan/panvk_cmd_draw.h
+index ff34da3..9c6dfac 100644
+--- a/src/panfrost/vulkan/panvk_cmd_draw.h
++++ b/src/panfrost/vulkan/panvk_cmd_draw.h
+@@ -443,6 +443,7 @@ struct panvk_draw_info {
+    } indirect;
+ 
+    enum mesa_prim prim;
++   bool gpu_prerast_generated;
+ 
+ #if PAN_ARCH < 9
+    uint32_t layer_id;
+diff --git a/src/panfrost/vulkan/panvk_device.h b/src/panfrost/vulkan/panvk_device.h
+index abd4a68..adaa57d 100644
+--- a/src/panfrost/vulkan/panvk_device.h
++++ b/src/panfrost/vulkan/panvk_device.h
+@@ -112,6 +112,7 @@ struct panvk_device {
+    } utrace;
+ 
+    struct panvk_device_draw_context* draw_ctx;
++   struct panvk_priv_mem gpu_prerast_arena;
+ 
+    struct {
+       struct pandecode_context *decode_ctx;
+diff --git a/src/panfrost/vulkan/panvk_gpu_prerast.h b/src/panfrost/vulkan/panvk_gpu_prerast.h
+new file mode 100644
+index 0000000..0655ee0
+--- /dev/null
++++ b/src/panfrost/vulkan/panvk_gpu_prerast.h
+@@ -0,0 +1,193 @@
++/*
++ * Copyright 2026 Abhay Byte
++ * SPDX-License-Identifier: MIT
++ */
++
++#ifndef PANVK_GPU_PRERAST_H
++#define PANVK_GPU_PRERAST_H
++
++#include "compiler/pan_compiler.h"
++#include "panvk_macros.h"
++#include "poly/geometry.h"
++#include "util/macros.h"
++#include "vulkan/vulkan_core.h"
++
++#define PANVK_GPU_PRERAST_ABI_VERSION 1
++#define PANVK_GPU_PRERAST_MAX_EXECUTION_BYTES (256ull * 1024 * 1024)
++#define PANVK_GPU_PRERAST_ARENA_SIZE (256ull * 1024)
++#define PANVK_GPU_PRERAST_MAX_INVOCATIONS (4096u)
++#define PANVK_GPU_PRERAST_PARAMS_OFFSET 64
++#define PANVK_GPU_PRERAST_DISPATCH_OFFSET 256
++#define PANVK_GPU_PRERAST_DRAW_OFFSET 320
++#define PANVK_GPU_PRERAST_INDEX_OFFSET 4096
++#define PANVK_GPU_PRERAST_RECORD_OFFSET \
++   (PANVK_GPU_PRERAST_INDEX_OFFSET + \
++    PANVK_GPU_PRERAST_MAX_INVOCATIONS * sizeof(uint32_t))
++
++struct panvk_cmd_buffer;
++struct panvk_draw_info;
++
++enum panvk_prerast_path {
++   PANVK_PRERAST_HW_IDVS,
++   PANVK_PRERAST_GPU_LOWERED,
++};
++
++enum panvk_gpu_prerast_requirement {
++   PANVK_GPU_PRERAST_CLIP_DISTANCE = BITFIELD_BIT(0),
++   PANVK_GPU_PRERAST_CULL_DISTANCE = BITFIELD_BIT(1),
++   PANVK_GPU_PRERAST_NON_SOLID = BITFIELD_BIT(2),
++   PANVK_GPU_PRERAST_GEOMETRY = BITFIELD_BIT(3),
++   PANVK_GPU_PRERAST_MULTIVIEWPORT = BITFIELD_BIT(4),
++   PANVK_GPU_PRERAST_XFB = BITFIELD_BIT(5),
++   PANVK_GPU_PRERAST_TESSELLATION = BITFIELD_BIT(6),
++   PANVK_GPU_PRERAST_SIDE_EFFECTS = BITFIELD_BIT(7),
++};
++
++enum panvk_gpu_prerast_side_effect_policy {
++   PANVK_GPU_PRERAST_SIDE_EFFECT_SINGLE_EXECUTION,
++};
++
++enum panvk_gpu_prerast_lifetime {
++   PANVK_GPU_PRERAST_LIFETIME_SUBMISSION,
++};
++
++enum panvk_gpu_prerast_render_scope {
++   PANVK_GPU_PRERAST_INTERNAL_JOB_SPLIT,
++};
++
++enum panvk_gpu_prerast_output_order {
++   PANVK_GPU_PRERAST_ORDER_ORIGINAL_PRIMITIVE,
++};
++
++enum panvk_gpu_prerast_state_isolation {
++   PANVK_GPU_PRERAST_STATE_SAVED_AND_DIRTIED,
++};
++
++struct panvk_gpu_prerast_record {
++   float position[4];
++   float point_size;
++   uint32_t primitive_id;
++   uint32_t layer;
++   uint32_t viewport_index;
++   uint32_t provoking_vertex;
++   uint32_t flags;
++   uint32_t varying_data[];
++};
++
++struct panvk_gpu_prerast_io {
++   uint32_t abi_version;
++   uint32_t record_stride;
++   uint64_t outputs_written;
++   uint16_t varying_count;
++   uint8_t clip_distance_array_size;
++   uint8_t cull_distance_array_size;
++   struct pan_varying_layout varyings;
++};
++
++struct panvk_gpu_prerast_shader {
++   struct panvk_gpu_prerast_io io;
++   uint32_t requirements;
++   bool lowered_vs_compiled;
++   bool passthrough_vs_compiled;
++   bool has_side_effects;
++};
++
++struct panvk_gpu_prerast_draw {
++   uint64_t index_buffer;
++   uint64_t indirect_buffer;
++   uint64_t indirect_count_buffer;
++   uint32_t index_buffer_size;
++   uint32_t index_offset;
++   uint32_t index_size;
++   int32_t vertex_offset;
++   uint32_t vertex_count;
++   uint32_t first_instance;
++   uint32_t instance_count;
++   uint32_t draw_count;
++   uint32_t indirect_stride;
++   enum mesa_prim prim;
++   bool primitive_restart;
++};
++
++struct panvk_gpu_prerast_execution {
++   uint32_t abi_version;
++   uint32_t record_stride;
++   uint64_t record_count;
++   uint64_t execution_id;
++};
++
++struct panvk_gpu_prerast_params {
++   struct poly_vertex_params vertex;
++   uint64_t generated_indices;
++   uint64_t generated_draw;
++   uint32_t vertex_count;
++   uint32_t instance_count;
++   uint32_t first_instance;
++   uint32_t restart_index;
++   uint32_t primitive_restart;
++   uint32_t index_offset;
++   uint32_t _pad[2];
++};
++
++struct panvk_gpu_prerast_arena {
++   uint32_t available;
++   uint32_t error;
++   uint32_t _pad[14];
++   struct panvk_gpu_prerast_params params;
++   uint8_t data[];
++};
++
++struct panvk_gpu_prerast_sync_contract {
++   VkPipelineStageFlags2 producer_stages;
++   VkAccessFlags2 producer_access;
++   VkPipelineStageFlags2 internal_consumer_stages;
++   VkAccessFlags2 internal_consumer_access;
++};
++
++struct panvk_gpu_prerast_contract {
++   enum panvk_gpu_prerast_side_effect_policy side_effect_policy;
++   enum panvk_gpu_prerast_lifetime scratch_lifetime;
++   enum panvk_gpu_prerast_render_scope render_scope;
++   enum panvk_gpu_prerast_output_order output_order;
++   enum panvk_gpu_prerast_state_isolation state_isolation;
++   struct panvk_gpu_prerast_sync_contract sync;
++};
++
++extern const struct panvk_gpu_prerast_contract
++panvk_per_arch(gpu_prerast_contract);
++
++static inline enum panvk_prerast_path
++panvk_gpu_prerast_select(uint32_t requirements, bool lowered_vs_compiled)
++{
++   return requirements && lowered_vs_compiled ? PANVK_PRERAST_GPU_LOWERED
++                                              : PANVK_PRERAST_HW_IDVS;
++}
++
++struct panvk_gpu_prerast_draw
++panvk_per_arch(gpu_prerast_draw_info)(const struct panvk_draw_info *draw);
++
++static inline bool
++panvk_gpu_prerast_checked_size(uint64_t count, uint64_t stride,
++                               uint64_t alignment, uint64_t *size)
++{
++   if (!alignment || (alignment & (alignment - 1)) ||
++       (count && stride > UINT64_MAX / count))
++      return false;
++
++   uint64_t bytes = count * stride;
++   if (bytes > UINT64_MAX - (alignment - 1))
++      return false;
++
++   *size = ALIGN_POT(bytes, alignment);
++   return true;
++}
++
++VkResult panvk_per_arch(gpu_prerast_validate_execution)(
++   const struct panvk_cmd_buffer *cmdbuf,
++   const struct panvk_gpu_prerast_execution *exec);
++
++bool panvk_per_arch(gpu_prerast_can_lower)(
++   const struct panvk_cmd_buffer *cmdbuf, const struct panvk_draw_info *draw,
++   const struct panvk_gpu_prerast_shader *shader);
++
++#endif
+diff --git a/src/panfrost/vulkan/panvk_instance.c b/src/panfrost/vulkan/panvk_instance.c
+index fc467a0..d3448ea 100644
+--- a/src/panfrost/vulkan/panvk_instance.c
++++ b/src/panfrost/vulkan/panvk_instance.c
+@@ -61,6 +61,7 @@ static const struct debug_control panvk_debug_options[] = {
+    {"hsr_prepass", PANVK_DEBUG_HSR_PREPASS},
+    {"no_crc", PANVK_DEBUG_NO_CRC},
+    {"kbase_diag", PANVK_DEBUG_KBASE_DIAG},
++   {"gpu_prerast", PANVK_DEBUG_GPU_PRERAST},
+    {NULL, 0},
+ };
+ 
+diff --git a/src/panfrost/vulkan/panvk_instance.h b/src/panfrost/vulkan/panvk_instance.h
+index d6cb823..d04530c 100644
+--- a/src/panfrost/vulkan/panvk_instance.h
++++ b/src/panfrost/vulkan/panvk_instance.h
+@@ -36,6 +36,7 @@ enum panvk_debug_flags {
+    PANVK_DEBUG_HSR_PREPASS = 1 << 18,
+    PANVK_DEBUG_NO_CRC = 1 << 19,
+    PANVK_DEBUG_KBASE_DIAG = 1 << 20,
++   PANVK_DEBUG_GPU_PRERAST = 1 << 21,
+ };
+ 
+ extern uint64_t panvk_debug;
+diff --git a/src/panfrost/vulkan/panvk_shader.h b/src/panfrost/vulkan/panvk_shader.h
+index fabb9a9..cba5f6b 100644
+--- a/src/panfrost/vulkan/panvk_shader.h
++++ b/src/panfrost/vulkan/panvk_shader.h
+@@ -19,6 +19,9 @@
+ #include "panvk_descriptor_set.h"
+ #include "panvk_macros.h"
+ #include "panvk_mempool.h"
++#if PAN_ARCH >= 10
++#include "panvk_gpu_prerast.h"
++#endif
+ 
+ #include "vk_pipeline_layout.h"
+ 
+@@ -157,7 +160,12 @@ struct panvk_graphics_sysvals {
+       int32_t first_vertex;
+       int32_t base_instance;
+       uint32_t noperspective_varyings;
+-   } vs;
++    } vs;
++
++#if PAN_ARCH >= 10
++   aligned_u64 gpu_prerast_params;
++   aligned_u64 gpu_prerast_records;
++#endif
+ 
+    struct {
+       aligned_u64 blend_descs[MAX_RTS];
+@@ -441,6 +449,11 @@ enum panvk_vs_variant {
+    /* Hardware vertex shader, when next stage is fragment */
+    PANVK_VS_VARIANT_HW,
+ 
++#if PAN_ARCH >= 10
++   PANVK_VS_VARIANT_GPU_LOWERED,
++   PANVK_VS_VARIANT_GPU_PASSTHROUGH,
++#endif
++
+    PANVK_VS_VARIANTS,
+ };
+ 
+@@ -449,6 +462,10 @@ struct panvk_shader {
+ 
+    struct panvk_shader_desc_info desc_info;
+ 
++#if PAN_ARCH >= 10
++   struct panvk_gpu_prerast_shader gpu_prerast;
++#endif
++
+    struct panvk_shader_variant variants[];
+ };
+ 
+@@ -463,6 +480,10 @@ panvk_shader_num_variants(mesa_shader_stage stage)
+ 
+ static const char *panvk_vs_shader_variant_name[] = {
+    [PANVK_VS_VARIANT_HW] = NULL,
++#if PAN_ARCH >= 10
++   [PANVK_VS_VARIANT_GPU_LOWERED] = "GPU_LOWERED",
++   [PANVK_VS_VARIANT_GPU_PASSTHROUGH] = "GPU_PASSTHROUGH",
++#endif
+ };
+ 
+ static const char *
+@@ -501,6 +522,14 @@ panvk_shader_hw_variant(const struct panvk_shader *shader)
+    return &shader->variants[0];
+ }
+ 
++static inline const struct panvk_shader_variant *
++panvk_shader_gpu_prerast_variant(const struct panvk_shader *shader,
++                                 enum panvk_vs_variant variant)
++{
++   assert(shader && variant < PANVK_VS_VARIANTS);
++   return &shader->variants[variant];
++}
++
+ static inline uint64_t
+ panvk_shader_variant_get_dev_addr(const struct panvk_shader_variant *shader)
+ {
+diff --git a/src/panfrost/vulkan/panvk_vX_device.c b/src/panfrost/vulkan/panvk_vX_device.c
+index 604f558..764c1db 100644
+--- a/src/panfrost/vulkan/panvk_vX_device.c
++++ b/src/panfrost/vulkan/panvk_vX_device.c
+@@ -20,6 +20,9 @@
+ #include "panvk_cmd_alloc.h"
+ #include "panvk_cmd_buffer.h"
+ #include "panvk_device.h"
++#if PAN_ARCH >= 10
++#include "panvk_gpu_prerast.h"
++#endif
+ #include "panvk_cmd_draw.h"
+ #include "panvk_entrypoints.h"
+ #include "panvk_instance.h"
+@@ -581,6 +584,26 @@ panvk_per_arch(create_device)(struct panvk_physical_device *physical_device,
+ 
+    panvk_device_init_mempools(device);
+ 
++#if PAN_ARCH >= 10
++   if (PANVK_DEBUG(GPU_PRERAST)) {
++      device->gpu_prerast_arena = panvk_pool_alloc_mem(
++         &device->mempools.rw,
++         (struct panvk_pool_alloc_info){
++            .size = PANVK_GPU_PRERAST_ARENA_SIZE,
++            .alignment = 4096,
++         });
++      if (!panvk_priv_mem_check_alloc(device->gpu_prerast_arena)) {
++         result = panvk_error(device, VK_ERROR_OUT_OF_DEVICE_MEMORY);
++         goto err_free_priv_bos;
++      }
++      panvk_priv_mem_write(device->gpu_prerast_arena, 0,
++                           struct panvk_gpu_prerast_arena, arena) {
++         memset(arena, 0, sizeof(*arena));
++         arena->available = 1;
++      }
++   }
++#endif
++
+ #if PAN_ARCH >= 10
+    /* The only reason this is a heap allocation is that PANVK_SUBQUEUE_COUNT
+     * isn't available in the header */
+@@ -707,6 +730,7 @@ err_free_mem_cache:
+ err_free_precomp:
+    panvk_precomp_cleanup(device);
+ err_free_priv_bos:
++   panvk_pool_free_mem(&device->gpu_prerast_arena);
+    if (device->printf.bo)
+       u_printf_destroy(&device->printf.ctx);
+    panvk_priv_bo_unref(device->printf.bo);
+@@ -764,10 +788,11 @@ panvk_per_arch(destroy_device)(struct panvk_device *device,
+    u_printf_destroy(&device->printf.ctx);
+    panvk_priv_bo_unref(device->printf.bo);
+    panvk_priv_bo_unref(device->tiler_oom.handlers_bo);
+-   panvk_priv_bo_unref(device->indirect_varying_buffer);
+-   panvk_priv_bo_unref(device->tiler_heap);
+-   panvk_priv_bo_unref(device->sample_positions);
+-   panvk_device_cleanup_mempools(device);
++    panvk_priv_bo_unref(device->indirect_varying_buffer);
++    panvk_priv_bo_unref(device->tiler_heap);
++    panvk_priv_bo_unref(device->sample_positions);
++    panvk_pool_free_mem(&device->gpu_prerast_arena);
++    panvk_device_cleanup_mempools(device);
+    vk_free(&device->vk.alloc, device->dump_region_size);
+    pan_kmod_vm_destroy(device->kmod.vm);
+    util_vma_heap_finish(&device->as.heap);
+diff --git a/src/panfrost/vulkan/panvk_vX_shader.c b/src/panfrost/vulkan/panvk_vX_shader.c
+index ae29960..b9a7b4c 100644
+--- a/src/panfrost/vulkan/panvk_vX_shader.c
++++ b/src/panfrost/vulkan/panvk_vX_shader.c
+@@ -20,6 +20,9 @@
+ #include "panvk_physical_device.h"
+ #include "panvk_sampler.h"
+ #include "panvk_shader.h"
++#if PAN_ARCH >= 10
++#include "panvk_gpu_prerast.h"
++#endif
+ 
+ #include "spirv/nir_spirv.h"
+ #include "util/memstream.h"
+@@ -502,6 +506,265 @@ panvk_preprocess_nir(struct vk_physical_device *vk_pdev,
+    pan_preprocess_nir(nir, pdev->kmod.dev->props.gpu_id);
+ }
+ 
++#if PAN_ARCH >= 10
++static bool
++panvk_lower_gpu_prerast_sysval(nir_builder *b, nir_intrinsic_instr *intr,
++                               UNUSED void *data)
++{
++   if (intr->intrinsic != nir_intrinsic_load_vertex_param_buffer_poly)
++      return false;
++
++   b->cursor = nir_before_instr(&intr->instr);
++   nir_def *addr = load_sysval(b, graphics, 64, gpu_prerast_params);
++   nir_def_replace(&intr->def, addr);
++   return true;
++}
++
++static nir_def *
++poly_nir_load_raw_vertex_id(nir_builder *b, nir_def *id)
++{
++   nir_def *p = nir_load_vertex_param_buffer_poly(b);
++   nir_def *index_size = nir_load_global(
++      b, 1, 32,
++      nir_iadd_imm(b, p, offsetof(struct poly_vertex_params, index_size_B)),
++      .align_mul = 4);
++   nir_def *pulled;
++   nir_if *have_index = nir_push_if(b, nir_ine_imm(b, index_size, 0));
++   {
++      nir_def *index_buffer = nir_load_global(b, 1, 64, p, .align_mul = 8);
++      nir_def *range = nir_load_global(
++         b, 1, 32,
++         nir_iadd_imm(b, p,
++                      offsetof(struct poly_vertex_params,
++                               index_buffer_range_el)),
++         .align_mul = 4);
++      nir_def *oob = nir_uge(b, id, range);
++      nir_def *el_id = nir_bcsel(b, oob, nir_imm_int(b, 0), id);
++      nir_def *addr = nir_iadd(
++         b, index_buffer, nir_u2u64(b, nir_imul(b, el_id, index_size)));
++      nir_def *el8;
++      nir_def *el_rest;
++      nir_if *is8 = nir_push_if(b, nir_ieq_imm(b, index_size, 1));
++      {
++         el8 = nir_u2u32(b, nir_load_global(b, 1, 8, addr, .align_mul = 1));
++      }
++      nir_push_else(b, is8);
++      {
++         nir_def *el16;
++         nir_def *el32;
++         nir_if *is16 = nir_push_if(b, nir_ieq_imm(b, index_size, 2));
++         {
++            el16 =
++               nir_u2u32(b, nir_load_global(b, 1, 16, addr, .align_mul = 2));
++         }
++         nir_push_else(b, is16);
++         {
++            el32 = nir_load_global(b, 1, 32, addr, .align_mul = 4);
++         }
++         nir_pop_if(b, is16);
++         el_rest = nir_if_phi(b, el16, el32);
++      }
++      nir_pop_if(b, is8);
++      nir_def *el = nir_if_phi(b, el8, el_rest);
++      pulled = nir_bcsel(b, oob, nir_imm_int(b, 0), el);
++   }
++   nir_pop_if(b, have_index);
++   return nir_if_phi(b, pulled, id);
++}
++
++static nir_def *
++poly_nir_load_vertex_id(nir_builder *b, nir_def *id)
++{
++   return nir_iadd(b, poly_nir_load_raw_vertex_id(b, id),
++                   nir_load_first_vertex(b));
++}
++
++static bool
++panvk_gpu_prerast_lower_sysval_intr(nir_builder *b, nir_intrinsic_instr *intr,
++                                    UNUSED void *data)
++{
++   if (intr->intrinsic != nir_intrinsic_load_index_size_poly &&
++       intr->intrinsic != nir_intrinsic_load_vs_outputs_poly)
++      return false;
++
++   b->cursor = nir_before_instr(&intr->instr);
++   nir_def *p = nir_load_vertex_param_buffer_poly(b);
++   unsigned off = intr->intrinsic == nir_intrinsic_load_index_size_poly
++                     ? offsetof(struct poly_vertex_params, index_size_B)
++                     : offsetof(struct poly_vertex_params, outputs);
++   unsigned bits = intr->intrinsic == nir_intrinsic_load_index_size_poly ? 32
++                                                                         : 64;
++   nir_def *v = nir_load_global(b, 1, bits, nir_iadd_imm(b, p, off),
++                                .align_mul = bits / 8);
++   nir_def_replace(&intr->def, v);
++   return true;
++}
++
++static bool
++poly_nir_lower_sysvals(nir_shader *s)
++{
++   return nir_shader_intrinsics_pass(s, panvk_gpu_prerast_lower_sysval_intr,
++                                     nir_metadata_control_flow, NULL);
++}
++
++static bool
++panvk_gpu_prerast_lower_sw_vs_intr(nir_builder *b, nir_intrinsic_instr *intr,
++                                   UNUSED void *data)
++{
++   b->cursor = nir_before_instr(&intr->instr);
++   if (intr->intrinsic == nir_intrinsic_load_vertex_id) {
++      nir_def *id = nir_channel(b, nir_load_global_invocation_id(b, 32), 0);
++      nir_def_replace(&intr->def, poly_nir_load_vertex_id(b, id));
++      return true;
++   }
++   if (intr->intrinsic == nir_intrinsic_load_vertex_id_zero_base) {
++      nir_def_replace(
++         &intr->def, nir_channel(b, nir_load_global_invocation_id(b, 32), 0));
++      return true;
++   }
++   if (intr->intrinsic == nir_intrinsic_load_instance_id) {
++      nir_def_replace(
++         &intr->def, nir_channel(b, nir_load_global_invocation_id(b, 32), 1));
++      return true;
++   }
++   return false;
++}
++
++static bool
++poly_nir_lower_sw_vs(nir_shader *s)
++{
++   return nir_shader_intrinsics_pass(s, panvk_gpu_prerast_lower_sw_vs_intr,
++                                     nir_metadata_control_flow, NULL);
++}
++
++static bool
++panvk_gpu_prerast_lower_vs_before_gs_intr(nir_builder *b,
++                                          nir_intrinsic_instr *intr,
++                                          UNUSED void *data)
++{
++   if (intr->intrinsic != nir_intrinsic_store_output)
++      return false;
++
++   b->cursor = nir_instr_remove(&intr->instr);
++   nir_io_semantics sem = nir_intrinsic_io_semantics(intr);
++   uint64_t mask = b->shader->info.outputs_written;
++   unsigned slot =
++      util_bitcount64(mask & (((uint64_t)1 << sem.location) - 1));
++   unsigned nout = util_bitcount64(mask);
++   nir_def *p = nir_load_vertex_param_buffer_poly(b);
++   nir_def *nr_verts = nir_load_global(
++      b, 1, 32,
++      nir_iadd_imm(b, p, offsetof(struct poly_vertex_params, verts_per_instance)),
++      .align_mul = 4);
++   nir_def *out_buf = nir_load_global(
++      b, 1, 64,
++      nir_iadd_imm(b, p, offsetof(struct poly_vertex_params, output_buffer)),
++      .align_mul = 8);
++   nir_def *linear =
++      nir_iadd(b, nir_imul(b, nir_load_instance_id(b), nr_verts),
++               nir_load_vertex_id_zero_base(b));
++   nir_def *addr = nir_iadd(
++      b, out_buf,
++      nir_u2u64(b, nir_iadd_imm(b, nir_imul_imm(b, linear, nout * 16),
++                                slot * 16 + nir_intrinsic_component(intr) * 4)));
++   nir_store_global(b, intr->src[0].ssa, addr,
++                    .write_mask = nir_intrinsic_write_mask(intr),
++                    .align_mul = 4);
++   return true;
++}
++
++static bool
++panvk_gpu_prerast_lower_vs_outputs(nir_shader *vs)
++{
++   return nir_shader_intrinsics_pass(vs, panvk_gpu_prerast_lower_vs_before_gs_intr,
++                                     nir_metadata_control_flow, NULL);
++}
++
++static nir_shader *
++panvk_gpu_prerast_passthrough_nir(const nir_shader *source)
++{
++   nir_builder b = nir_builder_init_simple_shader(
++      MESA_SHADER_VERTEX, source->options, "panvk_gpu_prerast_passthrough");
++    nir_def *base = load_sysval(&b, graphics, 64, gpu_prerast_records);
++    nir_def *params = load_sysval(&b, graphics, 64, gpu_prerast_params);
++    nir_def *stride = nir_u2u64(
++       &b, nir_imm_int(&b, ALIGN_POT(util_bitcount64(source->info.outputs_written) * 16, 16)));
++    nir_def *verts = nir_load_global(
++       &b, 1, 32,
++       nir_iadd_imm(&b, params,
++                    offsetof(struct panvk_gpu_prerast_params, vertex_count)),
++       .align_mul = 4);
++    nir_def *vertex = nir_load_vertex_id_zero_base(&b);
++    nir_def *linear = nir_iadd(&b, vertex,
++                               nir_imul(&b, nir_load_instance_id(&b), verts));
++    nir_def *record = nir_iadd(&b, base, nir_imul(&b, nir_u2u64(&b, linear), stride));
++
++    u_foreach_bit64(location, source->info.outputs_written) {
++       unsigned slot = util_bitcount64(source->info.outputs_written &
++                                       BITFIELD64_MASK(location));
++       nir_def *addr = nir_iadd_imm(&b, record, slot * 16);
++       nir_def *value = nir_load_global(&b, 4, 32, addr, .align_mul = 16);
++       nir_store_output(&b, value, nir_imm_int(&b, 0), .base = location,
++                        .write_mask = 0xf,
++                        .src_type = nir_type_uint32,
++                        .io_semantics = { .location = location, .num_slots = 1 });
++    }
++
++   b.shader->info.outputs_written = source->info.outputs_written;
++   return b.shader;
++}
++
++static void
++panvk_gpu_prerast_emit_generated_records(nir_shader *nir)
++{
++   nir_function_impl *impl = nir_shader_get_entrypoint(nir);
++   nir_builder b = nir_builder_at(nir_after_impl(impl));
++   nir_def *gid = nir_load_global_invocation_id(&b, 32);
++   nir_def *vertex = nir_channel(&b, gid, 0);
++   nir_def *instance = nir_channel(&b, gid, 1);
++   nir_def *params = load_sysval(&b, graphics, 64, gpu_prerast_params);
++
++    nir_def *index = vertex;
++    nir_def *index_offset = nir_load_global(
++       &b, 1, 32,
++       nir_iadd_imm(&b, params,
++                    offsetof(struct panvk_gpu_prerast_params, index_offset)),
++       .align_mul = 4);
++    index = nir_iadd(&b, vertex, index_offset);
++    nir_def *raw = poly_nir_load_raw_vertex_id(&b, index);
++   nir_def *restart_enable = nir_load_global(
++      &b, 1, 32,
++      nir_iadd_imm(&b, params,
++                   offsetof(struct panvk_gpu_prerast_params, primitive_restart)),
++      .align_mul = 4);
++   nir_def *restart_index = nir_load_global(
++      &b, 1, 32,
++      nir_iadd_imm(&b, params,
++                   offsetof(struct panvk_gpu_prerast_params, restart_index)),
++      .align_mul = 4);
++   nir_def *is_restart = nir_iand(
++      &b, nir_ine_imm(&b, restart_enable, 0), nir_ieq(&b, raw, restart_index));
++   nir_def *verts = nir_load_global(
++      &b, 1, 32,
++      nir_iadd_imm(&b, params,
++                   offsetof(struct panvk_gpu_prerast_params, vertex_count)),
++      .align_mul = 4);
++   nir_def *linear = nir_iadd(&b, vertex, nir_imul(&b, instance, verts));
++   nir_def *generated_indices = nir_load_global(
++      &b, 1, 64,
++      nir_iadd_imm(&b, params,
++                   offsetof(struct panvk_gpu_prerast_params, generated_indices)),
++      .align_mul = 8);
++   nir_push_if(&b, nir_ieq_imm(&b, instance, 0));
++   nir_store_global(&b, nir_bcsel(&b, is_restart, nir_imm_int(&b, -1), vertex),
++                    nir_iadd(&b, generated_indices,
++                             nir_u2u64(&b, nir_imul_imm(&b, vertex, 4))),
++                    .write_mask = 1, .align_mul = 4);
++   nir_pop_if(&b, NULL);
++   nir_progress(true, impl, nir_metadata_none);
++}
++#endif
++
+ static void
+ panvk_hash_state(struct vk_physical_device *device,
+                  const struct vk_graphics_pipeline_state *state,
+@@ -511,6 +774,11 @@ panvk_hash_state(struct vk_physical_device *device,
+    struct mesa_blake3 blake3_ctx;
+    _mesa_blake3_init(&blake3_ctx);
+ 
++#if PAN_ARCH >= 10
++   const uint32_t gpu_prerast_abi = PANVK_GPU_PRERAST_ABI_VERSION;
++   _mesa_blake3_update(&blake3_ctx, &gpu_prerast_abi, sizeof(gpu_prerast_abi));
++#endif
++
+    if (state != NULL) {
+       /* This doesn't impact the shader compile but it does go in the
+        * panvk_shader and gets [de]serialized along with the binary so
+@@ -1410,6 +1678,18 @@ panvk_compile_shader(struct panvk_device *dev,
+    if (shader == NULL)
+       return panvk_error(dev, VK_ERROR_OUT_OF_HOST_MEMORY);
+ 
++#if PAN_ARCH >= 10
++   if (info->stage == MESA_SHADER_VERTEX) {
++      shader->gpu_prerast.io.abi_version = PANVK_GPU_PRERAST_ABI_VERSION;
++      shader->gpu_prerast.io.outputs_written = info->nir->info.outputs_written;
++      shader->gpu_prerast.io.clip_distance_array_size =
++         info->nir->info.clip_distance_array_size;
++      shader->gpu_prerast.io.cull_distance_array_size =
++         info->nir->info.cull_distance_array_size;
++      shader->gpu_prerast.has_side_effects = info->nir->info.writes_memory;
++   }
++#endif
++
+    nir_variable_mode robust_modes = 0;
+    if (info->robustness->uniform_buffers != VK_PIPELINE_ROBUSTNESS_BUFFER_BEHAVIOR_DISABLED_EXT)
+       robust_modes |= nir_var_mem_ubo;
+@@ -1426,20 +1706,40 @@ panvk_compile_shader(struct panvk_device *dev,
+ 
+    switch (info->stage) {
+    case MESA_SHADER_VERTEX: {
++#if PAN_ARCH >= 10
++      const enum panvk_vs_variant last_variant = PANVK_VS_VARIANT_GPU_PASSTHROUGH;
++#else
+       const enum panvk_vs_variant last_variant = PANVK_VS_VARIANT_HW;
++#endif
+       for (enum panvk_vs_variant v = 0; v <= last_variant; v++) {
+          struct panvk_shader_variant *variant = &shader->variants[v];
+ 
+          /* Each variant gets its own NIR. To save an extra clone, we use the
+           * original NIR for the last stage.
+           */
++#if PAN_ARCH >= 10
++         const bool clone_nir = true;
++         nir_shader *nir = v == PANVK_VS_VARIANT_GPU_PASSTHROUGH
++                              ? panvk_gpu_prerast_passthrough_nir(info->nir)
++                              : nir_shader_clone(NULL, info->nir);
++#else
+          const bool clone_nir = (v != last_variant);
+          nir_shader *nir =
+             clone_nir ? nir_shader_clone(NULL, info->nir) : info->nir;
++#endif
++
++         bool gpu_lower = false;
++#if PAN_ARCH >= 10
++         gpu_lower = v == PANVK_VS_VARIANT_GPU_LOWERED;
++         if (gpu_lower) {
++            nir_assign_io_var_locations(nir, nir_var_shader_out);
++            nir->xfb_info = NULL;
++         }
++#endif
+ 
+          panvk_lower_nir(dev, nir, info->set_layout_count,
+                          info->set_layouts, info->robustness,
+-                         state, &shader->desc_info, false);
++                          state, &shader->desc_info, false);
+ 
+ #if PAN_ARCH >= 10 && PAN_ARCH < 14
+          if (inputs.view_mask) {
+@@ -1469,14 +1746,43 @@ panvk_compile_shader(struct panvk_device *dev,
+           * vk_vertex_input_state where there are holes in the attribute
+           * locations.
+           */
+-         nir_foreach_shader_in_variable(var, nir) {
+-            assert(var->data.location >= VERT_ATTRIB_GENERIC0 &&
+-                   var->data.location <= VERT_ATTRIB_GENERIC15);
+-            var->data.driver_location =
+-               var->data.location - VERT_ATTRIB_GENERIC0;
++#if PAN_ARCH >= 10
++         if (v != PANVK_VS_VARIANT_GPU_PASSTHROUGH) {
++#endif
++            nir_foreach_shader_in_variable(var, nir) {
++               assert(var->data.location >= VERT_ATTRIB_GENERIC0 &&
++                      var->data.location <= VERT_ATTRIB_GENERIC15);
++               var->data.driver_location =
++                  var->data.location - VERT_ATTRIB_GENERIC0;
++            }
++#if PAN_ARCH >= 10
+          }
+-         nir_assign_io_var_locations(nir, nir_var_shader_out);
+-         panvk_lower_nir_io(nir);
++         if (!gpu_lower && v != PANVK_VS_VARIANT_GPU_PASSTHROUGH) {
++#endif
++            nir_assign_io_var_locations(nir, nir_var_shader_out);
++#if PAN_ARCH >= 10
++         }
++         if (v != PANVK_VS_VARIANT_GPU_PASSTHROUGH) {
++#endif
++            panvk_lower_nir_io(nir);
++#if PAN_ARCH >= 10
++            if (gpu_lower) {
++               NIR_PASS(_, nir, pan_nir_lower_vs_inputs_poly, inputs.gpu_id);
++               NIR_PASS(_, nir, panvk_gpu_prerast_lower_vs_outputs);
++               panvk_gpu_prerast_emit_generated_records(nir);
++               NIR_PASS(_, nir, poly_nir_lower_sw_vs);
++               NIR_PASS(_, nir, poly_nir_lower_sysvals);
++               NIR_PASS(_, nir, nir_shader_intrinsics_pass,
++                        panvk_lower_gpu_prerast_sysval,
++                        nir_metadata_control_flow, NULL);
++               nir->info.stage = MESA_SHADER_COMPUTE;
++               memset(&nir->info.cs, 0, sizeof(nir->info.cs));
++               nir->info.workgroup_size[0] = 1;
++               nir->info.workgroup_size[1] = 1;
++               nir->info.workgroup_size[2] = 1;
++            }
++         }
++#endif
+          /* This somehow folds the location for multi-slot nir_load/nir_store */
+          NIR_PASS(_, nir, nir_opt_constant_folding);
+ 
+@@ -1486,14 +1789,32 @@ panvk_compile_shader(struct panvk_device *dev,
+             pan_build_varying_layout_compact(&varying_layout, nir,
+                                              inputs.gpu_id);
+             inputs.varying_layout = &varying_layout;
++#if PAN_ARCH >= 10
++            shader->gpu_prerast.io.varyings = varying_layout;
++            shader->gpu_prerast.io.varying_count = nir->num_outputs;
++            shader->gpu_prerast.io.record_stride =
++               ALIGN_POT(util_bitcount64(info->nir->info.outputs_written) * 16, 16);
++#endif
+          }
+ 
++#if PAN_ARCH >= 10
++         if (v == PANVK_VS_VARIANT_GPU_PASSTHROUGH)
++            inputs.varying_layout = &shader->gpu_prerast.io.varyings;
++#endif
++
+          variant->own_bin = true;
+ 
+          result = panvk_compile_nir(dev, nir, info->flags, &inputs, state,
+                                     noperspective_varyings,
+                                     &shader->desc_info, variant);
+ 
++#if PAN_ARCH >= 10
++         if (result == VK_SUCCESS && gpu_lower)
++            shader->gpu_prerast.lowered_vs_compiled = true;
++         if (result == VK_SUCCESS && v == PANVK_VS_VARIANT_GPU_PASSTHROUGH)
++            shader->gpu_prerast.passthrough_vs_compiled = true;
++#endif
++
+          /* If we cloned, it's our job to clean up */
+          if (clone_nir)
+             ralloc_free(nir);
+@@ -1946,6 +2291,12 @@ panvk_deserialize_shader(struct vk_device *vk_dev, struct blob_reader *blob,
+    if (shader == NULL)
+       return panvk_error(device, VK_ERROR_OUT_OF_HOST_MEMORY);
+ 
++#if PAN_ARCH >= 10
++   blob_copy_bytes(blob, &shader->gpu_prerast, sizeof(shader->gpu_prerast));
++   if (shader->gpu_prerast.io.abi_version != PANVK_GPU_PRERAST_ABI_VERSION)
++      blob->overrun = true;
++#endif
++
+    result = shader_desc_info_deserialize(device, blob, shader);
+    if (result != VK_SUCCESS) {
+       panvk_shader_destroy(vk_dev, &shader->vk, pAllocator);
+@@ -2060,6 +2411,10 @@ panvk_shader_serialize(struct vk_device *vk_dev,
+ 
+    blob_write_uint8(blob, vk_shader->stage);
+ 
++#if PAN_ARCH >= 10
++   blob_write_bytes(blob, &shader->gpu_prerast, sizeof(shader->gpu_prerast));
++#endif
++
+    shader_desc_info_serialize(blob, shader);
+ 
+    panvk_shader_foreach_variant(shader, variant) {
