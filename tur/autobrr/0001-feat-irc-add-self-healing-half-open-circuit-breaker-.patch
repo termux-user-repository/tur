@@ -1,19 +1,19 @@
-From 413aea00235cd511e287aadfdc526c2d09988d20 Mon Sep 17 00:00:00 2001
+From e2ac69cc8561875f4c9e23523c0e2cbdc2604210 Mon Sep 17 00:00:00 2001
 From: Pankaj Kumar <pankaj.pal9@gmail.com>
 Date: Mon, 19 Oct 2026 10:24:11 +0530
-Subject: [PATCH 2/3] feat(irc): add self-healing half-open circuit breaker for
+Subject: [PATCH 1/2] feat(irc): add self-healing half-open circuit breaker for
  connection flapping
 
 ---
- internal/irc/clock.go         | 109 +++++++++++++
- internal/irc/flapping_test.go | 280 ++++++++++++++++++++++++++++++++++
- internal/irc/handler.go       | 176 ++++++++++++++++++++-
- 3 files changed, 558 insertions(+), 7 deletions(-)
+ internal/irc/clock.go         | 109 ++++++++++++++
+ internal/irc/flapping_test.go | 260 ++++++++++++++++++++++++++++++++++
+ internal/irc/handler.go       | 198 ++++++++++++++++++++++++--
+ 3 files changed, 556 insertions(+), 11 deletions(-)
  create mode 100644 internal/irc/clock.go
 
 diff --git a/internal/irc/clock.go b/internal/irc/clock.go
 new file mode 100644
-index 0000000..b3ea455
+index 00000000..109dab9c
 --- /dev/null
 +++ b/internal/irc/clock.go
 @@ -0,0 +1,109 @@
@@ -59,9 +59,9 @@ index 0000000..b3ea455
 +
 +// mockClock is used for deterministic unit testing.
 +type mockClock struct {
-+	m       sync.Mutex
-+	now     time.Time
-+	timers  []*mockTimer
++	m      sync.Mutex
++	now    time.Time
++	timers []*mockTimer
 +}
 +
 +type mockTimer struct {
@@ -127,7 +127,7 @@ index 0000000..b3ea455
 +	}
 +}
 diff --git a/internal/irc/flapping_test.go b/internal/irc/flapping_test.go
-index efc919d..3d373d1 100644
+index efc919dd..dddb6eda 100644
 --- a/internal/irc/flapping_test.go
 +++ b/internal/irc/flapping_test.go
 @@ -5,6 +5,7 @@ package irc
@@ -138,7 +138,7 @@ index efc919d..3d373d1 100644
  	"sync"
  	"testing"
  	"time"
-@@ -181,3 +182,282 @@ func TestStaleDisconnectCannotTripBreakerOnReplacement(t *testing.T) {
+@@ -181,3 +182,262 @@ func TestStaleDisconnectCannotTripBreakerOnReplacement(t *testing.T) {
  	require.Equal(t, ircLive, h.clientState, "stale disconnect stopped the replacement client")
  	require.Len(t, h.shortSessionEnds, flappingStopThreshold-1, "stale disconnect changed breaker strikes")
  }
@@ -152,7 +152,6 @@ index efc919d..3d373d1 100644
 +	h.runFn = func() error { return nil }
 +	h.stateMachine.currentState = StateFullyOperational
 +
-+	// Trip the breaker with 5 short sessions
 +	for i := range flappingStopThreshold - 1 {
 +		recordSessionEnd(h, time.Second, initial.Add(time.Duration(i)*time.Second))
 +	}
@@ -167,22 +166,20 @@ index efc919d..3d373d1 100644
 +	require.Equal(t, initial.Add(flappingInitialCooldown), h.flappingRetryAt)
 +	h.m.RUnlock()
 +
-+	// Advance clock by 15 minutes to trigger half-open retry
 +	clock.Advance(flappingInitialCooldown + 10*time.Second)
 +
 +	h.m.RLock()
 +	require.True(t, h.halfOpenAttempt, "halfOpenAttempt should be true after cooldown expires")
 +	h.m.RUnlock()
 +
-+	// Simulate successful connection
 +	h.m.Lock()
 +	h.clientState = ircLive
-+	h.client = &ircevent.Connection{}
++	client := &ircevent.Connection{}
++	h.client = client
 +	h.connectedSince = clock.Now()
 +	h.m.Unlock()
-+	h.onConnect(ircmsg.Message{})
++	h.onConnect(client, ircmsg.Message{})
 +
-+	// Advance clock by 30 seconds to trigger probe survival
 +	clock.Advance(flappingSessionMinLifetime)
 +
 +	h.m.RLock()
@@ -202,7 +199,6 @@ index efc919d..3d373d1 100644
 +	h.runFn = func() error { return nil }
 +	h.stateMachine.currentState = StateFullyOperational
 +
-+	// Trip the breaker
 +	for i := range flappingStopThreshold - 1 {
 +		recordSessionEnd(h, time.Second, initial.Add(time.Duration(i)*time.Second))
 +	}
@@ -211,18 +207,15 @@ index efc919d..3d373d1 100644
 +	h.m.Unlock()
 +	h.onDisconnect(ircmsg.Message{})
 +
-+	// 1st cooldown: 15m
 +	h.m.RLock()
 +	require.Equal(t, flappingInitialCooldown, h.flappingCooldown)
 +	h.m.RUnlock()
 +
-+	// Advance clock to trigger 1st half-open
 +	clock.Advance(flappingInitialCooldown + time.Second)
 +	h.m.RLock()
 +	require.True(t, h.halfOpenAttempt)
 +	h.m.RUnlock()
 +
-+	// Simulate half-open client connecting and dropping in 10s (<30s)
 +	client1 := &ircevent.Connection{}
 +	h.m.Lock()
 +	h.clientState = ircLive
@@ -232,18 +225,15 @@ index efc919d..3d373d1 100644
 +	clock.Advance(10 * time.Second)
 +	h.onClientDisconnect(client1, ircmsg.Message{})
 +
-+	// 2nd cooldown should double to 30m
 +	h.m.RLock()
 +	require.Equal(t, 30*time.Minute, h.flappingCooldown)
 +	h.m.RUnlock()
 +
-+	// Advance clock to trigger 2nd half-open
 +	clock.Advance(30*time.Minute + time.Second)
 +	h.m.RLock()
 +	require.True(t, h.halfOpenAttempt)
 +	h.m.RUnlock()
 +
-+	// Drop again in 10s
 +	client2 := &ircevent.Connection{}
 +	h.m.Lock()
 +	h.clientState = ircLive
@@ -253,7 +243,6 @@ index efc919d..3d373d1 100644
 +	clock.Advance(10 * time.Second)
 +	h.onClientDisconnect(client2, ircmsg.Message{})
 +
-+	// 3rd cooldown should cap at 60m
 +	h.m.RLock()
 +	require.Equal(t, flappingMaxCooldown, h.flappingCooldown)
 +	h.m.RUnlock()
@@ -268,7 +257,6 @@ index efc919d..3d373d1 100644
 +	h.runFn = func() error { return nil }
 +	h.stateMachine.currentState = StateFullyOperational
 +
-+	// Trip the breaker
 +	for i := range flappingStopThreshold - 1 {
 +		recordSessionEnd(h, time.Second, initial.Add(time.Duration(i)*time.Second))
 +	}
@@ -281,7 +269,6 @@ index efc919d..3d373d1 100644
 +	require.NotNil(t, h.flappingRetryTimer)
 +	h.m.RUnlock()
 +
-+	// User stops network
 +	h.Stop()
 +
 +	h.m.RLock()
@@ -290,7 +277,6 @@ index efc919d..3d373d1 100644
 +	require.Equal(t, flappingInitialCooldown, h.flappingCooldown, "cooldown should reset to initial")
 +	h.m.RUnlock()
 +
-+	// Advance clock - half-open should NOT trigger
 +	clock.Advance(2 * time.Hour)
 +	h.m.RLock()
 +	require.False(t, h.halfOpenAttempt)
@@ -305,7 +291,6 @@ index efc919d..3d373d1 100644
 +	h.clock = clock
 +	h.stateMachine.currentState = StateFullyOperational
 +
-+	// Trip the breaker
 +	for i := range flappingStopThreshold - 1 {
 +		recordSessionEnd(h, time.Second, initial.Add(time.Duration(i)*time.Second))
 +	}
@@ -314,35 +299,33 @@ index efc919d..3d373d1 100644
 +	h.m.Unlock()
 +	h.onDisconnect(ircmsg.Message{})
 +
-+	// 1st cooldown: 15m
 +	h.m.RLock()
 +	require.Equal(t, flappingInitialCooldown, h.flappingCooldown)
 +	h.m.RUnlock()
 +
-+	// Half-open run fails (e.g. dial error)
 +	done := make(chan struct{})
 +	h.runFn = func() error {
 +		defer close(done)
 +		return errors.New("dial tcp: connection refused")
 +	}
 +
-+	// Advance clock to trigger half-open retry
 +	clock.Advance(flappingInitialCooldown + time.Second)
 +
-+	// Wait for goroutine
 +	select {
 +	case <-done:
 +	case <-time.After(time.Second):
 +		t.Fatal("timeout waiting for runFn")
 +	}
 +
-+	time.Sleep(10 * time.Millisecond)
++	require.Eventually(t, func() bool {
++		h.m.RLock()
++		defer h.m.RUnlock()
++		return !h.halfOpenAttempt && h.flappingRetryTimer != nil
++	}, time.Second, 10*time.Millisecond)
 +
 +	h.m.RLock()
 +	defer h.m.RUnlock()
-+	require.False(t, h.halfOpenAttempt, "halfOpenAttempt should be cleared after run failure")
 +	require.Equal(t, 30*time.Minute, h.flappingCooldown, "cooldown should double after failed run")
-+	require.NotNil(t, h.flappingRetryTimer, "cooldown timer should be re-armed")
 +}
 +
 +func TestFlappingBreakerHalfOpenRunFailurePreservesManualStop(t *testing.T) {
@@ -353,7 +336,6 @@ index efc919d..3d373d1 100644
 +	h.clock = clock
 +	h.stateMachine.currentState = StateFullyOperational
 +
-+	// Trip the breaker
 +	for i := range flappingStopThreshold - 1 {
 +		recordSessionEnd(h, time.Second, initial.Add(time.Duration(i)*time.Second))
 +	}
@@ -364,23 +346,25 @@ index efc919d..3d373d1 100644
 +
 +	started := make(chan struct{})
 +	unblock := make(chan struct{})
++	done := make(chan struct{})
++	h.halfOpenDone = func() { close(done) }
 +	h.runFn = func() error {
 +		close(started)
 +		<-unblock
 +		return errors.New("dial failed")
 +	}
 +
-+	// Advance clock to trigger half-open retry
 +	clock.Advance(flappingInitialCooldown + time.Second)
 +
 +	<-started
-+
-+	// User manually stops network while reconnect attempt was in flight
 +	h.Stop()
-+
-+	// Unblock runFn to return error
 +	close(unblock)
-+	time.Sleep(10 * time.Millisecond)
++
++	select {
++	case <-done:
++	case <-time.After(time.Second):
++		t.Fatal("timeout waiting for half-open reconnect completion")
++	}
 +
 +	h.m.RLock()
 +	defer h.m.RUnlock()
@@ -396,7 +380,6 @@ index efc919d..3d373d1 100644
 +	h.clock = clock
 +	h.stateMachine.currentState = StateFullyOperational
 +
-+	// Trip the breaker
 +	for i := range flappingStopThreshold - 1 {
 +		recordSessionEnd(h, time.Second, initial.Add(time.Duration(i)*time.Second))
 +	}
@@ -409,10 +392,8 @@ index efc919d..3d373d1 100644
 +	staleGen := h.flappingRetryGen
 +	h.m.RUnlock()
 +
-+	// User stops network
 +	h.Stop()
 +
-+	// An already-dispatched callback with stale generation executes
 +	h.tryHalfOpenReconnect(staleGen)
 +
 +	h.m.RLock()
@@ -420,12 +401,11 @@ index efc919d..3d373d1 100644
 +	require.False(t, h.halfOpenAttempt, "stale timer callback must not trigger half-open attempt")
 +	require.Equal(t, ircStopped, h.clientState)
 +}
-+
 diff --git a/internal/irc/handler.go b/internal/irc/handler.go
-index aa5d1c7..21d5766 100644
+index 4b60ad20..e52b0fa1 100644
 --- a/internal/irc/handler.go
 +++ b/internal/irc/handler.go
-@@ -66,6 +66,8 @@ const (
+@@ -69,6 +69,8 @@ const (
  	flappingSessionMinLifetime = 30 * time.Second
  	flappingStopThreshold      = 5
  	flappingWindow             = 15 * time.Minute
@@ -433,13 +413,14 @@ index aa5d1c7..21d5766 100644
 +	flappingMaxCooldown        = 60 * time.Minute
  )
  
- // identifyForm is the argument form of the outstanding NickServ IDENTIFY.
-@@ -102,6 +104,16 @@ type Handler struct {
+ // restartQuitTimeout bounds how long a restart waits for the server to close the
+@@ -126,6 +128,17 @@ type Handler struct {
  	authenticated    bool
  	saslauthed       bool
  
 +	clock                 clock
 +	runFn                 func() error
++	halfOpenDone          func()
 +	flappingCooldown      time.Duration
 +	flappingRetryAt       time.Time
 +	flappingRetryTimer    timer
@@ -451,50 +432,88 @@ index aa5d1c7..21d5766 100644
  	identifyAttempt     identifyForm
  	identifyEscalated   bool
  	identifyFormLearned identifyForm
-@@ -133,6 +145,7 @@ func NewHandler(log zerolog.Logger, eventBus eventBus, sse sseServer, network do
- 		saslauthed:       false,
+@@ -166,6 +179,7 @@ func NewHandler(log zerolog.Logger, eventBus eventBus, sse sseServer, network do
  		connectionErrors: []string{},
  		channels:         haxmap.New[string, *Channel](),
+ 		caseMapping:      ircCaseMappingRFC1459,
 +		flappingCooldown: flappingInitialCooldown,
  	}
  
  	// init state machine
-@@ -279,6 +292,11 @@ func (h *Handler) Run() (err error) {
- 		shouldConnect = true
- 		h.clientState = ircConnecting
- 		h.failedNickServAttempts = 0
+@@ -299,6 +313,10 @@ func (h *Handler) removeIndexer() {
+ // Run connects the network and blocks until the connection is live, the network
+ // is stopped, or the attempt fails for good.
+ func (h *Handler) Run() error {
++	if h.runFn != nil {
++		return h.runFn()
++	}
++
+ 	connectGen, err := h.claimConnect()
+ 	if err != nil {
+ 		return err
+@@ -310,11 +328,27 @@ func (h *Handler) Run() error {
+ // claimConnect moves a stopped handler to connecting. The service claims
+ // synchronously and connects in the background, so a Stop that lands after the
+ // claim cancels the attempt instead of being overtaken by it.
+-func (h *Handler) claimConnect() (uint64, error) {
++// Passing a retry generation validates that the breaker timer is still current
++// and marks the connection as a half-open attempt.
++func (h *Handler) claimConnect(retryGen ...uint64) (uint64, error) {
+ 	h.m.Lock()
+-	if h.clientState != ircStopped {
+-		h.m.Unlock()
+-		return 0, connectionInProgress
++	if len(retryGen) > 0 {
++		if retryGen[0] != h.flappingRetryGen || h.clientState != ircStopped {
++			h.m.Unlock()
++			return 0, connectionInProgress
++		}
++		h.halfOpenAttempt = true
++		h.flappingRetryTimer = nil
++	} else {
++		if h.clientState != ircStopped {
++			h.m.Unlock()
++			return 0, connectionInProgress
++		}
 +		if !h.halfOpenAttempt {
 +			h.cancelFlappingTimersLocked()
 +			h.flappingCooldown = flappingInitialCooldown
 +			h.flappingRetryAt = time.Time{}
 +		}
  	}
- 	h.m.Unlock()
- 
-@@ -554,7 +572,7 @@ func (h *Handler) isOurCurrentNick(nick string) bool {
- func (h *Handler) setConnectionStatus() {
- 	h.m.Lock()
- 	if h.client != nil && h.client.Connected() {
--		h.connectedSince = time.Now()
-+		h.connectedSince = h.getClock().Now()
- 	}
- 	h.m.Unlock()
- }
-@@ -608,6 +626,10 @@ func (h *Handler) Stop() {
+ 	h.clientState = ircConnecting
+ 	h.currentNick = ""
+@@ -341,7 +375,6 @@ func (h *Handler) connect(connectGen uint64) (err error) {
+ 	// this used to be TraceLevel but was changed to DebugLevel during connect to see the info without needing to change loglevel
+ 	// we change back to TraceLevel in the handleJoined method.
+ 	subLogger := zstdlog.NewStdLoggerWithLevel(h.log.With().Logger(), zerolog.TraceLevel)
+-
+ 	// either we will successfully transition to `StateRunning`, or else
+ 	// we need to reset the state to `ircStopped`. A Stop followed by a new Run can
+ 	// land before this deferred reset, so only touch the state if it is still ours.
+@@ -840,8 +873,12 @@ func (h *Handler) stop() *ircevent.Connection {
  	h.m.Lock()
  	h.connectedSince = time.Time{}
+ 	h.haveDisconnected = false
+-	h.failedNickServAttempts = 0
  	h.resetFlappingBreakerLocked()
 +	h.cancelFlappingTimersLocked()
 +	h.flappingCooldown = flappingInitialCooldown
 +	h.flappingRetryAt = time.Time{}
 +	h.halfOpenAttempt = false
- 	h.failedNickServAttempts = 0
- 	h.identifyOutstanding = false
++	h.failedNickServAttempts = 0
+ 	h.resetSessionLocked()
+ 	h.currentNick = ""
  	client := h.client
-@@ -644,6 +666,18 @@ func (h *Handler) onConnect(m ircmsg.Message) {
- 	networkName := h.GetNetwork().Name
+@@ -901,9 +938,21 @@ func (h *Handler) onConnect(client *ircevent.Connection, _ ircmsg.Message) {
  
- 	h.m.Lock()
+ 	// not gated on client.Connected(): irc-go only reports the connection as
+ 	// active once Connect returns, after the connect callbacks have run
+-	h.connectedSince = time.Now()
++	h.connectedSince = h.getClock().Now()
+ 
+ 	networkName := h.network.Name
++
 +	if h.halfOpenAttempt {
 +		h.log.Info().Str("network", networkName).Msg("half-open probe connected; arming 30s survival timer")
 +		if h.flappingSurvivalTimer != nil {
@@ -506,11 +525,10 @@ index aa5d1c7..21d5766 100644
 +			h.onHalfOpenSurvived(gen)
 +		})
 +	}
-+
  	reconnected := h.haveDisconnected && h.clientState == ircLive
  	if reconnected {
- 		// reset haveDisconnected
-@@ -688,7 +722,7 @@ func (h *Handler) onClientDisconnect(client *ircevent.Connection, _ ircmsg.Messa
+ 		h.haveDisconnected = false
+@@ -951,7 +1000,7 @@ func (h *Handler) onClientDisconnect(client *ircevent.Connection, _ ircmsg.Messa
  		return
  	}
  
@@ -519,11 +537,10 @@ index aa5d1c7..21d5766 100644
  	sessionLifetime := time.Duration(0)
  	if !h.connectedSince.IsZero() {
  		sessionLifetime = endedAt.Sub(h.connectedSince)
-@@ -696,6 +730,16 @@ func (h *Handler) onClientDisconnect(client *ircevent.Connection, _ ircmsg.Messa
- 
+@@ -960,6 +1009,15 @@ func (h *Handler) onClientDisconnect(client *ircevent.Connection, _ ircmsg.Messa
  	h.connectedSince = time.Time{}
+ 	h.currentNick = ""
  
-+	// stop survival timer if running
 +	if h.flappingSurvivalTimer != nil {
 +		h.flappingSurvivalGen++
 +		h.flappingSurvivalTimer.Stop()
@@ -533,10 +550,10 @@ index aa5d1c7..21d5766 100644
 +	isHalfOpen := h.halfOpenAttempt
 +	h.halfOpenAttempt = false
 +
- 	// reset authenticated
- 	h.authenticated = false
- 
-@@ -707,8 +751,10 @@ func (h *Handler) onClientDisconnect(client *ircevent.Connection, _ ircmsg.Messa
+ 	// a reconnect starts the identify ladder over: the nick we get back may
+ 	// differ, and the previous connection's escalation says nothing about this one
+ 	h.resetSessionLocked()
+@@ -968,8 +1026,10 @@ func (h *Handler) onClientDisconnect(client *ircevent.Connection, _ ircmsg.Messa
  
  	manuallyDisconnected := h.clientState == ircStopped
  	networkName := h.network.Name
@@ -548,7 +565,7 @@ index aa5d1c7..21d5766 100644
  	if stopForFlapping {
  		flappingError = fmt.Sprintf("connection flapping: %d sessions lasted under %s within %s; network stopped to avoid repeated reconnects", flappingStopThreshold, flappingSessionMinLifetime, flappingWindow)
  		if !slices.Contains(h.connectionErrors, flappingError) {
-@@ -720,6 +766,16 @@ func (h *Handler) onClientDisconnect(client *ircevent.Connection, _ ircmsg.Messa
+@@ -985,6 +1045,16 @@ func (h *Handler) onClientDisconnect(client *ircevent.Connection, _ ircmsg.Messa
  		h.resetFlappingBreakerLocked()
  		h.resetChannelState()
  		h.stateMachine.OnError(flappingError)
@@ -565,7 +582,7 @@ index aa5d1c7..21d5766 100644
  	}
  
  	h.m.Unlock()
-@@ -735,13 +791,15 @@ func (h *Handler) onClientDisconnect(client *ircevent.Connection, _ ircmsg.Messa
+@@ -1000,13 +1070,15 @@ func (h *Handler) onClientDisconnect(client *ircevent.Connection, _ ircmsg.Messa
  			Int("sessions", flappingStopThreshold).
  			Dur("min_lifetime", flappingSessionMinLifetime).
  			Dur("window", flappingWindow).
@@ -583,7 +600,7 @@ index aa5d1c7..21d5766 100644
  		})
  
  		if client != nil {
-@@ -794,6 +852,106 @@ func (h *Handler) resetFlappingBreakerLocked() {
+@@ -1059,6 +1131,110 @@ func (h *Handler) resetFlappingBreakerLocked() {
  	h.shortSessionEnds = nil
  }
  
@@ -625,23 +642,27 @@ index aa5d1c7..21d5766 100644
 +}
 +
 +func (h *Handler) tryHalfOpenReconnect(gen uint64) {
-+	h.m.Lock()
-+	if gen != h.flappingRetryGen || h.clientState != ircStopped {
-+		h.m.Unlock()
++	connectGen, err := h.claimConnect(gen)
++	if err != nil {
 +		return
 +	}
-+	h.halfOpenAttempt = true
-+	h.flappingRetryTimer = nil
-+	h.m.Unlock()
 +
-+	h.log.Info().Str("network", h.network.Name).Msg("circuit breaker entering half-open state; attempting reconnect")
++	h.log.Info().Str("network", h.GetNetwork().Name).Msg("circuit breaker entering half-open state; attempting reconnect")
 +	go func() {
-+		fn := h.runFn
-+		if fn == nil {
-+			fn = h.Run
++		if h.halfOpenDone != nil {
++			defer h.halfOpenDone()
 +		}
-+		if err := fn(); err != nil {
-+			h.log.Error().Err(err).Str("network", h.network.Name).Msg("half-open reconnect failed to run")
++		var err error
++		if h.runFn != nil {
++			err = h.runFn()
++		} else {
++			err = h.connect(connectGen)
++		}
++		if err != nil {
++			if errors.Is(err, connectionInProgress) || errors.Is(err, clientManuallyDisconnected) {
++				return
++			}
++			h.log.Error().Err(err).Str("network", h.GetNetwork().Name).Msg("half-open reconnect failed to run")
 +			h.m.Lock()
 +			if h.halfOpenAttempt && (h.clientState == ircStopped || h.clientState == ircConnecting) {
 +				h.clientState = ircStopped
@@ -689,27 +710,7 @@ index aa5d1c7..21d5766 100644
 +
  // onNotice handles NOTICE events
  func (h *Handler) onNotice(msg ircmsg.Message) {
- 	switch msg.Nick() {
-@@ -895,13 +1053,17 @@ func (h *Handler) handleNickServ(msg ircmsg.Message) {
- 		h.m.Unlock()
- 
- 		if attempts >= 3 {
--			h.log.Warn().Int("attempt", attempts).Msg("NickServ failed login attempts")
-+			h.log.Warn().Int("attempt", attempts).Msg("NickServ failed login attempts (nick in use); scheduling cooldown retry")
- 			h.addConnectError("authentication failed: nick in use and not authenticated")
- 
- 			h.stateMachine.OnError("nickserv authentication failed: nick in use")
- 
--			// stop network and notify user
-+			// stop network and schedule cooldown retry
- 			h.Stop()
-+
-+			h.m.Lock()
-+			h.scheduleFlappingCooldownLocked(flappingInitialCooldown, h.getClock().Now())
-+			h.m.Unlock()
- 		}
- 	}
- }
+ 	if h.identifiersEqual(msg.Nick(), "NickServ") {
 -- 
 2.56.0
 
