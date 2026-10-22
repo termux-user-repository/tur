@@ -1,32 +1,31 @@
-From 354b32e24b487aeee07a5b4b0afdaac6897c0448 Mon Sep 17 00:00:00 2001
+From 0525ea144bea33132691df4af8033fe3a6bac0b9 Mon Sep 17 00:00:00 2001
 From: Pankaj Kumar <pankaj.pal9@gmail.com>
 Date: Mon, 19 Oct 2026 10:29:50 +0530
-Subject: [PATCH 3/3] feat(irc): add system resume detection and post-thaw
+Subject: [PATCH 2/2] feat(irc): add system resume detection and post-thaw
  grace period
 
 ---
- internal/irc/flapping_test.go  | 70 ++++++++++++++++++++++++
+ internal/irc/flapping_test.go  | 68 +++++++++++++++++++++++
  internal/irc/handler.go        | 98 ++++++++++++++++++++++++++++++++++
  internal/irc/health_monitor.go | 29 ++++++++++
- internal/irc/service.go        |  1 +
+ internal/irc/service.go        |  3 ++
  4 files changed, 198 insertions(+)
 
 diff --git a/internal/irc/flapping_test.go b/internal/irc/flapping_test.go
-index 3d373d1..3280dc5 100644
+index dddb6eda..1cd2b443 100644
 --- a/internal/irc/flapping_test.go
 +++ b/internal/irc/flapping_test.go
-@@ -461,3 +461,73 @@ func TestFlappingBreakerStaleTimerCallbackIgnoredAfterStop(t *testing.T) {
+@@ -441,3 +441,71 @@ func TestFlappingBreakerStaleTimerCallbackIgnoredAfterStop(t *testing.T) {
+ 	require.False(t, h.halfOpenAttempt, "stale timer callback must not trigger half-open attempt")
  	require.Equal(t, ircStopped, h.clientState)
  }
- 
++
 +func TestFlappingBreakerResumeGracePeriodExcludesSession(t *testing.T) {
 +	initial := time.Date(2026, time.October, 19, 12, 0, 0, 0, time.UTC)
 +	h, _ := newTestHandler()
 +
-+	// Notify system resume with 30s grace period
 +	h.OnSystemResume(initial.Add(-20*time.Second), initial.Add(30*time.Second))
 +
-+	// Short session ends during the grace period (at +10s)
 +	endedAt := initial.Add(10 * time.Second)
 +	tripped := recordSessionEnd(h, 5*time.Second, endedAt)
 +	require.False(t, tripped, "session during resume grace period should not trip breaker")
@@ -88,20 +87,19 @@ index 3d373d1..3280dc5 100644
 +
 +	require.False(t, reconnected, "reconnect should NOT be triggered when matching PONG is received")
 +}
-+
 diff --git a/internal/irc/handler.go b/internal/irc/handler.go
-index 21d5766..febc6de 100644
+index e52b0fa1..ad54dd57 100644
 --- a/internal/irc/handler.go
 +++ b/internal/irc/handler.go
-@@ -68,6 +68,7 @@ const (
+@@ -71,6 +71,7 @@ const (
  	flappingWindow             = 15 * time.Minute
  	flappingInitialCooldown    = 15 * time.Minute
  	flappingMaxCooldown        = 60 * time.Minute
 +	postThawGracePeriod        = 30 * time.Second
  )
  
- // identifyForm is the argument form of the outstanding NickServ IDENTIFY.
-@@ -113,6 +114,11 @@ type Handler struct {
+ // restartQuitTimeout bounds how long a restart waits for the server to close the
+@@ -138,6 +139,11 @@ type Handler struct {
  	flappingRetryGen      uint64
  	flappingSurvivalGen   uint64
  	halfOpenAttempt       bool
@@ -113,7 +111,7 @@ index 21d5766..febc6de 100644
  
  	identifyAttempt     identifyForm
  	identifyEscalated   bool
-@@ -827,6 +833,11 @@ func (h *Handler) onClientDisconnect(client *ircevent.Connection, _ ircmsg.Messa
+@@ -1106,6 +1112,11 @@ func (h *Handler) onClientDisconnect(client *ircevent.Connection, _ ircmsg.Messa
  // recordSessionEndLocked records one registered session and reports whether the
  // flapping threshold was reached. The caller must hold h.m.
  func (h *Handler) recordSessionEndLocked(lifetime time.Duration, endedAt time.Time) bool {
@@ -125,7 +123,7 @@ index 21d5766..febc6de 100644
  	if lifetime >= flappingSessionMinLifetime {
  		h.resetFlappingBreakerLocked()
  		return false
-@@ -952,6 +963,93 @@ func (h *Handler) clearConnectErrorLocked(substr string) {
+@@ -1235,6 +1246,93 @@ func (h *Handler) clearConnectErrorLocked(substr string) {
  	h.connectionErrors = filtered
  }
  
@@ -209,18 +207,18 @@ index 21d5766..febc6de 100644
 +
 +	select {
 +	case <-pongReceived:
-+		h.log.Debug().Str("network", h.network.Name).Msg("resume socket probe succeeded; connection is alive")
++		h.log.Debug().Str("network", h.GetNetwork().Name).Msg("resume socket probe succeeded; connection is alive")
 +	case <-time.After(timeout):
-+		h.log.Warn().Str("network", h.network.Name).Msg("resume socket probe timed out waiting for PONG; reconnecting dead socket")
++		h.log.Warn().Str("network", h.GetNetwork().Name).Msg("resume socket probe timed out waiting for PONG; reconnecting dead socket")
 +		reconnect()
 +	}
 +}
 +
  // onNotice handles NOTICE events
  func (h *Handler) onNotice(msg ircmsg.Message) {
- 	switch msg.Nick() {
+ 	if h.identifiersEqual(msg.Nick(), "NickServ") {
 diff --git a/internal/irc/health_monitor.go b/internal/irc/health_monitor.go
-index 2c54f52..337f342 100644
+index 2c54f525..337f3421 100644
 --- a/internal/irc/health_monitor.go
 +++ b/internal/irc/health_monitor.go
 @@ -124,6 +124,35 @@ func (s *Service) monitorHealth(ctx context.Context) {
@@ -260,17 +258,19 @@ index 2c54f52..337f342 100644
  // unhealthy since the last check, and one IRCHealthy event for those that
  // recovered after being reported. A network stopped on a fatal failure is
 diff --git a/internal/irc/service.go b/internal/irc/service.go
-index 0f0b19a..0584bcc 100644
+index 1251b0da..77f79bef 100644
 --- a/internal/irc/service.go
 +++ b/internal/irc/service.go
-@@ -234,6 +234,7 @@ func (s *Service) StartHandlers() {
- 	s.stopHealthMonitor = cancel
- 
- 	go s.monitorHealth(healthCtx)
-+	go s.watchResume(healthCtx)
+@@ -233,6 +233,9 @@ func (s *Service) StartHandlers() {
+ 	s.wg.Go(func() {
+ 		s.monitorHealth(healthCtx)
+ 	})
++	s.wg.Go(func() {
++		s.watchResume(healthCtx)
++	})
  }
  
- func (s *Service) StopHandlers() {
+ // StopHandlers stops every network and waits, until ctx is done, for the
 -- 
 2.56.0
 
