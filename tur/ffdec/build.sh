@@ -1,8 +1,9 @@
 TERMUX_PKG_HOMEPAGE=https://github.com/jindrapetrik/jpexs-decompiler
 TERMUX_PKG_DESCRIPTION="JPEXS Free Flash Decompiler"
 TERMUX_PKG_LICENSE="GPL-3.0"
-TERMUX_PKG_MAINTAINER="@termux-user-repository"
+TERMUX_PKG_MAINTAINER="@TheMightyArie"
 TERMUX_PKG_VERSION="26.4.0"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_GIT_BRANCH="version${TERMUX_PKG_VERSION}"
 TERMUX_PKG_SRCURL="git+https://github.com/jindrapetrik/jpexs-decompiler"
 TERMUX_PKG_UPDATE_TAG_TYPE="latest-release-tag"
