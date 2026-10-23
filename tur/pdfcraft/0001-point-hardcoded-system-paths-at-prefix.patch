@@ -12,23 +12,23 @@ index f4945f7..433c058 100644
              dirs.extend([home.join(".local/share/fonts"), home.join(".fonts")]);
          }
 diff --git a/crates/print/src/spool.rs b/crates/print/src/spool.rs
-index cf1c0cb..a41121a 100644
+index 5ce3d97..b8b7819 100644
 --- a/crates/print/src/spool.rs
 +++ b/crates/print/src/spool.rs
-@@ -12,7 +12,7 @@ pub use craft_print::{
- pub fn printer_options(printer: &str) -> Vec<PrinterOption> {
+@@ -19,7 +19,7 @@ pub fn printer_options(printer: &str) -> Vec<PrinterOption> {
+ pub fn printer_options_in(printer: &str, lang: &str) -> Vec<PrinterOption> {
      #[cfg(all(unix, not(target_arch = "wasm32")))]
      {
--        printer_options_via(printer, std::path::Path::new("/etc/cups/ppd"), std::process::Command::new("lpoptions"))
-+        printer_options_via(printer, std::path::Path::new("@TERMUX_PREFIX@/etc/cups/ppd"), std::process::Command::new("lpoptions"))
+-        printer_options_via_within(printer, std::path::Path::new("/etc/cups/ppd"), std::process::Command::new("lpoptions"), LPOPTIONS_LIMIT, lang)
++        printer_options_via_within(printer, std::path::Path::new("@TERMUX_PREFIX@/etc/cups/ppd"), std::process::Command::new("lpoptions"), LPOPTIONS_LIMIT, lang)
      }
      #[cfg(not(all(unix, not(target_arch = "wasm32"))))]
      {
 diff --git a/crates/ui-egui/src/system_fonts.rs b/crates/ui-egui/src/system_fonts.rs
-index 606fa92..dff7856 100644
+index e2c6a0d..90e10c0 100644
 --- a/crates/ui-egui/src/system_fonts.rs
 +++ b/crates/ui-egui/src/system_fonts.rs
-@@ -313,7 +313,7 @@ fn unix_fonts(files: &'static [&'static str]) -> Vec<PathBuf> {
+@@ -412,7 +412,7 @@ fn unix_fonts(files: &'static [&'static str]) -> Vec<PathBuf> {
  
  fn unix_candidates(files: &[&str], installed: &[PathBuf]) -> Vec<PathBuf> {
      let mut paths: Vec<_> =
