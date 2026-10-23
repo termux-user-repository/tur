@@ -1,0 +1,72 @@
+--- a/externals/CMakeLists.txt
++++ b/externals/CMakeLists.txt
+@@ -428,6 +428,7 @@ if (ENABLE_VULKAN)
+     # spirv-headers
+     if(USE_SYSTEM_SPIRV_HEADERS)
+         find_package(SPIRV-Headers REQUIRED)
++        find_package(SPIRV-Tools REQUIRED)
+         if(TARGET SPIRV-Headers::SPIRV-Headers)
+             message(STATUS "Found SPIRV headers")
+             get_target_property(SPIRV-Headers_SOURCE_DIR SPIRV-Headers::SPIRV-Headers INTERFACE_INCLUDE_DIRECTORIES)
+@@ -438,10 +439,6 @@ if (ENABLE_VULKAN)
+         add_subdirectory(spirv-headers EXCLUDE_FROM_ALL)
+     endif()
+ 
+-    # spirv-tools
+-    # TODO: Implement USE_SYSTEM_SPIRV_TOOLS -OS
+-    set(SPIRV_SKIP_EXECUTABLES ON)
+-    add_subdirectory(spirv-tools EXCLUDE_FROM_ALL)
+ 
+     # glslang
+     if(USE_SYSTEM_GLSLANG)
+
+--- a/externals/cubeb/CMakeLists.txt
++++ b/externals/cubeb/CMakeLists.txt
+@@ -172,7 +172,6 @@ if(LAZY_LOAD_LIBS)
+   check_include_files(alsa/asoundlib.h   USE_ALSA)
+   check_include_files(jack/jack.h        USE_JACK)
+   check_include_files(sndio.h            USE_SNDIO)
+-  check_include_files(aaudio/AAudio.h    USE_AAUDIO)
+ 
+   if(USE_PULSE OR USE_ALSA OR USE_JACK OR USE_SNDIO OR USE_AAUDIO)
+     target_link_libraries(cubeb PRIVATE ${CMAKE_DL_LIBS})
+@@ -213,7 +212,6 @@ else()
+     target_link_libraries(cubeb PRIVATE sndio)
+   endif()
+ 
+-  check_include_files(aaudio/AAudio.h USE_AAUDIO)
+   if(USE_AAUDIO)
+     target_compile_definitions(cubeb PRIVATE DISABLE_LIBAAUDIO_DLOPEN)
+     target_link_libraries(cubeb PRIVATE aaudio)
+--- a/src/common/error.cpp
++++ b/src/common/error.cpp
+@@ -6,6 +6,9 @@
+ // Licensed under GPLv2 or any later version
+ // Refer to the license.txt file included.
+ 
++#ifdef __TERMUX__
++#define _GNU_SOURCE 1
++#endif
+ #include <cstddef>
+ #ifdef _WIN32
+ #include <windows.h>
+@@ -35,7 +38,7 @@ std::string NativeErrorToString(int e) {
+ #else
+     char err_str[255];
+ #if defined(__GLIBC__) && (_GNU_SOURCE || (_POSIX_C_SOURCE < 200112L && _XOPEN_SOURCE < 600)) ||   \
+-    (defined(ANDROID) && !defined(HAVE_LIBRETRO))
++    (defined(ANDROID) && !defined(HAVE_LIBRETRO)) || defined(__TERMUX__)
+     // Thread safe (GNU-specific)
+     const char* str = strerror_r(e, err_str, sizeof(err_str));
+     return std::string(str);
+--- a/src/core/hle/service/soc/soc_u.cpp
++++ b/src/core/hle/service/soc/soc_u.cpp
+@@ -1060,7 +1060,7 @@ void SOC_U::SockAtMark(Kernel::HLERequestContext& ctx) {
+     func_res = ::ioctlsocket(holder.socket_fd, SIOCATMARK, &atMark);
+     is_at_mark = atMark != 0;
+ #else
+-#ifdef ANDROID
++#if defined(ANDROID) || defined(__TERMUX__)
+     func_res = 0;
+     LOG_WARNING(Service_SOC, "(STUBBED) called");
+ #else
