@@ -13,7 +13,7 @@ TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_EXCLUDED_ARCHES="arm, i686"
 TERMUX_PKG_NO_STRIP=true
 TERMUX_PKG_ON_DEVICE_BUILD_NOT_SUPPORTED=true
-# `bazel5` has been deprecated since Dec 2025.
+# `bazel6` has been deprecated since Dec 2025.
 TERMUX_PKG_AUTO_UPDATE=false
 
 __sed_verbose() {
