@@ -95,23 +95,33 @@ termux_step_get_source() {
 }
 
 termux_pkg_auto_update() {
-	local api_url="https://api.github.com/repos/bazelbuild/bazel/releases?per_page=100"
+	local major_version=9
+	local tags_api="https://api.github.com/repos/bazelbuild/bazel/git/refs/tags"
+
 	local latest_version=$(
-		curl -fsSL "$api_url" |
-			jq -r '
-				.[] |
-				select(.draft == false and .prerelease == false) |
-				select(.tag_name | test("^9\\.[0-9]+(\\.[0-9]+)?$")) |
-				. as $release |
-				select(any(.assets[]?.name; . == ("bazel-" + $release.tag_name + "-dist.zip"))) |
-				.tag_name
-			' |
+		curl -s "$tags_api" | jq -r '.[].ref' | cut -d'/' -f3 |
+			grep "^${major_version}\." | grep -v -E "(rc)|(pre)" |
 			sort -V | tail -n1
 	)
+
 	if [[ -z "${latest_version}" ]]; then
-		echo "WARN: Unable to find a published Bazel 9 release with a dist archive. Try again later." >&2
+		echo "WARN: Unable to get latest refs tags from upstream. Try again later." >&2
 		return
 	fi
+
+	local release_api="https://api.github.com/repos/bazelbuild/bazel/releases/tags/${latest_version}"
+	local has_dist=$(
+		curl -fsSL "$release_api" 2>/dev/null |
+			jq -r --arg dist "bazel-${latest_version}-dist.zip" '
+				.assets[]?.name // empty | select(. == $dist)
+			' | head -n1
+	)
+
+	if [[ -z "$has_dist" ]]; then
+		echo "WARN: Latest version ${latest_version} does not have dist archive. Try again later." >&2
+		return
+	fi
+
 	termux_pkg_upgrade_version "${latest_version}"
 }
 
