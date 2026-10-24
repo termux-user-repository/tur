@@ -9,11 +9,24 @@ TERMUX_PKG_DEPENDS="atk, cups, dbus, fontconfig, gtk3, krb5, libc++, libevdev, l
 TERMUX_PKG_BUILD_DEPENDS="chromium-beta-host-tools, libffi-static"
 # Chromium doesn't support i686 on Linux.
 TERMUX_PKG_EXCLUDED_ARCHES="i686"
-TERMUX_PKG_AUTO_UPDATE=false
+TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_ON_DEVICE_BUILD_NOT_SUPPORTED=true
 
 SYSTEM_LIBRARIES="    fontconfig"
 # TERMUX_PKG_DEPENDS="fontconfig"
+
+termux_pkg_auto_update() {
+	local latest_version="$(. $TERMUX_SCRIPTDIR/tur/chromium-beta-host-tools/build.sh; echo ${TERMUX_PKG_VERSION})"
+
+	if ! termux_pkg_is_update_needed \
+		"${TERMUX_PKG_VERSION#*:}" "${latest_version}"; then
+		echo "INFO: No update needed. Already at version '${latest_version}'."
+		return 0
+	fi
+
+	termux_error_exit \
+		"Chromium Beta version ${latest_version} is available. Please update manually."
+}
 
 termux_step_post_get_source() {
 	# Apply patches related to chromium
