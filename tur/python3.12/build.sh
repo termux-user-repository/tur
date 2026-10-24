@@ -7,11 +7,11 @@ TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION=3.12.15
 TERMUX_PKG_SRCURL=https://www.python.org/ftp/python/${TERMUX_PKG_VERSION}/Python-${TERMUX_PKG_VERSION}.tar.xz
 TERMUX_PKG_SHA256=c2c4321961fab0fb999d66e0cecf521c2ab3994c7992873ea99e306c1094fd5a
-TERMUX_PKG_AUTO_UPDATE=false
 TERMUX_PKG_DEPENDS="gdbm, libandroid-posix-semaphore, libandroid-support, libbz2, libcrypt, libexpat, libffi, liblzma, libsqlite, ncurses, ncurses-ui-libs, openssl, readline, zlib"
 TERMUX_PKG_BUILD_DEPENDS="tk"
 TERMUX_PKG_SUGGESTS="python3.12-tkinter"
 TERMUX_PKG_MAKE_INSTALL_TARGET=altinstall
+TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_HOSTBUILD=true
 
 # https://github.com/termux/termux-packages/issues/15908
@@ -61,6 +61,23 @@ TERMUX_PKG_EXTRA_HOSTBUILD_CONFIGURE_ARGS="
 TERMUX_PKG_UNDEF_SYMBOLS_FILES="
 ./opt/python$_MAJOR_VERSION/cross/lib/python$_MAJOR_VERSION/lib-dynload/*.so
 "
+
+termux_pkg_auto_update() {
+	local series="${_MAJOR_VERSION}"
+	local latest
+	latest="$(
+		curl --fail --silent --location --retry 3 \
+			"https://www.python.org/ftp/python/" |
+			grep -oE "${series}\\.[0-9]+/" |
+			sed 's|/$||' |
+			sort -V |
+			tail -n1
+	)" || termux_error_exit "failed to query Python releases"
+	if [[ -z "${latest}" ]]; then
+		termux_error_exit "failed to find latest Python ${series} release"
+	fi
+	termux_pkg_upgrade_version "${latest}"
+}
 
 termux_step_host_build() {
 	$TERMUX_PKG_SRCDIR/configure $TERMUX_PKG_EXTRA_HOSTBUILD_CONFIGURE_ARGS

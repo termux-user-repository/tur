@@ -10,6 +10,7 @@ TERMUX_PKG_DEPENDS="gdbm, libandroid-posix-semaphore, libandroid-support, libbz2
 TERMUX_PKG_RECOMMENDS="clang, make, pkg-config"
 TERMUX_PKG_SUGGESTS="python${_MAJOR_VERSION}-tkinter"
 TERMUX_PKG_BREAKS="python2 (<= 2.7.15)"
+TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_HOSTBUILD=true
 # Set ac_cv_func_wcsftime=no to avoid errors such as "character U+ca0025 is not in range [U+0000; U+10ffff]"
 # when executing e.g. "from time import time, strftime, localtime; print(strftime(str('%Y-%m-%d %H:%M'), localtime()))"
@@ -52,6 +53,23 @@ TERMUX_PKG_MAKE_PROCESSES=1
 TERMUX_PKG_UNDEF_SYMBOLS_FILES="
 ./opt/python$_MAJOR_VERSION/cross/lib/python$_MAJOR_VERSION/lib-dynload/*.so
 "
+
+termux_pkg_auto_update() {
+	local series="${_MAJOR_VERSION}"
+	local latest
+	latest="$(
+		curl --fail --silent --location --retry 3 \
+			"https://www.python.org/ftp/python/" |
+			grep -oE "${series}\\.[0-9]+/" |
+			sed 's|/$||' |
+			sort -V |
+			tail -n1
+	)" || termux_error_exit "failed to query Python releases"
+	if [[ -z "${latest}" ]]; then
+		termux_error_exit "failed to find latest Python ${series} release"
+	fi
+	termux_pkg_upgrade_version "${latest}"
+}
 
 termux_step_host_build() {
 	$TERMUX_PKG_SRCDIR/configure $TERMUX_PKG_EXTRA_HOSTBUILD_CONFIGURE_ARGS

@@ -46,6 +46,23 @@ TERMUX_PKG_EXTRA_HOSTBUILD_CONFIGURE_ARGS="
 --prefix=$TERMUX_PREFIX/opt/python$_MAJOR_VERSION/cross
 "
 
+termux_pkg_auto_update() {
+	local series="${_MAJOR_VERSION}"
+	local latest
+	latest="$(
+		curl --fail --silent --location --retry 3 \
+			"https://www.python.org/ftp/python/" |
+			grep -oE "${series}\\.[0-9]+/" |
+			sed 's|/$||' |
+			sort -V |
+			tail -n1
+	)" || termux_error_exit "failed to query Python releases"
+	if [[ -z "${latest}" ]]; then
+		termux_error_exit "failed to find latest Python ${series} release"
+	fi
+	termux_pkg_upgrade_version "${latest}"
+}
+
 termux_step_host_build() {
 	LN="ln -s" $TERMUX_PKG_SRCDIR/configure $TERMUX_PKG_EXTRA_HOSTBUILD_CONFIGURE_ARGS
 	make -j $TERMUX_PKG_MAKE_PROCESSES
