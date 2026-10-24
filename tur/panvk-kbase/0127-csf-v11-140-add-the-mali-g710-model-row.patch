@@ -1,0 +1,32 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: Wed, 7 Oct 2026 11:00:00 +0530
+Subject: [PATCH] panfrost: add the Mali-G710 model row biblioklept
+
+A Pixel 7 (Tensor G2) reports gpu_id 0xa8620004 and panvk drops it with
+"Unknown gpu_id (0xa8620004) or variant (0)". 0xa862 is kbase TODX
+(GPU_ID2_MODEL_MAKE(10, 2), "Mali-G710"): the same Valhall v10 core as
+the G610 (LODX, 0xa867), in 7-16 core configurations. Reuse the G610
+tile buffer sizes and rates, which describe one core.
+
+G510 (TGRX, product major 3) is not added: its arch minor is unseen
+and pan_model matches the full (major, minor, product) id.
+
+---
+ src/panfrost/model/pan_model.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/src/panfrost/model/pan_model.c b/src/panfrost/model/pan_model.c
+index f46d98b91ee..677713ca29d 100644
+--- a/src/panfrost/model/pan_model.c
++++ b/src/panfrost/model/pan_model.c
+@@ -90,6 +90,9 @@ const struct pan_model pan_model_list[] = {
+                                               MODEL_RATES_X(2, 4, 8,  32,  32, 8)),
+    VALHALL_MODEL(PAN_PROD_ID(9, 2, 4), 0, "G68",    "G78", MODEL_ANISO(ALL),  MODEL_TB_SIZES(16384,  8192),
+                                               MODEL_RATES_X(2, 4, 8,  32,  32, 8)),
++   /* G710 (kbase TODX, 0xa862): same Valhall v10 core as G610, 7-16 cores. */
++   VALHALL_MODEL(PAN_PROD_ID(10, 8, 2), 0, "G710",   "G710", MODEL_ANISO(ALL),  MODEL_TB_SIZES(32768, 16384),
++                                              MODEL_RATES_X(4, 8, 16,  64,  64, 16)),
+    VALHALL_MODEL(PAN_PROD_ID(10, 8, 7), 0, "G610",   "G710", MODEL_ANISO(ALL),  MODEL_TB_SIZES(32768, 16384),
+                                               MODEL_RATES_X(4, 8, 16,  64,  64, 16)),
+    /* var/cvt/sfu rates might not be correct (we haven't found any detailed documentation) */

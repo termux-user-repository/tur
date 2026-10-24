@@ -1,0 +1,77 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: Wed, 7 Oct 2026 20:00:00 +0530
+Subject: [PATCH] util/os_misc: look each Android property option up once biblioklept
+
+On Android, os_get_option() falls back to three system property
+lookups (debug.mesa.*, vendor.mesa.*, mesa.*) whenever the variable is
+not in the environment. For an app context each denied lookup is also
+logged by libc ("Access denied finding property"), so one miss costs
+about 1 ms.
+
+Some options are read per object: panvk_image_init() and
+panvk_bc_shadow_info() read one each per vkCreateImage, spirv_to_nir()
+and bifrost_dump_shader() per shader. In an NFS Most Wanted capture
+this was 335 ms of driver time per session, and 128 ms of a 1.3 s
+loading freeze on the game thread (perf, nfs-23197, 18.3-19.6 s).
+
+Cache the property result per name (hits and misses). The environment
+is still read on every call, so getenv/setenv behavior is unchanged;
+only properties are assumed not to change while the driver runs.
+---
+diff --git a/src/util/os_misc.c b/src/util/os_misc.c
+index 16dd51b..2196c1d 100644
+--- a/src/util/os_misc.c
++++ b/src/util/os_misc.c
+@@ -206,6 +206,42 @@ os_get_android_option(const char *name)
+    }
+    return NULL;
+ }
++
++/* Every miss above is three property lookups, and for an app context each
++ * denied lookup is also logged by libc: about 1 ms per call. Some options are
++ * read per object (vkCreateImage reads two), which added up to over 100 ms
++ * of a game's load. Look each name up once; properties are not expected to
++ * change while the driver runs.
++ */
++static struct hash_table *android_option_tbl;
++static simple_mtx_t android_option_mtx = SIMPLE_MTX_INITIALIZER;
++
++static const char *
++os_get_android_option_cached(const char *name)
++{
++   const char *opt;
++
++   simple_mtx_lock(&android_option_mtx);
++   if (!android_option_tbl)
++      android_option_tbl = _mesa_hash_table_create(NULL, _mesa_hash_string,
++                                                   _mesa_key_string_equal);
++   struct hash_entry *entry =
++      android_option_tbl ? _mesa_hash_table_search(android_option_tbl, name)
++                         : NULL;
++   if (entry) {
++      opt = entry->data;
++   } else {
++      opt = os_get_android_option(name);
++      char *key = android_option_tbl ? ralloc_strdup(android_option_tbl, name)
++                                     : NULL;
++      if (key) {
++         opt = ralloc_strdup(android_option_tbl, opt);
++         _mesa_hash_table_insert(android_option_tbl, key, (void *)opt);
++      }
++   }
++   simple_mtx_unlock(&android_option_mtx);
++   return opt;
++}
+ #endif
+ 
+ #if DETECT_OS_WINDOWS
+@@ -239,7 +275,7 @@ os_get_option_internal(const char *name, bool use_secure_getenv)
+    }
+ #if DETECT_OS_ANDROID
+    if (!opt) {
+-      opt = os_get_android_option(name);
++      opt = os_get_android_option_cached(name);
+    }
+ #endif
+    return opt;

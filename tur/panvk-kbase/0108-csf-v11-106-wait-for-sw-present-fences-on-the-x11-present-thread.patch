@@ -1,0 +1,82 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: Mon, 5 Oct 2026 20:00:00 +0530
+Subject: [PATCH] wsi/x11: wait for sw present fences on the present thread
+
+With software WSI (no dma-buf/DRI3, the kbase launcher's X server),
+wsi_common_queue_present() called WaitForFences on the image's fence
+before returning from vkQueuePresentKHR. DXVK presents from its submit
+thread, so that thread sat in the wait until the frame's GPU work was done
+(47% of wall time in NFS Most Wanted) and could not submit the next frame:
+CPU and GPU never overlapped.
+
+The X11 present thread already exists for sw swapchains. Let it wait for
+the per-image fence before copying the image, and skip the wait in
+wsi_common_queue_present() for such swapchains. Explicit-sync swapchains
+are unchanged.
+
+Purpose: let the app submit frame N+1 while frame N renders (sw WSI)
+
+Tested GPU: Mali-G615 MC6 (Poco X6 Pro)
+Tested Kbase UAPI: CSF 1.21 (MediaTek)
+Mesa base range: 5a07217f034b (26.3.0-devel)
+Validation test: NFS Most Wanted race 88.7 -> 92.1 fps, p99 22 -> 16 ms; submit thread blocked 47% -> 2.4%
+
+Generated-by: LLM
+---
+
+diff --git a/src/vulkan/wsi/wsi_common.c b/src/vulkan/wsi/wsi_common.c
+index 2bca1a2..ba84e36 100644
+--- a/src/vulkan/wsi/wsi_common.c
++++ b/src/vulkan/wsi/wsi_common.c
+@@ -2889,7 +2889,7 @@ wsi_common_queue_present(const struct wsi_device *wsi,
+ #endif
+       }
+ 
+-      if (wsi->sw) {
++      if (wsi->sw && !swapchain->sw_fence_wait_in_present_thread) {
+          wsi->WaitForFences(vk_device_to_handle(dev),
+                             1, &swapchain->fences[image_index], true, ~0ull);
+       }
+diff --git a/src/vulkan/wsi/wsi_common_private.h b/src/vulkan/wsi/wsi_common_private.h
+index 0b1f5f4..7dacaa4 100644
+--- a/src/vulkan/wsi/wsi_common_private.h
++++ b/src/vulkan/wsi/wsi_common_private.h
+@@ -239,6 +239,10 @@ struct wsi_swapchain {
+    VkSemaphore present_id_timeline;
+    bool present_wait_enabled;
+ 
++   /* sw (CPU-presented) images: the platform's present thread waits for
++    * the per-image fence itself, so vkQueuePresentKHR need not block. */
++   bool sw_fence_wait_in_present_thread;
++
+    int signal_dma_buf_from_semaphore;
+    /**
+     * Optional semaphore for implicit-sync swapchains.  It will be signaled by
+diff --git a/src/vulkan/wsi/wsi_common_x11.c b/src/vulkan/wsi/wsi_common_x11.c
+index c9d35d3..0edfffb 100644
+--- a/src/vulkan/wsi/wsi_common_x11.c
++++ b/src/vulkan/wsi/wsi_common_x11.c
+@@ -2559,8 +2559,11 @@ x11_manage_present_queue(void *state)
+       VkPresentModeKHR present_mode = chain->images[image_index].present_mode;
+ 
+       /* Not necessary to block when we have explicit sync */
++      /* sw images are read by the CPU (X server or XPutImage): wait for the
++       * blit here instead of in vkQueuePresentKHR. */
+       bool need_fence_wait =
+-            x11_needs_wait_for_fences(chain->base.wsi, wsi_conn, present_mode) &&
++            (chain->base.wsi->sw ||
++             x11_needs_wait_for_fences(chain->base.wsi, wsi_conn, present_mode)) &&
+             !chain->base.image_info.explicit_sync;
+ 
+       bool need_timing_fence_wait = x11_swapchain_present_timing_is_out_of_order_completion(
+@@ -3406,6 +3409,9 @@ x11_surface_create_swapchain(VkIcdSurfaceBase *icd_surface,
+          wsi_queue_push(&chain->acquire_queue, i);
+    }
+ 
++   chain->base.sw_fence_wait_in_present_thread =
++      !chain->base.image_info.explicit_sync;
++
+    ret = thrd_create(&chain->queue_manager,
+                      x11_manage_present_queue, chain);
+    if (ret != thrd_success) {

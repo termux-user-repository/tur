@@ -1,0 +1,841 @@
+From a7a1a31d7fd1649ff9c750911080176d5fd107e5 Mon Sep 17 00:00:00 2001
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: Sat, 3 Oct 2026 09:49:58 +0530
+Subject: [PATCH] panvk: select viewports for VS and TES ViewportIndex writes
+ biblioklept
+
+A VS or TES that writes ViewportIndex now draws through the gpu_prerast
+passthrough, which applies the selected viewport transform and writes
+per-viewport scissor planes. The draw is split into ordered viewport
+runs (libpan vp_runs.cl, now instance aware) so each run gets that
+viewport's hardware depth clamp. Tess-fed draws replay the run list
+per chunk. Allocate the gpu_prerast arena when shaderOutputViewportIndex
+is enabled and advertise the feature on v10+. v12 keeps the passthrough
+without run splitting.
+
+Generated-by: LLM
+---
+ src/panfrost/libpan/tests/vp_runs.c           |  27 +++
+ src/panfrost/libpan/vp_runs.cl                |  75 ++++--
+ src/panfrost/vulkan/csf/panvk_gpu_prerast.c   |   4 +-
+ src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c   | 226 +++++++++---------
+ src/panfrost/vulkan/panvk_cmd_draw.h          |  12 +-
+ src/panfrost/vulkan/panvk_gpu_prerast.h       |   6 +-
+ src/panfrost/vulkan/panvk_vX_cmd_draw.c       |   4 +-
+ src/panfrost/vulkan/panvk_vX_device.c         |   1 +
+ .../vulkan/panvk_vX_physical_device.c         |   2 +-
+ src/panfrost/vulkan/panvk_vX_shader.c         | 134 ++++++++++-
+ 10 files changed, 350 insertions(+), 141 deletions(-)
+
+diff --git a/src/panfrost/libpan/tests/vp_runs.c b/src/panfrost/libpan/tests/vp_runs.c
+index f17c9c78181..5df18a8c6f9 100644
+--- a/src/panfrost/libpan/tests/vp_runs.c
++++ b/src/panfrost/libpan/tests/vp_runs.c
+@@ -340,6 +340,33 @@ main(void)
+             buf.h.run_count == 0);
+    }
+ 
++   /* VS draw: two instances of two points, instance k reads records at
++    * 2 * k. Ids 0..3 pick viewports 0, 1, 1, 0.
++    */
++   {
++      uint32_t idx[] = {0, 1};
++      const uint32_t vps[] = {0, 1, 1, 0};
++
++      for (uint32_t i = 0; i < 4; i++)
++         put_vp(rec, 20 + i, vps[i]);
++      memset(out, 0xa5, 64 * sizeof(uint32_t));
++      memset(&buf, 0xa5, sizeof(buf));
++      for (uint32_t i = 0; i < 2; i++)
++         idx[i] += 20;
++      panlib_vp_runs_n(idx, 2, rec, STRIDE, outs, 4, MESA_PRIM_POINTS, 0, 64,
++                       8, out, &buf.h, 2, 2);
++      CHECK(!buf.h.overflow && buf.h.index_count == 4 && buf.h.run_count == 3);
++      CHECK(out[0] == 20 && out[1] == 21 && out[2] == 22 && out[3] == 23);
++      CHECK(buf.r[0].viewport == 0 && buf.r[0].index_count == 1);
++      CHECK(buf.r[1].viewport == 1 && buf.r[1].first_index == 1 &&
++            buf.r[1].index_count == 2);
++      CHECK(buf.r[2].viewport == 0 && buf.r[2].first_index == 3);
++      /* the instance offset must not wrap */
++      panlib_vp_runs_n(idx, 2, rec, STRIDE, outs, 4, MESA_PRIM_POINTS, 0, 64,
++                       8, out, &buf.h, 2, 0xffffffffu);
++      CHECK(buf.h.overflow == 1 && buf.h.run_count == 0);
++   }
++
+    free(rec);
+    printf("vp_runs ok\n");
+    return 0;
+diff --git a/src/panfrost/libpan/vp_runs.cl b/src/panfrost/libpan/vp_runs.cl
+index 74753673464..a3117d1307a 100644
+--- a/src/panfrost/libpan/vp_runs.cl
++++ b/src/panfrost/libpan/vp_runs.cl
+@@ -68,7 +68,7 @@ static bool
+ vp_prim(VP_CONST uint32_t *in_indices, VP_CONST uint32_t *records,
+         uint32_t record_stride, uint32_t vp_slot, bool has_vp, uint32_t count,
+         uint32_t prim, bool provoking_last, uint32_t p, uint32_t num_prims,
+-        uint32_t base, VP_GLOBAL uint32_t *out_indices,
++        uint32_t base, uint32_t rec_base, VP_GLOBAL uint32_t *out_indices,
+         VP_GLOBAL struct panlib_vp_run *runs, uint32_t *nidx, uint32_t *nrun,
+         uint32_t index_cap, uint32_t run_cap)
+ {
+@@ -86,7 +86,11 @@ vp_prim(VP_CONST uint32_t *in_indices, VP_CONST uint32_t *records,
+                                                      num_prims),
+                       &at))
+          return false;
+-      vtx[v] = in_indices[at];
++      /* rec_base is the record index of instance k's vertex 0 for a VS draw
++       * where every instance has its own records. 0 otherwise.
++       */
++      if (!vp_add_u32(in_indices[at], rec_base, &vtx[v]))
++         return false;
+    }
+    return vp_emit(out_indices, runs, nidx, nrun, index_cap, run_cap,
+                   vp_prim_viewport(records, record_stride, vp_slot, has_vp,
+@@ -94,13 +98,19 @@ vp_prim(VP_CONST uint32_t *in_indices, VP_CONST uint32_t *records,
+                   k, vtx);
+ }
+ 
++/* instances > 1 repeats the index list once per instance, instance k reading
++ * records at k * instance_stride. Only a VS draw has per-instance records, a
++ * GS draw passes instances = 1.
++ */
+ static void
+-panlib_vp_runs(VP_CONST uint32_t *in_indices, uint32_t index_count,
+-               VP_CONST uint32_t *records, uint32_t record_stride,
+-               uint64_t outputs_written, uint32_t viewport_count,
+-               uint32_t prim, uint32_t provoking_last, uint32_t index_capacity,
+-               uint32_t run_capacity, VP_GLOBAL uint32_t *out_indices,
+-               VP_GLOBAL struct panlib_vp_run_header *header)
++panlib_vp_runs_n(VP_CONST uint32_t *in_indices, uint32_t index_count,
++                 VP_CONST uint32_t *records, uint32_t record_stride,
++                 uint64_t outputs_written, uint32_t viewport_count,
++                 uint32_t prim, uint32_t provoking_last,
++                 uint32_t index_capacity, uint32_t run_capacity,
++                 VP_GLOBAL uint32_t *out_indices,
++                 VP_GLOBAL struct panlib_vp_run_header *header,
++                 uint32_t instances, uint32_t instance_stride)
+ {
+    bool has_vp = (outputs_written & VARYING_BIT_VIEWPORT) != 0;
+    uint32_t vp_slot = util_bitcount64(outputs_written &
+@@ -110,7 +120,8 @@ panlib_vp_runs(VP_CONST uint32_t *in_indices, uint32_t index_count,
+    bool overflow = false;
+    bool accepted = prim == MESA_PRIM_POINTS || prim == MESA_PRIM_LINES ||
+                    prim == MESA_PRIM_LINE_STRIP || prim == MESA_PRIM_TRIANGLES ||
+-                   prim == MESA_PRIM_TRIANGLE_STRIP;
++                   prim == MESA_PRIM_TRIANGLE_STRIP ||
++                   prim == MESA_PRIM_TRIANGLE_FAN;
+ 
+    if (count > PANLIB_VP_MAX_VIEWPORTS)
+       count = PANLIB_VP_MAX_VIEWPORTS;
+@@ -130,8 +141,14 @@ panlib_vp_runs(VP_CONST uint32_t *in_indices, uint32_t index_count,
+       (VP_GLOBAL struct panlib_vp_run *)(header + 1);
+    uint32_t nidx = 0, nrun = 0;
+    bool prov_last = provoking_last != 0;
++
++   for (uint32_t inst = 0; inst < instances && !overflow; inst++) {
++   uint64_t rec64 = (uint64_t)inst * instance_stride;
++   uint32_t rec_base = (uint32_t)rec64;
+    uint32_t needle = 0;
+ 
++   if (rec64 > UINT32_MAX - 1)
++      overflow = true;
+    while (needle < index_count && !overflow) {
+       uint32_t next = index_count;
+ 
+@@ -149,12 +166,13 @@ panlib_vp_runs(VP_CONST uint32_t *in_indices, uint32_t index_count,
+       for (uint32_t p = 0; p < prims && !overflow; p++) {
+          overflow = !vp_prim(in_indices, records, record_stride, vp_slot,
+                              has_vp, count, prim, prov_last, p, prims,
+-                             needle, out_indices, runs, &nidx, &nrun,
+-                             index_capacity, run_capacity);
++                             needle, rec_base, out_indices, runs, &nidx,
++                             &nrun, index_capacity, run_capacity);
+       }
+       if (!vp_add_u32(next, 1, &needle))
+          overflow = true;
+    }
++   }
+ 
+    /* Fail closed: a partial draw is not a draw. */
+    header->index_count = overflow ? 0 : nidx;
+@@ -162,6 +180,19 @@ panlib_vp_runs(VP_CONST uint32_t *in_indices, uint32_t index_count,
+    header->overflow = overflow ? 1 : 0;
+ }
+ 
++__attribute__((unused)) static void
++panlib_vp_runs(VP_CONST uint32_t *in_indices, uint32_t index_count,
++               VP_CONST uint32_t *records, uint32_t record_stride,
++               uint64_t outputs_written, uint32_t viewport_count,
++               uint32_t prim, uint32_t provoking_last, uint32_t index_capacity,
++               uint32_t run_capacity, VP_GLOBAL uint32_t *out_indices,
++               VP_GLOBAL struct panlib_vp_run_header *header)
++{
++   panlib_vp_runs_n(in_indices, index_count, records, record_stride,
++                    outputs_written, viewport_count, prim, provoking_last,
++                    index_capacity, run_capacity, out_indices, header, 1, 0);
++}
++
+ #ifndef PANLIB_VP_HOST
+ /* counts points at the GS draw word: the number of indices the GS kernel
+  * restart-filled. Slots past it are untouched and must not be read.
+@@ -173,20 +204,26 @@ panlib_vp_runs_launch(uint64_t in_indices, uint64_t records,
+                      uint32_t record_stride, uint32_t viewport_count,
+                      uint32_t prim, uint32_t provoking_last,
+                      uint32_t index_bound, uint32_t index_capacity,
+-                     uint32_t run_capacity)
++                     uint32_t run_capacity, uint32_t per_instance)
+ {
+    uint32_t n = *((global const uint32_t *)counts);
++   /* A VS draw: counts is {vertex count, instance count}, and instance k
++    * owns the n records after instance k - 1.
++    */
++   uint32_t instances = per_instance ? ((global const uint32_t *)counts)[1] : 1;
+ 
+    /* A count past the filled region means the draw word is not the one
+     * this allocation was sized for. Force the walker's overflow path.
+     */
+-   if (n > index_bound)
++   if (n > index_bound ||
++       (per_instance && (uint64_t)n * instances > index_bound))
+       n = PANLIB_VP_MAX_INPUT_INDICES + 1;
+-   panlib_vp_runs((global const uint32_t *)in_indices, n,
+-                  (global const uint32_t *)records, record_stride,
+-                  outputs_written, viewport_count, prim, provoking_last,
+-                  index_capacity, run_capacity,
+-                  (global uint32_t *)out_indices,
+-                  (global struct panlib_vp_run_header *)header);
++   panlib_vp_runs_n((global const uint32_t *)in_indices, n,
++                    (global const uint32_t *)records, record_stride,
++                    outputs_written, viewport_count, prim, provoking_last,
++                    index_capacity, run_capacity,
++                    (global uint32_t *)out_indices,
++                    (global struct panlib_vp_run_header *)header, instances,
++                    per_instance ? n : 0);
+ }
+ #endif
+diff --git a/src/panfrost/vulkan/csf/panvk_gpu_prerast.c b/src/panfrost/vulkan/csf/panvk_gpu_prerast.c
+index 090587b7c4d..38db89b52de 100644
+--- a/src/panfrost/vulkan/csf/panvk_gpu_prerast.c
++++ b/src/panfrost/vulkan/csf/panvk_gpu_prerast.c
+@@ -80,7 +80,9 @@ panvk_per_arch(gpu_prerast_can_lower)(
+                      panvk_gpu_prerast_has_xfb(gs ? &gs->gpu_prerast.xfb
+                                                   : &shader->xfb);
+     const bool side_effects = PAN_ARCH < 13 && shader->has_side_effects;
+-    if (!(PANVK_DEBUG(GPU_PRERAST) || poly || gs || xfb || side_effects) ||
++    const bool vp_select = !gs && shader->vp_scissor_loc;
++    if (!(PANVK_DEBUG(GPU_PRERAST) || poly || gs || xfb || side_effects ||
++          vp_select) ||
+         (PAN_ARCH >= 13 && !gs && !poly && !xfb && shader->has_side_effects) ||
+         !shader->lowered_vs_compiled || !shader->passthrough_vs_compiled ||
+         (poly && !shader->polygon_compiled) ||
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+index 2f06e59a365..5f908d89b80 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+@@ -466,10 +466,13 @@ raster_vs_variant(const struct panvk_cmd_buffer *cmdbuf, bool generated)
+    if (gs)
+       return &gs->variants[PANVK_GS_VARIANT_PASSTHROUGH];
+ 
+-   return generated
+-      ? panvk_shader_gpu_prerast_variant(cmdbuf->state.gfx.vs.shader,
+-                                         PANVK_VS_VARIANT_GPU_PASSTHROUGH)
+-      : panvk_shader_hw_variant(cmdbuf->state.gfx.vs.shader);
++   /* A VS/TES that selects a viewport is only ever drawn through its
++    * passthrough, and its varying layout is the passthrough's.
++    */
++   const struct panvk_shader *vs = cmdbuf->state.gfx.vs.shader;
++   return generated || (vs && vs->gpu_prerast.vp_scissor_loc)
++      ? panvk_shader_gpu_prerast_variant(vs, PANVK_VS_VARIANT_GPU_PASSTHROUGH)
++      : panvk_shader_hw_variant(vs);
+ }
+ 
+ static void
+@@ -3633,6 +3636,10 @@ static void gpu_prerast_draw_generated(
+    struct panvk_cmd_buffer *cmdbuf, const struct panvk_draw_info *source,
+    uint64_t arena, enum panvk_gpu_prerast_poly_mode poly_mode,
+    const struct panlib_vp_runs_launch_args *vp_launch);
++static bool gpu_prerast_vp_prepare(struct panvk_cmd_buffer *cmdbuf,
++                                   uint64_t arena,
++                                   const struct panvk_draw_info *source,
++                                   struct panlib_vp_runs_launch_args *args);
+ 
+ static void
+ gpu_prerast_wait_compute(struct panvk_cmd_buffer *cmdbuf)
+@@ -4445,85 +4452,25 @@ gpu_prerast_draw_generated(struct panvk_cmd_buffer *cmdbuf,
+    }
+     generated.gpu_prerast_generated = true;
+ 
++   const struct panvk_shader *vps =
++      panvk_prerast_viewport_shader(&cmdbuf->state.gfx);
+ #if PAN_ARCH >= 12
+     /* v12 packs the depth clamp into the viewport register. A run split
+      * there would change the index buffer and still clamp to viewport 0.
+      */
+-    gs = NULL;
++    vps = NULL;
+ #endif
+-    if (gs && (vp_launch ||
+-               panvk_prerast_viewport_shader(&cmdbuf->state.gfx))) {
+-       const struct panvk_gpu_prerast_gs_info *gsi = &gs->gpu_prerast.gs;
+-        const uint32_t slots =
+-           vp_launch ? 1 : panvk_gpu_prerast_gs_cap_slots(gsi);
+-        uint32_t index_count = 0;
+-        const bool count_ok = vp_launch ||
+-           (slots && gsi->index_stride &&
+-            !__builtin_mul_overflow(slots, gsi->index_stride, &index_count));
+-        /* A triangle strip expands to 3 indices per primitive. The output
+-         * buffer has to hold that, not the input count.
+-         */
+-        const uint32_t out_count =
+-           gsi->output_prim == MESA_PRIM_TRIANGLE_STRIP && index_count > 2
+-              ? (index_count - 2) * 3
+-              : index_count;
+-        const uint32_t run_capacity =
+-           count_ok ? MIN2(out_count, PANLIB_VP_MAX_RUNS) : 0;
+-        uint64_t run_bytes = 0;
+-        uint64_t index_bytes = 0;
+-
+-        /* Fail closed before any raster work. A short buffer would keep a
+-         * prefix of the primitive stream.
+-         */
+-        if (!vp_launch &&
+-            (!count_ok || index_count > PANLIB_VP_MAX_INPUT_INDICES ||
+-             out_count > PANLIB_VP_MAX_OUT_INDICES ||
+-             !panlib_vp_run_bytes(run_capacity, &run_bytes) ||
+-             !panvk_gpu_prerast_checked_size(out_count, sizeof(uint32_t), 4,
+-                                             &index_bytes))) {
+-          mesa_loge_once(
+-             "panvk: viewport run list does not fit, draw discarded");
+-          vk_command_buffer_set_error(&cmdbuf->vk,
+-                                      VK_ERROR_OUT_OF_DEVICE_MEMORY);
+-          return;
+-       }
+-
+-        struct pan_ptr runs = {0}, out = {0};
+-
+-       if (!vp_launch) {
+-          runs = panvk_cmd_alloc_dev_mem(cmdbuf, desc, run_bytes, 16);
+-          out = panvk_cmd_alloc_dev_mem(cmdbuf, desc, index_bytes, 16);
+-       }
+-       if (!vp_launch && (!runs.gpu || !out.gpu)) {
+-          vk_command_buffer_set_error(&cmdbuf->vk,
+-                                      VK_ERROR_OUT_OF_DEVICE_MEMORY);
+-          return;
+-       }
+-
++    /* A polygon-mode draw has no run list: its passthrough still picks the
++     * viewport per vertex, but depth clamp and clip use the union range.
++     */
++    if (vps && (gs || poly_mode == PANVK_GPU_PRERAST_POLY_NONE)) {
+         struct panlib_vp_runs_launch_args owned, *use = &owned;
+ 
+-       if (vp_launch)
+-          use = (struct panlib_vp_runs_launch_args *)vp_launch;
+-       else
+-          owned = (struct panlib_vp_runs_launch_args) {
+-           .in_indices = arena + PANVK_GPU_PRERAST_GS_INDEX_OFFSET,
+-           .records = arena + PANVK_GPU_PRERAST_GS_RECORD_OFFSET,
+-           .out_indices = out.gpu,
+-           .header = runs.gpu,
+-           .outputs_written = gsi->outputs_written,
+-           /* First word of the GS draw is the restart-filled index count. */
+-           .counts = arena + PANVK_GPU_PRERAST_GS_DRAW_OFFSET,
+-           .record_stride = gsi->record_stride,
+-           .viewport_count =
+-              cmdbuf->vk.dynamic_graphics_state.vp.viewport_count,
+-           .prim = gsi->output_prim,
+-           .provoking_last =
+-              cmdbuf->vk.dynamic_graphics_state.rs.provoking_vertex ==
+-              VK_PROVOKING_VERTEX_MODE_LAST_VERTEX_EXT,
+-           .index_bound = index_count,
+-           .index_capacity = out_count,
+-           .run_capacity = run_capacity,
+-        };
++        if (vp_launch)
++           use = (struct panlib_vp_runs_launch_args *)vp_launch;
++        else if (!gpu_prerast_vp_prepare(cmdbuf, arena, source, &owned))
++           return;
++
+         uint32_t vp_count = use->viewport_count ? use->viewport_count : 1;
+ 
+         generated.index.buffer_dev_addr = use->out_indices;
+@@ -4531,10 +4478,13 @@ gpu_prerast_draw_generated(struct panvk_cmd_buffer *cmdbuf,
+            (uint64_t)use->index_capacity * sizeof(uint32_t);
+         generated.index.offset = 0;
+         generated.vertex.count = 0;
++        generated.instance.base = 0;
++        generated.instance.count = 1;
+         generated.indirect.buffer_dev_addr = 0;
+         generated.index.restart_enable = false;
+-        generated.prim = gsi->output_prim == MESA_PRIM_POINTS ? MESA_PRIM_POINTS
+-                         : gsi->output_prim == MESA_PRIM_LINE_STRIP
++        generated.prim = use->prim == MESA_PRIM_POINTS ? MESA_PRIM_POINTS
++                         : (use->prim == MESA_PRIM_LINE_STRIP ||
++                            use->prim == MESA_PRIM_LINES)
+                             ? MESA_PRIM_LINES
+                             : MESA_PRIM_TRIANGLES;
+ 
+@@ -4708,35 +4658,97 @@ gpu_prerast_cond_render_pass(struct panvk_cmd_buffer *cmdbuf,
+  */
+ static bool
+ gpu_prerast_vp_prepare(struct panvk_cmd_buffer *cmdbuf, uint64_t arena,
++                       const struct panvk_draw_info *source,
+                        struct panlib_vp_runs_launch_args *args)
+ {
+ #if PAN_ARCH >= 12
+    return false;
+ #else
+    const struct panvk_shader *gs = cmdbuf->state.gfx.gs.shader;
++   const struct panvk_shader *vps =
++      panvk_prerast_viewport_shader(&cmdbuf->state.gfx);
+ 
+-   if (!gs || !panvk_prerast_viewport_shader(&cmdbuf->state.gfx))
++   if (!vps)
+       return false;
+ 
+-   const struct panvk_gpu_prerast_gs_info *gsi = &gs->gpu_prerast.gs;
+-   const uint32_t slots = panvk_gpu_prerast_gs_cap_slots(gsi);
+-   uint32_t index_count = 0;
+-   const bool count_ok =
+-      slots && gsi->index_stride &&
+-      !__builtin_mul_overflow(slots, gsi->index_stride, &index_count);
+-   const uint32_t out_count =
+-      gsi->output_prim == MESA_PRIM_TRIANGLE_STRIP && index_count > 2
+-         ? (index_count - 2) * 3
+-         : index_count;
+-   const uint32_t run_capacity =
+-      count_ok ? MIN2(out_count, PANLIB_VP_MAX_RUNS) : 0;
++   uint64_t in_indices, records, counts, outputs;
++   uint32_t record_stride, prim, index_count = 0, out_count = 0;
++   uint32_t run_capacity = 0;
++   bool count_ok;
++   bool per_instance;
++
++   if (gs) {
++      const struct panvk_gpu_prerast_gs_info *gsi = &gs->gpu_prerast.gs;
++      const uint32_t slots = panvk_gpu_prerast_gs_cap_slots(gsi);
++
++      count_ok = slots && gsi->index_stride &&
++                 !__builtin_mul_overflow(slots, gsi->index_stride,
++                                         &index_count);
++      /* A triangle strip expands to 3 indices per primitive. The output
++       * buffer has to hold that, not the input count.
++       */
++      out_count = gsi->output_prim == MESA_PRIM_TRIANGLE_STRIP &&
++                          index_count > 2
++                     ? (index_count - 2) * 3
++                     : index_count;
++      run_capacity = count_ok ? MIN2(out_count, PANLIB_VP_MAX_RUNS) : 0;
++      in_indices = arena + PANVK_GPU_PRERAST_GS_INDEX_OFFSET;
++      records = arena + PANVK_GPU_PRERAST_GS_RECORD_OFFSET;
++      /* First word of the GS draw is the restart-filled index count. */
++      counts = arena + PANVK_GPU_PRERAST_GS_DRAW_OFFSET;
++      outputs = gsi->outputs_written;
++      record_stride = gsi->record_stride;
++      prim = gsi->output_prim;
++      per_instance = false;
++   } else {
++      /* VS or TES records, one per vertex and instance. The generated draw
++       * word holds the vertex count and the instance count.
++       */
++      const struct panvk_gpu_prerast_io *io = &vps->gpu_prerast.io;
++
++      if (panvk_per_arch(gpu_prerast_poly_mode)(cmdbuf, source) !=
++          PANVK_GPU_PRERAST_POLY_NONE)
++         return false;
++
++      index_count = panvk_gpu_prerast_record_capacity(io->record_stride);
++      uint64_t total = index_count;
++      if (!source->indirect.buffer_dev_addr)
++         total = MIN2(total, (uint64_t)source->vertex.count *
++                                source->instance.count);
++      const uint32_t mult =
++         source->prim == MESA_PRIM_LINE_STRIP                ? 2
++         : (source->prim == MESA_PRIM_TRIANGLE_STRIP ||
++            source->prim == MESA_PRIM_TRIANGLE_FAN)          ? 3
++                                                             : 1;
++      const uint32_t vpp = source->prim == MESA_PRIM_POINTS ? 1
++                           : (source->prim == MESA_PRIM_LINES ||
++                              source->prim == MESA_PRIM_LINE_STRIP)
++                              ? 2
++                              : 3;
++      count_ok = index_count && total && total * mult <= UINT32_MAX;
++      out_count = count_ok ? total * mult : 0;
++      run_capacity =
++         count_ok ? MIN2(DIV_ROUND_UP(out_count, vpp), PANLIB_VP_MAX_RUNS) : 0;
++      in_indices = arena + PANVK_GPU_PRERAST_INDEX_OFFSET;
++      records = arena + PANVK_GPU_PRERAST_RECORD_OFFSET;
++      counts = arena + PANVK_GPU_PRERAST_DRAW_OFFSET;
++      outputs = io->outputs_written;
++      record_stride = io->record_stride;
++      prim = source->prim;
++      per_instance = true;
++   }
++
+    uint64_t run_bytes = 0, index_bytes = 0;
+ 
++   /* Fail closed before any raster work. A short buffer would keep a prefix
++    * of the primitive stream.
++    */
+    if (!count_ok || index_count > PANLIB_VP_MAX_INPUT_INDICES ||
+        out_count > PANLIB_VP_MAX_OUT_INDICES ||
+        !panlib_vp_run_bytes(run_capacity, &run_bytes) ||
+        !panvk_gpu_prerast_checked_size(out_count, sizeof(uint32_t), 4,
+                                        &index_bytes)) {
++      mesa_loge_once("panvk: viewport run list does not fit, draw discarded");
+       vk_command_buffer_set_error(&cmdbuf->vk, VK_ERROR_OUT_OF_DEVICE_MEMORY);
+       return false;
+    }
+@@ -4750,21 +4762,22 @@ gpu_prerast_vp_prepare(struct panvk_cmd_buffer *cmdbuf, uint64_t arena,
+    }
+ 
+    *args = (struct panlib_vp_runs_launch_args) {
+-      .in_indices = arena + PANVK_GPU_PRERAST_GS_INDEX_OFFSET,
+-      .records = arena + PANVK_GPU_PRERAST_GS_RECORD_OFFSET,
++      .in_indices = in_indices,
++      .records = records,
+       .out_indices = out.gpu,
+       .header = runs.gpu,
+-      .outputs_written = gsi->outputs_written,
+-      .counts = arena + PANVK_GPU_PRERAST_GS_DRAW_OFFSET,
+-      .record_stride = gsi->record_stride,
++      .outputs_written = outputs,
++      .counts = counts,
++      .record_stride = record_stride,
+       .viewport_count = cmdbuf->vk.dynamic_graphics_state.vp.viewport_count,
+-      .prim = gsi->output_prim,
++      .prim = prim,
+       .provoking_last =
+          cmdbuf->vk.dynamic_graphics_state.rs.provoking_vertex ==
+          VK_PROVOKING_VERTEX_MODE_LAST_VERTEX_EXT,
+       .index_bound = index_count,
+       .index_capacity = out_count,
+       .run_capacity = run_capacity,
++      .per_instance = per_instance,
+    };
+    return true;
+ #endif
+@@ -4772,8 +4785,7 @@ gpu_prerast_vp_prepare(struct panvk_cmd_buffer *cmdbuf, uint64_t arena,
+ 
+ static void
+ gpu_prerast_tess(struct panvk_cmd_buffer *cmdbuf,
+-                 const struct panvk_draw_info *draw,
+-                 const struct panlib_vp_runs_launch_args *vp_launch)
++                 const struct panvk_draw_info *draw)
+ {
+    struct panvk_device *dev = to_panvk_device(cmdbuf->vk.base.device);
+    const struct vk_dynamic_graphics_state *dyns =
+@@ -4980,6 +4992,12 @@ gpu_prerast_tess(struct panvk_cmd_buffer *cmdbuf,
+    out.indirect.buffer_dev_addr = TD(draw);
+    out.prims_generated_counted = true;
+ 
++   /* The run list is built once per iteration by the compute loop below. */
++   struct panlib_vp_runs_launch_args vp_args;
++   const struct panlib_vp_runs_launch_args *vp_launch = NULL;
++   if (nested && gpu_prerast_vp_prepare(cmdbuf, prerast_arena, &out, &vp_args))
++      vp_launch = &vp_args;
++
+    struct panvk_draw_info vs_src = *draw;
+    vs_src.indirect.buffer_dev_addr = TD(vs_draw);
+    vs_src.indirect.count_buffer_dev_addr = 0;
+@@ -5258,6 +5276,7 @@ gpu_prerast_needed(const struct panvk_cmd_buffer *cmdbuf,
+ {
+    return !draw->gpu_prerast_generated &&
+           (draw->prim == MESA_PRIM_PATCHES || cmdbuf->state.gfx.gs.shader ||
++           panvk_prerast_viewport_shader(&cmdbuf->state.gfx) ||
+            gpu_prerast_xfb_active(cmdbuf) ||
+            panvk_per_arch(gpu_prerast_poly_mode)(cmdbuf, draw) !=
+               PANVK_GPU_PRERAST_POLY_NONE);
+@@ -5447,14 +5466,7 @@ panvk_cmd_draw(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info draw)
+       return;
+ 
+    if (!draw.gpu_prerast_generated && draw.prim == MESA_PRIM_PATCHES) {
+-      struct panlib_vp_runs_launch_args vp_args;
+-      uint64_t prerast = panvk_priv_mem_dev_addr(
+-         to_panvk_device(cmdbuf->vk.base.device)->gpu_prerast_arena);
+-      const struct panlib_vp_runs_launch_args *vp = NULL;
+-
+-      if (gpu_prerast_vp_prepare(cmdbuf, prerast, &vp_args))
+-         vp = &vp_args;
+-      gpu_prerast_tess(cmdbuf, &draw, vp);
++      gpu_prerast_tess(cmdbuf, &draw);
+       return;
+    }
+ 
+diff --git a/src/panfrost/vulkan/panvk_cmd_draw.h b/src/panfrost/vulkan/panvk_cmd_draw.h
+index b5438b83ae0..c7cd98d6760 100644
+--- a/src/panfrost/vulkan/panvk_cmd_draw.h
++++ b/src/panfrost/vulkan/panvk_cmd_draw.h
+@@ -262,13 +262,21 @@ struct panvk_cmd_graphics_state {
+ };
+ 
+ #if PAN_ARCH >= 10
+-/* Geometry shader whose passthrough selects a viewport, or NULL. */
++/* Last pre-raster stage whose passthrough selects a viewport (GS, else
++ * TES, else VS), or NULL.
++ */
+ static inline const struct panvk_shader *
+ panvk_prerast_viewport_shader(const struct panvk_cmd_graphics_state *gfx)
+ {
+    const struct panvk_shader *gs = gfx->gs.shader;
+ 
+-   return gs && gs->gpu_prerast.gs.scissor_clip_loc ? gs : NULL;
++   if (gs)
++      return gs->gpu_prerast.gs.scissor_clip_loc ? gs : NULL;
++
++   const struct panvk_shader *last =
++      gfx->tes.shader ? gfx->tes.shader : gfx->vs.shader;
++
++   return last && last->gpu_prerast.vp_scissor_loc ? last : NULL;
+ }
+ #endif
+ 
+diff --git a/src/panfrost/vulkan/panvk_gpu_prerast.h b/src/panfrost/vulkan/panvk_gpu_prerast.h
+index 1eeeda04553..67fe0caab72 100644
+--- a/src/panfrost/vulkan/panvk_gpu_prerast.h
++++ b/src/panfrost/vulkan/panvk_gpu_prerast.h
+@@ -15,7 +15,7 @@
+ #include "util/macros.h"
+ #include "vulkan/vulkan_core.h"
+ 
+-#define PANVK_GPU_PRERAST_ABI_VERSION 9
++#define PANVK_GPU_PRERAST_ABI_VERSION 10
+ #define PANVK_GPU_PRERAST_MAX_EXECUTION_BYTES (256ull * 1024 * 1024)
+ #define PANVK_GPU_PRERAST_VS_REGION_END (32ull * 1024 * 1024)
+ #define PANVK_GPU_PRERAST_GS_INDEX_OFFSET PANVK_GPU_PRERAST_VS_REGION_END
+@@ -190,6 +190,10 @@ struct panvk_gpu_prerast_shader {
+    bool passthrough_vs_compiled;
+    bool polygon_compiled;
+    bool has_side_effects;
++   /* Clip slot that carries the per-viewport scissor planes when this VS/TES
++    * is the last pre-raster stage and writes ViewportIndex. 0 if not.
++    */
++   uint8_t vp_scissor_loc;
+ };
+ 
+ struct panvk_gpu_prerast_gs_params {
+diff --git a/src/panfrost/vulkan/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/panvk_vX_cmd_draw.c
+index 20ae18a7dbc..3876d95e063 100644
+--- a/src/panfrost/vulkan/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/panvk_vX_cmd_draw.c
+@@ -1040,7 +1040,9 @@ panvk_per_arch(cmd_prepare_draw_sysvals)(struct panvk_cmd_buffer *cmdbuf,
+          panvk_prerast_viewport_shader(&cmdbuf->state.gfx);
+       if (pshader) {
+          const struct panvk_shader_variant *pt =
+-            &pshader->variants[PANVK_GS_VARIANT_PASSTHROUGH];
++            pshader == cmdbuf->state.gfx.gs.shader
++               ? &pshader->variants[PANVK_GS_VARIANT_PASSTHROUGH]
++               : &pshader->variants[PANVK_VS_VARIANT_GPU_PASSTHROUGH];
+          BITSET_AND(dirty_shader_sysvals, dirty_sysvals, pt->fau.used_sysvals);
+          if (!BITSET_IS_EMPTY(dirty_shader_sysvals))
+             gfx_state_set_dirty(cmdbuf, VS_PUSH_UNIFORMS);
+diff --git a/src/panfrost/vulkan/panvk_vX_device.c b/src/panfrost/vulkan/panvk_vX_device.c
+index adf39c2d4ce..28b29f76836 100644
+--- a/src/panfrost/vulkan/panvk_vX_device.c
++++ b/src/panfrost/vulkan/panvk_vX_device.c
+@@ -588,6 +588,7 @@ panvk_per_arch(create_device)(struct panvk_physical_device *physical_device,
+    if (PANVK_DEBUG(GPU_PRERAST) || device->vk.enabled_features.fillModeNonSolid ||
+        device->vk.enabled_features.geometryShader ||
+        device->vk.enabled_features.transformFeedback ||
++       device->vk.enabled_features.shaderOutputViewportIndex ||
+        device->vk.enabled_features.vertexPipelineStoresAndAtomics) {
+       device->gpu_prerast_arena = panvk_pool_alloc_mem(
+          &device->mempools.rw,
+diff --git a/src/panfrost/vulkan/panvk_vX_physical_device.c b/src/panfrost/vulkan/panvk_vX_physical_device.c
+index 66a11693d7e..c84d77f62f5 100644
+--- a/src/panfrost/vulkan/panvk_vX_physical_device.c
++++ b/src/panfrost/vulkan/panvk_vX_physical_device.c
+@@ -436,7 +436,7 @@ panvk_per_arch(get_physical_device_features)(
+       .vulkanMemoryModel = true,
+       .vulkanMemoryModelDeviceScope = true,
+       .vulkanMemoryModelAvailabilityVisibilityChains = true,
+-      .shaderOutputViewportIndex = false,
++      .shaderOutputViewportIndex = PAN_ARCH >= 10 && PAN_ARCH < 12,
+       .shaderOutputLayer = PAN_ARCH >= 10,
+       .subgroupBroadcastDynamicId = true,
+ 
+diff --git a/src/panfrost/vulkan/panvk_vX_shader.c b/src/panfrost/vulkan/panvk_vX_shader.c
+index 8a827377566..e148369a18c 100644
+--- a/src/panfrost/vulkan/panvk_vX_shader.c
++++ b/src/panfrost/vulkan/panvk_vX_shader.c
+@@ -1203,6 +1203,82 @@ panvk_gpu_prerast_passthrough_nir(const nir_shader *source, uint64_t outputs,
+    return b.shader;
+ }
+ 
++/* Passthrough for a VS or TES that writes ViewportIndex. Same job as the GS
++ * passthrough: transform the clip position with the selected viewport, store
++ * the per-viewport scissor planes in scissor_loc, and keep the index itself
++ * out of the HW varyings (it shares the layer byte). The draw that uses it
++ * is split into per-viewport runs on the CPU-recorded command stream.
++ */
++static nir_shader *
++panvk_gpu_prerast_vs_vp_passthrough_nir(
++   const nir_shader *source, uint64_t outputs,
++   const struct panvk_gpu_prerast_out_types *t, uint8_t scissor_loc)
++{
++   nir_builder b = nir_builder_init_simple_shader(
++      MESA_SHADER_VERTEX, source->options, "panvk_gpu_prerast_vs_vp_passthrough");
++   nir_def *base = load_sysval(&b, graphics, 64, gpu_prerast_records);
++   nir_def *params = load_sysval(&b, graphics, 64, gpu_prerast_params);
++   nir_def *stride = nir_u2u64(
++      &b, nir_imm_int(&b, ALIGN_POT(util_bitcount64(outputs) * 16, 16)));
++   nir_def *verts = nir_load_global(
++      &b, 1, 32,
++      nir_iadd_imm(&b, params,
++                   offsetof(struct panvk_gpu_prerast_params, vertex_count)),
++      .align_mul = 4);
++   nir_def *linear = nir_iadd(&b, nir_load_vertex_id(&b),
++                              nir_imul(&b, nir_load_instance_id(&b), verts));
++   nir_def *record =
++      nir_iadd(&b, base, nir_imul(&b, nir_u2u64(&b, linear), stride));
++
++   unsigned vp_slot =
++      util_bitcount64(outputs & BITFIELD64_MASK(VARYING_SLOT_VIEWPORT));
++   nir_def *vp_index = nir_load_global(
++      &b, 1, 32, nir_iadd_imm(&b, record, vp_slot * 16), .align_mul = 4);
++
++   unsigned idx = 0;
++   nir_def *planes = NULL;
++   u_foreach_bit64(location, outputs) {
++      unsigned slot = util_bitcount64(outputs & BITFIELD64_MASK(location));
++      if (location == VARYING_SLOT_VIEWPORT)
++         continue;
++      unsigned ncomp = 4;
++      nir_alu_type type = t->type[location] ? t->type[location]
++                                            : nir_type_float32;
++      switch (location) {
++      case VARYING_SLOT_PSIZ:
++         ncomp = 1;
++         type = nir_type_float32;
++         break;
++      case VARYING_SLOT_LAYER:
++      case VARYING_SLOT_PRIMITIVE_ID:
++         ncomp = 1;
++         type = nir_type_int32;
++         break;
++      default:
++         break;
++      }
++      nir_def *value = nir_load_global(
++         &b, ncomp, 32, nir_iadd_imm(&b, record, slot * 16), .align_mul = 4);
++      if (location == VARYING_SLOT_POS) {
++         struct panvk_prerast_xform xf =
++            panvk_prerast_viewport_xform(&b, value, vp_index);
++         value = xf.screen;
++         planes = xf.planes;
++         type = nir_type_float32;
++         ncomp = 4;
++      }
++      nir_store_output(&b, value, nir_imm_int(&b, 0), .base = idx++,
++                       .write_mask = BITFIELD_MASK(ncomp), .src_type = type,
++                       .io_semantics = {.location = location, .num_slots = 1});
++   }
++
++   panvk_prerast_store_clip(&b, planes, scissor_loc, idx++);
++   b.shader->info.outputs_written =
++      (outputs & ~VARYING_BIT_VIEWPORT) | BITFIELD64_BIT(scissor_loc);
++   b.shader->num_outputs = idx;
++   return b.shader;
++}
++
+ static nir_def *
+ panvk_gpu_prerast_vs_is_restart(nir_builder *b)
+ {
+@@ -3246,8 +3322,19 @@ panvk_compile_shader(struct panvk_device *dev,
+          (dev->vk.enabled_features.fillModeNonSolid &&
+           (dyn_polygon_mode ||
+            state->rs->polygon_mode != VK_POLYGON_MODE_FILL));
++      /* ViewportIndex from the last pre-raster stage selects the viewport,
++       * which only the gpu_prerast passthrough can do.
++       */
++      const bool last_raster_stage =
++         !(info->next_stage_mask & (VK_SHADER_STAGE_GEOMETRY_BIT |
++                                    VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT));
++      const bool writes_vp =
++         last_raster_stage &&
++         (info->nir->info.outputs_written & VARYING_BIT_VIEWPORT) &&
++         (info->nir->info.outputs_written & VARYING_BIT_POS);
+       const enum panvk_vs_variant last_variant =
+-         want_prerast ? PANVK_VS_VARIANT_GPU_PASSTHROUGH : PANVK_VS_VARIANT_HW;
++         (want_prerast || writes_vp) ? PANVK_VS_VARIANT_GPU_PASSTHROUGH
++                                     : PANVK_VS_VARIANT_HW;
+       struct panvk_gpu_prerast_out_types out_types = {0};
+ #else
+       const enum panvk_vs_variant last_variant = PANVK_VS_VARIANT_HW;
+@@ -3260,13 +3347,21 @@ panvk_compile_shader(struct panvk_device *dev,
+           */
+ #if PAN_ARCH >= 10
+          const bool clone_nir = true;
+-         nir_shader *nir = v == PANVK_VS_VARIANT_GPU_PASSTHROUGH
+-                              ? panvk_gpu_prerast_passthrough_nir(
+-                                   info->nir,
+-                                   shader->gpu_prerast.io.outputs_written,
+-                                   &out_types,
+-                                   &shader->gpu_prerast.io.varyings)
+-                              : nir_shader_clone(NULL, info->nir);
++         const uint64_t pt_outputs = shader->gpu_prerast.io.outputs_written;
++         const uint8_t vp_loc =
++            v == PANVK_VS_VARIANT_GPU_PASSTHROUGH && writes_vp &&
++            (pt_outputs & VARYING_BIT_VIEWPORT)
++               ? panvk_prerast_scissor_slot(pt_outputs & ~VARYING_BIT_VIEWPORT)
++               : 0;
++         nir_shader *nir =
++            vp_loc ? panvk_gpu_prerast_vs_vp_passthrough_nir(
++                        info->nir, pt_outputs, &out_types, vp_loc)
++            : v == PANVK_VS_VARIANT_GPU_PASSTHROUGH
++               ? panvk_gpu_prerast_passthrough_nir(
++                    info->nir, pt_outputs, &out_types,
++                    &shader->gpu_prerast.io.varyings)
++               : nir_shader_clone(NULL, info->nir);
++         struct pan_varying_layout vp_layout;
+ #else
+          const bool clone_nir = (v != last_variant);
+          nir_shader *nir =
+@@ -3383,8 +3478,15 @@ panvk_compile_shader(struct panvk_device *dev,
+          }
+ 
+ #if PAN_ARCH >= 10
+-         if (v == PANVK_VS_VARIANT_GPU_PASSTHROUGH)
++         if (vp_loc) {
++            shader->gpu_prerast.vp_scissor_loc = vp_loc;
++            pan_varying_collect_formats(&vp_layout, nir, inputs.gpu_id);
++            pan_build_varying_layout_compact(&vp_layout, nir, inputs.gpu_id);
++            inputs.varying_layout = &vp_layout;
++            inputs.skip_viewport_transform = true;
++         } else if (v == PANVK_VS_VARIANT_GPU_PASSTHROUGH) {
+             inputs.varying_layout = &shader->gpu_prerast.io.varyings;
++         }
+ #endif
+ 
+          if (v == PANVK_VS_VARIANT_HW
+@@ -3407,6 +3509,7 @@ panvk_compile_shader(struct panvk_device *dev,
+             shader->gpu_prerast.lowered_vs_compiled = true;
+          if (result == VK_SUCCESS && v == PANVK_VS_VARIANT_GPU_PASSTHROUGH)
+             shader->gpu_prerast.passthrough_vs_compiled = true;
++         inputs.skip_viewport_transform = false;
+ #endif
+ 
+          /* If we cloned, it's our job to clean up */
+@@ -3801,6 +3904,19 @@ compile_shaders(struct vk_device *vk_dev, uint32_t shader_count,
+          /* The last geometry stage before the FS will always have a HW vertex
+           * shader variant. Geometry's first vertex variant is the passthrough.
+           */
++#if PAN_ARCH >= 10
++         /* A VS/TES that selects a viewport is drawn through its
++          * passthrough, whose layout carries the scissor planes.
++          */
++         if (prev_shader->vk.stage != MESA_SHADER_GEOMETRY &&
++             prev_shader->gpu_prerast.vp_scissor_loc) {
++            scissor_loc = prev_shader->gpu_prerast.vp_scissor_loc;
++            vs_varying_layout =
++               &prev_shader->variants[PANVK_VS_VARIANT_GPU_PASSTHROUGH]
++                   .info.varyings.formats;
++            pan_varying_layout_require_layout(vs_varying_layout);
++         } else
++#endif
+          panvk_shader_foreach_variant(prev_shader, variant) {
+             if (variant->info.stage == MESA_SHADER_VERTEX) {
+                vs_varying_layout = &variant->info.varyings.formats;
+-- 
+2.55.0
+

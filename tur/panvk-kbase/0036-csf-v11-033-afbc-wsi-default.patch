@@ -1,0 +1,60 @@
+From: Valentine Burley <valentine.burley@collabora.com>
+Subject: [PATCH csf-v11 033] panvk: Enable AFBC for WSI images by default
+
+Purpose: AFBC for WSI images by default (validated on kbase glibc path; Android Gate H pending)
+Source/Reference: upstream Mesa commit 50bda0b8978 (author preserved)
+Backport-of: 50bda0b8978
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/032
+Validation test: tests/dxvk/vulkan/backport-ext/icc.c (AFBC modifier images, ICC_FAILS=0); wsi_ext.c
+
+diff --git a/src/panfrost/vulkan/panvk_instance.c b/src/panfrost/vulkan/panvk_instance.c
+index 0f5cafc5e436eb1ed01ca0e8b435a92fd2ea97b7..8c3148a58cd8493d53578471714f10ba8c2e7bfa 100644
+--- a/src/panfrost/vulkan/panvk_instance.c
++++ b/src/panfrost/vulkan/panvk_instance.c
+@@ -53,7 +53,7 @@ static const struct debug_control panvk_debug_options[] = {
+    {"force_simultaneous", PANVK_DEBUG_FORCE_SIMULTANEOUS},
+    {"implicit_others_inv", PANVK_DEBUG_IMPLICIT_OTHERS_INV},
+    {"force_blackhole", PANVK_DEBUG_FORCE_BLACKHOLE},
+-   {"wsi_afbc", PANVK_DEBUG_WSI_AFBC},
++   {"wsi_no_afbc", PANVK_DEBUG_WSI_NO_AFBC},
+    {"no_wb_mmap", PANVK_DEBUG_NO_WB_MMAP},
+    {"no_user_mmap_sync", PANVK_DEBUG_NO_USER_MMAP_SYNC},
+    {"cached_before_coherent", PANVK_DEBUG_CACHED_BEFORE_COHERENT},
+diff --git a/src/panfrost/vulkan/panvk_instance.h b/src/panfrost/vulkan/panvk_instance.h
+index 4de917f0133777d9368248b5c9762da58da62e25..aded0f48ac0590d8a87a4efde1dbd8607d610827 100644
+--- a/src/panfrost/vulkan/panvk_instance.h
++++ b/src/panfrost/vulkan/panvk_instance.h
+@@ -28,7 +28,7 @@ enum panvk_debug_flags {
+    PANVK_DEBUG_FORCE_SIMULTANEOUS = 1 << 10,
+    PANVK_DEBUG_IMPLICIT_OTHERS_INV = 1 << 11,
+    PANVK_DEBUG_FORCE_BLACKHOLE = 1 << 12,
+-   PANVK_DEBUG_WSI_AFBC = 1 << 13,
++   PANVK_DEBUG_WSI_NO_AFBC = 1 << 13,
+    PANVK_DEBUG_NO_WB_MMAP = 1 << 14,
+    PANVK_DEBUG_NO_USER_MMAP_SYNC = 1 << 15,
+    PANVK_DEBUG_CACHED_BEFORE_COHERENT = 1 << 16,
+diff --git a/src/panfrost/vulkan/panvk_physical_device.c b/src/panfrost/vulkan/panvk_physical_device.c
+index f067574ee496872f38249f6810888ae58ae1cf93..613d72468bf04150b6e44f06b5cb94b6605d0392 100644
+--- a/src/panfrost/vulkan/panvk_physical_device.c
++++ b/src/panfrost/vulkan/panvk_physical_device.c
+@@ -2026,7 +2026,7 @@ panvk_get_mod_format_caps(const struct panvk_physical_device *pdev,
+    if (!mod_handler)
+       return 0;
+ 
+-   if (drm_is_afbc(mod) && !PANVK_DEBUG(WSI_AFBC))
++   if (drm_is_afbc(mod) && PANVK_DEBUG(WSI_NO_AFBC))
+       return 0;
+ 
+    return mod_handler->get_format_caps(&pdev->kmod.dev->props, pfmt, mod);
+@@ -2587,7 +2587,7 @@ panvk_GetPhysicalDeviceImageFormatProperties2(
+        * report suboptimal access. */
+       enum pipe_format pfmt = vk_format_to_pipe_format(base_info->format);
+       bool can_use_afbc = false;
+-      if (PANVK_DEBUG(WSI_AFBC) &&
++      if (!PANVK_DEBUG(WSI_NO_AFBC) &&
+           base_info->tiling != VK_IMAGE_TILING_LINEAR &&
+           base_info->type != VK_IMAGE_TYPE_1D &&
+           pan_query_afbc(&physical_device->kmod.dev->props)) {

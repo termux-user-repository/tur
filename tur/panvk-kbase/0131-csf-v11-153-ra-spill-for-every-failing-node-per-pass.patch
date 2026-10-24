@@ -1,0 +1,243 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: Wed, 7 Oct 2026 16:00:00 +0530
+Subject: [PATCH] pan/bi: spill for every node that fails in an LCRA pass, not just the first biblioklept
+
+When LCRA failed, bi_register_allocate() spilled one node and redid
+the whole pass (liveness, interference, solve) from scratch. A shader
+that needs N spills after SSA spilling took N passes: a D3D9-style
+pixel shader with ~150 registers of demand took 88-130 passes, 0.6-1.6 s
+on an x86 host and 3-4 s on the G615 (the multi-second hitches in DXVK
+games, e.g. NFS Most Wanted: 3.6-4.1 s of compile on dxvk-cs per new
+pipeline). 2000 passes was the only limit.
+
+On the full-register attempt, the solver now leaves a failing node
+unassigned and keeps going, recording every failure. The spiller then
+picks one spill candidate per failed node (the same cost/benefit choice
+as before, against that node's constraints; a node chosen once is not
+picked again) and spills all of them before the next pass. Constraint
+counts are cached for the round. The 32-register attempt still stops at
+the first failure since it never spills.
+
+Passes drop from 88-290 to 2-26 on the worst shaders; spill code
+quality is close (see csf-v11/154, which also brings total fills below
+the old code).
+---
+diff --git a/src/panfrost/compiler/bifrost/bi_ra.c b/src/panfrost/compiler/bifrost/bi_ra.c
+--- a/src/panfrost/compiler/bifrost/bi_ra.c
++++ b/src/panfrost/compiler/bifrost/bi_ra.c
+@@ -29,8 +29,9 @@ struct lcra_state {
+    /* Before solving, forced registers; after solving, solutions. */
+    unsigned *solutions;
+ 
+-   /** Node which caused register allocation to fail */
+-   unsigned spill_node;
++   /** Every node that failed, when solving past failures */
++   unsigned *failed;
++   unsigned failed_count;
+ };
+ 
+ /* This module is an implementation of "Linearly Constrained
+@@ -64,6 +65,7 @@ lcra_free(struct lcra_state *l)
+    free(l->linear);
+    free(l->affinity);
+    free(l->solutions);
++   free(l->failed);
+    free(l);
+ }
+ 
+@@ -174,9 +176,16 @@ lcra_forbidden(struct lcra_state *l, unsigned i)
+    return forbidden;
+ }
+ 
++/* With keep_going, a node that fails is left unassigned (it constrains nothing)
++ * and solving continues, so one pass finds every node that does not fit. The
++ * spiller then handles all of them at once instead of one per full RA pass.
++ */
+ static bool
+-lcra_solve(struct lcra_state *l)
++lcra_solve(struct lcra_state *l, bool keep_going)
+ {
++   if (keep_going)
++      l->failed = malloc(sizeof(*l->failed) * l->node_count);
++
+    for (unsigned step = 0; step < l->node_count; ++step) {
+       if (l->solutions[step] != ~0)
+          continue;
+@@ -194,12 +203,15 @@ lcra_solve(struct lcra_state *l)
+ 
+       /* Out of registers - prepare to spill */
+       if (!succ) {
+-         l->spill_node = step;
+-         return false;
++         if (!keep_going)
++            return false;
++
++         l->failed[l->failed_count++] = step;
++         l->solutions[step] = ~0;
+       }
+    }
+ 
+-   return true;
++   return l->failed_count == 0;
+ }
+ 
+ /* Register spilling is implemented with a cost-benefit system. Costs are set
+@@ -627,7 +639,9 @@ bi_allocate_registers(bi_context *ctx, bool *success, bool full_regs)
+       }
+    }
+ 
+-   *success = lcra_solve(l);
++   /* Only the full register file attempt spills, so only it needs every
++    * failing node. */
++   *success = lcra_solve(l, full_regs);
+ 
+    return l;
+ }
+@@ -706,12 +720,12 @@ bi_rewrite_index_src_single(bi_instr *ins, bi_index old, bi_index new)
+    }
+ }
+ 
+-/* If register allocation fails, find the best spill node */
++/* Nodes that must not be spilled, satisfying bi_spill_register's
++ * preconditions */
+ 
+-static signed
+-bi_choose_spill_node(bi_context *ctx, struct lcra_state *l)
++static BITSET_WORD *
++bi_no_spill_set(bi_context *ctx, struct lcra_state *l)
+ {
+-   /* Pick a node satisfying bi_spill_register's preconditions */
+    BITSET_WORD *no_spill = BITSET_CALLOC(l->node_count);
+ 
+    bi_foreach_instr_global(ctx, ins) {
+@@ -731,6 +745,24 @@ bi_choose_spill_node(bi_context *ctx, struct lcra_state *l)
+       }
+    }
+ 
++   return no_spill;
++}
++
++static unsigned
++bi_spill_benefit(struct lcra_state *l, unsigned *benefit, unsigned i)
++{
++   if (benefit[i] == ~0)
++      benefit[i] = lcra_count_constraints(l, i);
++
++   return benefit[i];
++}
++
++/* If register allocation fails at `node`, find the best spill node */
++
++static signed
++bi_choose_spill_node(struct lcra_state *l, BITSET_WORD *no_spill,
++                     unsigned *benefit, unsigned node)
++{
+    unsigned best_benefit = 0;
+    signed best_node = -1;
+ 
+@@ -738,13 +770,13 @@ bi_choose_spill_node(bi_context *ctx, struct lcra_state *l)
+     * rather the ones interfering with it, if that would be
+     * better
+     */
+-   if (!BITSET_TEST(no_spill, l->spill_node)) {
+-      best_node = l->spill_node;
+-      best_benefit = lcra_count_constraints(l, best_node);
++   if (!BITSET_TEST(no_spill, node)) {
++      best_node = node;
++      best_benefit = bi_spill_benefit(l, benefit, node);
+    }
+ 
+-   if (nodearray_is_sparse(&l->linear[l->spill_node])) {
+-      nodearray_sparse_foreach(&l->linear[l->spill_node], elem) {
++   if (nodearray_is_sparse(&l->linear[node])) {
++      nodearray_sparse_foreach(&l->linear[node], elem) {
+          unsigned i = nodearray_sparse_key(elem);
+          unsigned constraint = nodearray_sparse_value(elem);
+ 
+@@ -756,15 +788,15 @@ bi_choose_spill_node(bi_context *ctx, struct lcra_state *l)
+          if (BITSET_TEST(no_spill, i))
+             continue;
+ 
+-         unsigned benefit = lcra_count_constraints(l, i);
++         unsigned b = bi_spill_benefit(l, benefit, i);
+ 
+-         if (benefit > best_benefit) {
+-            best_benefit = benefit;
++         if (b > best_benefit) {
++            best_benefit = b;
+             best_node = i;
+          }
+       }
+    } else {
+-      nodearray_value *row = l->linear[l->spill_node].dense;
++      nodearray_value *row = l->linear[node].dense;
+ 
+       for (unsigned i = 0; i < l->node_count; ++i) {
+          /* Only spill nodes that interfere with the node failing
+@@ -775,16 +807,15 @@ bi_choose_spill_node(bi_context *ctx, struct lcra_state *l)
+          if (BITSET_TEST(no_spill, i))
+             continue;
+ 
+-         unsigned benefit = lcra_count_constraints(l, i);
++         unsigned b = bi_spill_benefit(l, benefit, i);
+ 
+-         if (benefit > best_benefit) {
+-            best_benefit = benefit;
++         if (b > best_benefit) {
++            best_benefit = b;
+             best_node = i;
+          }
+       }
+    }
+ 
+-   free(no_spill);
+    return best_node;
+ }
+ 
+@@ -1422,17 +1453,37 @@ bi_register_allocate(bi_context *ctx)
+       if (success) {
+          ctx->info.work_reg_count = BI_MAX_REGS;
+       } else {
+-         signed spill_node = bi_choose_spill_node(ctx, l);
+-
+-         if (spill_node == -1)
+-            UNREACHABLE("Failed to choose spill node\n");
+-
+          if (ctx->inputs->is_blend)
+             UNREACHABLE("Blend shaders may not spill");
+ 
+-         spill_count =
+-            bi_spill_register(ctx, bi_get_index(spill_node), spill_count,
+-                              bi_get_index(l->spill_node));
++         /* Spill one node for every node that failed. Each RA pass costs a
++          * full liveness and interference rebuild, so spilling one node per
++          * pass took hundreds of passes (seconds) on big shaders.
++          */
++         BITSET_WORD *no_spill = bi_no_spill_set(ctx, l);
++         unsigned *benefit = malloc(sizeof(*benefit) * l->node_count);
++         memset(benefit, ~0, sizeof(*benefit) * l->node_count);
++         unsigned spilled = 0;
++
++         for (unsigned f = 0; f < l->failed_count; ++f) {
++            signed spill_node =
++               bi_choose_spill_node(l, no_spill, benefit, l->failed[f]);
++            if (spill_node == -1)
++               continue;
++
++            /* Don't pick it again for another failed node */
++            BITSET_SET(no_spill, spill_node);
++            spill_count =
++               bi_spill_register(ctx, bi_get_index(spill_node), spill_count,
++                                 bi_get_index(l->failed[f]));
++            spilled++;
++         }
++
++         free(benefit);
++         free(no_spill);
++
++         if (spilled == 0)
++            UNREACHABLE("Failed to choose spill node\n");
+ 
+          lcra_free(l);
+          l = NULL;

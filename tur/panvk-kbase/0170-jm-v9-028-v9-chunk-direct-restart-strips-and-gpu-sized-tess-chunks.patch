@@ -1,0 +1,501 @@
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: 2026-10-11
+Subject: [PATCH jm-v9 028] panvk: v9 chunk direct restart strips, size tess chunks on the GPU biblioklept
+
+Purpose: PanProbe large_draw, gs_tess_primitive_id and tessellation
+(30 s fence timeout) failed on the G57.
+Root causes: (011/017) direct strips with primitive restart larger than
+the arena were dropped; the GPU chunker was indirect-only. (014/017) tess
+chunks were sized for every patch at level 64: with XFB/GS 2 patches per
+chunk, so 70000 patches needed 35000 iterations (cap 4096) and indirect
+draws got 8 x 2 patches.
+Fix: panlib_chunk_step cut_tail mode (cut after the last restart in the
+first half of the window, so each chunk advances >= step/2 and the CPU can
+bound the chunk count); v9_prerast_chunked takes a chunk count and direct
+draws (cap 1024). panlib_tess_draw sizes chunks from the real levels:
+up to 4096 patches per chunk, keeps the longest run that fits the arena
+index budget, hands the rest to the next chunk, counts the TCS statistic
+for kept patches. Direct tess draws record up to 1024 iterations,
+indirect 32. Tess output ranges that fit go straight to
+v9_prerast_draw_one. All new fields and kernel logic are under
+PAN_ARCH == 9: CSF structs and kernels are byte-identical.
+Known limits: postponed patches rerun VS/TCS (duplicate TCS side effects);
+output past the caps is dropped with a warning; triangle strips with
+adjacency stay unhandled.
+---
+
+diff --git a/src/panfrost/libpan/draw_helper.cl b/src/panfrost/libpan/draw_helper.cl
+index c5699a8..9e5ee83 100644
+--- a/src/panfrost/libpan/draw_helper.cl
++++ b/src/panfrost/libpan/draw_helper.cl
+@@ -237,8 +237,14 @@ panlib_tess_step(global struct panlib_tess_draw *t, global uint32_t *tcs_stat)
+    t->tcs_grid[1] = k;
+    t->tcs_grid[2] = 1;
+ 
++#if PAN_ARCH == 9
++   /* With idx_limit, panlib_tess_draw() counts the patches the chunk keeps. */
++   if (tcs_stat && !t->idx_limit)
++      pstats_add(tcs_stat, n);
++#else
+    if (tcs_stat)
+       pstats_add(tcs_stat, n);
++#endif
+ }
+ 
+ /* domain: 0 triangles, 1 quads, 2 isolines. */
+@@ -289,11 +295,35 @@ panlib_tess_draw(global struct panlib_tess_draw *t, global uint32_t *c_invs,
+    if (t->new_chunk) {
+       uint32_t sum = 0;
+ 
++#if PAN_ARCH == 9
++      uint32_t n = t->chunk_patches;
++
++      /* ponytail: serial prefix sum, a chunk holds a few thousand patches. */
++      for (uint32_t i = 0; i < t->chunk_patches; i++) {
++         if (t->idx_limit && i && sum + p->counts[i] > t->idx_limit) {
++            n = i;
++            break;
++         }
++         sum += p->counts[i];
++         p->counts[i] = sum;
++      }
++
++      /* The patches past the budget go to the next chunk, the tessellator
++       * writes the kept ones only. */
++      if (t->idx_limit) {
++         t->next_patch -= t->chunk_patches - n;
++         t->chunk_patches = n;
++         p->nr_patches = n;
++         if (t->tcs_stat)
++            pstats_add((global uint32_t *)(uintptr_t)t->tcs_stat, n);
++      }
++#else
+       /* ponytail: serial prefix sum, a chunk holds a few hundred patches. */
+       for (uint32_t i = 0; i < t->chunk_patches; i++) {
+          sum += p->counts[i];
+          p->counts[i] = sum;
+       }
++#endif
+ 
+       t->idx_total = sum;
+       t->idx_cursor = 0;
+@@ -510,6 +540,19 @@ panlib_chunk_step(global struct panlib_chunk_draw *c)
+          const uint32_t window = min(c->max_verts, verts - i);
+ 
+          prims = sc.closed;
++#if PAN_ARCH == 9
++         if (sc.last != UINT32_MAX && c->cut_tail && sc.last - i < step / 2 &&
++             i + window < verts) {
++            /* The strip after the last restart starts at s: cut it at a
++             * multiple of align from s, as a strip without restart. */
++            const uint32_t s = sc.last + 1;
++            const uint32_t cut = s + (i + step - s) / align * align;
++
++            n_verts = cut + overlap - i;
++            next = cut;
++            prims += u_decomposed_prims_for_vertices(prim, cut + overlap - s);
++         } else
++#endif
+          if (sc.last != UINT32_MAX) {
+             n_verts = sc.last - i;
+             next = sc.last + 1;
+diff --git a/src/panfrost/libpan/tess_draw.h b/src/panfrost/libpan/tess_draw.h
+index f45a48f..a7db509 100644
+--- a/src/panfrost/libpan/tess_draw.h
++++ b/src/panfrost/libpan/tess_draw.h
+@@ -49,10 +49,17 @@ struct panlib_tess_draw {
+    /* Chunk start within the API draw, see panvk_gpu_prerast_params. */
+    uint32_t chunk_vertex;
+    uint32_t chunk_instance;
+-   uint32_t _pad;
++   /* v9 JM, unused (0) elsewhere: index budget of a chunk. panlib_tess_draw() keeps
++    * the longest run of the chunk's patches whose indices fit it (at least
++    * one patch) and hands the rest back to the next chunk. */
++   uint32_t idx_limit;
+ 
+    uint64_t total_patches;
+    uint64_t next_patch;
++#if defined(PAN_ARCH) && PAN_ARCH == 9
++   /* TCS patches statistic, counted by panlib_tess_draw() with idx_limit. */
++   uint64_t tcs_stat;
++#endif
+ } PACKED;
+ 
+ /* Vertex stride of a chunk window and what it shares with the next one, for
+@@ -142,4 +149,10 @@ struct panlib_chunk_draw {
+    /* Instances per chunk, 0 for PANLIB_CHUNK_MAX_INSTANCES. v9 JM, which
+     * lowered whole draws before, keeps whole instance ranges. */
+    uint32_t max_insts;
++#if defined(PAN_ARCH) && PAN_ARCH == 9
++   /* v9 JM: a strip window whose last restart index comes in
++    * its first half cuts the strip after it instead, so that every window
++    * moves on by at least half a step and the CPU can bound the chunks. */
++   uint32_t cut_tail;
++#endif
+ } PACKED;
+diff --git a/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c
+index c5605c5..f2deccc 100644
+--- a/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c
+@@ -3541,10 +3541,14 @@ v9_prerast_chunkable(enum mesa_prim prim)
+  * prim_base only reaches the GS, as on CSF).
+  */
+ #define V9_PRERAST_INDIRECT_CHUNKS 8
++/* Bound of the GPU chunks of one direct draw (strips with restart), so that a
++ * draw cannot blow up the command buffer. */
++#define V9_PRERAST_DIRECT_CHUNKS 1024
+ 
+ static void
+ v9_prerast_chunked(struct panvk_cmd_buffer *cmdbuf,
+-                   const struct panvk_draw_info *draw, uint32_t max_verts)
++                   const struct panvk_draw_info *draw, uint32_t max_verts,
++                   uint32_t chunks)
+ {
+    const bool indexed = draw->index.index_size != 0;
+    struct pan_ptr cd =
+@@ -3554,6 +3558,33 @@ v9_prerast_chunked(struct panvk_cmd_buffer *cmdbuf,
+       return;
+    }
+ 
++   /* A direct draw gets its draw command written here. */
++   uint64_t src = draw->indirect.buffer_dev_addr;
++   if (!src) {
++      struct pan_ptr rec =
++         panvk_cmd_alloc_dev_mem(cmdbuf, desc, 5 * sizeof(uint32_t), 4);
++      if (!rec.gpu) {
++         vk_command_buffer_set_error(&cmdbuf->vk,
++                                     VK_ERROR_OUT_OF_DEVICE_MEMORY);
++         return;
++      }
++
++      uint32_t *r = rec.cpu;
++      r[0] = draw->vertex.count;
++      r[1] = draw->instance.count;
++      if (indexed) {
++         /* JM draw infos carry the index offset in bytes. */
++         r[2] = draw->index.offset / draw->index.index_size;
++         r[3] = draw->vertex.base;
++         r[4] = draw->instance.base;
++      } else {
++         r[2] = draw->vertex.base;
++         r[3] = draw->instance.base;
++         r[4] = 0;
++      }
++      src = rec.gpu;
++   }
++
+ #define CD(f) (cd.gpu + offsetof(struct panlib_chunk_draw, f))
+    struct panlib_chunk_draw *c = cd.cpu;
+    memset(c, 0, sizeof(*c));
+@@ -3569,11 +3600,19 @@ v9_prerast_chunked(struct panvk_cmd_buffer *cmdbuf,
+       indexed ? draw->index.buffer_size / draw->index.index_size : 0;
+    c->view_count = 1;
+    c->max_insts = UINT32_MAX;
++   /* ponytail: a mid-strip cut of a triangle strip with adjacency changes
++    * the winding parity and end adjacency, as the cuts without restart do. */
++   c->cut_tail = draw->prim != MESA_PRIM_TRIANGLE_STRIP_ADJACENCY;
+ 
+    /* What the lowering sees: an indirect draw that is one chunk of the API
+     * draw. The chunk start is added to the VS invocation IDs, so the base
+     * vertex and base instance stay the API ones. */
+    struct panvk_draw_info chunk = *draw;
++   chunk.index.offset = 0;
++   chunk.vertex.base = 0;
++   chunk.vertex.count = 1;
++   chunk.instance.base = 0;
++   chunk.instance.count = 1;
+    chunk.indirect.buffer_dev_addr = CD(draw);
+    chunk.indirect.count_buffer_dev_addr = 0;
+    chunk.indirect.draw_count = 1;
+@@ -3588,19 +3627,19 @@ v9_prerast_chunked(struct panvk_cmd_buffer *cmdbuf,
+       return;
+ 
+    /* The cut happens on the GPU, the CPU cannot tell when: say it once. */
+-   mesa_logw_once("panvk: v9 indirect gpu_prerast draws (GS, transform "
+-                  "feedback, polygon mode, viewport select, VS stores) are "
+-                  "drawn in at most %u chunks of %u vertices; the rest of a "
+-                  "larger draw is dropped",
+-                  V9_PRERAST_INDIRECT_CHUNKS, max_verts);
++   if (draw->indirect.buffer_dev_addr)
++      mesa_logw_once("panvk: v9 indirect gpu_prerast draws (GS, transform "
++                     "feedback, polygon mode, viewport select, VS stores) are "
++                     "drawn in at most %u chunks of %u vertices; the rest of "
++                     "a larger draw is dropped",
++                     chunks, max_verts);
+ 
+    struct panvk_precomp_ctx ctx = panvk_per_arch(precomp_cs)(cmdbuf);
+    panlib_chunk_setup(&ctx, panlib_1d(1), PANLIB_BARRIER_JM_BARRIER, cd.gpu,
+-                      draw->indirect.buffer_dev_addr,
+-                      draw->indirect.count_buffer_dev_addr,
++                      src, draw->indirect.count_buffer_dev_addr,
+                       draw->indirect.draw_index);
+ 
+-   for (uint32_t i = 0; i < V9_PRERAST_INDIRECT_CHUNKS; i++) {
++   for (uint32_t i = 0; i < chunks; i++) {
+       if (!v9_prerast_reserve_jobs(cmdbuf, 2))
+          return;
+ 
+@@ -3634,8 +3673,10 @@ v9_prerast_draw(struct panvk_cmd_buffer *cmdbuf,
+ 
+    /* v9_draw_indirect_unrolled() hands over one draw at a time. */
+    if (draw->indirect.buffer_dev_addr) {
+-      if (v9_prerast_chunkable(draw->prim) && max_verts >= overlap + align)
+-         v9_prerast_chunked(cmdbuf, draw, max_verts);
++      if (!draw->fits_arena && v9_prerast_chunkable(draw->prim) &&
++          max_verts >= overlap + align)
++         v9_prerast_chunked(cmdbuf, draw, max_verts,
++                            V9_PRERAST_INDIRECT_CHUNKS);
+       else
+          v9_prerast_draw_one(cmdbuf, draw, 0);
+       return;
+@@ -3667,12 +3708,30 @@ v9_prerast_draw(struct panvk_cmd_buffer *cmdbuf,
+    const uint32_t step =
+       max_verts > overlap ? (max_verts - overlap) / align * align : 0;
+    if (!step || draw->prim == MESA_PRIM_TRIANGLE_FAN ||
+-       draw->prim == MESA_PRIM_PATCHES ||
+-       (overlap && draw->index.index_size && draw->index.restart_enable)) {
++       draw->prim == MESA_PRIM_PATCHES) {
+       v9_prerast_unhandled("vertex count over the arena capacity");
+       return;
+    }
+ 
++   /* Restart indices cut the strips where the index buffer says: chunked on
++    * the GPU like an indirect draw. With cut_tail every chunk but the last
++    * two of an instance moves on by at least step / 2 vertices. */
++   if (overlap && draw->index.index_size && draw->index.restart_enable) {
++      if (draw->prim == MESA_PRIM_TRIANGLE_STRIP_ADJACENCY) {
++         v9_prerast_unhandled("vertex count over the arena capacity");
++         return;
++      }
++      const uint64_t chunks =
++         (DIV_ROUND_UP((uint64_t)draw->vertex.count, MAX2(step / 2, 1)) + 2) *
++         draw->instance.count;
++      if (chunks > V9_PRERAST_DIRECT_CHUNKS) {
++         v9_prerast_unhandled("restart strip with too many chunks");
++         return;
++      }
++      v9_prerast_chunked(cmdbuf, draw, max_verts, chunks);
++      return;
++   }
++
+    chunk.instance.count = 1;
+    for (uint32_t inst = 0; inst < draw->instance.count; inst++) {
+       chunk.instance.base = draw->instance.base + inst;
+@@ -3713,23 +3772,75 @@ v9_prerast_reserve_jobs(struct panvk_cmd_buffer *cmdbuf, uint32_t jobs)
+  * panlib_tess_draw() writes an empty draw that the draw patch makes a NULL
+  * job. No CPU reads anything back.
+  *
+- * Direct draws get exactly the iterations the chunk plan of
+- * panlib_tess_step() needs. Indirect draws get V9_TESS_INDIRECT_CHUNKS chunks
+- * (each up to max_patches patches); patches past them are not drawn.
+- * ponytail: fixed bound, a GPU-sized chain of job slots would lift it.
++ * Chunks are sized on the GPU from the real tessellation levels: a chunk
++ * plans up to V9_TESS_CHUNK_PATCHES patches, and panlib_tess_draw() keeps the
++ * longest run of them whose indices fit the index budget of the arena
++ * (idx_limit), handing the rest to the next chunk. Low levels thus take few
++ * iterations, the worst case (every patch at level 64) still fits.
++ *
++ * Direct draws get the iterations of that worst case, at most
++ * V9_TESS_MAX_ITERATIONS; indirect draws V9_TESS_INDIRECT_ITERATIONS. A
++ * draw whose real output needs more loses the rest.
++ * ponytail: fixed bounds, JM has no job chain loop.
+  *
+  * When the TES output goes through gpu_prerast again (GS, transform
+  * feedback, viewport select, TES stores), an iteration lowers at most one
+- * arena of tessellator indices. Chunks are cut so that one at the maximum
+- * tessellation level still fits, with more iterations per chunk when a single
+- * patch does not. After Noysz/panvk-g99-jm 0062/0065 (libpoly kernels in the
++ * arena of tessellator indices (range), a chunk over it takes several
++ * iterations. After Noysz/panvk-g99-jm 0062/0065 (libpoly kernels in the
+  * vertex/tiler chain), on the shared chunked kernels of csf-v11.
+  */
+-#define V9_TESS_INDIRECT_CHUNKS 8
+-#define V9_TESS_MAX_ITERATIONS 4096
++#define V9_TESS_CHUNK_PATCHES 4096
++#define V9_TESS_INDIRECT_ITERATIONS 32
++#define V9_TESS_MAX_ITERATIONS 1024
+ /* Jobs of one iteration, including a nested GS lowering and its draw. */
+ #define V9_TESS_ITERATION_JOBS 32
+ 
++/* The v9 tess arena: per-patch TCS outputs, counts and point allocations for
++ * the patches of a chunk, then an index budget shared by the chunk and the
++ * domain points of those indices. A patch has no more domain points than
++ * indices, so the heap holds the points of any run of patches that fits the
++ * index budget. Returns the patches per chunk, 0 if the arena is too small.
++ */
++static uint32_t
++v9_tess_layout(uint64_t arena, uint32_t tcs_stride_B, uint32_t vs_record_stride,
++               uint32_t patch_size, struct panvk_gpu_prerast_tess_layout *l)
++{
++   const uint64_t data = PANVK_GPU_PRERAST_TESS_ARENA_SIZE -
++                         PANVK_GPU_PRERAST_TESS_DATA_OFFSET - 4 * 16;
++   const uint64_t per_patch =
++      tcs_stride_B + 2 * sizeof(uint32_t) + 16 /* point alloc alignment */;
++   const uint32_t patches = MIN3(
++      panvk_gpu_prerast_record_capacity(vs_record_stride) / patch_size,
++      V9_TESS_CHUNK_PATCHES, data / 2 / per_patch);
++   uint64_t off = arena + PANVK_GPU_PRERAST_TESS_DATA_OFFSET;
++
++   if (!patches)
++      return 0;
++
++   l->tcs = off;
++   off += ALIGN_POT((uint64_t)patches * tcs_stride_B, 16);
++   l->counts = off;
++   off += ALIGN_POT((uint64_t)patches * sizeof(uint32_t), 16);
++   l->coord_allocs = off;
++   off += ALIGN_POT((uint64_t)patches * sizeof(uint32_t), 16);
++
++   const uint64_t left =
++      arena + PANVK_GPU_PRERAST_TESS_ARENA_SIZE - off - patches * 16 - 64;
++   const uint64_t indices =
++      left / (sizeof(uint32_t) + sizeof(struct poly_tess_point));
++   if (indices < PANVK_GPU_PRERAST_TESS_MAX_INDICES)
++      return 0;
++
++   l->heap = off;
++   l->heap_size =
++      indices * sizeof(struct poly_tess_point) + patches * 16 + 16;
++   off += ALIGN_POT((uint64_t)l->heap_size, 16);
++   l->index = off;
++   l->index_size = indices * sizeof(uint32_t);
++   assert(off + l->index_size <= arena + PANVK_GPU_PRERAST_TESS_ARENA_SIZE);
++   return patches;
++}
++
+ static void
+ v9_tess_draw(struct panvk_cmd_buffer *cmdbuf,
+              const struct panvk_draw_info *draw)
+@@ -3760,8 +3871,9 @@ v9_tess_draw(struct panvk_cmd_buffer *cmdbuf,
+       (te->ccw || tc->ccw) !=
+       (dyns->ts.domain_origin == VK_TESSELLATION_DOMAIN_ORIGIN_LOWER_LEFT);
+    const uint32_t ps = MAX2(dyns->ts.patch_control_points, 1);
+-   uint32_t max_patches = panvk_gpu_prerast_tess_max_patches(
+-      tc->stride_el * 4, vs->gpu_prerast.io.record_stride, ps);
++   struct panvk_gpu_prerast_tess_layout l;
++   const uint32_t max_patches = v9_tess_layout(
++      arena, tc->stride_el * 4, vs->gpu_prerast.io.record_stride, ps, &l);
+ 
+    if (domain == PANVK_GPU_PRERAST_TESS_UNSET ||
+        spacing == PANVK_GPU_PRERAST_TESS_UNSET || !max_patches) {
+@@ -3793,6 +3905,8 @@ v9_tess_draw(struct panvk_cmd_buffer *cmdbuf,
+    out.prims_generated_counted = true;
+    out.gpu_prerast_prim_base = 0;
+    out.gpu_prerast_prim_base_addr = 0;
++   /* An index range is at most range indices, see below. */
++   out.fits_arena = true;
+ 
+    const uint32_t vpp = mesa_vertices_per_prim(out.prim);
+ 
+@@ -3802,7 +3916,7 @@ v9_tess_draw(struct panvk_cmd_buffer *cmdbuf,
+                        v9_prerast_side_effects(cmdbuf, &out);
+    cmdbuf->state.gfx.vs.shader = vs;
+ 
+-   uint32_t range = 0, iters_per_chunk = 1;
++   uint32_t range = 0;
+    if (nested) {
+       /* Same vertex budget as v9_prerast_draw(). */
+       uint32_t verts =
+@@ -3815,40 +3929,44 @@ v9_tess_draw(struct panvk_cmd_buffer *cmdbuf,
+          v9_prerast_unhandled("tessellation output range");
+          return;
+       }
+-      max_patches = MIN2(max_patches,
+-                         MAX2(range / PANVK_GPU_PRERAST_TESS_MAX_INDICES, 1));
+-      iters_per_chunk = DIV_ROUND_UP(
+-         (uint64_t)max_patches * PANVK_GPU_PRERAST_TESS_MAX_INDICES, range);
+    }
+ 
+-   /* The chunk plan of panlib_tess_step(). */
+-   uint64_t chunks = V9_TESS_INDIRECT_CHUNKS;
++   /* Worst case of the GPU chunk plan: every patch at the maximum level, so
++    * a chunk keeps min_keep patches. A chunk cut inside an instance costs one
++    * more for the rest of that instance, and a chunk over the range one more
++    * iteration per range of indices. */
++   const uint32_t idx_limit = l.index_size / sizeof(uint32_t);
++   const uint32_t min_keep = MAX2(
++      MIN2(max_patches, idx_limit / PANVK_GPU_PRERAST_TESS_MAX_INDICES), 1);
++   uint64_t iters = V9_TESS_INDIRECT_ITERATIONS;
+    if (!indirect) {
+       const uint32_t ppi = draw->vertex.count / ps;
+-
+-      chunks = ppi <= max_patches
+-                  ? DIV_ROUND_UP((uint64_t)draw->instance.count,
+-                                 MIN2(max_patches / ppi,
+-                                      PANLIB_CHUNK_MAX_INSTANCES))
+-                  : (uint64_t)draw->instance.count *
+-                       DIV_ROUND_UP((uint64_t)ppi, max_patches);
+-   }
+-   if (indirect)
+-      mesa_logw_once("panvk: v9 indirect tessellated draws are drawn in at "
+-                     "most %u chunks of %u patches; patches past them are "
+-                     "dropped",
+-                     V9_TESS_INDIRECT_CHUNKS, max_patches);
+-   uint64_t iters = chunks * iters_per_chunk;
+-   if (iters > V9_TESS_MAX_ITERATIONS) {
+-      mesa_loge_once("panvk: v9 tessellated draw needs %" PRIu64
+-                     " iterations, only %u are drawn",
+-                     iters, V9_TESS_MAX_ITERATIONS);
+-      iters = V9_TESS_MAX_ITERATIONS;
++      const uint64_t patches = (uint64_t)ppi * draw->instance.count;
++      const uint64_t planned =
++         ppi <= max_patches
++            ? DIV_ROUND_UP((uint64_t)draw->instance.count,
++                           MIN2(max_patches / ppi, PANLIB_CHUNK_MAX_INSTANCES))
++            : (uint64_t)draw->instance.count *
++                 DIV_ROUND_UP((uint64_t)ppi, max_patches);
++
++      iters = planned + 2 * DIV_ROUND_UP(patches, min_keep);
++      if (range)
++         iters += DIV_ROUND_UP(patches * PANVK_GPU_PRERAST_TESS_MAX_INDICES,
++                               range);
++      if (iters > V9_TESS_MAX_ITERATIONS) {
++         mesa_logw_once("panvk: v9 tessellated draws get at most %u "
++                        "iterations of up to %u patches; the output past "
++                        "them is dropped",
++                        V9_TESS_MAX_ITERATIONS, max_patches);
++         iters = V9_TESS_MAX_ITERATIONS;
++      }
++   } else {
++      mesa_logw_once("panvk: v9 indirect tessellated draws get at most %u "
++                     "iterations of up to %u patches; the output past them "
++                     "is dropped",
++                     V9_TESS_INDIRECT_ITERATIONS, max_patches);
+    }
+ 
+-   struct panvk_gpu_prerast_tess_layout l;
+-   panvk_gpu_prerast_tess_layout(arena, max_patches, tc->stride_el * 4, &l);
+-
+    struct pan_ptr td = panvk_cmd_alloc_dev_mem(
+       cmdbuf, desc, sizeof(struct panlib_tess_draw), 16);
+    /* Direct draws have no app buffer to read the counts from. */
+@@ -3898,6 +4016,7 @@ v9_tess_draw(struct panvk_cmd_buffer *cmdbuf,
+    t->indexed = indexed;
+    t->range = range;
+    t->verts_per_prim = vpp;
++   t->idx_limit = idx_limit;
+ 
+    uint64_t src = draw->indirect.buffer_dev_addr;
+    if (!indirect) {
+@@ -3974,6 +4093,7 @@ v9_tess_draw(struct panvk_cmd_buffer *cmdbuf,
+    const uint64_t tcs_stat = panvk_pstats_counter_addr(
+       pstats, VK_QUERY_PIPELINE_STATISTIC_TESSELLATION_CONTROL_SHADER_PATCHES_BIT,
+       true);
++   t->tcs_stat = tcs_stat;
+ 
+    bool ok = true;
+    for (uint32_t it = 0; ok && it < iters; it++) {
+diff --git a/src/panfrost/vulkan/panvk_cmd_draw.h b/src/panfrost/vulkan/panvk_cmd_draw.h
+index d973861..9943277 100644
+--- a/src/panfrost/vulkan/panvk_cmd_draw.h
++++ b/src/panfrost/vulkan/panvk_cmd_draw.h
+@@ -567,6 +567,9 @@ struct panvk_draw_info {
+    /* 1 + the viewport whose depth range clamps this draw, 0 for viewport 0
+     * (the draws of one viewport each of a multi-viewport draw). */
+    uint32_t viewport_clamp;
++   /* An indirect gpu_prerast draw known to fit the arena (a tessellation
++    * output range): lowered as is, without GPU chunks. */
++   bool fits_arena;
+ #endif
+ };
+ 

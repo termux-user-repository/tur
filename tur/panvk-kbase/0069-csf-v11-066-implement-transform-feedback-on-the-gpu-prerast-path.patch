@@ -1,0 +1,1292 @@
+From: abhay-byte <zenithblue.dev@gmail.com>
+Subject: [PATCH csf-v11 066] panvk: implement transform feedback on the gpu_prerast path
+Generated-by: LLM
+
+Purpose: GPU transform feedback capture from gpu_prerast VS/GS/TES records, counters, byte-count draws and stream queries; tessellated draws captured per index range; biblioklept
+Source/Reference: local, dx9-xfb 977b170ebb0 merged with tessellation, work/mesa-dxint 3546d8a9525
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/065
+Validation test: tests/dxvk/vulkan/xfb 17/17 XFB_FAILS=0 (incl. tes_capture); CTS dEQP-VK.transform_feedback.* 15793 Pass, 0 Fail
+
+diff --git a/src/panfrost/libpan/draw_helper.cl b/src/panfrost/libpan/draw_helper.cl
+index 87c5854293f..9f5185142da 100644
+--- a/src/panfrost/libpan/draw_helper.cl
++++ b/src/panfrost/libpan/draw_helper.cl
+@@ -12,6 +12,7 @@
+ #include "poly/cl/tessellator.h"
+ #include "draw_helper.h"
+ #include "tess_draw.h"
++#include "libpan_xfb.h"
+ 
+ #if PAN_ARCH >= 10
+ 
+@@ -317,6 +318,282 @@ panlib_tess_draw(global struct panlib_tess_draw *t, global uint32_t *c_invs,
+    if (prims_generated)
+       atomic_fetch_add((global atomic_uint *)prims_generated, count / vpp);
+ }
++
++#define XFB_WG 256
++
++static uint32_t
++xfb_prim_verts(uint32_t prim)
++{
++   switch (prim) {
++   case MESA_PRIM_POINTS:
++      return 1;
++   case MESA_PRIM_LINES:
++   case MESA_PRIM_LINE_STRIP:
++   case MESA_PRIM_LINES_ADJACENCY:
++   case MESA_PRIM_LINE_STRIP_ADJACENCY:
++      return 2;
++   default:
++      return 3;
++   }
++}
++
++static uint32_t
++xfb_topology_vertex(uint32_t prim, uint32_t v)
++{
++   switch (prim) {
++   case MESA_PRIM_LINES_ADJACENCY:
++   case MESA_PRIM_LINE_STRIP_ADJACENCY:
++      return v + 1;
++   case MESA_PRIM_TRIANGLES_ADJACENCY:
++   case MESA_PRIM_TRIANGLE_STRIP_ADJACENCY:
++      return v * 2;
++   default:
++      return v;
++   }
++}
++
++static uint32_t
++xfb_scan(uint32_t v, local uint32_t *tmp, uint32_t *total)
++{
++   uint32_t tid = cl_local_id.x;
++
++   barrier(CLK_LOCAL_MEM_FENCE);
++   tmp[tid] = v;
++   barrier(CLK_LOCAL_MEM_FENCE);
++   for (uint32_t o = 1; o < XFB_WG; o <<= 1) {
++      uint32_t t = tid >= o ? tmp[tid - o] : 0;
++      barrier(CLK_LOCAL_MEM_FENCE);
++      tmp[tid] += t;
++      barrier(CLK_LOCAL_MEM_FENCE);
++   }
++   *total = tmp[XFB_WG - 1];
++   return tmp[tid] - v;
++}
++
++static void
++xfb_write(constant struct panlib_xfb_params *x, uint32_t s, uint32_t g,
++          uint32_t *vtx, uint32_t k, uint32_t *off, uint32_t *fit)
++{
++   if (g >= fit[s])
++      return;
++
++   for (uint32_t o = 0; o < x->output_count; o++) {
++      uint32_t out = x->outputs[o];
++      uint32_t b = (out >> PANLIB_XFB_OUT_BUF_SHIFT) & 3;
++      uint32_t dst_dw = (out >> PANLIB_XFB_OUT_DST_SHIFT) & 0xfff;
++      uint32_t src_dw = (out >> PANLIB_XFB_OUT_SRC_SHIFT) & 0xff;
++
++      if (!x->strides[b] || !x->buffers[b] ||
++          ((x->buffer_to_stream >> (2 * b)) & 3) != s)
++         continue;
++
++      for (uint32_t v = 0; v < k; v++) {
++         global uint32_t *src =
++            (global uint32_t *)(x->records +
++                                (uint64_t)vtx[v] * x->record_stride);
++         global uint32_t *dst =
++            (global uint32_t *)(x->buffers[b] + off[b] +
++                                ((uint64_t)g * k + v) * x->strides[b]);
++         dst[dst_dw] = src[src_dw];
++      }
++   }
++}
++
++static void
++xfb_gs_walk(constant struct panlib_xfb_params *x, uint32_t rec0,
++            uint32_t count, uint32_t tag_dw, uint32_t k, bool emit,
++            uint32_t *base, uint32_t *off, uint32_t *fit, uint32_t *cnt)
++{
++   uint32_t len[PANLIB_XFB_MAX_STREAMS] = {0};
++   uint32_t p0[PANLIB_XFB_MAX_STREAMS] = {0};
++   uint32_t p1[PANLIB_XFB_MAX_STREAMS] = {0};
++   uint32_t vtx[3];
++
++   for (uint32_t v = 0; v < count; v++) {
++      uint32_t r = rec0 + v;
++      global uint32_t *rec =
++         (global uint32_t *)(x->records + (uint64_t)r * x->record_stride);
++      uint32_t tag = rec[tag_dw];
++      uint32_t s = tag & 3;
++      bool prim = false;
++
++      if (tag & 4)
++         len[s] = 0;
++
++      if (k == 1) {
++         vtx[0] = r;
++         prim = true;
++      } else if (k == 2) {
++         if (len[s] >= 1) {
++            vtx[0] = p1[s];
++            vtx[1] = r;
++            prim = true;
++         }
++      } else if (len[s] >= 2) {
++         bool odd = (len[s] - 2) & 1;
++         vtx[0] = p0[s];
++         vtx[1] = odd ? r : p1[s];
++         vtx[2] = odd ? p1[s] : r;
++         prim = true;
++      }
++
++      p0[s] = p1[s];
++      p1[s] = r;
++      len[s]++;
++
++      if (prim) {
++         if (emit)
++            xfb_write(x, s, base[s] + cnt[s], vtx, k, off, fit);
++         cnt[s]++;
++      }
++   }
++}
++
++KERNEL(XFB_WG)
++panlib_xfb_capture(constant struct panlib_xfb_params *x)
++{
++   global uint32_t *offsets = (global uint32_t *)x->offsets;
++   constant uint32_t *counts = (constant uint32_t *)x->counts;
++   local uint32_t tmp[XFB_WG];
++   POLY_DECL_UNROLL_RESTART_SCRATCH(scratch, XFB_WG);
++   uint32_t tid = cl_local_id.x;
++   uint32_t n = counts[0], inst = counts[1];
++   uint32_t k = xfb_prim_verts(x->prim);
++   uint32_t off[PANLIB_XFB_MAX_BUFFERS];
++   uint32_t fit[PANLIB_XFB_MAX_STREAMS];
++   uint32_t total[PANLIB_XFB_MAX_STREAMS] = {0};
++
++   if (!x->active)
++      return;
++
++   for (uint32_t s = 0; s < PANLIB_XFB_MAX_STREAMS; s++)
++      fit[s] = UINT32_MAX;
++
++   for (uint32_t b = 0; b < PANLIB_XFB_MAX_BUFFERS; b++) {
++      off[b] = offsets[b];
++      if (!x->strides[b] || !x->buffers[b])
++         continue;
++
++      uint32_t s = (x->buffer_to_stream >> (2 * b)) & 3;
++      uint32_t bytes = k * x->strides[b];
++      uint32_t avail = off[b] < x->sizes[b] ? (x->sizes[b] - off[b]) / bytes : 0;
++      fit[s] = min(fit[s], avail);
++   }
++
++   if (x->gs_max_vertices) {
++      uint32_t tag_dw = x->record_stride / 4 - 4;
++      uint32_t slots = min((uint64_t)n * inst * x->gs_invocations,
++                           (uint64_t)x->record_capacity);
++
++      for (uint32_t base_slot = 0; base_slot < slots; base_slot += XFB_WG) {
++         uint32_t slot = base_slot + tid;
++         uint32_t rec0 = slot * x->gs_max_vertices;
++         uint32_t count = 0;
++         uint32_t cnt[PANLIB_XFB_MAX_STREAMS] = {0};
++         uint32_t pre[PANLIB_XFB_MAX_STREAMS];
++
++         if (slot < slots) {
++            global uint32_t *r0 =
++               (global uint32_t *)(x->records +
++                                   (uint64_t)rec0 * x->record_stride);
++            count = min(r0[tag_dw + 1], x->gs_max_vertices);
++            xfb_gs_walk(x, rec0, count, tag_dw, k, false, total, off, fit,
++                        cnt);
++         }
++
++         for (uint32_t s = 0; s < PANLIB_XFB_MAX_STREAMS; s++) {
++            uint32_t sum;
++            pre[s] = total[s] + xfb_scan(cnt[s], tmp, &sum);
++            total[s] += sum;
++            cnt[s] = 0;
++         }
++
++         if (slot < slots)
++            xfb_gs_walk(x, rec0, count, tag_dw, k, true, pre, off, fit, cnt);
++      }
++   } else {
++      constant uint32_t *gen = (constant uint32_t *)x->indices;
++      uint32_t vtx[3];
++
++      for (uint32_t i = 0; i < inst; i++) {
++         uint32_t rec_base = i * n;
++         if (rec_base >= x->record_capacity)
++            break;
++
++         uint32_t nn = min(n, x->record_capacity - rec_base);
++         uint32_t needle = 0;
++
++         while (needle < nn) {
++            uint32_t next = nn;
++
++            if (x->restart) {
++               next = needle;
++               for (;;) {
++                  uint32_t idx = next + tid;
++                  bool is_restart = idx >= nn || gen[idx] == 0xffffffff;
++                  uint32_t first =
++                     poly_work_group_first_true(is_restart, scratch);
++
++                  next += first;
++                  if (first < XFB_WG)
++                     break;
++               }
++            }
++
++            uint32_t prims =
++               u_decomposed_prims_for_vertices((enum mesa_prim)x->prim,
++                                               next - needle);
++
++            for (uint32_t p = tid; p < prims; p += XFB_WG) {
++               for (uint32_t v = 0; v < k; v++)
++                  vtx[v] = rec_base + needle +
++                           poly_vertex_id_for_topology(
++                              (enum mesa_prim)x->prim, true, p, xfb_topology_vertex(x->prim, v),
++                              prims);
++               xfb_write(x, 0, total[0] + p, vtx, k, off, fit);
++            }
++
++            total[0] += prims;
++            needle = next + 1;
++         }
++      }
++   }
++
++   barrier(CLK_GLOBAL_MEM_FENCE);
++   if (tid)
++      return;
++
++   for (uint32_t b = 0; b < PANLIB_XFB_MAX_BUFFERS; b++) {
++      if (!x->strides[b] || !x->buffers[b])
++         continue;
++
++      uint32_t s = (x->buffer_to_stream >> (2 * b)) & 3;
++      offsets[b] = off[b] + min(total[s], fit[s]) * k * x->strides[b];
++   }
++
++   for (uint32_t s = 0; s < PANLIB_XFB_MAX_STREAMS; s++) {
++      global uint64_t *q = (global uint64_t *)x->queries[s];
++      if (q) {
++         q[0] += min(total[s], fit[s]);
++         q[1] += total[s];
++      }
++   }
++}
++
++KERNEL(1)
++panlib_xfb_byte_count_draw(constant uint32_t *counter, uint32_t counter_offset,
++                           uint32_t stride, uint32_t instance_count,
++                           uint32_t first_instance, global uint32_t *draw)
++{
++   uint32_t bytes = counter[0];
++
++   draw[0] = bytes > counter_offset && stride
++                ? (bytes - counter_offset) / stride
++                : 0;
++   draw[1] = instance_count;
++   draw[2] = 0;
++   draw[3] = first_instance;
++}
+ #endif
+ 
+ #if (PAN_ARCH == 6 || PAN_ARCH == 7)
+diff --git a/src/panfrost/libpan/libpan_xfb.h b/src/panfrost/libpan/libpan_xfb.h
+new file mode 100644
+index 00000000000..f552e65bf55
+--- /dev/null
++++ b/src/panfrost/libpan/libpan_xfb.h
+@@ -0,0 +1,45 @@
++/*
++ * Copyright 2026 Abhay Byte
++ * SPDX-License-Identifier: MIT
++ */
++
++#pragma once
++
++#include "compiler/libcl/libcl.h"
++
++#define PANLIB_XFB_MAX_BUFFERS 4
++#define PANLIB_XFB_MAX_STREAMS 4
++#define PANLIB_XFB_MAX_OUTPUTS 128
++
++#define PANLIB_XFB_OUT_DST_SHIFT 0
++#define PANLIB_XFB_OUT_SRC_SHIFT 12
++#define PANLIB_XFB_OUT_BUF_SHIFT 20
++
++static inline uint32_t
++panlib_xfb_output(uint32_t dst_dw, uint32_t src_dw, uint32_t buffer)
++{
++   return (dst_dw << PANLIB_XFB_OUT_DST_SHIFT) |
++          (src_dw << PANLIB_XFB_OUT_SRC_SHIFT) |
++          (buffer << PANLIB_XFB_OUT_BUF_SHIFT);
++}
++
++struct panlib_xfb_params {
++   uint64_t buffers[PANLIB_XFB_MAX_BUFFERS];
++   uint64_t queries[PANLIB_XFB_MAX_STREAMS];
++   uint64_t offsets;
++   uint64_t records;
++   uint64_t indices;
++   uint64_t counts;
++   uint32_t sizes[PANLIB_XFB_MAX_BUFFERS];
++   uint32_t strides[PANLIB_XFB_MAX_BUFFERS];
++   uint32_t record_stride;
++   uint32_t record_capacity;
++   uint32_t prim;
++   uint32_t restart;
++   uint32_t gs_max_vertices;
++   uint32_t gs_invocations;
++   uint32_t buffer_to_stream;
++   uint32_t output_count;
++   uint32_t active;
++   uint32_t outputs[PANLIB_XFB_MAX_OUTPUTS];
++};
+diff --git a/src/panfrost/vulkan/csf/panvk_cmd_buffer.h b/src/panfrost/vulkan/csf/panvk_cmd_buffer.h
+index d49aef58f39..478f871f1b3 100644
+--- a/src/panfrost/vulkan/csf/panvk_cmd_buffer.h
++++ b/src/panfrost/vulkan/csf/panvk_cmd_buffer.h
+@@ -980,6 +980,7 @@ panvk_get_subqueue_stages(enum panvk_subqueue_id subqueue)
+              VK_PIPELINE_STAGE_2_TESSELLATION_EVALUATION_SHADER_BIT |
+              VK_PIPELINE_STAGE_2_COPY_BIT |
+              VK_PIPELINE_STAGE_2_COPY_INDIRECT_BIT_KHR |
++             VK_PIPELINE_STAGE_2_TRANSFORM_FEEDBACK_BIT_EXT |
+              VK_PIPELINE_STAGE_2_CONDITIONAL_RENDERING_BIT_EXT;
+    default:
+       UNREACHABLE("Invalid subqueue id");
+diff --git a/src/panfrost/vulkan/csf/panvk_gpu_prerast.c b/src/panfrost/vulkan/csf/panvk_gpu_prerast.c
+index dedd94314d3..60992fd87e9 100644
+--- a/src/panfrost/vulkan/csf/panvk_gpu_prerast.c
++++ b/src/panfrost/vulkan/csf/panvk_gpu_prerast.c
+@@ -76,8 +76,11 @@ panvk_per_arch(gpu_prerast_can_lower)(
+     const bool poly = !gs &&
+                       panvk_per_arch(gpu_prerast_poly_mode)(cmdbuf, draw) !=
+                          PANVK_GPU_PRERAST_POLY_NONE;
+-    if (!(PANVK_DEBUG(GPU_PRERAST) || poly || gs) ||
+-        (!gs && !poly && shader->has_side_effects) ||
++    const bool xfb = cmdbuf->state.gfx.xfb.active &&
++                     panvk_gpu_prerast_has_xfb(gs ? &gs->gpu_prerast.xfb
++                                                  : &shader->xfb);
++    if (!(PANVK_DEBUG(GPU_PRERAST) || poly || gs || xfb) ||
++        (!gs && !poly && !xfb && shader->has_side_effects) ||
+         !shader->lowered_vs_compiled || !shader->passthrough_vs_compiled ||
+         (poly && !shader->polygon_compiled) ||
+         (gs && (!gs->gpu_prerast.gs.kernel_compiled ||
+@@ -122,6 +125,10 @@ panvk_per_arch(gpu_prerast_can_lower)(
+    case MESA_PRIM_TRIANGLES:
+    case MESA_PRIM_TRIANGLE_STRIP:
+    case MESA_PRIM_TRIANGLE_FAN:
++   case MESA_PRIM_LINES_ADJACENCY:
++   case MESA_PRIM_LINE_STRIP_ADJACENCY:
++   case MESA_PRIM_TRIANGLES_ADJACENCY:
++   case MESA_PRIM_TRIANGLE_STRIP_ADJACENCY:
+       return true;
+    default:
+       return false;
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+index b57fcd4a59c..a0017f857c0 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+@@ -3695,6 +3695,8 @@ gpu_prerast_gs_run(struct panvk_cmd_buffer *cmdbuf,
+    } else {
+       STORE_GS32(prim_id_base, source->gpu_prerast_prim_base);
+    }
++   STORE_GS32(raster_stream,
++              cmdbuf->vk.dynamic_graphics_state.rs.rasterization_stream);
+ 
+    const struct panvk_pstats_query_state *pstats =
+       &cmdbuf->state.gfx.pstats_query;
+@@ -3754,6 +3756,89 @@ gpu_prerast_acquire_arena(struct panvk_cmd_buffer *cmdbuf, uint64_t arena)
+    cs_sync32_add(b, true, MALI_CS_SYNC_SCOPE_CSG, value, addr, cs_now());
+ }
+ 
++static bool
++gpu_prerast_xfb_active(const struct panvk_cmd_buffer *cmdbuf)
++{
++   const struct panvk_shader *last = cmdbuf->state.gfx.gs.shader
++                                        ? cmdbuf->state.gfx.gs.shader
++                                        : cmdbuf->state.gfx.vs.shader;
++
++   return cmdbuf->state.gfx.xfb.active && last &&
++          panvk_gpu_prerast_has_xfb(&last->gpu_prerast.xfb);
++}
++
++static void
++gpu_prerast_xfb(struct panvk_cmd_buffer *cmdbuf,
++                const struct panvk_draw_info *source, uint64_t arena,
++                enum panlib_barrier barrier)
++{
++   struct panvk_device *dev = to_panvk_device(cmdbuf->vk.base.device);
++   const struct panvk_shader *gs = cmdbuf->state.gfx.gs.shader;
++   const struct panvk_shader *last = gs ? gs : cmdbuf->state.gfx.vs.shader;
++   const struct panvk_gpu_prerast_xfb_info *xi = &last->gpu_prerast.xfb;
++   struct pan_ptr ptr = panvk_cmd_alloc_dev_mem(
++      cmdbuf, desc, sizeof(struct panlib_xfb_params), 16);
++
++   if (!ptr.gpu)
++      return;
++
++   struct panlib_xfb_params *x = ptr.cpu;
++   memset(x, 0, sizeof(*x));
++   x->offsets = cmdbuf->state.gfx.xfb.offsets;
++   for (unsigned i = 0; i < PANLIB_XFB_MAX_BUFFERS; i++) {
++      x->buffers[i] = cmdbuf->state.gfx.xfb.buffers[i].addr;
++      x->sizes[i] = cmdbuf->state.gfx.xfb.buffers[i].size;
++      x->strides[i] = xi->stride[i];
++      x->buffer_to_stream |= xi->buffer_to_stream[i] << (2 * i);
++      x->queries[i] = cmdbuf->state.gfx.xfb.queries[i];
++   }
++   x->output_count = xi->output_count;
++   memcpy(x->outputs, xi->outputs, xi->output_count * sizeof(uint32_t));
++
++   if (gs) {
++      const struct panvk_gpu_prerast_gs_info *g = &gs->gpu_prerast.gs;
++
++      x->records = arena + PANVK_GPU_PRERAST_GS_RECORD_OFFSET;
++      x->counts = arena + PANVK_GPU_PRERAST_GS_PARAMS_OFFSET +
++                  offsetof(struct panvk_gpu_prerast_gs_params, vertex_count);
++      x->record_stride = g->record_stride;
++      x->record_capacity = panvk_gpu_prerast_gs_cap_slots(g);
++      x->prim = g->output_prim;
++      x->gs_max_vertices = g->max_vertices;
++      x->gs_invocations = g->invocations;
++   } else {
++      x->records = arena + PANVK_GPU_PRERAST_RECORD_OFFSET;
++      x->indices = arena + PANVK_GPU_PRERAST_INDEX_OFFSET;
++      x->counts = arena + PANVK_GPU_PRERAST_PARAMS_OFFSET +
++                  offsetof(struct panvk_gpu_prerast_params, vertex_count);
++      x->record_stride = last->gpu_prerast.io.record_stride;
++      x->record_capacity =
++         panvk_gpu_prerast_record_capacity(x->record_stride);
++      x->prim = source->prim;
++      x->restart = source->index.index_size && source->index.restart_enable;
++   }
++
++   struct cs_builder *b = panvk_get_cs_builder(cmdbuf, PANVK_SUBQUEUE_COMPUTE);
++   struct panvk_precomp_ctx ctx = panvk_per_arch(precomp_cs)(cmdbuf);
++
++   x->active = 1;
++   if (cmdbuf->state.cond_render.enabled || cmdbuf->state.cond_render.inherited) {
++      struct cs_index active = cs_scratch_reg32(b, 0);
++      struct cs_index addr = cs_scratch_reg64(b, 2);
++
++      cs_move32_to(b, active, 0);
++      panvk_cond_render(cmdbuf, b)
++         cs_move32_to(b, active, 1);
++      cs_move64_to(b, addr,
++                   ptr.gpu + offsetof(struct panlib_xfb_params, active));
++      cs_store32(b, active, addr, 0);
++      cs_flush_stores(b);
++   }
++
++   cs_wait_slots(b, dev->csf.sb.all_iters_mask);
++   panlib_xfb_capture(&ctx, panlib_1d(1), barrier, ptr.gpu);
++}
++
+ /* Acquires the arena and runs the lowered VS, plus the polygon kernel when
+  * poly_mode asks for it. Returns false if nothing was queued. chunk_addr
+  * points to the {vertex, instance} start of a tessellation chunk, or is 0.
+@@ -4044,6 +4129,9 @@ gpu_prerast_draw(struct panvk_cmd_buffer *cmdbuf,
+       return true;
+    }
+ 
++   if (gpu_prerast_xfb_active(cmdbuf))
++      gpu_prerast_xfb(cmdbuf, source, arena, PANLIB_BARRIER_CSF_SYNC);
++
+    gpu_prerast_wait_compute(cmdbuf);
+    gpu_prerast_draw_generated(cmdbuf, source, arena, poly_mode);
+    gpu_prerast_release_arena(cmdbuf, arena);
+@@ -4263,11 +4351,15 @@ gpu_prerast_tess(struct panvk_cmd_buffer *cmdbuf,
+    const enum panvk_gpu_prerast_poly_mode poly_mode =
+       gs ? PANVK_GPU_PRERAST_POLY_NONE
+          : panvk_per_arch(gpu_prerast_poly_mode)(cmdbuf, &out);
++   const bool xfb = cmdbuf->state.gfx.xfb.active &&
++                    panvk_gpu_prerast_has_xfb(gs ? &gs->gpu_prerast.xfb
++                                                 : &tes->gpu_prerast.xfb);
+    const bool nested =
+       panvk_per_arch(gpu_prerast_can_lower)(cmdbuf, &out, &tes->gpu_prerast);
+    uint32_t range = 0;
+ 
+-   if (!nested && (gs || poly_mode != PANVK_GPU_PRERAST_POLY_NONE)) {
++   if (!nested && (gs || poly_mode != PANVK_GPU_PRERAST_POLY_NONE ||
++                   xfb)) {
+       gpu_prerast_unhandled("tessellation gpu_prerast variants missing");
+       return;
+    }
+@@ -4515,6 +4607,10 @@ gpu_prerast_tess(struct panvk_cmd_buffer *cmdbuf,
+                   poly_compact_prim(gs_out_prim));
+             }
+          }
++         if (xfb) {
++            gpu_prerast_xfb(cmdbuf, &out, prerast_arena, PANLIB_BARRIER_NONE);
++            cs_wait_slots(b, dev->csf.sb.all_iters_mask);
++         }
+          cmdbuf->state.gfx.vs.shader = vs;
+          gfx_state_set_dirty(cmdbuf, VS);
+          gfx_state_set_dirty(cmdbuf, VS_PUSH_UNIFORMS);
+@@ -4574,6 +4670,7 @@ gpu_prerast_needed(const struct panvk_cmd_buffer *cmdbuf,
+ {
+    return !draw->gpu_prerast_generated &&
+           (draw->prim == MESA_PRIM_PATCHES || cmdbuf->state.gfx.gs.shader ||
++           gpu_prerast_xfb_active(cmdbuf) ||
+            panvk_per_arch(gpu_prerast_poly_mode)(cmdbuf, draw) !=
+               PANVK_GPU_PRERAST_POLY_NONE);
+ }
+@@ -4699,7 +4796,8 @@ panvk_cmd_draw(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info draw)
+    /* If there's no vertex shader, we can skip the draw. With tessellation,
+     * the TES rasterizes and the VS may be empty.
+     */
+-   if (draw.prim != MESA_PRIM_PATCHES && !panvk_priv_mem_check_alloc(vs->spd))
++   if (draw.prim != MESA_PRIM_PATCHES && !panvk_priv_mem_check_alloc(vs->spd) &&
++       (draw.gpu_prerast_generated || !gpu_prerast_xfb_active(cmdbuf)))
+       return;
+ 
+    /* Count once per API draw, before gpu_prerast splits or lowers it. */
+@@ -6317,3 +6415,152 @@ panvk_per_arch(cmd_draw_volume)(struct vk_command_buffer *cmd,
+       return;
+    panvk_per_arch(cmd_draw_fullscreen)(cmd, meta, 1, rect, layer_count);
+ }
++
++VKAPI_ATTR void VKAPI_CALL
++panvk_per_arch(CmdBindTransformFeedbackBuffersEXT)(
++   VkCommandBuffer commandBuffer, uint32_t firstBinding, uint32_t bindingCount,
++   const VkBuffer *pBuffers, const VkDeviceSize *pOffsets,
++   const VkDeviceSize *pSizes)
++{
++   VK_FROM_HANDLE(panvk_cmd_buffer, cmdbuf, commandBuffer);
++
++   for (uint32_t i = 0; i < bindingCount; i++) {
++      VK_FROM_HANDLE(panvk_buffer, buffer, pBuffers[i]);
++      uint64_t size = vk_buffer_range(&buffer->vk, pOffsets[i],
++                                      pSizes ? pSizes[i] : VK_WHOLE_SIZE);
++
++      cmdbuf->state.gfx.xfb.buffers[firstBinding + i].addr =
++         panvk_buffer_gpu_ptr(buffer, pOffsets[i]);
++      cmdbuf->state.gfx.xfb.buffers[firstBinding + i].size =
++         MIN2(size, UINT32_MAX);
++   }
++}
++
++static uint64_t
++xfb_counter_addr(uint32_t i, uint32_t first, uint32_t count,
++                 const VkBuffer *buffers, const VkDeviceSize *offsets)
++{
++   if (!buffers || i < first || i - first >= count)
++      return 0;
++
++   VK_FROM_HANDLE(panvk_buffer, buffer, buffers[i - first]);
++   return buffer ? panvk_buffer_gpu_ptr(buffer,
++                                        offsets ? offsets[i - first] : 0)
++                 : 0;
++}
++
++VKAPI_ATTR void VKAPI_CALL
++panvk_per_arch(CmdBeginTransformFeedbackEXT)(
++   VkCommandBuffer commandBuffer, uint32_t firstCounterBuffer,
++   uint32_t counterBufferCount, const VkBuffer *pCounterBuffers,
++   const VkDeviceSize *pCounterBufferOffsets)
++{
++   VK_FROM_HANDLE(panvk_cmd_buffer, cmdbuf, commandBuffer);
++   struct pan_ptr offsets = panvk_cmd_alloc_dev_mem(
++      cmdbuf, desc, PANLIB_XFB_MAX_BUFFERS * sizeof(uint32_t), 16);
++
++   if (!offsets.gpu)
++      return;
++
++   struct cs_builder *b = panvk_get_cs_builder(cmdbuf, PANVK_SUBQUEUE_COMPUTE);
++   struct cs_index addr = cs_scratch_reg64(b, 0);
++   struct cs_index vals = cs_scratch_reg_tuple(b, 2, PANLIB_XFB_MAX_BUFFERS);
++
++   for (uint32_t i = 0; i < PANLIB_XFB_MAX_BUFFERS; i++) {
++      uint64_t counter =
++         xfb_counter_addr(i, firstCounterBuffer, counterBufferCount,
++                          pCounterBuffers, pCounterBufferOffsets);
++      struct cs_index val = cs_scratch_reg32(b, 2 + i);
++
++      if (counter) {
++         cs_move64_to(b, addr, counter);
++         cs_load32_to(b, val, addr, 0);
++         cs_wait_slot(b, SB_ID(LS));
++      } else {
++         cs_move32_to(b, val, 0);
++      }
++   }
++
++   cs_move64_to(b, addr, offsets.gpu);
++   cs_store(b, vals, addr, BITFIELD_MASK(PANLIB_XFB_MAX_BUFFERS), 0);
++   cs_flush_stores(b);
++
++   cmdbuf->state.gfx.xfb.offsets = offsets.gpu;
++   cmdbuf->state.gfx.xfb.active = true;
++}
++
++VKAPI_ATTR void VKAPI_CALL
++panvk_per_arch(CmdEndTransformFeedbackEXT)(
++   VkCommandBuffer commandBuffer, uint32_t firstCounterBuffer,
++   uint32_t counterBufferCount, const VkBuffer *pCounterBuffers,
++   const VkDeviceSize *pCounterBufferOffsets)
++{
++   VK_FROM_HANDLE(panvk_cmd_buffer, cmdbuf, commandBuffer);
++   struct panvk_device *dev = to_panvk_device(cmdbuf->vk.base.device);
++   const uint64_t offsets = cmdbuf->state.gfx.xfb.offsets;
++
++   cmdbuf->state.gfx.xfb.active = false;
++   cmdbuf->state.gfx.xfb.offsets = 0;
++   if (!offsets)
++      return;
++
++   struct cs_builder *b = panvk_get_cs_builder(cmdbuf, PANVK_SUBQUEUE_COMPUTE);
++   struct cs_index addr = cs_scratch_reg64(b, 0);
++   struct cs_index vals = cs_scratch_reg_tuple(b, 2, PANLIB_XFB_MAX_BUFFERS);
++
++   cs_wait_slots(b, dev->csf.sb.all_iters_mask);
++   cs_move64_to(b, addr, offsets);
++   cs_load_to(b, vals, addr, BITFIELD_MASK(PANLIB_XFB_MAX_BUFFERS), 0);
++   cs_wait_slot(b, SB_ID(LS));
++
++   for (uint32_t i = 0; i < PANLIB_XFB_MAX_BUFFERS; i++) {
++      uint64_t counter =
++         xfb_counter_addr(i, firstCounterBuffer, counterBufferCount,
++                          pCounterBuffers, pCounterBufferOffsets);
++
++      if (!counter)
++         continue;
++
++      cs_move64_to(b, addr, counter);
++      cs_store32(b, cs_scratch_reg32(b, 2 + i), addr, 0);
++   }
++   cs_flush_stores(b);
++}
++
++VKAPI_ATTR void VKAPI_CALL
++panvk_per_arch(CmdDrawIndirectByteCountEXT)(
++   VkCommandBuffer commandBuffer, uint32_t instanceCount,
++   uint32_t firstInstance, VkBuffer counterBuffer,
++   VkDeviceSize counterBufferOffset, uint32_t counterOffset,
++   uint32_t vertexStride)
++{
++   VK_FROM_HANDLE(panvk_cmd_buffer, cmdbuf, commandBuffer);
++   VK_FROM_HANDLE(panvk_buffer, counter, counterBuffer);
++   struct panvk_device *dev = to_panvk_device(cmdbuf->vk.base.device);
++
++   if (!instanceCount)
++      return;
++
++   struct pan_ptr draw = panvk_cmd_alloc_dev_mem(
++      cmdbuf, desc, sizeof(VkDrawIndirectCommand), 16);
++   if (!draw.gpu)
++      return;
++
++   struct panvk_precomp_ctx ctx = panvk_per_arch(precomp_cs)(cmdbuf);
++   panlib_xfb_byte_count_draw(
++      &ctx, panlib_1d(1), PANLIB_BARRIER_CSF_SYNC,
++      panvk_buffer_gpu_ptr(counter, counterBufferOffset), counterOffset,
++      vertexStride, instanceCount, firstInstance, draw.gpu);
++   cs_wait_slots(panvk_get_cs_builder(cmdbuf, PANVK_SUBQUEUE_COMPUTE),
++                 dev->csf.sb.all_iters_mask);
++   gpu_prerast_wait_compute(cmdbuf);
++
++   struct panvk_draw_info info = {
++      .indirect.buffer_dev_addr = draw.gpu,
++      .indirect.draw_count = 1,
++      .indirect.stride = sizeof(VkDrawIndirectCommand),
++      .prim = panvk_get_client_prim(cmdbuf),
++   };
++
++   panvk_cmd_draw(cmdbuf, info);
++}
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_query.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_query.c
+index 84d6ff2c69a..8334a8508c5 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_query.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_query.c
+@@ -38,6 +38,7 @@ panvk_subqueue_for_query_type(VkQueryType type)
+    case VK_QUERY_TYPE_OCCLUSION:
+       return PANVK_SUBQUEUE_FRAGMENT;
+    case VK_QUERY_TYPE_PRIMITIVES_GENERATED_EXT:
++   case VK_QUERY_TYPE_TRANSFORM_FEEDBACK_STREAM_EXT:
+       return PANVK_SUBQUEUE_COMPUTE;
+    case VK_QUERY_TYPE_PIPELINE_STATISTICS:
+       /* Availability is signalled from the fragment subqueue, after the
+@@ -144,7 +145,8 @@ panvk_cmd_reset_queries(struct panvk_cmd_buffer *cmd,
+    /* Pipeline statistics reports are written from several subqueues and
+     * zeroed by Begin on the subqueue that owns each counter, zeroing them
+     * here could race with a following Begin. */
+-   if (pool->vk.query_type != VK_QUERY_TYPE_PIPELINE_STATISTICS) {
++   if (pool->vk.query_type != VK_QUERY_TYPE_PIPELINE_STATISTICS &&
++       pool->vk.query_type != VK_QUERY_TYPE_TRANSFORM_FEEDBACK_STREAM_EXT) {
+       cs_move64_to(b, addr, panvk_query_report_dev_addr(pool, first_query));
+       reset_queries_batch(b, addr, zero_regs, query_count);
+    }
+@@ -730,6 +732,52 @@ panvk_cmd_end_prims_generated_query(
+                  cs_defer(SB_MASK(DEFERRED_FLUSH), SB_ID(DEFERRED_SYNC)));
+ }
+ 
++static void
++panvk_cmd_begin_xfb_query(struct panvk_cmd_buffer *cmd,
++                          struct panvk_query_pool *pool, uint32_t query,
++                          uint32_t index)
++{
++   uint64_t report_addr = panvk_query_report_dev_addr(pool, query);
++
++   cmd->state.gfx.xfb.queries[index] = report_addr;
++
++   struct cs_builder *b = panvk_get_cs_builder(cmd, PANVK_SUBQUEUE_COMPUTE);
++   struct cs_index addr = cs_scratch_reg64(b, 0);
++   struct cs_index zero = cs_scratch_reg64(b, 2);
++
++   cs_move64_to(b, addr, report_addr);
++   cs_move64_to(b, zero, 0);
++   for (uint32_t i = 0; i < pool->reports_per_query; i++)
++      cs_store64(b, zero, addr, i * sizeof(uint64_t));
++   cs_flush_stores(b);
++}
++
++static void
++panvk_cmd_end_xfb_query(struct panvk_cmd_buffer *cmd,
++                        struct panvk_query_pool *pool, uint32_t query,
++                        uint32_t index)
++{
++   struct panvk_device *dev = to_panvk_device(cmd->vk.base.device);
++
++   cmd->state.gfx.xfb.queries[index] = 0;
++
++   struct cs_builder *b = panvk_get_cs_builder(cmd, PANVK_SUBQUEUE_COMPUTE);
++   struct cs_index query_syncobj = cs_scratch_reg64(b, 0);
++   struct cs_index val = cs_scratch_reg32(b, 2);
++
++   cs_wait_slots(b, dev->csf.sb.all_iters_mask);
++   cs_move32_to(b, val, 0);
++   cs_flush_caches(
++      b, MALI_CS_FLUSH_MODE_CLEAN, MALI_CS_FLUSH_MODE_CLEAN,
++      MALI_CS_OTHER_FLUSH_MODE_NONE, val,
++      cs_defer(SB_IMM_MASK, SB_ID(DEFERRED_FLUSH)));
++
++   cs_move32_to(b, val, 1);
++   cs_move64_to(b, query_syncobj, panvk_query_available_dev_addr(pool, query));
++   cs_sync32_set(b, true, MALI_CS_SYNC_SCOPE_CSG, val, query_syncobj,
++                 cs_defer(SB_MASK(DEFERRED_FLUSH), SB_ID(DEFERRED_SYNC)));
++}
++
+ #define PSTAT(name) VK_QUERY_PIPELINE_STATISTIC_##name##_BIT
+ 
+ /* The largest per-draw or per-dispatch increment added with CS immediates,
+@@ -1135,6 +1183,13 @@ panvk_copy_pstats_query_results(struct panvk_cmd_buffer *cmd,
+       BITFIELD_BIT(PANVK_SUBQUEUE_FRAGMENT);
+    panvk_per_arch(emit_barrier)(cmd, deps);
+ 
++   const bool xfb =
++      pool->vk.query_type == VK_QUERY_TYPE_TRANSFORM_FEEDBACK_STREAM_EXT;
++
++   if (xfb)
++      cs_wait_slot(panvk_get_cs_builder(cmd, PANVK_SUBQUEUE_COMPUTE),
++                   SB_ID(DEFERRED_SYNC));
++
+    const struct panlib_copy_pstats_query_result_args push = {
+       .pool_addr = panvk_query_report_dev_addr(pool, first_query),
+       .available_addr = panvk_query_available_dev_addr(pool, first_query),
+@@ -1143,7 +1198,7 @@ panvk_copy_pstats_query_results(struct panvk_cmd_buffer *cmd,
+       .dst_addr = dst_buffer_addr,
+       .dst_stride = stride,
+       .flags = flags,
+-      .stat_count = util_bitcount(pool->vk.pipeline_statistics),
++      .stat_count = xfb ? 2 : util_bitcount(pool->vk.pipeline_statistics),
+    };
+    struct panvk_precomp_ctx precomp_ctx = panvk_per_arch(precomp_cs)(cmd);
+ 
+@@ -1173,7 +1228,8 @@ panvk_per_arch(CmdResetQueryPool)(VkCommandBuffer commandBuffer,
+    switch (pool->vk.query_type) {
+    case VK_QUERY_TYPE_OCCLUSION:
+    case VK_QUERY_TYPE_PRIMITIVES_GENERATED_EXT:
+-   case VK_QUERY_TYPE_PIPELINE_STATISTICS: {
++   case VK_QUERY_TYPE_PIPELINE_STATISTICS:
++   case VK_QUERY_TYPE_TRANSFORM_FEEDBACK_STREAM_EXT: {
+       panvk_cmd_reset_queries(cmd, pool, firstQuery, queryCount);
+       break;
+    }
+@@ -1195,10 +1251,14 @@ panvk_per_arch(CmdBeginQueryIndexedEXT)(VkCommandBuffer commandBuffer,
+    VK_FROM_HANDLE(panvk_cmd_buffer, cmd, commandBuffer);
+    VK_FROM_HANDLE(panvk_query_pool, pool, queryPool);
+ 
+-   /* TODO: transform feedback */
+-   assert(index == 0);
++   assert(index == 0 ||
++          pool->vk.query_type == VK_QUERY_TYPE_TRANSFORM_FEEDBACK_STREAM_EXT);
+ 
+    switch (pool->vk.query_type) {
++   case VK_QUERY_TYPE_TRANSFORM_FEEDBACK_STREAM_EXT: {
++      panvk_cmd_begin_xfb_query(cmd, pool, query, index);
++      break;
++   }
+    case VK_QUERY_TYPE_OCCLUSION: {
+       panvk_cmd_begin_occlusion_query(cmd, pool, query, flags);
+       break;
+@@ -1224,10 +1284,14 @@ panvk_per_arch(CmdEndQueryIndexedEXT)(VkCommandBuffer commandBuffer,
+    VK_FROM_HANDLE(panvk_cmd_buffer, cmd, commandBuffer);
+    VK_FROM_HANDLE(panvk_query_pool, pool, queryPool);
+ 
+-   /* TODO: transform feedback */
+-   assert(index == 0);
++   assert(index == 0 ||
++          pool->vk.query_type == VK_QUERY_TYPE_TRANSFORM_FEEDBACK_STREAM_EXT);
+ 
+    switch (pool->vk.query_type) {
++   case VK_QUERY_TYPE_TRANSFORM_FEEDBACK_STREAM_EXT: {
++      panvk_cmd_end_xfb_query(cmd, pool, query, index);
++      break;
++   }
+    case VK_QUERY_TYPE_OCCLUSION: {
+       panvk_cmd_end_occlusion_query(cmd, pool, query);
+       break;
+@@ -1275,7 +1339,8 @@ panvk_per_arch(CmdCopyQueryPoolResults)(
+                                dst_buffer_addr, stride, flags);
+       break;
+    }
+-   case VK_QUERY_TYPE_PIPELINE_STATISTICS: {
++   case VK_QUERY_TYPE_PIPELINE_STATISTICS:
++   case VK_QUERY_TYPE_TRANSFORM_FEEDBACK_STREAM_EXT: {
+       panvk_copy_pstats_query_results(cmd, pool, firstQuery, queryCount,
+                                       dst_buffer_addr, stride, flags);
+       break;
+diff --git a/src/panfrost/vulkan/panvk_cmd_draw.h b/src/panfrost/vulkan/panvk_cmd_draw.h
+index 40aff4f44ca..04e7f31d64b 100644
+--- a/src/panfrost/vulkan/panvk_cmd_draw.h
++++ b/src/panfrost/vulkan/panvk_cmd_draw.h
+@@ -164,6 +164,16 @@ struct panvk_cmd_graphics_state {
+ #if PAN_ARCH >= 10
+    struct panvk_prims_generated_query_state prims_generated_query;
+    struct panvk_pstats_query_state pstats_query;
++
++   struct {
++      bool active;
++      uint64_t offsets;
++      struct {
++         uint64_t addr;
++         uint32_t size;
++      } buffers[4];
++      uint64_t queries[4];
++   } xfb;
+ #endif
+    struct panvk_graphics_sysvals sysvals;
+ 
+diff --git a/src/panfrost/vulkan/panvk_gpu_prerast.h b/src/panfrost/vulkan/panvk_gpu_prerast.h
+index 46d438a6043..c19ecc33e7e 100644
+--- a/src/panfrost/vulkan/panvk_gpu_prerast.h
++++ b/src/panfrost/vulkan/panvk_gpu_prerast.h
+@@ -7,6 +7,7 @@
+ #define PANVK_GPU_PRERAST_H
+ 
+ #include "compiler/pan_compiler.h"
++#include "libpan/libpan_xfb.h"
+ #include "panvk_macros.h"
+ #include "poly/geometry.h"
+ #include "poly/tessellator.h"
+@@ -14,7 +15,7 @@
+ #include "util/macros.h"
+ #include "vulkan/vulkan_core.h"
+ 
+-#define PANVK_GPU_PRERAST_ABI_VERSION 5
++#define PANVK_GPU_PRERAST_ABI_VERSION 6
+ #define PANVK_GPU_PRERAST_MAX_EXECUTION_BYTES (256ull * 1024 * 1024)
+ #define PANVK_GPU_PRERAST_VS_REGION_END (32ull * 1024 * 1024)
+ #define PANVK_GPU_PRERAST_GS_INDEX_OFFSET PANVK_GPU_PRERAST_VS_REGION_END
+@@ -117,7 +118,7 @@ struct panvk_gpu_prerast_gs_info {
+    uint8_t output_prim;
+    bool kernel_compiled;
+    bool passthrough_compiled;
+-   bool _pad;
++   bool xfb;
+ };
+ 
+ /* TCS/TES state the tessellation kernels need. The tessellation modes are
+@@ -135,10 +136,29 @@ struct panvk_gpu_prerast_tess_info {
+    bool _pad;
+ };
+ 
++struct panvk_gpu_prerast_xfb_info {
++   uint16_t stride[PANLIB_XFB_MAX_BUFFERS];
++   uint8_t buffer_to_stream[PANLIB_XFB_MAX_BUFFERS];
++   uint8_t output_count;
++   uint8_t _pad[3];
++   uint32_t outputs[PANLIB_XFB_MAX_OUTPUTS];
++};
++
++static inline bool
++panvk_gpu_prerast_has_xfb(const struct panvk_gpu_prerast_xfb_info *x)
++{
++   for (unsigned b = 0; b < PANLIB_XFB_MAX_BUFFERS; b++) {
++      if (x->stride[b])
++         return true;
++   }
++   return false;
++}
++
+ struct panvk_gpu_prerast_shader {
+    struct panvk_gpu_prerast_io io;
+    struct panvk_gpu_prerast_gs_info gs;
+    struct panvk_gpu_prerast_tess_info tess;
++   struct panvk_gpu_prerast_xfb_info xfb;
+    uint32_t requirements;
+    bool lowered_vs_compiled;
+    bool passthrough_vs_compiled;
+@@ -161,6 +181,8 @@ struct panvk_gpu_prerast_gs_params {
+    uint32_t vs_record_capacity;
+    uint32_t provoking_last;
+    uint32_t prim_id_base;
++   uint32_t raster_stream;
++   uint32_t _pad;
+    /* Pipeline statistics counters the GS kernel adds to, 0 when not
+     * counted: GS invocations, GS primitives, clipping invocations and
+     * clipping primitives. */
+diff --git a/src/panfrost/vulkan/panvk_vX_device.c b/src/panfrost/vulkan/panvk_vX_device.c
+index 92e22138e64..d098222d95f 100644
+--- a/src/panfrost/vulkan/panvk_vX_device.c
++++ b/src/panfrost/vulkan/panvk_vX_device.c
+@@ -586,7 +586,8 @@ panvk_per_arch(create_device)(struct panvk_physical_device *physical_device,
+ 
+ #if PAN_ARCH >= 10
+    if (PANVK_DEBUG(GPU_PRERAST) || device->vk.enabled_features.fillModeNonSolid ||
+-       device->vk.enabled_features.geometryShader) {
++       device->vk.enabled_features.geometryShader ||
++       device->vk.enabled_features.transformFeedback) {
+       device->gpu_prerast_arena = panvk_pool_alloc_mem(
+          &device->mempools.rw,
+          (struct panvk_pool_alloc_info){
+diff --git a/src/panfrost/vulkan/panvk_vX_query_pool.c b/src/panfrost/vulkan/panvk_vX_query_pool.c
+index bee279c8162..379711ed177 100644
+--- a/src/panfrost/vulkan/panvk_vX_query_pool.c
++++ b/src/panfrost/vulkan/panvk_vX_query_pool.c
+@@ -77,6 +77,10 @@ panvk_per_arch(CreateQueryPool)(VkDevice _device,
+          MAX2(2 * util_bitcount(pCreateInfo->pipelineStatistics), 1);
+       break;
+    }
++   case VK_QUERY_TYPE_TRANSFORM_FEEDBACK_STREAM_EXT: {
++      reports_per_query = 4;
++      break;
++   }
+ #endif
+    default:
+       UNREACHABLE("Unsupported query type");
+@@ -271,6 +275,8 @@ panvk_per_arch(GetQueryPoolResults)(VkDevice _device, VkQueryPool queryPool,
+    const uint32_t result_count =
+       pool->vk.query_type == VK_QUERY_TYPE_PIPELINE_STATISTICS
+          ? util_bitcount(pool->vk.pipeline_statistics)
++      : pool->vk.query_type == VK_QUERY_TYPE_TRANSFORM_FEEDBACK_STREAM_EXT
++         ? 2
+          : 1;
+    for (uint32_t i = 0; i < queryCount; i++) {
+       const uint32_t query = firstQuery + i;
+@@ -312,7 +318,8 @@ panvk_per_arch(GetQueryPoolResults)(VkDevice _device, VkQueryPool queryPool,
+                cpu_write_query_result(dst, 0, flags, src[0].value);
+             break;
+          }
+-         case VK_QUERY_TYPE_PIPELINE_STATISTICS: {
++         case VK_QUERY_TYPE_PIPELINE_STATISTICS:
++         case VK_QUERY_TYPE_TRANSFORM_FEEDBACK_STREAM_EXT: {
+             for (uint32_t s = 0; write_results && s < result_count; s++) {
+                cpu_write_query_result(dst, s, flags,
+                                       src[s].value +
+diff --git a/src/panfrost/vulkan/panvk_vX_shader.c b/src/panfrost/vulkan/panvk_vX_shader.c
+index 387add5b10b..b25a12b0bbe 100644
+--- a/src/panfrost/vulkan/panvk_vX_shader.c
++++ b/src/panfrost/vulkan/panvk_vX_shader.c
+@@ -36,6 +36,8 @@
+ #include "nir_builder.h"
+ #include "nir_conversion_builder.h"
+ #include "nir_deref.h"
++#include "nir_xfb_info.h"
++#include "util/log.h"
+ 
+ #include "shader_enums.h"
+ #include "vk_graphics_state.h"
+@@ -530,10 +532,7 @@ panvk_lower_clip_cull_vs(nir_shader *nir)
+                      : nir_imm_float(&b, 1.0f);
+       cull_v[i] =
+          i < ncull && cull[i].var
+-            ? nir_b2f32(&b, nir_flt_imm(&b,
+-                                        nir_load_array_var_imm(
+-                                           &b, cull[i].var, cull[i].idx),
+-                                        0.0))
++            ? nir_load_array_var_imm(&b, cull[i].var, cull[i].idx)
+             : nir_imm_float(&b, 0.0f);
+    }
+ 
+@@ -1363,8 +1362,78 @@ struct panvk_gs_lower_state {
+    nir_def *idx_base;
+    nir_def *prim_id;
+    nir_def *invocation;
++   nir_def *raster_stream;
++   nir_variable *restart[4];
+ };
+ 
++static void
++panvk_gs_store_tag(nir_builder *b, struct panvk_gs_lower_state *s,
++                   nir_def *vc, nir_def *value, unsigned comp)
++{
++   nir_def *addr = nir_iadd(
++      b, s->rec_base,
++      nir_u2u64(b, nir_iadd_imm(b, nir_imul_imm(b, vc, s->gs->record_stride),
++                                s->gs->record_stride - 16 + comp * 4)));
++   nir_store_global(b, value, addr, .write_mask = 1, .align_mul = 4);
++}
++
++static void
++panvk_gpu_prerast_gather_xfb(struct panvk_gpu_prerast_xfb_info *x,
++                             const nir_xfb_info *xfb, uint64_t outputs,
++                             unsigned nclip)
++{
++   memset(x, 0, sizeof(*x));
++   if (!xfb)
++      return;
++
++   for (unsigned b = 0; b < PANLIB_XFB_MAX_BUFFERS; b++) {
++      if (xfb->buffers_written & BITFIELD_BIT(b)) {
++         x->stride[b] = xfb->buffers[b].stride;
++         x->buffer_to_stream[b] = xfb->buffer_to_stream[b];
++      }
++   }
++
++   const bool has_culls = (outputs & (VARYING_BIT_CULL_DIST0 |
++                                      VARYING_BIT_CULL_DIST1)) != 0;
++
++   for (unsigned i = 0; i < xfb->output_count; i++) {
++      const nir_xfb_output_info *o = &xfb->outputs[i];
++      const bool is_clip_slot = (o->location == VARYING_SLOT_CLIP_DIST0 ||
++                                 o->location == VARYING_SLOT_CLIP_DIST1);
++      if (!is_clip_slot && !(outputs & BITFIELD64_BIT(o->location)))
++         continue;
++
++      unsigned dst = o->offset / 4;
++      u_foreach_bit(c, o->component_mask) {
++         gl_varying_slot loc = o->location;
++         unsigned comp = c;
++         if (has_culls && is_clip_slot) {
++            unsigned d = (loc - VARYING_SLOT_CLIP_DIST0) * 4 + c;
++            if (d >= nclip) {
++               loc = VARYING_SLOT_CULL_DIST0 + (d - nclip) / 4;
++               comp = (d - nclip) % 4;
++            }
++         }
++
++         if (!(outputs & BITFIELD64_BIT(loc))) {
++            dst++;
++            continue;
++         }
++
++         if (x->output_count == PANLIB_XFB_MAX_OUTPUTS) {
++            mesa_loge_once("panvk: more than %u transform feedback "
++                           "components, the rest are not captured",
++                           PANLIB_XFB_MAX_OUTPUTS);
++            assert(!"xfb component count over PANLIB_XFB_MAX_OUTPUTS");
++            return;
++         }
++         unsigned slot = util_bitcount64(outputs & BITFIELD64_MASK(loc));
++         x->outputs[x->output_count++] =
++            panlib_xfb_output(dst++, slot * 4 + comp, o->buffer);
++      }
++   }
++}
++
+ static nir_def *
+ panvk_gs_is_restart(nir_builder *b, nir_def *restart_en, nir_def *gen,
+                     nir_def *pos)
+@@ -1459,7 +1528,7 @@ panvk_gs_lower_intr(nir_builder *b, nir_intrinsic_instr *intr, void *data)
+    case nir_intrinsic_store_output: {
+       b->cursor = nir_instr_remove(&intr->instr);
+       nir_io_semantics sem = nir_intrinsic_io_semantics(intr);
+-      if (sem.gs_streams & 0x3)
++      if ((sem.gs_streams & 0x3) && !gs->xfb)
+          return true;
+       unsigned location = sem.location;
+       if (nir_src_is_const(intr->src[1]))
+@@ -1486,11 +1555,22 @@ panvk_gs_lower_intr(nir_builder *b, nir_intrinsic_instr *intr, void *data)
+ 
+    case nir_intrinsic_emit_vertex: {
+       b->cursor = nir_instr_remove(&intr->instr);
+-      if (nir_intrinsic_stream_id(intr) != 0)
++      const unsigned stream = nir_intrinsic_stream_id(intr);
++      if (stream != 0 && !gs->xfb)
+          return true;
+       nir_def *vc = nir_load_var(b, s->vcount);
+       nir_push_if(b, nir_ult_imm(b, vc, gs->max_vertices));
+       {
++         nir_if *raster = NULL;
++         if (gs->xfb) {
++            nir_def *rst = nir_load_var(b, s->restart[stream]);
++            panvk_gs_store_tag(b, s, vc,
++                               nir_ior_imm(b, nir_ishl_imm(b, rst, 2), stream),
++                               0);
++            nir_store_var(b, s->restart[stream], nir_imm_int(b, 0), 1);
++            nir_store_var(b, s->vcount, nir_iadd_imm(b, vc, 1), 1);
++            raster = nir_push_if(b, nir_ieq_imm(b, s->raster_stream, stream));
++         }
+          nir_def *ip = nir_load_var(b, s->ipos);
+          nir_push_if(b, nir_ult_imm(b, ip, gs->index_stride));
+          nir_store_global(b, nir_iadd(b, s->rec_idx_base, vc),
+@@ -1499,7 +1579,8 @@ panvk_gs_lower_intr(nir_builder *b, nir_intrinsic_instr *intr, void *data)
+                           .write_mask = 1, .align_mul = 4);
+          nir_pop_if(b, NULL);
+          nir_store_var(b, s->ipos, nir_iadd_imm(b, ip, 1), 1);
+-         nir_store_var(b, s->vcount, nir_iadd_imm(b, vc, 1), 1);
++         if (!gs->xfb)
++            nir_store_var(b, s->vcount, nir_iadd_imm(b, vc, 1), 1);
+ 
+          const unsigned prim_verts =
+             gs->output_prim == MESA_PRIM_POINTS       ? 1
+@@ -1511,6 +1592,8 @@ panvk_gs_lower_intr(nir_builder *b, nir_intrinsic_instr *intr, void *data)
+                        nir_iadd(b, nir_load_var(b, s->prims),
+                                 nir_b2i32(b, nir_uge_imm(b, len, prim_verts))),
+                        1);
++         if (raster)
++            nir_pop_if(b, raster);
+       }
+       nir_pop_if(b, NULL);
+       return true;
+@@ -1518,11 +1601,19 @@ panvk_gs_lower_intr(nir_builder *b, nir_intrinsic_instr *intr, void *data)
+ 
+    case nir_intrinsic_end_primitive: {
+       b->cursor = nir_instr_remove(&intr->instr);
+-      if (nir_intrinsic_stream_id(intr) != 0)
++      const unsigned stream = nir_intrinsic_stream_id(intr);
++      if (stream != 0 && !gs->xfb)
+          return true;
++      nir_if *raster = NULL;
++      if (gs->xfb) {
++         nir_store_var(b, s->restart[stream], nir_imm_int(b, 1), 1);
++         raster = nir_push_if(b, nir_ieq_imm(b, s->raster_stream, stream));
++      }
+       nir_store_var(b, s->ipos, nir_iadd_imm(b, nir_load_var(b, s->ipos), 1),
+                     1);
+       nir_store_var(b, s->strip_len, nir_imm_int(b, 0), 1);
++      if (raster)
++         nir_pop_if(b, raster);
+       return true;
+    }
+ 
+@@ -1618,6 +1709,14 @@ panvk_gpu_prerast_lower_gs(nir_shader *nir,
+    s.vs_stride = nir_imul_imm(b, nir_bit_count(b, s.vs_outputs), 16);
+    nir_def *records = GS_PARAM(b, p, 64, records);
+    nir_def *indices = GS_PARAM(b, p, 64, indices);
++   if (gs->xfb) {
++      s.raster_stream = GS_PARAM(b, p, 32, raster_stream);
++      for (unsigned i = 0; i < ARRAY_SIZE(s.restart); i++) {
++         s.restart[i] =
++            nir_local_variable_create(impl, glsl_uint_type(), "gs_restart");
++         nir_store_var(b, s.restart[i], nir_imm_int(b, 0), 1);
++      }
++   }
+ 
+    nir_def *slot_idx = nir_iadd(
+       b, nir_imul_imm(b, nir_iadd(b, nir_imul(b, s.inst, s.n), j),
+@@ -1866,6 +1965,12 @@ panvk_gpu_prerast_lower_gs(nir_shader *nir,
+    }
+    nir_pop_if(b, NULL);
+ 
++   if (gs->xfb) {
++      nir_push_if(b, in_cap);
++      panvk_gs_store_tag(b, &s, zero, nir_load_var(b, s.vcount), 1);
++      nir_pop_if(b, NULL);
++   }
++
+    nir_progress(true, impl, nir_metadata_none);
+ 
+    nir_shader_intrinsics_pass(nir, panvk_gs_lower_intr, nir_metadata_none,
+@@ -2842,6 +2947,24 @@ panvk_shader_destroy(struct vk_device *vk_dev, struct vk_shader *vk_shader,
+    vk_shader_free(vk_dev, pAllocator, &shader->vk);
+ }
+ 
++static bool
++panvk_lower_cull_dist_flags_intr(nir_builder *b, nir_intrinsic_instr *intr,
++                                 UNUSED void *data)
++{
++   if (intr->intrinsic != nir_intrinsic_store_output)
++      return false;
++
++   gl_varying_slot loc = nir_intrinsic_io_semantics(intr).location;
++   if (loc != VARYING_SLOT_CULL_DIST0 && loc != VARYING_SLOT_CULL_DIST1)
++      return false;
++
++   b->cursor = nir_before_instr(&intr->instr);
++   nir_def *val = intr->src[0].ssa;
++   nir_def *flag = nir_b2f32(b, nir_flt_imm(b, val, 0.0));
++   nir_src_rewrite(&intr->src[0], flag);
++   return true;
++}
++
+ static const struct vk_shader_ops panvk_shader_ops;
+ 
+ static VkResult
+@@ -2908,7 +3031,7 @@ panvk_compile_shader(struct panvk_device *dev,
+          !state || !state->rs ||
+          BITSET_TEST(state->dynamic, MESA_VK_DYNAMIC_RS_POLYGON_MODE);
+       const bool want_prerast =
+-         PANVK_DEBUG(GPU_PRERAST) ||
++         PANVK_DEBUG(GPU_PRERAST) || info->nir->xfb_info ||
+          (info->next_stage_mask & (VK_SHADER_STAGE_GEOMETRY_BIT |
+                                    VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT)) ||
+          (dev->vk.enabled_features.fillModeNonSolid &&
+@@ -3052,6 +3175,15 @@ panvk_compile_shader(struct panvk_device *dev,
+             inputs.varying_layout = &shader->gpu_prerast.io.varyings;
+ #endif
+ 
++         if (v == PANVK_VS_VARIANT_HW
++#if PAN_ARCH >= 10
++             || v == PANVK_VS_VARIANT_GPU_PASSTHROUGH
++#endif
++         ) {
++            nir_shader_intrinsics_pass(nir, panvk_lower_cull_dist_flags_intr,
++                                       nir_metadata_control_flow, NULL);
++         }
++
+          variant->own_bin = true;
+ 
+          result = panvk_compile_nir(dev, nir, info->flags, &inputs, state,
+@@ -3075,6 +3207,11 @@ panvk_compile_shader(struct panvk_device *dev,
+          }
+       }
+ #if PAN_ARCH >= 10
++      if (shader->gpu_prerast.lowered_vs_compiled)
++         panvk_gpu_prerast_gather_xfb(&shader->gpu_prerast.xfb,
++                                      info->nir->xfb_info,
++                                      shader->gpu_prerast.io.outputs_written,
++                                      info->nir->info.clip_distance_array_size);
+       if (want_prerast && shader->gpu_prerast.lowered_vs_compiled &&
+           shader->gpu_prerast.passthrough_vs_compiled &&
+           (shader->gpu_prerast.io.outputs_written & VARYING_BIT_POS)) {
+@@ -3087,6 +3224,11 @@ panvk_compile_shader(struct panvk_device *dev,
+          struct pan_compile_inputs poly_inputs = inputs;
+          poly_inputs.varying_layout = NULL;
+          variant->own_bin = true;
++         if (nir->info.outputs_written & (VARYING_BIT_CULL_DIST0 |
++                                          VARYING_BIT_CULL_DIST1)) {
++            nir_shader_intrinsics_pass(nir, panvk_lower_cull_dist_flags_intr,
++                                       nir_metadata_control_flow, NULL);
++         }
+          result = panvk_compile_nir(dev, nir, info->flags, &poly_inputs, state,
+                                     NULL, &shader->desc_info, variant);
+          ralloc_free(nir);
+@@ -3119,6 +3261,11 @@ panvk_compile_shader(struct panvk_device *dev,
+       gs->outputs_written = nir->info.outputs_written;
+       gs->record_stride =
+          MAX2(ALIGN_POT(util_bitcount64(gs->outputs_written) * 16, 16), 16);
++      gs->xfb = nir->xfb_info || (nir->info.gs.active_stream_mask & ~1);
++      if (gs->xfb)
++         gs->record_stride += 16;
++      panvk_gpu_prerast_gather_xfb(&shader->gpu_prerast.xfb, nir->xfb_info,
++                                   gs->outputs_written, 0);
+       gs->max_vertices = MAX2(nir->info.gs.vertices_out, 1);
+       gs->index_stride = ALIGN_POT(2 * gs->max_vertices, 4);
+       gs->invocations = MAX2(nir->info.gs.invocations, 1);

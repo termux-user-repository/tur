@@ -1,0 +1,58 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: Sun, 4 Oct 2026 13:00:00 +0530
+Subject: [PATCH] panvk: commit gpu_prerast arenas up front on kbase
+
+The regression bisects to beta.11: beta.10 passes, beta.11 fails, and
+reverting patch 097 fixes it. Dropping only the alloc-on-fault flag from
+the gpu_prerast arena allocation also fixes it, so keep 097's shared TLS
+memory fix.
+
+On MediaTek kbase (CSF 1.21), GPU-fault growth of these arenas loses the
+first gpu_prerast draw's output. PanProbe gs_viewport_depth case A drew
+nothing on every run with alloc-on-fault; without the flag, 6/6 runs pass.
+Commit the arenas at creation using only the adjusted WB_MMAP flags.
+This commits 160 MiB per VkDevice enabling GS/tess/XFB features; the
+upgrade path is KBASE_IOCTL_MEM_COMMIT on first gpu_prerast use.
+
+Purpose: restore the first gpu_prerast draw's output on kbase
+Tested GPU: Mali-G615 MC6 (Poco X6 Pro)
+Tested Kbase UAPI: CSF 1.21 (MediaTek)
+Mesa base range: 5a07217f034b (26.3.0-devel)
+Validation test: PanProbe autorun (gs_viewport_depth A/B/C, vs_viewport_index, depth_bounds), CTS geometry/clipping/viewport + memory/sync
+
+Generated-by: LLM
+---
+
+diff --git a/src/panfrost/vulkan/panvk_vX_device.c b/src/panfrost/vulkan/panvk_vX_device.c
+index 6fd68e513f4..17b398789e8 100644
+--- a/src/panfrost/vulkan/panvk_vX_device.c
++++ b/src/panfrost/vulkan/panvk_vX_device.c
+@@ -131,17 +131,17 @@
+ }
+ 
+ #if PAN_ARCH >= 10
+-/* Only GS, tessellation, XFB, polygon-mode and VS-store draws touch the
+- * gpu_prerast arenas, and many apps (DXVK D3D9 games) never issue one.  Let
+- * the kernel back them on GPU fault where it can, instead of committing and
+- * zeroing 160 MiB per VkDevice up front.  The CPU only writes the header. */
++/* Commit the gpu_prerast arenas at creation.  On MediaTek kbase (CSF 1.21),
++ * GPU-fault growth loses the first gpu_prerast draw's output: PanProbe
++ * gs_viewport_depth case A drew nothing on every run; without alloc-on-fault,
++ * 6/6 runs pass.
++ * ponytail: commits 160 MiB per VkDevice enabling GS/tess/XFB features;
++ * upgrade path = KBASE_IOCTL_MEM_COMMIT on first gpu_prerast use. */
+ static struct panvk_priv_mem
+ alloc_gpu_prerast_arena(struct panvk_device *dev, uint64_t size)
+ {
+    uint32_t flags =
+-      panvk_device_adjust_bo_flags(dev, PAN_KMOD_BO_FLAG_WB_MMAP) |
+-      (dev->kmod.dev->props.supported_bo_flags &
+-       PAN_KMOD_BO_FLAG_ALLOC_ON_FAULT);
++      panvk_device_adjust_bo_flags(dev, PAN_KMOD_BO_FLAG_WB_MMAP);
+    struct panvk_priv_bo *bo;
+ 
+    if (panvk_priv_bo_create(dev, size, flags, VK_SYSTEM_ALLOCATION_SCOPE_DEVICE,
+--
+2.51.0
+

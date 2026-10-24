@@ -1,0 +1,118 @@
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: 2026-10-11
+Subject: [PATCH jm-v9 013] panvk: v9 clip/cull distances and vertex pipeline stores biblioklept
+
+Purpose: Expose shaderClipDistance, shaderCullDistance (8 each, 8
+combined) and vertexPipelineStoresAndAtomics on v9 JM.
+Clip and cull distances use the shared lowering that v10+ already uses,
+which is arch-agnostic: the VS (or TES) writes the distances as varyings
+(cull distances as "negative" flags, so a primitive whose vertices are all
+negative interpolates to 1), and the FS discards. The FS lowering only runs
+when the previous stage writes clip/cull distances, so FPK stays on for
+every other pipeline (no blanket emulation). Only the feature and limit
+bits change for v9.
+Vertex stores and atomics: like CSF gpu_prerast_wanted(), a VS with side
+effects runs once per vertex as the gpu_prerast lowered VS (patch 011
+path, direct and indirect) and is drawn with its passthrough, so IDVS never
+runs the stores twice or on the indices it shades past the draw. A draw the
+path cannot lower falls back to IDVS (the VS invocation count is
+implementation-defined). Same drirc switch as v10+
+(pan_enable_vertex_pipeline_stores_atomics).
+Not in this patch: multiViewport (needs per-viewport depth clamp runs, CSF
+does them with a command stream loop) and the gl_ViewportIndex stage
+outputs.
+Source/Reference: https://github.com/Noysz/panvk-g99-jm (commit 6ce0d46e419a, MIT; patch 0066 (VPS, clip/cull), reference only); lowering from csf-v11
+Tested GPU: build-checked (universal Android build v6-v14); device run on Mali-G57 MC2 (gpu_id 0x90930010) pending, no G57 attached, see worklogs/v9-jm/PROGRESS.md
+Tested Kbase UAPI: JM 11.38
+Mesa base range: 5a07217f + g615-v11-csf series + jm-v9 001-012
+Dependencies: jm-v9 011
+Validation test: dEQP-VK.clipping.user_defined.*, dEQP-VK.glsl.builtin_var.*clip*/*cull*, PanProbe vertex stores (pending device)
+
+---
+diff --git a/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c
+index 1427139..e1b4a10 100644
+--- a/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c
+@@ -2521,6 +2521,28 @@ v9_prerast_needed(const struct panvk_cmd_buffer *cmdbuf,
+            v9_prerast_xfb_active(cmdbuf));
+ }
+ 
++/* VS stores and atomics run once per vertex through gpu_prerast, like CSF
++ * gpu_prerast_wanted(). Draws it cannot lower fall back to IDVS, which runs
++ * them per position and varying shader invocation (allowed: the number of
++ * VS invocations is implementation-defined). */
++static bool
++v9_prerast_side_effects(struct panvk_cmd_buffer *cmdbuf,
++                        const struct panvk_draw_info *info)
++{
++   const struct panvk_shader *vs = cmdbuf->state.gfx.vs.shader;
++
++   if (info->gpu_prerast_generated || !vs ||
++       !vs->gpu_prerast.has_side_effects)
++      return false;
++
++   /* v9_prerast_draw() splits direct draws over the arena. */
++   struct panvk_draw_info probe = *info;
++   if (!probe.indirect.buffer_dev_addr)
++      probe.vertex.count = probe.instance.count = 1;
++   return panvk_per_arch(gpu_prerast_can_lower)(cmdbuf, &probe,
++                                                &vs->gpu_prerast);
++}
++
+ /* Raster VS of a draw: the GS passthrough after a GS, the VS passthrough for
+  * generated draws and viewport-selecting VSs, else the HW variant. */
+ static const struct panvk_shader_variant *
+@@ -3190,7 +3212,8 @@ v9_cmd_draw_layer(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info *info)
+    if (info->prim == MESA_PRIM_PATCHES)
+       return;
+ 
+-   if (v9_prerast_needed(cmdbuf, info)) {
++   if (v9_prerast_needed(cmdbuf, info) ||
++       v9_prerast_side_effects(cmdbuf, info)) {
+       v9_prerast_draw(cmdbuf, info);
+       return;
+    }
+diff --git a/src/panfrost/vulkan/panvk_vX_physical_device.c b/src/panfrost/vulkan/panvk_vX_physical_device.c
+index 2b682c0..bdefbec 100644
+--- a/src/panfrost/vulkan/panvk_vX_physical_device.c
++++ b/src/panfrost/vulkan/panvk_vX_physical_device.c
+@@ -340,12 +340,12 @@ panvk_per_arch(get_physical_device_features)(
+       .occlusionQueryPrecise = true,
+       .pipelineStatisticsQuery = PAN_ARCH >= 10,
+       /* On v13+, the hardware isn't speculatively referencing to invalid
+-         indices anymore. On v10-v12, pre-rasterization stages that write
++         indices anymore. On v9-v12, pre-rasterization stages that write
+          memory run through gpu_prerast compute instead of IDVS. On by default
+-         on v10+ (DXVK FL11_1); pan_enable_vertex_pipeline_stores_atomics=false
++         on v9+ (DXVK FL11_1); pan_enable_vertex_pipeline_stores_atomics=false
+          turns it off. */
+       .vertexPipelineStoresAndAtomics =
+-         (PAN_ARCH >= 10 && instance->drirc.misc.enable_vertex_pipeline_stores_atomics) ||
++         (PAN_ARCH >= 9 && instance->drirc.misc.enable_vertex_pipeline_stores_atomics) ||
+          instance->drirc.misc.force_enable_shader_atomics,
+       .fragmentStoresAndAtomics = true,
+       .shaderTessellationAndGeometryPointSize = PAN_ARCH >= 10,
+@@ -358,8 +358,8 @@ panvk_per_arch(get_physical_device_features)(
+       .shaderSampledImageArrayDynamicIndexing = true,
+       .shaderStorageBufferArrayDynamicIndexing = true,
+       .shaderStorageImageArrayDynamicIndexing = true,
+-      .shaderClipDistance = PAN_ARCH >= 10,
+-      .shaderCullDistance = PAN_ARCH >= 10,
++      .shaderClipDistance = PAN_ARCH >= 9,
++      .shaderCullDistance = PAN_ARCH >= 9,
+       .shaderFloat64 = false,
+       .shaderInt64 = true,
+       .shaderInt16 = true,
+@@ -1032,9 +1032,9 @@ panvk_per_arch(get_physical_device_properties)(
+          PAN_ARCH >= 10 && device->kmod.dev->props.gpu_can_query_timestamp,
+       .timestampPeriod =
+          PAN_ARCH >= 10 ? panvk_get_gpu_system_timestamp_period(device) : 0,
+-      .maxClipDistances = PAN_ARCH >= 10 ? 8 : 0,
+-      .maxCullDistances = PAN_ARCH >= 10 ? 8 : 0,
+-      .maxCombinedClipAndCullDistances = PAN_ARCH >= 10 ? 8 : 0,
++      .maxClipDistances = PAN_ARCH >= 9 ? 8 : 0,
++      .maxCullDistances = PAN_ARCH >= 9 ? 8 : 0,
++      .maxCombinedClipAndCullDistances = PAN_ARCH >= 9 ? 8 : 0,
+       .discreteQueuePriorities = 2,
+       .pointSizeRange = {pointSizeRangeMin, pointSizeRangeMax},
+       .lineWidthRange = {0.0, 7.9921875},

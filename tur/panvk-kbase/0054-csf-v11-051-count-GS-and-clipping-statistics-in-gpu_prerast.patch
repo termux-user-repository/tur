@@ -1,0 +1,137 @@
+From: abhay-byte <zenithblue.dev@gmail.com>
+Subject: [PATCH csf-v11 051] panvk: count GS and clipping statistics in gpu_prerast
+Generated-by: LLM
+
+Purpose: Count geometry and clipping work in GPU prerast; biblioklept
+Source/Reference: local fix, work/mesa d891837d442
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/050
+Validation test: pipeline statistics smoke 12/12; integrated build NINJA_RC=0
+
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+index 06ce34fe394..23cdf6c7bda 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+@@ -3681,6 +3681,19 @@ gpu_prerast_gs_run(struct panvk_cmd_buffer *cmdbuf,
+               cmdbuf->vk.dynamic_graphics_state.rs.provoking_vertex ==
+                  VK_PROVOKING_VERTEX_MODE_LAST_VERTEX_EXT);
+    STORE_GS32(prim_id_base, source->gpu_prerast_prim_base);
++
++   const struct panvk_pstats_query_state *pstats =
++      &cmdbuf->state.gfx.pstats_query;
++   STORE_GS64(stats[0], panvk_pstats_counter_addr(
++      pstats, VK_QUERY_PIPELINE_STATISTIC_GEOMETRY_SHADER_INVOCATIONS_BIT,
++      true));
++   STORE_GS64(stats[1], panvk_pstats_counter_addr(
++      pstats, VK_QUERY_PIPELINE_STATISTIC_GEOMETRY_SHADER_PRIMITIVES_BIT,
++      true));
++   STORE_GS64(stats[2], panvk_pstats_counter_addr(
++      pstats, VK_QUERY_PIPELINE_STATISTIC_CLIPPING_INVOCATIONS_BIT, true));
++   STORE_GS64(stats[3], panvk_pstats_counter_addr(
++      pstats, VK_QUERY_PIPELINE_STATISTIC_CLIPPING_PRIMITIVES_BIT, true));
+ #undef STORE_GS32
+ #undef STORE_GS64
+ 
+diff --git a/src/panfrost/vulkan/panvk_gpu_prerast.h b/src/panfrost/vulkan/panvk_gpu_prerast.h
+index bd2e30a9c54..e6069d60d68 100644
+--- a/src/panfrost/vulkan/panvk_gpu_prerast.h
++++ b/src/panfrost/vulkan/panvk_gpu_prerast.h
+@@ -143,6 +143,10 @@ struct panvk_gpu_prerast_gs_params {
+    uint32_t vs_record_capacity;
+    uint32_t provoking_last;
+    uint32_t prim_id_base;
++   /* Pipeline statistics counters the GS kernel adds to, 0 when not
++    * counted: GS invocations, GS primitives, clipping invocations and
++    * clipping primitives. */
++   uint64_t stats[4];
+ };
+ 
+ static_assert(PANVK_GPU_PRERAST_GS_PARAMS_OFFSET +
+diff --git a/src/panfrost/vulkan/panvk_vX_shader.c b/src/panfrost/vulkan/panvk_vX_shader.c
+index ade8419b26f..ebfe1149b55 100644
+--- a/src/panfrost/vulkan/panvk_vX_shader.c
++++ b/src/panfrost/vulkan/panvk_vX_shader.c
+@@ -1232,6 +1232,10 @@ struct panvk_gs_lower_state {
+    const struct panvk_gpu_prerast_gs_info *gs;
+    nir_variable *vcount;
+    nir_variable *ipos;
++   /* Vertices in the current strip and primitives emitted, for the
++    * pipeline statistics. */
++   nir_variable *strip_len;
++   nir_variable *prims;
+    nir_def *vin[6];
+    unsigned nvin;
+    nir_def *inst;
+@@ -1381,6 +1385,17 @@ panvk_gs_lower_intr(nir_builder *b, nir_intrinsic_instr *intr, void *data)
+          nir_pop_if(b, NULL);
+          nir_store_var(b, s->ipos, nir_iadd_imm(b, ip, 1), 1);
+          nir_store_var(b, s->vcount, nir_iadd_imm(b, vc, 1), 1);
++
++         const unsigned prim_verts =
++            gs->output_prim == MESA_PRIM_POINTS       ? 1
++            : gs->output_prim == MESA_PRIM_LINE_STRIP ? 2
++                                                      : 3;
++         nir_def *len = nir_iadd_imm(b, nir_load_var(b, s->strip_len), 1);
++         nir_store_var(b, s->strip_len, len, 1);
++         nir_store_var(b, s->prims,
++                       nir_iadd(b, nir_load_var(b, s->prims),
++                                nir_b2i32(b, nir_uge_imm(b, len, prim_verts))),
++                       1);
+       }
+       nir_pop_if(b, NULL);
+       return true;
+@@ -1392,6 +1407,7 @@ panvk_gs_lower_intr(nir_builder *b, nir_intrinsic_instr *intr, void *data)
+          return true;
+       nir_store_var(b, s->ipos, nir_iadd_imm(b, nir_load_var(b, s->ipos), 1),
+                     1);
++      nir_store_var(b, s->strip_len, nir_imm_int(b, 0), 1);
+       return true;
+    }
+ 
+@@ -1463,6 +1479,9 @@ panvk_gpu_prerast_lower_gs(nir_shader *nir,
+    };
+    s.vcount = nir_local_variable_create(impl, glsl_uint_type(), "gs_vcount");
+    s.ipos = nir_local_variable_create(impl, glsl_uint_type(), "gs_ipos");
++   s.strip_len =
++      nir_local_variable_create(impl, glsl_uint_type(), "gs_strip_len");
++   s.prims = nir_local_variable_create(impl, glsl_uint_type(), "gs_prims");
+ 
+    nir_def *gid = nir_load_global_invocation_id(b, 32);
+    nir_def *j = nir_channel(b, gid, 0);
+@@ -1704,11 +1723,34 @@ panvk_gpu_prerast_lower_gs(nir_shader *nir,
+ 
+    nir_store_var(b, s.vcount, zero, 1);
+    nir_store_var(b, s.ipos, zero, 1);
++   nir_store_var(b, s.strip_len, zero, 1);
++   nir_store_var(b, s.prims, zero, 1);
+ 
+    nir_if *vif = nir_push_if(b, valid);
+    b->cursor = nir_cf_reinsert(&body, b->cursor);
+    nir_pop_if(b, vif);
+ 
++   /* Pipeline statistics: one GS invocation per valid invocation, and the
++    * emitted primitives for the GS primitive and clipping counters. */
++   nir_push_if(b, valid);
++   {
++      nir_def *emitted = nir_u2u64(b, nir_load_var(b, s.prims));
++      for (unsigned i = 0; i < 4; i++) {
++         nir_def *counter = nir_load_global(
++            b, 1, 64,
++            nir_iadd_imm(b, p,
++                         offsetof(struct panvk_gpu_prerast_gs_params, stats) +
++                            i * sizeof(uint64_t)),
++            .align_mul = 8);
++         nir_push_if(b, nir_ine_imm(b, counter, 0));
++         nir_global_atomic(b, 64, counter,
++                           i == 0 ? nir_imm_int64(b, 1) : emitted,
++                           .atomic_op = nir_atomic_op_iadd);
++         nir_pop_if(b, NULL);
++      }
++   }
++   nir_pop_if(b, NULL);
++
+    nir_progress(true, impl, nir_metadata_none);
+ 
+    nir_shader_intrinsics_pass(nir, panvk_gs_lower_intr, nir_metadata_none,

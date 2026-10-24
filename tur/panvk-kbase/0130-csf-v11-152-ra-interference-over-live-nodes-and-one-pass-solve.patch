@@ -1,0 +1,201 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: Wed, 7 Oct 2026 16:00:00 +0530
+Subject: [PATCH] pan/bi: walk only live nodes in LCRA interference and solve each node in one pass biblioklept
+
+LCRA register allocation of big shaders runs the full liveness +
+interference + solve pass many times (see csf-v11/153), so the cost of
+one pass matters. Two lossless speedups, same allocation bit for bit
+(checked on 67539 captured shaders: identical regs, spills, fills and
+instruction counts):
+
+- bi_mark_interference() looped over every node for every destination
+  and for the blend clobber. Keep a set of the nodes with a nonzero live
+  mask, updated together with the liveness walk, and loop over it.
+
+- lcra_solve() tried each allowed register and re-scanned the whole
+  constraint row for each (lcra_test_linear per register). One pass over
+  the row now builds the 64-bit mask of forbidden registers from the
+  solved neighbours; first fit takes the lowest allowed register, which
+  is the register the old loop found first.
+---
+diff --git a/src/panfrost/compiler/bifrost/bi_ra.c b/src/panfrost/compiler/bifrost/bi_ra.c
+--- a/src/panfrost/compiler/bifrost/bi_ra.c
++++ b/src/panfrost/compiler/bifrost/bi_ra.c
+@@ -141,6 +141,39 @@ lcra_test_linear(struct lcra_state *l, unsigned *solutions, unsigned i)
+    return true;
+ }
+ 
++/* Registers node i cannot take given the nodes solved so far. Bit (d + 7) of
++ * a constraint forbids c_i - c_j == d, i.e. c_i == c_j + d. One pass over the
++ * row gives the answer for all 64 registers, where lcra_test_linear needs a
++ * pass per candidate register.
++ */
++static uint64_t
++lcra_forbidden(struct lcra_state *l, unsigned i)
++{
++   uint64_t forbidden = 0;
++
++#define LCRA_FORBID(j, constraint)                                             \
++   do {                                                                        \
++      if (l->solutions[j] != ~0 && (constraint)) {                             \
++         int sh = (int)l->solutions[j] - 7;                                    \
++         uint64_t m = (uint64_t)(constraint);                                  \
++         forbidden |= sh >= 0 ? (m << sh) : (m >> -sh);                        \
++      }                                                                        \
++   } while (0)
++
++   if (nodearray_is_sparse(&l->linear[i])) {
++      nodearray_sparse_foreach(&l->linear[i], elem)
++         LCRA_FORBID(nodearray_sparse_key(elem), nodearray_sparse_value(elem));
++   } else {
++      nodearray_value *row = l->linear[i].dense;
++
++      for (unsigned j = 0; j < l->node_count; ++j)
++         LCRA_FORBID(j, row[j]);
++   }
++
++#undef LCRA_FORBID
++   return forbidden;
++}
++
+ static bool
+ lcra_solve(struct lcra_state *l)
+ {
+@@ -152,13 +185,11 @@ lcra_solve(struct lcra_state *l)
+ 
+       bool succ = false;
+ 
+-      u_foreach_bit64(r, l->affinity[step]) {
+-         l->solutions[step] = r;
+-
+-         if (lcra_test_linear(l, l->solutions, step)) {
+-            succ = true;
+-            break;
+-         }
++      /* First fit: the lowest allowed register */
++      uint64_t allowed = l->affinity[step] & ~lcra_forbidden(l, step);
++      if (allowed) {
++         l->solutions[step] = ffsll(allowed) - 1;
++         succ = true;
+       }
+ 
+       /* Out of registers - prepare to spill */
+@@ -319,12 +350,47 @@ bi_make_affinity(uint64_t clobber, unsigned count, bool split_file)
+    return ~clobbered;
+ }
+ 
++/* The nodes with a nonzero live mask, so interference only walks live nodes
++ * instead of every node for every destination.
++ */
++struct bi_live_set {
++   unsigned *list, *pos, count;
++};
++
++static inline void
++bi_live_set_add(struct bi_live_set *s, unsigned v)
++{
++   if (s->pos[v] == ~0u) {
++      s->pos[v] = s->count;
++      s->list[s->count++] = v;
++   }
++}
++
++static inline void
++bi_live_set_del(struct bi_live_set *s, unsigned v)
++{
++   if (s->pos[v] != ~0u) {
++      unsigned last = s->list[--s->count];
++      s->list[s->pos[v]] = last;
++      s->pos[last] = s->pos[v];
++      s->pos[v] = ~0u;
++   }
++}
++
+ static void
+ bi_mark_interference(bi_block *block, struct lcra_state *l, uint8_t *live,
++                     struct bi_live_set *ls,
+                      uint64_t preload_live, unsigned node_count, bool is_blend,
+                      bool split_file, unsigned arch)
+ {
+    bool aligned_sr = arch >= 9;
++
++   ls->count = 0;
++   for (unsigned i = 0; i < node_count; ++i) {
++      ls->pos[i] = ~0u;
++      if (live[i])
++         bi_live_set_add(ls, i);
++   }
+    bi_foreach_instr_in_block_rev(block, ins) {
+       /* Mark all registers live after the instruction as
+        * interfering with the destination */
+@@ -348,7 +414,8 @@ bi_mark_interference(bi_block *block, struct lcra_state *l, uint8_t *live,
+ 
+          l->affinity[node] &= affinity;
+ 
+-         for (unsigned i = 0; i < node_count; ++i) {
++         for (unsigned k = 0; k < ls->count; ++k) {
++            unsigned i = ls->list[k];
+             uint8_t r = live[i];
+ 
+             /* Nodes only interfere if they occupy
+@@ -410,15 +477,28 @@ bi_mark_interference(bi_block *block, struct lcra_state *l, uint8_t *live,
+             BITFIELD64_MASK(16) |
+             BITFIELD64_BIT(bi_preload_reg(BI_PRELOAD_BLEND_LINK, arch));
+ 
+-         for (unsigned i = 0; i < node_count; ++i) {
+-            if (live[i])
+-               l->affinity[i] &= ~clobber;
+-         }
++         for (unsigned k = 0; k < ls->count; ++k)
++            l->affinity[ls->list[k]] &= ~clobber;
+       }
+ 
+       /* Update live_in */
+       preload_live = bi_postra_liveness_ins(preload_live, ins);
+-      bi_liveness_ins_update_ra(live, ins);
++
++      /* bi_liveness_ins_update_ra, keeping the live set in sync */
++      bi_foreach_dest(ins, d) {
++         unsigned v = ins->dest[d].value;
++         live[v] &= ~bi_writemask(ins, d);
++         if (!live[v])
++            bi_live_set_del(ls, v);
++      }
++
++      bi_foreach_ssa_src(ins, src) {
++         unsigned v = ins->src[src].value;
++         unsigned rmask = BITFIELD_MASK(bi_count_read_registers(ins, src));
++         live[v] |= (rmask << ins->src[src].offset);
++         if (live[v])
++            bi_live_set_add(ls, v);
++      }
+    }
+ 
+    block->reg_live_in = preload_live;
+@@ -430,14 +510,23 @@ bi_compute_interference(bi_context *ctx, struct lcra_state *l, bool full_regs)
+    bi_compute_liveness_ra(ctx);
+    bi_postra_liveness(ctx);
+ 
++   struct bi_live_set ls = {
++      .list = malloc(sizeof(unsigned) * ctx->ssa_alloc),
++      .pos = malloc(sizeof(unsigned) * ctx->ssa_alloc),
++   };
++
+    bi_foreach_block_rev(ctx, blk) {
+       uint8_t *live = mem_dup(blk->live_out, ctx->ssa_alloc);
+ 
+-      bi_mark_interference(blk, l, live, blk->reg_live_out, ctx->ssa_alloc,
+-                           ctx->inputs->is_blend, !full_regs, ctx->arch);
++      bi_mark_interference(blk, l, live, &ls, blk->reg_live_out,
++                           ctx->ssa_alloc, ctx->inputs->is_blend, !full_regs,
++                           ctx->arch);
+ 
+       free(live);
+    }
++
++   free(ls.list);
++   free(ls.pos);
+ }
+ 
+ static struct lcra_state *
