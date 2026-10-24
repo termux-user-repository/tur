@@ -7,6 +7,7 @@ TERMUX_PKG_MAINTAINER="@licy183"
 TERMUX_PKG_SRCURL="https://mirrors.kernel.org/gnu/gcc/gcc-${TERMUX_PKG_VERSION}/gcc-${TERMUX_PKG_VERSION}.tar.gz"
 TERMUX_PKG_SHA256=48be131b8c719db967cf0265a0ccb0cab2a3b224d5bb42f84904f0c1744213e6
 TERMUX_PKG_BREAKS="binutils-is-llvm"
+TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_NO_STATICSPLIT=true
 TERMUX_PKG_ON_DEVICE_BUILD_NOT_SUPPORTED=true
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS+="\
@@ -61,6 +62,30 @@ elif [ "$TERMUX_ARCH" = "x86_64" ]; then
 fi
 
 source $TERMUX_SCRIPTDIR/common-files/setup_toolchain_gcc.sh
+
+termux_pkg_auto_update() {
+	local major="${TERMUX_PKG_VERSION%%.*}"
+	local latest
+	latest="$(
+		curl --fail --silent --location --retry 3 \
+			"https://mirrors.kernel.org/gnu/gcc/" |
+			grep -oE "gcc-${major}\\.[0-9]+\\.0/" |
+			sed -E 's|^gcc-||; s|/$||' |
+			sort -V |
+			tail -n1
+	)" || termux_error_exit "failed to query GCC releases from mirrors.kernel.org"
+	if [[ -z "${latest}" ]]; then
+		termux_error_exit "failed to find latest GCC ${major} release"
+	fi
+
+	local prebuilt_json="$TERMUX_SCRIPTDIR/common-files/prebuilt-gcc.json"
+	local prebuilt_version
+	prebuilt_version="$(jq -r --arg major "$major" '.[$major].version // empty' "$prebuilt_json")"
+	if [[ "${prebuilt_version}" != "${latest}" ]]; then
+		termux_error_exit "prebuilt GCC ${major} toolchain ${latest} is not in common-files/prebuilt-gcc.json (found: ${prebuilt_version:-none})"
+	fi
+	termux_pkg_upgrade_version "${latest}"
+}
 
 termux_step_pre_configure() {
 	export ac_cv_func_aligned_alloc=no
