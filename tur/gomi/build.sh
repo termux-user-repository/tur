@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://gomi.dev
 TERMUX_PKG_DESCRIPTION="Safer alternative to the rm command, with a trash can you can restore from"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="Zeldris <80939130+zeldrisho@users.noreply.github.com>"
-TERMUX_PKG_VERSION="1.9.0"
+TERMUX_PKG_VERSION="1.9.1"
 TERMUX_PKG_SRCURL=https://github.com/babarot/gomi/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz
-TERMUX_PKG_SHA256=850a09c2b738a1f831cb798ce308137d6ef4207d70544dbc6eaf3fddbfaf7b1a
+TERMUX_PKG_SHA256=ec8805aba669b8ee57268196f098f366bf9eddecda57a3cac35d4853e08b04b9
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_BUILD_IN_SRC=true
 
