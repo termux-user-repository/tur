@@ -4,9 +4,9 @@ TERMUX_PKG_DESCRIPTION="The GUI for MongoDB"
 TERMUX_PKG_LICENSE="custom"
 TERMUX_PKG_LICENSE_FILE="LICENSE"
 TERMUX_PKG_MAINTAINER="Gouranga Das Samrat <gouranga.das.khulna@gmail.com>"
-TERMUX_PKG_VERSION="1.53.0"
+TERMUX_PKG_VERSION="1.53.1"
 TERMUX_PKG_SRCURL="https://github.com/mongodb-js/compass/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz"
-TERMUX_PKG_SHA256=31c3da98c1ec5739fc5f2e9d6a10b53beca0e809d53145f966618cfa3a472015
+TERMUX_PKG_SHA256=d40fc5544b6622efbed4c473635637c0ebedb7b498bea9e4017dfad00c5c7c8f
 TERMUX_PKG_DEPENDS="electron42, krb5, libx11"
 TERMUX_PKG_BUILD_DEPENDS="electron42-headers"
 TERMUX_PKG_BUILD_IN_SRC=true
@@ -81,7 +81,9 @@ termux_step_make() {
 	local _pack_dir
 	_pack_dir="$(mktemp -d /tmp/mongodb-compass.XXXXXX)"
 	mv "$_app_dir" "$_pack_dir/app"
-	npm exec --workspace=hadron-build -- asar pack \
+	# select the workspace by path: upstream renamed it from "hadron-build"
+	# to "@mongodb-js/hadron-build" in 1.53.1, the path is stable
+	npm exec --workspace=packages/hadron-build -- asar pack \
 		"$_pack_dir/app" "$_pack_dir/app.asar" --unpack "$_unpack"
 	mv "$_pack_dir"/app.asar* "$TERMUX_PKG_TMPDIR/"
 	rm -rf "$_pack_dir"
