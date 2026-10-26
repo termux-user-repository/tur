@@ -1,0 +1,15 @@
+diff --git a/desktop-app/src/main/main.ts b/desktop-app/src/main/main.ts
+index 6b2ed18..9a91532 100644
+--- a/desktop-app/src/main/main.ts
++++ b/desktop-app/src/main/main.ts
+@@ -103,7 +103,9 @@ if (customTitlebarStatus && process.platform === 'win32') {
+ const createWindow = async () => {
+   windowShownOnOpen = false;
+   let isAppInitiated = false;
+-  await installExtensions();
++  if (isDebug) {
++    await installExtensions();
++  }
+ 
+   const setIsAppInitiated = () => {
+     isAppInitiated = true;
