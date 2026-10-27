@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="Guided upload preparation app for private-tracker workfl
 TERMUX_PKG_LICENSE="GPL-2.0-or-later"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="0.4.1"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL="https://github.com/autobrr/upbrr/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz"
 TERMUX_PKG_SHA256=894439578fdd0a0530902d36047375b970cf012ed7bc066b68214facdc6d778d
 TERMUX_PKG_DEPENDS="ffmpeg"
@@ -12,7 +13,7 @@ TERMUX_PKG_UPDATE_TAG_TYPE="latest-release-tag"
 TERMUX_PKG_HOSTBUILD=true
 TERMUX_PKG_SERVICE_SCRIPT=(
 	"upbrr"
-	"exec ${TERMUX_PREFIX}/bin/upbrr serve 2>&1"
+	"exec ${TERMUX_PREFIX}/bin/upbrr serve -nobrowser 2>&1"
 )
 
 termux_step_post_get_source() {

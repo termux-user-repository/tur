@@ -1,0 +1,46 @@
+diff --git a/cmd/upbrr/cli_flag_parity_test.go b/cmd/upbrr/cli_flag_parity_test.go
+index 04a4d8af..30acfb08 100644
+--- a/cmd/upbrr/cli_flag_parity_test.go
++++ b/cmd/upbrr/cli_flag_parity_test.go
+@@ -72,6 +72,7 @@ func TestServeAndAPITokenFlagsStayOutsideUploadManifest(t *testing.T) {
+ 		"host",
+ 		"live-test",
+ 		"live-test-max-images",
++		"nobrowser",
+ 		"persist-listen",
+ 		"persist-web-config",
+ 		"port",
+diff --git a/cmd/upbrr/cli_options.go b/cmd/upbrr/cli_options.go
+index 669b60c2..70325029 100644
+--- a/cmd/upbrr/cli_options.go
++++ b/cmd/upbrr/cli_options.go
+@@ -186,6 +186,7 @@ type serveOptions struct {
+ 	PersistListen     bool
+ 	PersistWebConfig  bool
+ 	DevNoAuth         bool
++	NoBrowser         bool
+ }
+ 
+ func bindUploadFlags(fs *pflag.FlagSet, opts *cliOptions) {
+@@ -786,6 +787,7 @@ func bindServeFlags(fs *pflag.FlagSet, opts *serveOptions) {
+ 	fs.BoolVar(&opts.PersistListen, "persist-listen", false, "Persist Web UI listen host and port to web-config.json")
+ 	fs.BoolVar(&opts.PersistWebConfig, "persist-web-config", false, "Persist supplied Web UI serve settings to web-config.json")
+ 	fs.BoolVar(&opts.DevNoAuth, "dev-no-auth", false, "Development only: serve web UI without web authentication on loopback hosts")
++	fs.BoolVar(&opts.NoBrowser, "nobrowser", false, "Do not open browser on startup")
+ }
+ 
+ // parseServeOptions parses serve-only flags and returns the set of flags the
+diff --git a/cmd/upbrr/main.go b/cmd/upbrr/main.go
+index 1321152f..c7b389d2 100644
+--- a/cmd/upbrr/main.go
++++ b/cmd/upbrr/main.go
+@@ -912,6 +912,9 @@ func applyServeOptionOverrides(webCfg webserver.CLIConfig, opts serveOptions, vi
+ 		}
+ 		webCfg.BaseURL = baseURL
+ 	}
++	if visited["nobrowser"] && opts.NoBrowser {
++		webCfg.OpenBrowser = false
++	}
+ 
+ 	return webCfg, nil
+ }
