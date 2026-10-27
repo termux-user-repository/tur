@@ -10,7 +10,7 @@ TERMUX_PKG_BREAKS="libgnutls-dev"
 TERMUX_PKG_REPLACES="libgnutls-dev"
 TERMUX_PKG_BUILD_IN_SRC=true
 
-source $TERMUX_SCRIPTDIR/common-files/setup_multilib_toolchain.sh
+source $TERMUX_SCRIPTDIR/common-files/toolchain/setup_toolchain_multilib.sh
 
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 --host=$TUR_MULTILIB_ARCH_TRIPLE
@@ -36,7 +36,7 @@ share/man
 "
 
 termux_step_pre_configure() {
-	_setup_multilib_toolchain
+	_setup_toolchain_multilib
 
 	CFLAGS+=" -DNO_INLINE_GETPASS=1"
 }

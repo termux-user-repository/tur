@@ -37,7 +37,7 @@ TERMUX_PKG_RM_AFTER_INSTALL="
 bin/
 "
 
-source $TERMUX_SCRIPTDIR/common-files/setup_toolchain_gcc.sh
+source $TERMUX_SCRIPTDIR/common-files/toolchain/setup_toolchain_gcc.sh
 
 termux_step_pre_configure() {
 	# FIXME: Don't know why NDK's libc++ should link against clang's libunwind,

@@ -8,7 +8,7 @@ TERMUX_PKG_SRCURL=https://mirrors.kernel.org/gnu/libunistring/libunistring-${TER
 TERMUX_PKG_SHA256=827c1eb9cb6e7c738b171745dac0888aa58c5924df2e59239318383de0729b98
 TERMUX_PKG_DEPENDS="lib32-libandroid-support, lib32-libiconv"
 
-source $TERMUX_SCRIPTDIR/common-files/setup_multilib_toolchain.sh
+source $TERMUX_SCRIPTDIR/common-files/toolchain/setup_toolchain_multilib.sh
 
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 ac_cv_func_uselocale=no
@@ -26,5 +26,5 @@ share/man
 "
 
 termux_step_pre_configure() {
-	_setup_multilib_toolchain
+	_setup_toolchain_multilib
 }

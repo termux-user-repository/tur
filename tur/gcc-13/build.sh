@@ -62,7 +62,7 @@ elif [ "$TERMUX_ARCH" = "x86_64" ]; then
 	TERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" --with-arch=x86-64 --with-fpmath=sse"
 fi
 
-source $TERMUX_SCRIPTDIR/common-files/setup_toolchain_gcc.sh
+source $TERMUX_SCRIPTDIR/common-files/toolchain/setup_toolchain_gcc.sh
 
 termux_pkg_auto_update() {
 	local major="${TERMUX_PKG_VERSION%%.*}"
@@ -79,7 +79,7 @@ termux_pkg_auto_update() {
 		termux_error_exit "failed to find latest GCC ${major} release"
 	fi
 
-	local prebuilt_json="$TERMUX_SCRIPTDIR/common-files/prebuilt-gcc.json"
+	local prebuilt_json="$TERMUX_SCRIPTDIR/common-files/toolchain/prebuilt-gcc.json"
 	local prebuilt_version
 	prebuilt_version="$(jq -r --arg major "$major" '.[$major].version // empty' "$prebuilt_json")"
 	if [[ "${prebuilt_version}" != "${latest}" ]]; then
@@ -121,4 +121,17 @@ termux_step_post_make_install() {
 	cp $TERMUX_PKG_TMPDIR/specs $TERMUX_PREFIX/lib/gcc/$TERMUX_HOST_PLATFORM/$TERMUX_PKG_VERSION/
 	# Avoid extract `ndk-sysroot-gcc-compact` at building time.
 	TERMUX_PKG_DEPENDS+=", ndk-sysroot-gcc-compact (>= 26b-3)"
+}
+
+termux_step_create_debscripts() {
+	cat <<-EOF > ./postinst
+		#!$TERMUX_PREFIX/bin/sh
+		echo
+		echo "********"
+		echo "GCC 13 and older no longer receive upstream support or fixes for bugs."
+		echo "Please switch to a newer GCC version or clang."
+		echo "The support for GCC 13 and older will be dropped when Android NDK 31 ships."
+		echo "********"
+		echo
+	EOF
 }

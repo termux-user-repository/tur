@@ -62,7 +62,7 @@ elif [ "$TERMUX_ARCH" = "x86_64" ]; then
 	TERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" --with-arch=x86-64 --with-fpmath=sse"
 fi
 
-source $TERMUX_SCRIPTDIR/common-files/setup_toolchain_gcc.sh
+source $TERMUX_SCRIPTDIR/common-files/toolchain/setup_toolchain_gcc.sh
 
 termux_pkg_auto_update() {
 	local major="${TERMUX_PKG_VERSION%%.*}"
@@ -79,7 +79,7 @@ termux_pkg_auto_update() {
 		termux_error_exit "failed to find latest GCC ${major} release"
 	fi
 
-	local prebuilt_json="$TERMUX_SCRIPTDIR/common-files/prebuilt-gcc.json"
+	local prebuilt_json="$TERMUX_SCRIPTDIR/common-files/toolchain/prebuilt-gcc.json"
 	local prebuilt_version
 	prebuilt_version="$(jq -r --arg major "$major" '.[$major].version // empty' "$prebuilt_json")"
 	if [[ "${prebuilt_version}" != "${latest}" ]]; then

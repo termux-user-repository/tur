@@ -1,7 +1,7 @@
 _setup_toolchain_ndk_gcc_9() {
 	local GCC_TOOLCHAIN_VERSION=2
 
-    local PREBUILT_GCC_JSON="$TERMUX_SCRIPTDIR/common-files/prebuilt-gcc.json"
+    local PREBUILT_GCC_JSON="$TERMUX_SCRIPTDIR/common-files/toolchain/deprecated/prebuilt-gcc.json"
 	local GCC_VERSION=$(jq -r '.["9"].version' $PREBUILT_GCC_JSON)
 	local GCC_TOOLCHAIN_REVISION=$(jq -r '.["9"].revision' $PREBUILT_GCC_JSON)
 	local GCC_PREBUILT_SHA256=$(jq -r ".[\"9\"].checksums.$TERMUX_ARCH" $PREBUILT_GCC_JSON)
@@ -13,7 +13,7 @@ _setup_toolchain_ndk_gcc_9() {
 _setup_toolchain_ndk_gcc_10() {
 	local GCC_TOOLCHAIN_VERSION=2
 
-    local PREBUILT_GCC_JSON="$TERMUX_SCRIPTDIR/common-files/prebuilt-gcc.json"
+    local PREBUILT_GCC_JSON="$TERMUX_SCRIPTDIR/common-files/toolchain/deprecated/prebuilt-gcc.json"
 	local GCC_VERSION=$(jq -r '.["10"].version' $PREBUILT_GCC_JSON)
 	local GCC_TOOLCHAIN_REVISION=$(jq -r '.["10"].revision' $PREBUILT_GCC_JSON)
 	local GCC_PREBUILT_SHA256=$(jq -r ".[\"10\"].checksums.$TERMUX_ARCH" $PREBUILT_GCC_JSON)
@@ -25,7 +25,7 @@ _setup_toolchain_ndk_gcc_10() {
 _setup_toolchain_ndk_with_gfortran_11() {
 	local GCC_TOOLCHAIN_VERSION=2
 
-    local PREBUILT_GCC_JSON="$TERMUX_SCRIPTDIR/common-files/prebuilt-gcc.json"
+    local PREBUILT_GCC_JSON="$TERMUX_SCRIPTDIR/common-files/toolchain/deprecated/prebuilt-gcc.json"
 	local GCC_VERSION=$(jq -r '.["11"].version' $PREBUILT_GCC_JSON)
 	local GCC_TOOLCHAIN_REVISION=$(jq -r '.["11"].revision' $PREBUILT_GCC_JSON)
 	local GCC_PREBUILT_SHA256=$(jq -r ".[\"11\"].checksums.$TERMUX_ARCH" $PREBUILT_GCC_JSON)
@@ -48,7 +48,7 @@ _setup_toolchain_ndk_with_gfortran_11() {
 _setup_toolchain_ndk_gcc_11() {
 	local GCC_TOOLCHAIN_VERSION=2
 
-    local PREBUILT_GCC_JSON="$TERMUX_SCRIPTDIR/common-files/prebuilt-gcc.json"
+    local PREBUILT_GCC_JSON="$TERMUX_SCRIPTDIR/common-files/toolchain/deprecated/prebuilt-gcc.json"
 	local GCC_VERSION=$(jq -r '.["11"].version' $PREBUILT_GCC_JSON)
 	local GCC_TOOLCHAIN_REVISION=$(jq -r '.["11"].revision' $PREBUILT_GCC_JSON)
 	local GCC_PREBUILT_SHA256=$(jq -r ".[\"11\"].checksums.$TERMUX_ARCH" $PREBUILT_GCC_JSON)
@@ -60,7 +60,7 @@ _setup_toolchain_ndk_gcc_11() {
 _setup_toolchain_ndk_gcc_12() {
 	local GCC_TOOLCHAIN_VERSION=2
 
-    local PREBUILT_GCC_JSON="$TERMUX_SCRIPTDIR/common-files/prebuilt-gcc.json"
+    local PREBUILT_GCC_JSON="$TERMUX_SCRIPTDIR/common-files/toolchain/deprecated/prebuilt-gcc.json"
 	local GCC_VERSION=$(jq -r '.["12"].version' $PREBUILT_GCC_JSON)
 	local GCC_TOOLCHAIN_REVISION=$(jq -r '.["12"].revision' $PREBUILT_GCC_JSON)
 	local GCC_PREBUILT_SHA256=$(jq -r ".[\"12\"].checksums.$TERMUX_ARCH" $PREBUILT_GCC_JSON)

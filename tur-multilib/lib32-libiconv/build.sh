@@ -6,7 +6,7 @@ TERMUX_PKG_VERSION=1.17
 TERMUX_PKG_SRCURL=https://ftp.gnu.org/pub/gnu/libiconv/libiconv-$TERMUX_PKG_VERSION.tar.gz
 TERMUX_PKG_SHA256=8f74213b56238c85a50a5329f77e06198771e70dd9a739779f4c02f65d971313
 
-source $TERMUX_SCRIPTDIR/common-files/setup_multilib_toolchain.sh
+source $TERMUX_SCRIPTDIR/common-files/toolchain/setup_toolchain_multilib.sh
 
 # Enable extra encodings (such as CP437) needed by some programs:
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
@@ -24,5 +24,5 @@ share/man
 "
 
 termux_step_pre_configure() {
-	_setup_multilib_toolchain
+	_setup_toolchain_multilib
 }

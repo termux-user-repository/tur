@@ -7,7 +7,7 @@ TERMUX_PKG_SRCURL=https://mirrors.kernel.org/gnu/nettle/nettle-${TERMUX_PKG_VERS
 TERMUX_PKG_SHA256=0ee7adf5a7201610bb7fe0acbb7c9b3be83be44904dd35ebbcd965cd896bfeaa
 TERMUX_PKG_DEPENDS="lib32-libgmp"
 
-source $TERMUX_SCRIPTDIR/common-files/setup_multilib_toolchain.sh
+source $TERMUX_SCRIPTDIR/common-files/toolchain/setup_toolchain_multilib.sh
 
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 --host=$TUR_MULTILIB_ARCH_TRIPLE
@@ -22,5 +22,5 @@ share/man
 "
 
 termux_step_pre_configure() {
-	_setup_multilib_toolchain
+	_setup_toolchain_multilib
 }

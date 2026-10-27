@@ -11,7 +11,7 @@ TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_BREAKS="ndk-multilib"
 TERMUX_PKG_CONFLICTS="ndk-multilib"
 
-source $TERMUX_SCRIPTDIR/common-files/setup_multilib_toolchain.sh
+source $TERMUX_SCRIPTDIR/common-files/toolchain/setup_toolchain_multilib.sh
 
 termux_step_post_make_install() {
 	mkdir -p "$TERMUX_PREFIX"/lib/$TUR_MULTILIB_ARCH_TRIPLE

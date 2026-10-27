@@ -1,0 +1,42 @@
+{
+  "12": {
+    "version": "12.5.0",
+    "revision": "0",
+    "checksums": {
+      "aarch64": "28bf616ba3c7f707f9ae16b65545d00766d0129b30840d5ffb6484bbafc131de",
+      "arm": "3cbbdafd397b268ccf49ee5b4d9eddd418f6ed704d07bcc44a33e2a094b6bf8d",
+      "i686": "6cf74c6252d790cb0943481a87e91f081403495572524114ca618eb52e60e418",
+      "x86_64": "59741e7adfdaabe3db7792bcc2a4de46699645aaebfb51d1e4f31878afd1c919"
+    }
+  },
+  "11": {
+    "version": "11.5.0",
+    "revision": "0",
+    "checksums": {
+      "aarch64": "095c18294c19d75d970c1eb85a5e909afd0bf8e20f84a2e1b0fd8ff987ffd576",
+      "arm": "dc10b5ce33580cae2bcefd4ea00c77b7a8b3b3d3877571a6afb4ecf06cd11a37",
+      "i686": "db575824696a3a82dded90c768e1619cc0f6170b47ced5201d855c9d2ad11ca8",
+      "x86_64": "388b290f4ff77d3c5f2ef2b08134667f68fbb12bde688be029ae10ef59bde4b4"
+    }
+  },
+  "10": {
+    "version": "10.5.0",
+    "revision": "2",
+    "checksums": {
+      "aarch64": "347e24889121b44e3c403f80a7c8aefe82c0ea96deaea465def2322db95fdcfe",
+      "arm": "15beb848a31f4b99202efd8e081b845c49878afe2bd437e08028d9ba1cbfb138",
+      "i686": "7df65474ba8dfcafde47d005e6fa6a6c9e86b46592eae31bc9570c4ca5d5fc62",
+      "x86_64": "f672f1a139f616268794d5130979d3773de33e762aa37c5074d9cf550c72a56b"
+    }
+  },
+  "9": {
+    "version": "9.5.0",
+    "revision": "4",
+    "checksums": {
+      "aarch64": "2c4f78b39318ad737bc18bdea2abc7d4a2c8f090f9d4b44b5335f1c4b81488cc",
+      "arm": "e414a6b7590444383124870baffc48ab6f9097d385984fe718e4ede16467b029",
+      "i686": "9ac1a3e10e2cbe735b5c277912cbf9a8aed96567149775c26a185017b7962cca",
+      "x86_64": "c2af64f48123d952be7444164b1a955f1de64b09f3d630ed4aac7f7e8dc44507"
+    }
+  }
+}

@@ -12,7 +12,7 @@ case "$TERMUX_ARCH" in
 	;;
 esac
 
-_setup_multilib_toolchain() {
+_setup_toolchain_multilib() {
 	export CFLAGS=""
 	export CPPFLAGS=""
 	export LDFLAGS="-L${TERMUX_PREFIX}/$TUR_MULTILIB_ARCH_TRIPLE/lib"

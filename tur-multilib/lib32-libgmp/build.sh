@@ -8,7 +8,7 @@ TERMUX_PKG_SRCURL=https://mirrors.kernel.org/gnu/gmp/gmp-${TERMUX_PKG_VERSION}.t
 TERMUX_PKG_SHA256=fd4829912cddd12f84181c3451cc752be224643e87fac497b69edddadc49b4f2
 TERMUX_PKG_DEPENDS="lib32-libc++"
 
-source $TERMUX_SCRIPTDIR/common-files/setup_multilib_toolchain.sh
+source $TERMUX_SCRIPTDIR/common-files/toolchain/setup_toolchain_multilib.sh
 
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 --enable-cxx
@@ -24,7 +24,7 @@ share/man
 "
 
 termux_step_pre_configure() {
-	_setup_multilib_toolchain
+	_setup_toolchain_multilib
 
 	# the cxx tests fail because it won't link properly without this
 	CXXFLAGS+=" -L$TERMUX_PREFIX/lib/$TUR_MULTILIB_ARCH_TRIPLE"
