@@ -1,0 +1,66 @@
+diff --git a/internal/webserver/browse_directory.go b/internal/webserver/browse_directory.go
+index f6c7a836..f1b8840c 100644
+--- a/internal/webserver/browse_directory.go
++++ b/internal/webserver/browse_directory.go
+@@ -70,6 +70,9 @@ func browseDirectoryWithinRoots(req api.BrowseDirectoryRequest, fallbackPath str
+ 	if len(roots) == 0 && runtime.GOOS == "windows" && requested == "" {
+ 		return browseWindowsRoots(mode), nil
+ 	}
++	if len(roots) == 0 && (runtime.GOOS == "android" || os.Getenv("TERMUX_VERSION") != "") && (requested == "" || requested == "/") {
++		return browseConfiguredRoots(mode, defaultAndroidBrowseRoots()), nil
++	}
+ 	if requested == "" {
+ 		requested = strings.TrimSpace(fallbackPath)
+ 	}
+@@ -280,6 +283,38 @@ func parentPath(current string) string {
+ 	return parent
+ }
+ 
++func defaultAndroidBrowseRoots() []string {
++	var candidates []string
++	if home := os.Getenv("HOME"); home != "" {
++		candidates = append(candidates, home)
++	}
++	candidates = append(candidates, "/sdcard", "/storage/emulated/0")
++	if entries, err := os.ReadDir("/storage"); err == nil {
++		for _, e := range entries {
++			if e.IsDir() && e.Name() != "self" && e.Name() != "emulated" {
++				candidates = append(candidates, filepath.Join("/storage", e.Name()))
++			}
++		}
++	}
++	seen := make(map[string]bool)
++	var roots []string
++	for _, c := range candidates {
++		resolved, err := filepath.EvalSymlinks(c)
++		if err != nil {
++			resolved = c
++		}
++		clean := filepath.Clean(resolved)
++		if seen[clean] {
++			continue
++		}
++		if _, err := os.ReadDir(clean); err == nil {
++			seen[clean] = true
++			roots = append(roots, clean)
++		}
++	}
++	return roots
++}
++
+ func browseWindowsRoots(mode string) api.BrowseDirectoryResponse {
+ 	entries := make([]api.BrowseDirectoryEntry, 0, 26)
+ 	for letter := 'A'; letter <= 'Z'; letter++ {
+diff --git a/internal/webserver/browse_search.go b/internal/webserver/browse_search.go
+index 76b5cee0..a1aed096 100644
+--- a/internal/webserver/browse_search.go
++++ b/internal/webserver/browse_search.go
+@@ -64,6 +64,8 @@ func browsePathsWithinRoots(ctx context.Context, req api.BrowseDirectoryRequest,
+ 			for _, entry := range browseWindowsRoots(mode).Entries {
+ 				roots = append(roots, entry.Path)
+ 			}
++		} else if runtime.GOOS == "android" || os.Getenv("TERMUX_VERSION") != "" {
++			roots = defaultAndroidBrowseRoots()
+ 		} else {
+ 			roots = []string{string(filepath.Separator)}
+ 		}
