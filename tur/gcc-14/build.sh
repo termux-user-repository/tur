@@ -2,11 +2,10 @@ TERMUX_PKG_HOMEPAGE=http://gcc.gnu.org/
 TERMUX_PKG_DESCRIPTION="GNU C compiler"
 TERMUX_PKG_LICENSE="GPL-3.0"
 TERMUX_PKG_DEPENDS="binutils, libc++, libgmp, libmpfr, libmpc, libisl, zlib"
-TERMUX_PKG_VERSION="14.3.0"
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_VERSION="14.4.0"
 TERMUX_PKG_MAINTAINER="@licy183"
 TERMUX_PKG_SRCURL="https://mirrors.kernel.org/gnu/gcc/gcc-${TERMUX_PKG_VERSION}/gcc-${TERMUX_PKG_VERSION}.tar.gz"
-TERMUX_PKG_SHA256=ace8b8b0dbfe6abfc22f821cb093e195aa5498b7ccf7cd23e4424b9f14afed22
+TERMUX_PKG_SHA256=f35aa1c7f14e6bbe5a7fab83abcb7813449aa1dc6d38bbf27b74614dee17db5e
 TERMUX_PKG_BREAKS="binutils-is-llvm"
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_NO_STATICSPLIT=true
@@ -111,10 +110,6 @@ termux_step_pre_configure() {
 
 	# Add host and target flag
 	TERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" --host=$TERMUX_HOST_PLATFORM --target=$TERMUX_HOST_PLATFORM"
-}
-
-termux_step_make() {
-	make -j $(nproc) || bash
 }
 
 termux_step_post_make_install() {
