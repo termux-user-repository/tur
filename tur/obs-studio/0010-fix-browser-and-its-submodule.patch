@@ -1,0 +1,56 @@
+From d7e4a8304f3f6608643101fef63fc8c4ac5b78cb Mon Sep 17 00:00:00 2001
+From: lumaparallax <257510328+lumaparallax@users.noreply.github.com>
+Date: Tue, 21 Apr 2026 17:31:20 +0900
+Subject: [PATCH 10/11] fix browser and its submodule
+
+---
+ frontend/OBSApp.cpp | 4 +++-
+ plugins/obs-browser | 2 +-
+ 2 files changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/frontend/OBSApp.cpp b/frontend/OBSApp.cpp
+index 6ade93c5d..10c8e1947 100644
+--- a/frontend/OBSApp.cpp
++++ b/frontend/OBSApp.cpp
+@@ -315,7 +315,9 @@ bool OBSApp::InitGlobalConfigDefaults()
+ 	config_set_default_bool(appConfig, "Audio", "DisableAudioDucking", true);
+ #endif
+ 
+-#if defined(_WIN32) || defined(__APPLE__) || defined(__linux__)
++#if defined(__ANDROID__)
++	config_set_default_bool(appConfig, "General", "BrowserHWAccel",false);
++#elif defined(_WIN32) || defined(__APPLE__) || defined(__linux__)
+ 	config_set_default_bool(appConfig, "General", "BrowserHWAccel", true);
+ #endif
+ 
+Submodule plugins/obs-browser ea04212e4..962bfa92b:
+diff --git a/plugins/obs-browser/browser-app.cpp b/plugins/obs-browser/browser-app.cpp
+index 5d2c4dc..0ad2f7a 100644
+--- a/plugins/obs-browser/browser-app.cpp
++++ b/plugins/obs-browser/browser-app.cpp
+@@ -92,6 +92,22 @@ void BrowserApp::OnBeforeCommandLineProcessing(const CefString &, CefRefPtr<CefC
+ 	}
+ 
+ 	command_line->AppendSwitchWithValue("autoplay-policy", "no-user-gesture-required");
++
++#ifdef __ANDROID__
++	// TERMUX OPTIMIZATIONS & FIXES
++
++	// 1. Termux Sandbox & Security Fixes
++	command_line->AppendSwitch("no-sandbox");
++	command_line->AppendSwitchWithValue("password-store", "basic");
++
++	// 2. Permissive GPU Flags (Optimizes internal Turnip/Zink rendering before RAM handoff)
++	command_line->AppendSwitch("ignore-gpu-blocklist");
++	command_line->AppendSwitch("disable-gpu-sandbox");
++	command_line->AppendSwitchWithValue("use-gl", "angle");
++	command_line->AppendSwitchWithValue("use-angle", "gles");
++
++#endif
++
+ #ifdef __APPLE__
+ 	command_line->AppendSwitch("use-mock-keychain");
+ #elif !defined(_WIN32)
+-- 
+2.54.0
+
