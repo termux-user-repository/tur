@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://github.com/storytold/effectcraft
 TERMUX_PKG_DESCRIPTION="Native open-source motion-graphics and effects editor in pure Rust (eframe/wgpu)"
 TERMUX_PKG_LICENSE="MIT, Apache-2.0"
 TERMUX_PKG_MAINTAINER="@termux"
-TERMUX_PKG_VERSION="0.17.0"
+TERMUX_PKG_VERSION="0.18.0"
 TERMUX_PKG_SRCURL="https://github.com/storytold/effectcraft/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz"
-TERMUX_PKG_SHA256=39f62b8d533428fb9a77ae403994f0c75e6e69752535a6a856fe86f7493e0bc8
+TERMUX_PKG_SHA256=e269f9fd6a7094db07e4f87827c6a6d47bb01c9e7e4fe3e733539180723d285d
 TERMUX_PKG_DEPENDS="libx11, libxcb, libxcursor, libxi, libxrandr, libxkbcommon, vulkan-loader-android, hicolor-icon-theme, alsa-lib, alsa-plugins"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_AUTO_UPDATE=true
@@ -27,6 +27,13 @@ termux_step_pre_configure() {
 		! -wholename ./vendor/xkbcommon-dl \
 		! -wholename ./vendor/wayland-cursor \
 		! -path './vendor/smithay-client-toolkit*' \
+		! -path './vendor/craft*' \
+		! -path './vendor/filmcraft*' \
+		! -path './vendor/egui*' \
+		! -path './vendor/epaint*' \
+		! -path './vendor/ecolor*' \
+		! -path './vendor/emath*' \
+		! -path './vendor/hayro*' \
 		-exec rm -rf '{}' \;
 
 	patch -p1 -d vendor/wayland-cursor <"$TERMUX_PKG_BUILDER_DIR/wayland-cursor-no-shm.diff"
@@ -49,7 +56,14 @@ termux_step_pre_configure() {
 			-e "s|libxkbcommon-x11.so.0|libxkbcommon-x11.so|g" \
 			-e "s|libxcb.so.1|libxcb.so|g"
 
-	for crate in eframe egui-winit arboard rfd cpal winit wgpu wgpu-hal x11rb-protocol xkbcommon-dl wayland-cursor; do
+	for d in vendor/egui vendor/egui-* vendor/egui_* vendor/eframe vendor/epaint* vendor/emath vendor/ecolor; do
+		[ -d "$d" ] || continue
+		crate="$(basename "$d")"
+		sed -i -E "s|^$crate = \{ git = .*\}|$crate = { path = \"./vendor/$crate\" }|" Cargo.toml
+	done
+	sed -i '/git = "https:\/\/github\.com\/storytold\/egui\.git"/d' Cargo.toml
+	sed -i 's|^winit = { git = .* }|winit = { path = "./vendor/winit" }|' Cargo.toml
+	for crate in arboard rfd cpal wgpu wgpu-hal x11rb-protocol xkbcommon-dl wayland-cursor; do
 		echo "$crate = { path = \"./vendor/$crate\" }" >>Cargo.toml
 	done
 	i=0

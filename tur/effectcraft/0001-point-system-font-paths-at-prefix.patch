@@ -1,9 +1,9 @@
 diff --git a/crates/text/src/font_dirs.rs b/crates/text/src/font_dirs.rs
-index 39714ca..0b50608 100644
+index 3069494..88456a4 100644
 --- a/crates/text/src/font_dirs.rs
 +++ b/crates/text/src/font_dirs.rs
-@@ -36,8 +36,8 @@ impl FontEnv {
-             fontconfig_file: var("FONTCONFIG_FILE").map(PathBuf::from),
+@@ -39,8 +39,8 @@ impl FontEnv {
+             fontconfig_path: var("FONTCONFIG_PATH"),
              fontconfig_roots: ["/etc/fonts/fonts.conf", "/usr/local/etc/fonts/fonts.conf"].map(PathBuf::from).to_vec(),
              fixed: [
 -                "/usr/share/fonts",
