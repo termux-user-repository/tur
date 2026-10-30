@@ -1,11 +1,11 @@
-diff --git a/crates/fonts/src/fontdb.rs b/crates/fonts/src/fontdb.rs
-index f65dd70..2fbdc7e 100644
---- a/crates/fonts/src/fontdb.rs
-+++ b/crates/fonts/src/fontdb.rs
-@@ -785,7 +785,7 @@ pub fn system_font_dirs() -> Vec<std::path::PathBuf> {
+diff --git a/crates/fonts/src/fontdb/system.rs b/crates/fonts/src/fontdb/system.rs
+index 2a367b8..de933c4 100644
+--- a/crates/fonts/src/fontdb/system.rs
++++ b/crates/fonts/src/fontdb/system.rs
+@@ -199,7 +199,7 @@ pub fn system_font_dirs() -> Vec<std::path::PathBuf> {
  }
  
- fn unix_font_dirs(home: Option<&std::path::Path>, xdg_data_home: Option<&std::path::Path>) -> Vec<std::path::PathBuf> {
+ pub(super) fn unix_font_dirs(home: Option<&std::path::Path>, xdg_data_home: Option<&std::path::Path>) -> Vec<std::path::PathBuf> {
 -    let mut dirs: Vec<std::path::PathBuf> = ["/usr/share/fonts", "/usr/local/share/fonts"].map(Into::into).into();
 +    let mut dirs: Vec<std::path::PathBuf> = ["@TERMUX_PREFIX@/share/fonts", "@TERMUX_PREFIX@/local/share/fonts"].map(Into::into).into();
      if let Some(home) = home {
