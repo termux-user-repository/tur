@@ -1,0 +1,81 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: Mon, 5 Oct 2026 12:00:00 +0530
+Subject: [PATCH] panvk: map the CSF trace buffer at a kbase-assigned VA
+
+PANVK_DEBUG=trace failed device creation on kbase ("cannot map BO at explicit
+VA 0xffdff000 (kbase-assigned VA is 0x5fffa00000)", CreateDevice r=-2), so
+PanProbe's Mesa debug env made every test fail on the Poco X6 Pro. The CS
+tracebuf took an explicit VA from the private heap, which kbase cannot honor.
+On AUTO_VA VMs, let kbase pick the VA (no guard page) and skip the heap free.
+
+Purpose: make PANVK_DEBUG=trace work on kbase
+Tested GPU: Mali-G615 MC6 (Poco X6 Pro)
+Tested Kbase UAPI: CSF 1.21 (MediaTek)
+Mesa base range: 5a07217f034b (26.3.0-devel)
+Validation test: PanProbe with Mesa debug env (PANVK_DEBUG=trace)
+
+Generated-by: LLM
+---
+
+--- a/src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c	2026-10-05 11:14:18.551752884 +0530
++++ b/src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c	2026-10-05 11:14:18.551752884 +0530
+@@ -1348,8 +1348,9 @@
+          pan_kmod_vm_bind(dev->kmod.vm, PAN_KMOD_VM_OP_MODE_IMMEDIATE, &op, 1);
+       assert(!ret);
+ 
+-      panvk_as_free(dev, dev->as.priv_heap, subq->tracebuf.addr.dev,
+-                    subq->tracebuf.size + pgsize);
++      if (!(dev->kmod.vm->flags & PAN_KMOD_VM_FLAG_AUTO_VA))
++         panvk_as_free(dev, dev->as.priv_heap, subq->tracebuf.addr.dev,
++                       subq->tracebuf.size + pgsize);
+    }
+ 
+    if (subq->tracebuf.addr.host) {
+@@ -1445,14 +1446,19 @@
+                           "Failed to CPU map tracebuf");
+    }
+ 
+-   /* Add a guard page. */
++   /* Add a guard page.  kbase (AUTO_VA) assigns the VA itself and cannot map
++    * at a caller-chosen address, so there is no guard page there. */
+    uint64_t pgsize = panvk_get_gpu_page_size(dev);
+-   dev_addr = panvk_as_alloc(dev, dev->as.priv_heap,
+-                             subq->tracebuf.size + pgsize, pgsize);
+-
+-   if (!dev_addr)
+-      return panvk_errorf(dev, VK_ERROR_OUT_OF_DEVICE_MEMORY,
+-                          "Failed to allocate virtual address for tracebuf");
++   const bool auto_va = dev->kmod.vm->flags & PAN_KMOD_VM_FLAG_AUTO_VA;
++   dev_addr = PAN_KMOD_VM_MAP_AUTO_VA;
++   if (!auto_va) {
++      dev_addr = panvk_as_alloc(dev, dev->as.priv_heap,
++                                subq->tracebuf.size + pgsize, pgsize);
++
++      if (!dev_addr)
++         return panvk_errorf(dev, VK_ERROR_OUT_OF_DEVICE_MEMORY,
++                             "Failed to allocate virtual address for tracebuf");
++   }
+ 
+    struct pan_kmod_vm_op vm_op = {
+       .type = PAN_KMOD_VM_OP_TYPE_MAP,
+@@ -1471,13 +1477,14 @@
+    int ret =
+       pan_kmod_vm_bind(dev->kmod.vm, PAN_KMOD_VM_OP_MODE_IMMEDIATE, &vm_op, 1);
+    if (ret) {
+-      panvk_as_free(dev, dev->as.priv_heap, dev_addr,
+-                    subq->tracebuf.size + pgsize);
++      if (!auto_va)
++         panvk_as_free(dev, dev->as.priv_heap, dev_addr,
++                       subq->tracebuf.size + pgsize);
+       return panvk_errorf(dev, VK_ERROR_OUT_OF_DEVICE_MEMORY,
+                           "Failed to GPU map ringbuf BO");
+    }
+ 
+-   subq->tracebuf.addr.dev = dev_addr;
++   subq->tracebuf.addr.dev = auto_va ? vm_op.va.start : dev_addr;
+ 
+    panvk_address_binding_report(dev, NULL, subq->tracebuf.addr.dev,
+                                 subq->tracebuf.size,
+-- 
+2.51.0

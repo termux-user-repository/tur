@@ -1,0 +1,1409 @@
+From: abhay-byte <zenithblue.dev@gmail.com>
+Subject: [PATCH csf-v11 042] panvk: geometry shaders on gpu_prerast
+Generated-by: LLM
+
+Purpose: GPU geometry shader lowering through compute and IDVS; biblioklept
+Source/Reference: local fix, work/mesa bdd0c26cc5e
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/041
+Validation test: tests/dxvk/vulkan/geometry 23/23; dEQP-VK.geometry 182 Pass, 6 Fail, 11 NotSupported with PANVK_DEBUG=gs
+
+diff --git a/src/panfrost/vulkan/csf/panvk_gpu_prerast.c b/src/panfrost/vulkan/csf/panvk_gpu_prerast.c
+index 7b3ad1dca70..f3935db1b1d 100644
+--- a/src/panfrost/vulkan/csf/panvk_gpu_prerast.c
++++ b/src/panfrost/vulkan/csf/panvk_gpu_prerast.c
+@@ -72,11 +72,16 @@ panvk_per_arch(gpu_prerast_can_lower)(
+    const struct panvk_cmd_buffer *cmdbuf, const struct panvk_draw_info *draw,
+    const struct panvk_gpu_prerast_shader *shader)
+ {
+-    const bool poly = panvk_per_arch(gpu_prerast_poly_mode)(cmdbuf, draw) !=
+-                      PANVK_GPU_PRERAST_POLY_NONE;
+-    if (!(PANVK_DEBUG(GPU_PRERAST) || poly) || shader->has_side_effects ||
++    const struct panvk_shader *gs = cmdbuf->state.gfx.gs.shader;
++    const bool poly = !gs &&
++                      panvk_per_arch(gpu_prerast_poly_mode)(cmdbuf, draw) !=
++                         PANVK_GPU_PRERAST_POLY_NONE;
++    if (!(PANVK_DEBUG(GPU_PRERAST) || poly || gs) ||
++        (!gs && shader->has_side_effects) ||
+         !shader->lowered_vs_compiled || !shader->passthrough_vs_compiled ||
+         (poly && !shader->polygon_compiled) ||
++        (gs && (!gs->gpu_prerast.gs.kernel_compiled ||
++                !gs->gpu_prerast.gs.passthrough_compiled)) ||
+         (draw->indirect.buffer_dev_addr && draw->indirect.draw_count > 1) ||
+         draw->indirect.count_buffer_dev_addr)
+        return false;
+@@ -87,8 +92,30 @@ panvk_per_arch(gpu_prerast_can_lower)(
+        if ((uint64_t)draw->vertex.count * draw->instance.count >
+            panvk_gpu_prerast_record_capacity(shader->io.record_stride))
+           return false;
++       if (gs && (uint64_t)draw->vertex.count * draw->instance.count *
++                       gs->gpu_prerast.gs.invocations >
++                    panvk_gpu_prerast_gs_cap_slots(&gs->gpu_prerast.gs))
++          return false;
+     }
+ 
++   if (gs) {
++      switch (draw->prim) {
++      case MESA_PRIM_POINTS:
++      case MESA_PRIM_LINES:
++      case MESA_PRIM_LINE_STRIP:
++      case MESA_PRIM_TRIANGLES:
++      case MESA_PRIM_TRIANGLE_STRIP:
++      case MESA_PRIM_TRIANGLE_FAN:
++      case MESA_PRIM_LINES_ADJACENCY:
++      case MESA_PRIM_LINE_STRIP_ADJACENCY:
++      case MESA_PRIM_TRIANGLES_ADJACENCY:
++      case MESA_PRIM_TRIANGLE_STRIP_ADJACENCY:
++         return true;
++      default:
++         return false;
++      }
++   }
++
+    switch (draw->prim) {
+    case MESA_PRIM_POINTS:
+    case MESA_PRIM_LINES:
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+index 07bad5f29eb..d33bee77f7e 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+@@ -458,12 +458,24 @@ prepare_vs_desc(struct panvk_cmd_buffer *cmdbuf,
+    return VK_SUCCESS;
+ }
+ 
++static const struct panvk_shader_variant *
++raster_vs_variant(const struct panvk_cmd_buffer *cmdbuf, bool generated)
++{
++   const struct panvk_shader *gs = cmdbuf->state.gfx.gs.shader;
++   if (gs)
++      return &gs->variants[PANVK_GS_VARIANT_PASSTHROUGH];
++
++   return generated
++      ? panvk_shader_gpu_prerast_variant(cmdbuf->state.gfx.vs.shader,
++                                         PANVK_VS_VARIANT_GPU_PASSTHROUGH)
++      : panvk_shader_hw_variant(cmdbuf->state.gfx.vs.shader);
++}
++
+ static void
+ emit_varying_descs(const struct panvk_cmd_buffer *cmdbuf,
+                    struct mali_attribute_packed *descs)
+ {
+-   const struct panvk_shader_variant *vs =
+-      panvk_shader_hw_variant(cmdbuf->state.gfx.vs.shader);
++   const struct panvk_shader_variant *vs = raster_vs_variant(cmdbuf, false);
+    const struct panvk_shader_variant *fs =
+       panvk_shader_only_variant(get_fs(cmdbuf));
+ 
+@@ -752,8 +764,7 @@ static VkResult
+ update_tls(struct panvk_cmd_buffer *cmdbuf)
+ {
+    struct panvk_tls_state *state = &cmdbuf->state.tls;
+-   const struct panvk_shader_variant *vs =
+-      panvk_shader_hw_variant(cmdbuf->state.gfx.vs.shader);
++   const struct panvk_shader_variant *vs = raster_vs_variant(cmdbuf, false);
+    const struct panvk_shader_variant *fs =
+       panvk_shader_only_variant(get_fs(cmdbuf));
+    struct cs_builder *b =
+@@ -1035,8 +1046,7 @@ prepare_tiler_primitive_size(struct panvk_cmd_buffer *cmdbuf,
+     */
+ #if PAN_ARCH < 13
+    case MESA_PRIM_POINTS: {
+-      const struct panvk_shader_variant *vs =
+-         panvk_shader_hw_variant(cmdbuf->state.gfx.vs.shader);
++      const struct panvk_shader_variant *vs = raster_vs_variant(cmdbuf, false);
+ 
+       if (vs->info.vs.writes_point_size)
+          return;
+@@ -2755,8 +2765,7 @@ static void
+ set_tiler_idvs_flags(struct cs_builder *b, struct panvk_cmd_buffer *cmdbuf,
+                      const struct panvk_draw_info *draw)
+ {
+-   const struct panvk_shader_variant *vs =
+-      panvk_shader_hw_variant(cmdbuf->state.gfx.vs.shader);
++   const struct panvk_shader_variant *vs = raster_vs_variant(cmdbuf, false);
+    const struct panvk_shader_variant *fs =
+       panvk_shader_only_variant(get_fs(cmdbuf));
+    const struct vk_dynamic_graphics_state *dyns =
+@@ -2838,10 +2847,8 @@ static VkResult
+ prepare_draw(struct panvk_cmd_buffer *cmdbuf,
+              const struct panvk_draw_info *draw)
+ {
+-   const struct panvk_shader_variant *vs = draw->gpu_prerast_generated
+-      ? panvk_shader_gpu_prerast_variant(cmdbuf->state.gfx.vs.shader,
+-                                         PANVK_VS_VARIANT_GPU_PASSTHROUGH)
+-      : panvk_shader_hw_variant(cmdbuf->state.gfx.vs.shader);
++   const struct panvk_shader_variant *vs =
++      raster_vs_variant(cmdbuf, draw->gpu_prerast_generated);
+    const struct panvk_shader_variant *fs =
+       panvk_shader_only_variant(get_fs(cmdbuf));
+    ASSERTED bool idvs = vs->info.vs.idvs;
+@@ -3297,10 +3304,8 @@ launch_indirect_draw(struct panvk_cmd_buffer *cmdbuf,
+ {
+    const struct cs_tracing_ctx *tracing_ctx =
+       &cmdbuf->state.cs[PANVK_SUBQUEUE_VERTEX_TILER].tracing;
+-   const struct panvk_shader_variant *vs = draw->gpu_prerast_generated
+-      ? panvk_shader_gpu_prerast_variant(cmdbuf->state.gfx.vs.shader,
+-                                         PANVK_VS_VARIANT_GPU_PASSTHROUGH)
+-      : panvk_shader_hw_variant(cmdbuf->state.gfx.vs.shader);
++   const struct panvk_shader_variant *vs =
++      raster_vs_variant(cmdbuf, draw->gpu_prerast_generated);
+    struct cs_builder *b =
+       panvk_get_cs_builder(cmdbuf, PANVK_SUBQUEUE_VERTEX_TILER);
+ 
+@@ -3503,10 +3508,11 @@ gpu_prerast_release_arena(struct panvk_cmd_buffer *cmdbuf, uint64_t arena)
+ }
+ 
+ static void
+-gpu_prerast_launch_cs(struct panvk_cmd_buffer *cmdbuf,
+-                      const struct panvk_shader_variant *cs,
+-                      uint64_t push_uniforms, uint64_t tsd,
+-                      const struct panvk_dispatch_info *info)
++gpu_prerast_launch_cs_desc(struct panvk_cmd_buffer *cmdbuf,
++                           const struct panvk_shader_variant *cs,
++                           const struct panvk_shader_desc_state *desc,
++                           uint64_t push_uniforms, uint64_t tsd,
++                           const struct panvk_dispatch_info *info)
+ {
+    /* Same TLS pointer copy as cmd_dispatch(): the global TLS descriptor is
+     * only filled at EndCommandBuffer, so copy its pointer on the GPU.
+@@ -3525,14 +3531,171 @@ gpu_prerast_launch_cs(struct panvk_cmd_buffer *cmdbuf,
+    compute_state_set_dirty(cmdbuf, DESC_STATE);
+    compute_state_set_dirty(cmdbuf, PUSH_UNIFORMS);
+ 
+-   panvk_per_arch(cmd_dispatch_shader)(cmdbuf, cs, &cmdbuf->state.gfx.vs.desc,
+-                                       push_uniforms, tsd, info);
++   panvk_per_arch(cmd_dispatch_shader)(cmdbuf, cs, desc, push_uniforms, tsd,
++                                       info);
+ 
+    compute_state_set_dirty(cmdbuf, CS);
+    compute_state_set_dirty(cmdbuf, DESC_STATE);
+    compute_state_set_dirty(cmdbuf, PUSH_UNIFORMS);
+ }
+ 
++static void
++gpu_prerast_launch_cs(struct panvk_cmd_buffer *cmdbuf,
++                      const struct panvk_shader_variant *cs,
++                      uint64_t push_uniforms, uint64_t tsd,
++                      const struct panvk_dispatch_info *info)
++{
++   gpu_prerast_launch_cs_desc(cmdbuf, cs, &cmdbuf->state.gfx.vs.desc,
++                              push_uniforms, tsd, info);
++}
++
++static VkResult
++prepare_gs_desc(struct panvk_cmd_buffer *cmdbuf, const struct panvk_shader *gs)
++{
++   const struct panvk_shader_desc_info *info = &gs->desc_info;
++   struct panvk_shader_desc_state *gs_desc = &cmdbuf->state.gfx.gs.desc;
++   struct panvk_descriptor_state *desc_state = &cmdbuf->state.gfx.desc_state;
++   const uint32_t desc_count = info->dyn_bufs.count + 1;
++   VkResult result = panvk_per_arch(cmd_prepare_push_descs)(
++      cmdbuf, desc_state, info->used_set_mask);
++   if (result != VK_SUCCESS)
++      return result;
++   struct pan_ptr driver_set = panvk_cmd_alloc_dev_mem(
++      cmdbuf, desc, desc_count * PANVK_DESCRIPTOR_SIZE, PANVK_DESCRIPTOR_SIZE);
++   struct panvk_opaque_desc *descs = driver_set.cpu;
++
++   if (!driver_set.gpu)
++      return VK_ERROR_OUT_OF_DEVICE_MEMORY;
++
++   pan_cast_and_pack(&descs[0], SAMPLER, cfg) {
++      cfg.clamp_integer_array_indices = false;
++   }
++   panvk_per_arch(cmd_fill_dyn_bufs)(desc_state, info,
++                                     (struct mali_buffer_packed *)(&descs[1]));
++
++   gs_desc->driver_set.dev_addr = driver_set.gpu;
++   gs_desc->driver_set.size = desc_count * PANVK_DESCRIPTOR_SIZE;
++
++   return panvk_per_arch(cmd_prepare_shader_res_table)(cmdbuf, desc_state, info,
++                                                       gs_desc, 1);
++}
++
++static bool
++gpu_prerast_gs_run(struct panvk_cmd_buffer *cmdbuf,
++                   const struct panvk_draw_info *source, uint64_t arena,
++                   uint64_t vs_records, uint64_t vs_indices)
++{
++   struct panvk_device *dev = to_panvk_device(cmdbuf->vk.base.device);
++   const struct panvk_shader *vs = cmdbuf->state.gfx.vs.shader;
++   const struct panvk_shader *gs = cmdbuf->state.gfx.gs.shader;
++   const struct panvk_gpu_prerast_gs_info *gsi = &gs->gpu_prerast.gs;
++   const struct panvk_shader_variant *kernel =
++      &gs->variants[PANVK_GS_VARIANT_KERNEL];
++   struct cs_builder *compute =
++      panvk_get_cs_builder(cmdbuf, PANVK_SUBQUEUE_COMPUTE);
++   struct cs_index addr = cs_scratch_reg64(compute, 0);
++   struct cs_index value = cs_scratch_reg32(compute, 2);
++   struct cs_index base = cs_scratch_reg64(compute, 4);
++   struct cs_index count_reg = cs_scratch_reg32(compute, 6);
++   struct cs_index instance_reg = cs_scratch_reg32(compute, 7);
++   const bool indirect = source->indirect.buffer_dev_addr != 0;
++   const uint64_t gs_params = arena + PANVK_GPU_PRERAST_GS_PARAMS_OFFSET;
++   const uint64_t gs_draw = arena + PANVK_GPU_PRERAST_GS_DRAW_OFFSET;
++   const uint64_t gs_dispatch = arena + PANVK_GPU_PRERAST_GS_DISPATCH_OFFSET;
++
++   if (prepare_gs_desc(cmdbuf, gs) != VK_SUCCESS)
++      return false;
++
++   struct pan_compute_dim dim = {source->vertex.count, source->instance.count,
++                                 gsi->invocations};
++   uint64_t tsd = panvk_per_arch(cmd_dispatch_prepare_tls)(cmdbuf, kernel,
++                                                           &dim, indirect);
++   if (!tsd)
++      return false;
++
++   struct pan_ptr push;
++   if (panvk_per_arch(cmd_prepare_gfx_push_uniforms)(cmdbuf, kernel, &push,
++                                                     1) != VK_SUCCESS)
++      return false;
++   if (shader_uses_sysval(kernel, graphics, gpu_prerast_params)) {
++      uint32_t off = shader_remapped_sysval_offset(
++         kernel, sysval_offset(graphics, gpu_prerast_params));
++      *(uint64_t *)((uint8_t *)push.cpu + off) = gs_params;
++   }
++
++   if (indirect) {
++      cs_move64_to(compute, base, source->indirect.buffer_dev_addr);
++      cs_load32_to(compute, count_reg, base, 0);
++      cs_load32_to(compute, instance_reg, base, 4);
++      cs_wait_slot(compute, SB_ID(LS));
++   }
++
++   cs_move64_to(compute, base, gs_params);
++#define STORE_GS32(field, imm) do {                                            \
++   cs_move32_to(compute, value, (imm));                                        \
++   cs_store32(compute, value, base,                                            \
++              offsetof(struct panvk_gpu_prerast_gs_params, field));            \
++} while (0)
++#define STORE_GS64(field, imm) do {                                            \
++   cs_move64_to(compute, addr, (imm));                                         \
++   cs_store64(compute, addr, base,                                             \
++              offsetof(struct panvk_gpu_prerast_gs_params, field));            \
++} while (0)
++   STORE_GS64(vs_records, vs_records);
++   STORE_GS64(vs_outputs, vs->gpu_prerast.io.outputs_written);
++   STORE_GS64(gen_indices, vs_indices);
++   STORE_GS64(records, arena + PANVK_GPU_PRERAST_GS_RECORD_OFFSET);
++   STORE_GS64(indices, arena + PANVK_GPU_PRERAST_GS_INDEX_OFFSET);
++   STORE_GS64(draw, gs_draw);
++   if (indirect) {
++      cs_store32(compute, count_reg, base,
++                 offsetof(struct panvk_gpu_prerast_gs_params, vertex_count));
++      cs_store32(compute, instance_reg, base,
++                 offsetof(struct panvk_gpu_prerast_gs_params, instance_count));
++   } else {
++      STORE_GS32(vertex_count, source->vertex.count);
++      STORE_GS32(instance_count, source->instance.count);
++   }
++   STORE_GS32(primitive_restart, source->index.restart_enable);
++   STORE_GS32(prim, source->prim);
++   STORE_GS32(cap_slots, panvk_gpu_prerast_gs_cap_slots(gsi));
++   STORE_GS32(vs_record_capacity,
++              panvk_gpu_prerast_record_capacity(
++                 vs->gpu_prerast.io.record_stride));
++   STORE_GS32(provoking_last,
++              cmdbuf->vk.dynamic_graphics_state.rs.provoking_vertex ==
++                 VK_PROVOKING_VERTEX_MODE_LAST_VERTEX_EXT);
++#undef STORE_GS32
++#undef STORE_GS64
++
++   cs_move64_to(compute, base, gs_draw);
++   cs_move32_to(compute, value, 0);
++   for (unsigned i = 0; i < 5; i++)
++      cs_store32(compute, value, base, i * 4);
++
++   if (indirect) {
++      cs_move64_to(compute, base, gs_dispatch);
++      cs_store32(compute, count_reg, base, 0);
++      cs_store32(compute, instance_reg, base, 4);
++      cs_move32_to(compute, value, gsi->invocations);
++      cs_store32(compute, value, base, 8);
++   }
++   cs_flush_stores(compute);
++
++   struct panvk_dispatch_info dispatch = {
++      .direct.wg_count = {source->vertex.count, source->instance.count,
++                          gsi->invocations},
++      .barrier = PANVK_CSF_BARRIER_SYNC,
++   };
++   if (indirect)
++      dispatch.indirect.buffer_dev_addr = gs_dispatch;
++
++   cs_wait_slots(compute, dev->csf.sb.all_iters_mask);
++   gpu_prerast_launch_cs_desc(cmdbuf, kernel, &cmdbuf->state.gfx.gs.desc,
++                              push.gpu, tsd, &dispatch);
++   return true;
++}
++
+ static bool
+ gpu_prerast_draw(struct panvk_cmd_buffer *cmdbuf,
+                  const struct panvk_draw_info *source)
+@@ -3567,8 +3730,10 @@ gpu_prerast_draw(struct panvk_cmd_buffer *cmdbuf,
+    uint64_t generated_draw = arena + PANVK_GPU_PRERAST_DRAW_OFFSET;
+    uint64_t poly_indices = arena + PANVK_GPU_PRERAST_POLY_INDEX_OFFSET;
+    uint64_t poly_draw = arena + PANVK_GPU_PRERAST_POLY_DRAW_OFFSET;
++   const struct panvk_shader *gs = cmdbuf->state.gfx.gs.shader;
+    const enum panvk_gpu_prerast_poly_mode poly_mode =
+-      panvk_per_arch(gpu_prerast_poly_mode)(cmdbuf, source);
++      gs ? PANVK_GPU_PRERAST_POLY_NONE
++         : panvk_per_arch(gpu_prerast_poly_mode)(cmdbuf, source);
+    struct cs_builder *compute =
+       panvk_get_cs_builder(cmdbuf, PANVK_SUBQUEUE_COMPUTE);
+    struct cs_index addr = cs_scratch_reg64(compute, 0);
+@@ -3754,6 +3919,12 @@ gpu_prerast_draw(struct panvk_cmd_buffer *cmdbuf,
+       gpu_prerast_launch_cs(cmdbuf, polygon, poly_push.gpu, tsd, &dispatch);
+    }
+ 
++   if (gs && !gpu_prerast_gs_run(cmdbuf, source, arena, records, indices)) {
++      gpu_prerast_wait_compute(cmdbuf);
++      gpu_prerast_release_arena(cmdbuf, arena);
++      return true;
++   }
++
+    gpu_prerast_wait_compute(cmdbuf);
+ 
+    struct panvk_draw_info generated = *source;
+@@ -3783,6 +3954,29 @@ gpu_prerast_draw(struct panvk_cmd_buffer *cmdbuf,
+       generated.instance.base = 0;
+       generated.instance.count = 1;
+       generated.indirect.buffer_dev_addr = poly_draw;
++   }
++   if (gs) {
++      switch (gs->gpu_prerast.gs.output_prim) {
++      case MESA_PRIM_POINTS:
++         generated.prim = MESA_PRIM_POINTS;
++         break;
++      case MESA_PRIM_LINE_STRIP:
++         generated.prim = MESA_PRIM_LINE_STRIP;
++         break;
++      default:
++         generated.prim = MESA_PRIM_TRIANGLE_STRIP;
++         break;
++      }
++      generated.index.buffer_dev_addr = arena + PANVK_GPU_PRERAST_GS_INDEX_OFFSET;
++      generated.index.buffer_size =
++         PANVK_GPU_PRERAST_GS_INDEX_CAPACITY * sizeof(uint32_t);
++      generated.index.restart_enable = true;
++      generated.instance.base = 0;
++      generated.instance.count = 1;
++      generated.indirect.buffer_dev_addr =
++         arena + PANVK_GPU_PRERAST_GS_DRAW_OFFSET;
++      cmdbuf->state.gfx.sysvals.gpu_prerast_records =
++         arena + PANVK_GPU_PRERAST_GS_RECORD_OFFSET;
+    }
+     generated.gpu_prerast_generated = true;
+ 
+@@ -3798,16 +3992,26 @@ gpu_prerast_draw(struct panvk_cmd_buffer *cmdbuf,
+ static void
+ panvk_cmd_draw(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info draw)
+ {
+-   const struct panvk_shader_variant *vs = draw.gpu_prerast_generated
+-      ? panvk_shader_gpu_prerast_variant(cmdbuf->state.gfx.vs.shader,
+-                                         PANVK_VS_VARIANT_GPU_PASSTHROUGH)
+-      : panvk_shader_hw_variant(cmdbuf->state.gfx.vs.shader);
++   const struct panvk_shader_variant *vs =
++      raster_vs_variant(cmdbuf, draw.gpu_prerast_generated);
+    VkResult result;
+ 
+    /* If there's no vertex shader, we can skip the draw. */
+    if (!panvk_priv_mem_check_alloc(vs->spd))
+       return;
+ 
++   if (cmdbuf->state.gfx.gs.shader && !draw.gpu_prerast_generated &&
++       draw.indirect.buffer_dev_addr && draw.indirect.draw_count > 1 &&
++       !draw.indirect.count_buffer_dev_addr) {
++      struct panvk_draw_info one = draw;
++      one.indirect.draw_count = 1;
++      for (uint32_t i = 0; i < draw.indirect.draw_count; i++) {
++         panvk_cmd_draw(cmdbuf, one);
++         one.indirect.buffer_dev_addr += draw.indirect.stride;
++      }
++      return;
++   }
++
+    /* Needs to be done before get_fs() is called because it depends on
+     * fs.required being initialized. */
+    cmdbuf->state.gfx.fs.required =
+@@ -3831,7 +4035,8 @@ panvk_cmd_draw(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info draw)
+    if (result != VK_SUCCESS)
+       return;
+ 
+-   if (!draw.gpu_prerast_generated && gpu_prerast_draw(cmdbuf, &draw))
++   if (!draw.gpu_prerast_generated &&
++       (gpu_prerast_draw(cmdbuf, &draw) || cmdbuf->state.gfx.gs.shader))
+       return;
+ 
+    /* For indirect draws, we need to patch the descriptors we just emitted */
+diff --git a/src/panfrost/vulkan/panvk_cmd_draw.h b/src/panfrost/vulkan/panvk_cmd_draw.h
+index 9c6dface42e..decd078c366 100644
+--- a/src/panfrost/vulkan/panvk_cmd_draw.h
++++ b/src/panfrost/vulkan/panvk_cmd_draw.h
+@@ -200,6 +200,13 @@ struct panvk_cmd_graphics_state {
+ #endif
+    } vs;
+ 
++#if PAN_ARCH >= 10
++   struct {
++      const struct panvk_shader *shader;
++      struct panvk_shader_desc_state desc;
++   } gs;
++#endif
++
+    struct {
+       struct panvk_attrib_buf bufs[MAX_VBS];
+       unsigned count;
+diff --git a/src/panfrost/vulkan/panvk_cmd_meta.h b/src/panfrost/vulkan/panvk_cmd_meta.h
+index a896f7df665..3018e105348 100644
+--- a/src/panfrost/vulkan/panvk_cmd_meta.h
++++ b/src/panfrost/vulkan/panvk_cmd_meta.h
+@@ -62,6 +62,10 @@ struct panvk_cmd_meta_graphics_save_ctx {
+       struct panvk_shader_desc_state desc;
+    } vs;
+ 
++#if PAN_ARCH >= 10
++   const struct panvk_shader *gs;
++#endif
++
+    struct panvk_occlusion_query_state occlusion_query;
+    bool cond_render_enabled;
+    bool cond_render_inherited;
+diff --git a/src/panfrost/vulkan/panvk_gpu_prerast.h b/src/panfrost/vulkan/panvk_gpu_prerast.h
+index cdb68416c80..a5c67b1ee5a 100644
+--- a/src/panfrost/vulkan/panvk_gpu_prerast.h
++++ b/src/panfrost/vulkan/panvk_gpu_prerast.h
+@@ -12,15 +12,24 @@
+ #include "util/macros.h"
+ #include "vulkan/vulkan_core.h"
+ 
+-#define PANVK_GPU_PRERAST_ABI_VERSION 2
++#define PANVK_GPU_PRERAST_ABI_VERSION 3
+ #define PANVK_GPU_PRERAST_MAX_EXECUTION_BYTES (256ull * 1024 * 1024)
+-#define PANVK_GPU_PRERAST_ARENA_SIZE (32ull * 1024 * 1024)
++#define PANVK_GPU_PRERAST_VS_REGION_END (32ull * 1024 * 1024)
++#define PANVK_GPU_PRERAST_GS_INDEX_OFFSET PANVK_GPU_PRERAST_VS_REGION_END
++#define PANVK_GPU_PRERAST_GS_INDEX_CAPACITY (2u * 1024 * 1024)
++#define PANVK_GPU_PRERAST_GS_RECORD_OFFSET \
++   (PANVK_GPU_PRERAST_GS_INDEX_OFFSET + \
++    PANVK_GPU_PRERAST_GS_INDEX_CAPACITY * sizeof(uint32_t))
++#define PANVK_GPU_PRERAST_ARENA_SIZE (64ull * 1024 * 1024)
+ #define PANVK_GPU_PRERAST_MAX_INVOCATIONS (65536u)
+ #define PANVK_GPU_PRERAST_POLY_INDICES_PER_PRIM 6
+ #define PANVK_GPU_PRERAST_PARAMS_OFFSET 64
+ #define PANVK_GPU_PRERAST_DISPATCH_OFFSET 256
+ #define PANVK_GPU_PRERAST_DRAW_OFFSET 320
+ #define PANVK_GPU_PRERAST_POLY_DRAW_OFFSET 384
++#define PANVK_GPU_PRERAST_GS_DISPATCH_OFFSET 448
++#define PANVK_GPU_PRERAST_GS_DRAW_OFFSET 512
++#define PANVK_GPU_PRERAST_GS_PARAMS_OFFSET 1024
+ #define PANVK_GPU_PRERAST_INDEX_OFFSET 4096
+ #define PANVK_GPU_PRERAST_POLY_INDEX_OFFSET \
+    (PANVK_GPU_PRERAST_INDEX_OFFSET + \
+@@ -96,8 +105,22 @@ struct panvk_gpu_prerast_io {
+    struct pan_varying_layout varyings;
+ };
+ 
++struct panvk_gpu_prerast_gs_info {
++   uint64_t outputs_written;
++   uint32_t record_stride;
++   uint32_t index_stride;
++   uint16_t max_vertices;
++   uint8_t invocations;
++   uint8_t input_prim;
++   uint8_t output_prim;
++   bool kernel_compiled;
++   bool passthrough_compiled;
++   bool _pad;
++};
++
+ struct panvk_gpu_prerast_shader {
+    struct panvk_gpu_prerast_io io;
++   struct panvk_gpu_prerast_gs_info gs;
+    uint32_t requirements;
+    bool lowered_vs_compiled;
+    bool passthrough_vs_compiled;
+@@ -105,6 +128,41 @@ struct panvk_gpu_prerast_shader {
+    bool has_side_effects;
+ };
+ 
++struct panvk_gpu_prerast_gs_params {
++   uint64_t vs_records;
++   uint64_t vs_outputs;
++   uint64_t gen_indices;
++   uint64_t records;
++   uint64_t indices;
++   uint64_t draw;
++   uint32_t vertex_count;
++   uint32_t instance_count;
++   uint32_t primitive_restart;
++   uint32_t prim;
++   uint32_t cap_slots;
++   uint32_t vs_record_capacity;
++   uint32_t provoking_last;
++   uint32_t _pad;
++};
++
++static_assert(PANVK_GPU_PRERAST_GS_PARAMS_OFFSET +
++                    sizeof(struct panvk_gpu_prerast_gs_params) <=
++                 PANVK_GPU_PRERAST_INDEX_OFFSET,
++              "gpu_prerast GS params overlap the index buffer");
++
++static inline uint32_t
++panvk_gpu_prerast_gs_cap_slots(const struct panvk_gpu_prerast_gs_info *gs)
++{
++   if (!gs->max_vertices || !gs->record_stride || !gs->index_stride)
++      return 0;
++
++   uint64_t rec = (PANVK_GPU_PRERAST_ARENA_SIZE -
++                   PANVK_GPU_PRERAST_GS_RECORD_OFFSET) /
++                  ((uint64_t)gs->record_stride * gs->max_vertices);
++   uint64_t idx = PANVK_GPU_PRERAST_GS_INDEX_CAPACITY / gs->index_stride;
++   return MIN2(rec, idx);
++}
++
+ struct panvk_gpu_prerast_draw {
+    uint64_t index_buffer;
+    uint64_t indirect_buffer;
+@@ -162,7 +220,7 @@ static inline uint32_t
+ panvk_gpu_prerast_record_capacity(uint32_t record_stride)
+ {
+    uint64_t cap = record_stride
+-      ? (PANVK_GPU_PRERAST_ARENA_SIZE - PANVK_GPU_PRERAST_RECORD_OFFSET) /
++      ? (PANVK_GPU_PRERAST_VS_REGION_END - PANVK_GPU_PRERAST_RECORD_OFFSET) /
+            record_stride
+       : 0;
+    return MIN2(cap, PANVK_GPU_PRERAST_MAX_INVOCATIONS);
+diff --git a/src/panfrost/vulkan/panvk_instance.c b/src/panfrost/vulkan/panvk_instance.c
+index c0d1b3c2ccd..e20a15a6920 100644
+--- a/src/panfrost/vulkan/panvk_instance.c
++++ b/src/panfrost/vulkan/panvk_instance.c
+@@ -63,6 +63,7 @@ static const struct debug_control panvk_debug_options[] = {
+    {"kbase_diag", PANVK_DEBUG_KBASE_DIAG},
+    {"gpu_prerast", PANVK_DEBUG_GPU_PRERAST},
+    {"no_bc_emul", PANVK_DEBUG_NO_BC_EMUL},
++   {"gs", PANVK_DEBUG_GS},
+    {NULL, 0},
+ };
+ 
+diff --git a/src/panfrost/vulkan/panvk_instance.h b/src/panfrost/vulkan/panvk_instance.h
+index 8474961fdf6..267028a9e0c 100644
+--- a/src/panfrost/vulkan/panvk_instance.h
++++ b/src/panfrost/vulkan/panvk_instance.h
+@@ -38,6 +38,7 @@ enum panvk_debug_flags {
+    PANVK_DEBUG_KBASE_DIAG = 1 << 20,
+    PANVK_DEBUG_GPU_PRERAST = 1 << 21,
+    PANVK_DEBUG_NO_BC_EMUL = 1 << 22,
++   PANVK_DEBUG_GS = 1 << 23,
+ };
+ 
+ extern uint64_t panvk_debug;
+diff --git a/src/panfrost/vulkan/panvk_shader.h b/src/panfrost/vulkan/panvk_shader.h
+index 3610fa3f3bd..cb37c93553e 100644
+--- a/src/panfrost/vulkan/panvk_shader.h
++++ b/src/panfrost/vulkan/panvk_shader.h
+@@ -458,6 +458,14 @@ enum panvk_vs_variant {
+    PANVK_VS_VARIANTS,
+ };
+ 
++#if PAN_ARCH >= 10
++enum panvk_gs_variant {
++   PANVK_GS_VARIANT_PASSTHROUGH,
++   PANVK_GS_VARIANT_KERNEL,
++   PANVK_GS_VARIANTS,
++};
++#endif
++
+ struct panvk_shader {
+    struct vk_shader vk;
+ 
+@@ -475,6 +483,10 @@ panvk_shader_num_variants(mesa_shader_stage stage)
+ {
+    if (stage == MESA_SHADER_VERTEX)
+       return PANVK_VS_VARIANTS;
++#if PAN_ARCH >= 10
++   if (stage == MESA_SHADER_GEOMETRY)
++      return PANVK_GS_VARIANTS;
++#endif
+ 
+    return 1;
+ }
+@@ -500,6 +512,11 @@ panvk_shader_variant_name(const struct panvk_shader *shader,
+       return panvk_vs_shader_variant_name[i];
+    }
+ 
++#if PAN_ARCH >= 10
++   if (shader->vk.stage == MESA_SHADER_GEOMETRY)
++      return i == PANVK_GS_VARIANT_KERNEL ? "GS_KERNEL" : "GS_PASSTHROUGH";
++#endif
++
+    assert(panvk_shader_num_variants(shader->vk.stage) == 1);
+ 
+    return NULL;
+diff --git a/src/panfrost/vulkan/panvk_vX_cmd_meta.c b/src/panfrost/vulkan/panvk_vX_cmd_meta.c
+index 37c1356e3af..28f2b4ee837 100644
+--- a/src/panfrost/vulkan/panvk_vX_cmd_meta.c
++++ b/src/panfrost/vulkan/panvk_vX_cmd_meta.c
+@@ -179,6 +179,10 @@ meta_gfx_start(struct panvk_cmd_buffer *cmdbuf,
+    save_ctx->vs.shader = cmdbuf->state.gfx.vs.shader;
+    save_ctx->vs.desc = cmdbuf->state.gfx.vs.desc;
+    save_ctx->vb0 = cmdbuf->state.gfx.vb.bufs[0];
++#if PAN_ARCH >= 10
++   save_ctx->gs = cmdbuf->state.gfx.gs.shader;
++   cmdbuf->state.gfx.gs.shader = NULL;
++#endif
+ 
+    save_ctx->dyn_state.all = cmdbuf->vk.dynamic_graphics_state;
+    save_ctx->dyn_state.vi = cmdbuf->state.gfx.dynamic.vi;
+@@ -245,6 +249,9 @@ meta_gfx_end(struct panvk_cmd_buffer *cmdbuf,
+    cmdbuf->state.gfx.vs.shader = save_ctx->vs.shader;
+    cmdbuf->state.gfx.vs.desc = save_ctx->vs.desc;
+    cmdbuf->state.gfx.vb.bufs[0] = save_ctx->vb0;
++#if PAN_ARCH >= 10
++   cmdbuf->state.gfx.gs.shader = save_ctx->gs;
++#endif
+ 
+ #if PAN_ARCH < 9
+    cmdbuf->state.gfx.vs.attribs = 0;
+diff --git a/src/panfrost/vulkan/panvk_vX_device.c b/src/panfrost/vulkan/panvk_vX_device.c
+index d1df4297f6d..75a92e3dbd6 100644
+--- a/src/panfrost/vulkan/panvk_vX_device.c
++++ b/src/panfrost/vulkan/panvk_vX_device.c
+@@ -585,7 +585,8 @@ panvk_per_arch(create_device)(struct panvk_physical_device *physical_device,
+    panvk_device_init_mempools(device);
+ 
+ #if PAN_ARCH >= 10
+-   if (PANVK_DEBUG(GPU_PRERAST) || device->vk.enabled_features.fillModeNonSolid) {
++   if (PANVK_DEBUG(GPU_PRERAST) || device->vk.enabled_features.fillModeNonSolid ||
++       device->vk.enabled_features.geometryShader) {
+       device->gpu_prerast_arena = panvk_pool_alloc_mem(
+          &device->mempools.rw,
+          (struct panvk_pool_alloc_info){
+diff --git a/src/panfrost/vulkan/panvk_vX_nir_lower_descriptors.c b/src/panfrost/vulkan/panvk_vX_nir_lower_descriptors.c
+index a5327ac9978..54c293ecbcd 100644
+--- a/src/panfrost/vulkan/panvk_vX_nir_lower_descriptors.c
++++ b/src/panfrost/vulkan/panvk_vX_nir_lower_descriptors.c
+@@ -1200,6 +1200,7 @@ create_copy_table(nir_shader *nir, struct lower_desc_ctx *ctx)
+       dummy_sampler_idx = desc_info->num_varying_attr_descs;
+       break;
+    case MESA_SHADER_COMPUTE:
++   case MESA_SHADER_GEOMETRY:
+       dummy_sampler_idx = 0;
+       break;
+    default:
+diff --git a/src/panfrost/vulkan/panvk_vX_physical_device.c b/src/panfrost/vulkan/panvk_vX_physical_device.c
+index a4d7019e359..81b33336141 100644
+--- a/src/panfrost/vulkan/panvk_vX_physical_device.c
++++ b/src/panfrost/vulkan/panvk_vX_physical_device.c
+@@ -308,7 +308,7 @@ panvk_per_arch(get_physical_device_features)(
+       .fullDrawIndexUint32 = true,
+       .imageCubeArray = true,
+       .independentBlend = true,
+-      .geometryShader = false,
++      .geometryShader = PAN_ARCH >= 10 && PANVK_DEBUG(GS),
+       .tessellationShader = false,
+       .sampleRateShading = true,
+       .dualSrcBlend = true,
+@@ -925,12 +925,11 @@ panvk_per_arch(get_physical_device_properties)(
+       .maxTessellationControlTotalOutputComponents = 0,
+       .maxTessellationEvaluationInputComponents = 0,
+       .maxTessellationEvaluationOutputComponents = 0,
+-      /* Geometry shaders not supported. */
+-      .maxGeometryShaderInvocations = 0,
+-      .maxGeometryInputComponents = 0,
+-      .maxGeometryOutputComponents = 0,
+-      .maxGeometryOutputVertices = 0,
+-      .maxGeometryTotalOutputComponents = 0,
++      .maxGeometryShaderInvocations = PAN_ARCH >= 10 ? 32 : 0,
++      .maxGeometryInputComponents = PAN_ARCH >= 10 ? 64 : 0,
++      .maxGeometryOutputComponents = PAN_ARCH >= 10 ? 128 : 0,
++      .maxGeometryOutputVertices = PAN_ARCH >= 10 ? 256 : 0,
++      .maxGeometryTotalOutputComponents = PAN_ARCH >= 10 ? 1024 : 0,
+       /* 32 vec4 varyings. */
+       .maxFragmentInputComponents = 128,
+       /* 8 render targets. */
+diff --git a/src/panfrost/vulkan/panvk_vX_shader.c b/src/panfrost/vulkan/panvk_vX_shader.c
+index 4da671a62b8..ef935b3d4a1 100644
+--- a/src/panfrost/vulkan/panvk_vX_shader.c
++++ b/src/panfrost/vulkan/panvk_vX_shader.c
+@@ -1214,6 +1214,560 @@ panvk_gpu_prerast_polygon_nir(const nir_shader_compiler_options *options,
+    return b.shader;
+ }
+ #undef PRERAST_PARAM
++
++#define GS_PARAM(b, p, bits, field)                                            \
++   nir_load_global((b), 1, (bits),                                             \
++                   nir_iadd_imm((b), (p),                                      \
++                                offsetof(struct panvk_gpu_prerast_gs_params,   \
++                                         field)),                              \
++                   .align_mul = (bits) / 8)
++
++struct panvk_gs_lower_state {
++   const struct panvk_gpu_prerast_gs_info *gs;
++   nir_variable *vcount;
++   nir_variable *ipos;
++   nir_def *vin[6];
++   unsigned nvin;
++   nir_def *inst;
++   nir_def *n;
++   nir_def *vs_records;
++   nir_def *vs_outputs;
++   nir_def *vs_stride;
++   nir_def *rec_base;
++   nir_def *rec_idx_base;
++   nir_def *idx_base;
++   nir_def *prim_id;
++   nir_def *invocation;
++};
++
++static nir_def *
++panvk_gs_is_restart(nir_builder *b, nir_def *restart_en, nir_def *gen,
++                    nir_def *pos)
++{
++   nir_def *idx = nir_load_global(
++      b, 1, 32, nir_iadd(b, gen, nir_u2u64(b, nir_imul_imm(b, pos, 4))),
++      .align_mul = 4);
++   return nir_iand(b, restart_en, nir_ieq_imm(b, idx, 0xffffffff));
++}
++
++static nir_def *
++panvk_gs_prims_in_run(nir_builder *b, nir_def *prim, nir_def *len)
++{
++   nir_def *zero = nir_imm_int(b, 0);
++   nir_def *sub_clamp1 = nir_bcsel(b, nir_uge_imm(b, len, 1),
++                                   nir_iadd_imm(b, len, -1), zero);
++   nir_def *sub_clamp2 = nir_bcsel(b, nir_uge_imm(b, len, 2),
++                                   nir_iadd_imm(b, len, -2), zero);
++   nir_def *sub_clamp3 = nir_bcsel(b, nir_uge_imm(b, len, 3),
++                                   nir_iadd_imm(b, len, -3), zero);
++   nir_def *strip_adj = nir_bcsel(b, nir_uge_imm(b, len, 6),
++                                  nir_udiv_imm(b, nir_iadd_imm(b, len, -4), 2),
++                                  zero);
++   nir_def *r = len;
++   r = nir_bcsel(b, nir_ieq_imm(b, prim, MESA_PRIM_LINES),
++                 nir_udiv_imm(b, len, 2), r);
++   r = nir_bcsel(b, nir_ieq_imm(b, prim, MESA_PRIM_LINE_STRIP), sub_clamp1, r);
++   r = nir_bcsel(b, nir_ieq_imm(b, prim, MESA_PRIM_TRIANGLES),
++                 nir_udiv_imm(b, len, 3), r);
++   r = nir_bcsel(b, nir_ior(b, nir_ieq_imm(b, prim, MESA_PRIM_TRIANGLE_STRIP),
++                            nir_ieq_imm(b, prim, MESA_PRIM_TRIANGLE_FAN)),
++                 sub_clamp2, r);
++   r = nir_bcsel(b, nir_ieq_imm(b, prim, MESA_PRIM_LINES_ADJACENCY),
++                 nir_udiv_imm(b, len, 4), r);
++   r = nir_bcsel(b, nir_ieq_imm(b, prim, MESA_PRIM_LINE_STRIP_ADJACENCY),
++                 sub_clamp3, r);
++   r = nir_bcsel(b, nir_ieq_imm(b, prim, MESA_PRIM_TRIANGLES_ADJACENCY),
++                 nir_udiv_imm(b, len, 6), r);
++   r = nir_bcsel(b, nir_ieq_imm(b, prim, MESA_PRIM_TRIANGLE_STRIP_ADJACENCY),
++                 strip_adj, r);
++   return r;
++}
++
++static nir_def *
++panvk_gs_tri_strip_adj_offset(nir_builder *b, nir_def *lp, unsigned v,
++                              nir_def *np, nir_def *pv_last)
++{
++   nir_def *last = nir_ieq(b, lp, nir_iadd_imm(b, np, -1));
++   nir_def *first = nir_ieq_imm(b, lp, 0);
++   nir_def *even = nir_ieq_imm(b, nir_iand_imm(b, lp, 1), 0);
++   nir_def *even_or_first = nir_ior(b, even, first);
++
++   nir_def *vr = nir_imm_int(b, v);
++   vr = nir_bcsel(b, nir_iand(b, pv_last, nir_inot(b, even_or_first)),
++                  nir_imm_int(b, (v + 4) % 6), vr);
++
++   nir_def *offs[6] = {
++      nir_imm_int(b, 0),
++      nir_bcsel(b, first, nir_imm_int(b, 1),
++                nir_bcsel(b, even, nir_imm_int(b, -2), nir_imm_int(b, 3))),
++      nir_bcsel(b, even_or_first, nir_imm_int(b, 2), nir_imm_int(b, 4)),
++      nir_bcsel(b, last, nir_imm_int(b, 5), nir_imm_int(b, 6)),
++      nir_bcsel(b, even_or_first, nir_imm_int(b, 4), nir_imm_int(b, 2)),
++      nir_bcsel(b, even_or_first, nir_imm_int(b, 3), nir_imm_int(b, -2)),
++   };
++   nir_def *off = offs[0];
++   for (unsigned i = 1; i < 6; i++)
++      off = nir_bcsel(b, nir_ieq_imm(b, vr, i), offs[i], off);
++
++   return nir_iadd(b, nir_imul_imm(b, lp, 2), off);
++}
++
++static nir_def *
++panvk_gs_widen32(nir_builder *b, nir_def *value, nir_alu_type type)
++{
++   if (value->bit_size == 32)
++      return value;
++
++   nir_alu_type base = nir_alu_type_get_base_type(type);
++   return base == nir_type_float ? nir_f2f32(b, value)
++          : base == nir_type_int ? nir_i2i32(b, value)
++                                 : nir_u2u32(b, value);
++}
++
++static bool
++panvk_gs_lower_intr(nir_builder *b, nir_intrinsic_instr *intr, void *data)
++{
++   struct panvk_gs_lower_state *s = data;
++   const struct panvk_gpu_prerast_gs_info *gs = s->gs;
++
++   switch (intr->intrinsic) {
++   case nir_intrinsic_store_output: {
++      b->cursor = nir_instr_remove(&intr->instr);
++      nir_io_semantics sem = nir_intrinsic_io_semantics(intr);
++      if (sem.gs_streams & 0x3)
++         return true;
++      unsigned location = sem.location;
++      if (nir_src_is_const(intr->src[1]))
++         location += nir_src_as_uint(intr->src[1]);
++      if (!(gs->outputs_written & BITFIELD64_BIT(location)))
++         return true;
++      unsigned slot =
++         util_bitcount64(gs->outputs_written & BITFIELD64_MASK(location));
++      nir_def *vc = nir_load_var(b, s->vcount);
++      nir_def *addr = nir_iadd(
++         b, s->rec_base,
++         nir_u2u64(b, nir_iadd_imm(b, nir_imul_imm(b, vc, gs->record_stride),
++                                   slot * 16 +
++                                      nir_intrinsic_component(intr) * 4)));
++      nir_def *value = panvk_gs_widen32(b, intr->src[0].ssa,
++                                        nir_intrinsic_src_type(intr));
++      nir_push_if(b, nir_ult_imm(b, vc, gs->max_vertices));
++      nir_store_global(b, value, addr,
++                       .write_mask = nir_intrinsic_write_mask(intr),
++                       .align_mul = 4);
++      nir_pop_if(b, NULL);
++      return true;
++   }
++
++   case nir_intrinsic_emit_vertex: {
++      b->cursor = nir_instr_remove(&intr->instr);
++      if (nir_intrinsic_stream_id(intr) != 0)
++         return true;
++      nir_def *vc = nir_load_var(b, s->vcount);
++      nir_push_if(b, nir_ult_imm(b, vc, gs->max_vertices));
++      {
++         nir_def *ip = nir_load_var(b, s->ipos);
++         nir_push_if(b, nir_ult_imm(b, ip, gs->index_stride));
++         nir_store_global(b, nir_iadd(b, s->rec_idx_base, vc),
++                          nir_iadd(b, s->idx_base,
++                                   nir_u2u64(b, nir_imul_imm(b, ip, 4))),
++                          .write_mask = 1, .align_mul = 4);
++         nir_pop_if(b, NULL);
++         nir_store_var(b, s->ipos, nir_iadd_imm(b, ip, 1), 1);
++         nir_store_var(b, s->vcount, nir_iadd_imm(b, vc, 1), 1);
++      }
++      nir_pop_if(b, NULL);
++      return true;
++   }
++
++   case nir_intrinsic_end_primitive: {
++      b->cursor = nir_instr_remove(&intr->instr);
++      if (nir_intrinsic_stream_id(intr) != 0)
++         return true;
++      nir_store_var(b, s->ipos, nir_iadd_imm(b, nir_load_var(b, s->ipos), 1),
++                    1);
++      return true;
++   }
++
++   case nir_intrinsic_load_per_vertex_input: {
++      b->cursor = nir_before_instr(&intr->instr);
++      nir_io_semantics sem = nir_intrinsic_io_semantics(intr);
++      nir_def *vtx = intr->src[0].ssa;
++      nir_def *pos = s->vin[0];
++      for (unsigned i = 1; i < s->nvin; i++)
++         pos = nir_bcsel(b, nir_ieq_imm(b, vtx, i), s->vin[i], pos);
++      nir_def *loc = nir_iadd_imm(b, intr->src[1].ssa, sem.location);
++      nir_def *below = nir_iadd_imm(
++         b, nir_ishl(b, nir_imm_int64(b, 1), loc), -1);
++      nir_def *slot = nir_bit_count(b, nir_iand(b, s->vs_outputs, below));
++      nir_def *rec = nir_iadd(b, nir_imul(b, s->inst, s->n), pos);
++      nir_def *off = nir_iadd(
++         b, nir_imul(b, rec, s->vs_stride),
++         nir_iadd_imm(b, nir_imul_imm(b, slot, 16),
++                      nir_intrinsic_component(intr) * 4));
++      nir_def *v = nir_load_global(b, intr->def.num_components, 32,
++                                   nir_iadd(b, s->vs_records, nir_u2u64(b, off)),
++                                   .align_mul = 4);
++      if (intr->def.bit_size != 32) {
++         nir_alu_type t = nir_intrinsic_has_dest_type(intr)
++                             ? nir_alu_type_get_base_type(
++                                  nir_intrinsic_dest_type(intr))
++                             : nir_type_float;
++         v = t == nir_type_float ? nir_f2fN(b, v, intr->def.bit_size)
++                                 : nir_u2uN(b, v, intr->def.bit_size);
++      }
++      nir_def_replace(&intr->def, v);
++      return true;
++   }
++
++   case nir_intrinsic_load_primitive_id:
++      b->cursor = nir_before_instr(&intr->instr);
++      nir_def_replace(&intr->def, s->prim_id);
++      return true;
++
++   case nir_intrinsic_load_invocation_id:
++      b->cursor = nir_before_instr(&intr->instr);
++      nir_def_replace(&intr->def, s->invocation);
++      return true;
++
++   default:
++      return false;
++   }
++}
++
++static void
++panvk_gpu_prerast_lower_gs(nir_shader *nir,
++                           const struct panvk_gpu_prerast_gs_info *gs)
++{
++   nir_function_impl *impl = nir_shader_get_entrypoint(nir);
++   const bool reads_prim_id =
++      BITSET_TEST(nir->info.system_values_read, SYSTEM_VALUE_PRIMITIVE_ID);
++   const unsigned nvin = nir->info.gs.vertices_in;
++   const enum mesa_prim in_prim = nir->info.gs.input_primitive;
++
++   nir_cf_list body;
++   nir_cf_extract(&body, nir_before_impl(impl), nir_after_impl(impl));
++
++   nir_builder bld = nir_builder_at(nir_before_impl(impl));
++   nir_builder *b = &bld;
++
++   struct panvk_gs_lower_state s = {
++      .gs = gs,
++      .nvin = nvin,
++   };
++   s.vcount = nir_local_variable_create(impl, glsl_uint_type(), "gs_vcount");
++   s.ipos = nir_local_variable_create(impl, glsl_uint_type(), "gs_ipos");
++
++   nir_def *gid = nir_load_global_invocation_id(b, 32);
++   nir_def *j = nir_channel(b, gid, 0);
++   s.inst = nir_channel(b, gid, 1);
++   s.invocation = nir_channel(b, gid, 2);
++   nir_def *p = load_sysval(b, graphics, 64, gpu_prerast_params);
++
++   s.n = GS_PARAM(b, p, 32, vertex_count);
++   nir_def *ninst = GS_PARAM(b, p, 32, instance_count);
++   nir_def *restart_en =
++      nir_ine_imm(b, GS_PARAM(b, p, 32, primitive_restart), 0);
++   nir_def *prim = GS_PARAM(b, p, 32, prim);
++   nir_def *cap_slots = GS_PARAM(b, p, 32, cap_slots);
++   nir_def *vs_cap = GS_PARAM(b, p, 32, vs_record_capacity);
++   nir_def *pv_last = nir_ine_imm(b, GS_PARAM(b, p, 32, provoking_last), 0);
++   nir_def *gen = GS_PARAM(b, p, 64, gen_indices);
++   s.vs_records = GS_PARAM(b, p, 64, vs_records);
++   s.vs_outputs = GS_PARAM(b, p, 64, vs_outputs);
++   s.vs_stride = nir_imul_imm(b, nir_bit_count(b, s.vs_outputs), 16);
++   nir_def *records = GS_PARAM(b, p, 64, records);
++   nir_def *indices = GS_PARAM(b, p, 64, indices);
++
++   nir_def *slot_idx = nir_iadd(
++      b, nir_imul_imm(b, nir_iadd(b, nir_imul(b, s.inst, s.n), j),
++                      gs->invocations),
++      s.invocation);
++   nir_def *in_cap = nir_ult(b, slot_idx, cap_slots);
++
++   nir_push_if(b, nir_ieq_imm(b, nir_ior(b, nir_ior(b, j, s.inst),
++                                          s.invocation), 0));
++   {
++      nir_def *total = nir_umin(
++         b, nir_imul_imm(b, nir_imul(b, s.n, ninst), gs->invocations),
++         cap_slots);
++      nir_def *draw = GS_PARAM(b, p, 64, draw);
++      nir_store_global(b,
++                       nir_vec4(b, nir_imul_imm(b, total, gs->index_stride),
++                                nir_imm_int(b, 1), nir_imm_int(b, 0),
++                                nir_imm_int(b, 0)),
++                       draw, .write_mask = 0xf, .align_mul = 4);
++      nir_store_global(b, nir_imm_int(b, 0), nir_iadd_imm(b, draw, 16),
++                       .write_mask = 1, .align_mul = 4);
++   }
++   nir_pop_if(b, NULL);
++
++   s.idx_base = nir_iadd(
++      b, indices,
++      nir_u2u64(b, nir_imul_imm(b, slot_idx, gs->index_stride * 4)));
++   s.rec_idx_base = nir_imul_imm(b, slot_idx, gs->max_vertices);
++   s.rec_base = nir_iadd(
++      b, records,
++      nir_u2u64(b, nir_imul_imm(b, s.rec_idx_base, gs->record_stride)));
++
++   nir_push_if(b, in_cap);
++   {
++      nir_variable *fill =
++         nir_local_variable_create(impl, glsl_uint_type(), "gs_fill");
++      nir_store_var(b, fill, nir_imm_int(b, 0), 1);
++      nir_def *rst = nir_imm_int(b, 0xffffffff);
++      nir_push_loop(b);
++      {
++         nir_def *f = nir_load_var(b, fill);
++         nir_break_if(b, nir_uge_imm(b, f, gs->index_stride));
++         nir_store_global(b, nir_vec4(b, rst, rst, rst, rst),
++                          nir_iadd(b, s.idx_base,
++                                   nir_u2u64(b, nir_imul_imm(b, f, 4))),
++                          .write_mask = 0xf, .align_mul = 16);
++         nir_store_var(b, fill, nir_iadd_imm(b, f, 4), 1);
++      }
++      nir_pop_loop(b, NULL);
++   }
++   nir_pop_if(b, NULL);
++
++   nir_variable *seg_var =
++      nir_local_variable_create(impl, glsl_uint_type(), "gs_seg");
++   nir_variable *end_var =
++      nir_local_variable_create(impl, glsl_uint_type(), "gs_end");
++   nir_store_var(b, seg_var, nir_imm_int(b, 0), 1);
++   nir_store_var(b, end_var, s.n, 1);
++   nir_push_if(b, restart_en);
++   {
++      nir_store_var(b, seg_var, j, 1);
++      nir_push_loop(b);
++      {
++         nir_def *sg = nir_load_var(b, seg_var);
++         nir_break_if(b, nir_ieq_imm(b, sg, 0));
++         nir_def *sm1 = nir_iadd_imm(b, sg, -1);
++         nir_break_if(b, panvk_gs_is_restart(b, restart_en, gen, sm1));
++         nir_store_var(b, seg_var, sm1, 1);
++      }
++      nir_pop_loop(b, NULL);
++
++      if (in_prim == MESA_PRIM_TRIANGLES_ADJACENCY) {
++         nir_store_var(b, end_var, j, 1);
++         nir_push_loop(b);
++         {
++            nir_def *e = nir_load_var(b, end_var);
++            nir_break_if(b, nir_uge(b, e, s.n));
++            nir_break_if(b, panvk_gs_is_restart(b, restart_en, gen, e));
++            nir_store_var(b, end_var, nir_iadd_imm(b, e, 1), 1);
++         }
++         nir_pop_loop(b, NULL);
++      }
++   }
++   nir_pop_if(b, NULL);
++   nir_def *seg = nir_load_var(b, seg_var);
++   nir_def *seg_len = nir_isub(b, nir_load_var(b, end_var), seg);
++   nir_def *k = nir_isub(b, j, seg);
++   nir_def *self_restart = panvk_gs_is_restart(b, restart_en, gen, j);
++
++   nir_def *valid = NULL, *lp = NULL;
++   nir_def *zero = nir_imm_int(b, 0);
++   switch (in_prim) {
++   case MESA_PRIM_POINTS:
++      valid = nir_imm_true(b);
++      lp = k;
++      for (unsigned v = 0; v < nvin; v++)
++         s.vin[v] = j;
++      break;
++
++   case MESA_PRIM_LINES:
++   case MESA_PRIM_LINES_ADJACENCY: {
++      const unsigned nv = nvin;
++      const enum mesa_prim strip =in_prim == MESA_PRIM_LINES
++                                 ? MESA_PRIM_LINE_STRIP
++                                 : MESA_PRIM_LINE_STRIP_ADJACENCY;
++      nir_def *is_strip = nir_ieq_imm(b, prim, strip);
++      valid = nir_bcsel(b, is_strip, nir_uge_imm(b, k, nv - 1),
++                        nir_ieq_imm(b, nir_umod_imm(b, k, nv), nv - 1));
++      lp = nir_bcsel(b, is_strip,
++                     nir_bcsel(b, nir_uge_imm(b, k, nv - 1),
++                               nir_iadd_imm(b, k, -(int)(nv - 1)), zero),
++                     nir_udiv_imm(b, k, nv));
++      for (unsigned v = 0; v < nv; v++)
++         s.vin[v] = nir_iadd_imm(b, j, (int)v - (int)(nv - 1));
++      break;
++   }
++
++   case MESA_PRIM_TRIANGLES: {
++      nir_def *is_list = nir_ieq_imm(b, prim, MESA_PRIM_TRIANGLES);
++      nir_def *is_strip = nir_ieq_imm(b, prim, MESA_PRIM_TRIANGLE_STRIP);
++      nir_def *ge2 = nir_uge_imm(b, k, 2);
++      valid = nir_bcsel(b, is_list,
++                        nir_ieq_imm(b, nir_umod_imm(b, k, 3), 2), ge2);
++      nir_def *slp = nir_bcsel(b, ge2, nir_iadd_imm(b, k, -2), zero);
++      lp = nir_bcsel(b, is_list, nir_udiv_imm(b, k, 3), slp);
++      nir_def *odd = nir_ine_imm(b, nir_iand_imm(b, slp, 1), 0);
++      for (unsigned v = 0; v < 3; v++) {
++         nir_def *first_map =
++            nir_bcsel(b, odd, nir_imm_int(b, v == 0 ? 0 : 3 - v),
++                      nir_imm_int(b, v));
++         nir_def *last_map =
++            nir_bcsel(b, odd, nir_imm_int(b, v == 2 ? 2 : 1 - v),
++                      nir_imm_int(b, v));
++         nir_def *smap = nir_bcsel(b, pv_last, last_map, first_map);
++         nir_def *strip_pos = nir_iadd(b, nir_iadd(b, seg, slp), smap);
++         nir_def *fv_first = nir_imm_int(b, v == 2 ? 0 : v + 1);
++         nir_def *fv = nir_bcsel(b, pv_last, nir_imm_int(b, v), fv_first);
++         nir_def *fan_pos =
++            nir_bcsel(b, nir_ieq_imm(b, fv, 0), seg,
++                      nir_iadd(b, nir_iadd(b, seg, slp), fv));
++         nir_def *list_pos = nir_iadd_imm(b, j, (int)v - 2);
++         s.vin[v] = nir_bcsel(b, is_list, list_pos,
++                              nir_bcsel(b, is_strip, strip_pos, fan_pos));
++      }
++      break;
++   }
++
++   case MESA_PRIM_TRIANGLES_ADJACENCY: {
++      nir_def *is_strip =
++         nir_ieq_imm(b, prim, MESA_PRIM_TRIANGLE_STRIP_ADJACENCY);
++      nir_def *np = panvk_gs_prims_in_run(b, prim, seg_len);
++      nir_def *ge5 = nir_uge_imm(b, k, 5);
++      nir_def *slp = nir_bcsel(b, ge5,
++                               nir_ushr_imm(b, nir_iadd_imm(b, k, -5), 1),
++                               zero);
++      nir_def *strip_valid =
++         nir_iand(b, nir_iand(b, ge5, nir_ieq_imm(b, nir_iand_imm(b, k, 1), 1)),
++                  nir_ult(b, slp, np));
++      valid = nir_bcsel(b, is_strip, strip_valid,
++                        nir_ieq_imm(b, nir_umod_imm(b, k, 6), 5));
++      lp = nir_bcsel(b, is_strip, slp, nir_udiv_imm(b, k, 6));
++      for (unsigned v = 0; v < 6; v++) {
++         nir_def *strip_pos = nir_iadd(
++            b, seg, panvk_gs_tri_strip_adj_offset(b, slp, v, np, pv_last));
++         s.vin[v] = nir_bcsel(b, is_strip, strip_pos,
++                              nir_iadd_imm(b, j, (int)v - 5));
++      }
++      break;
++   }
++
++   default:
++      UNREACHABLE("invalid GS input primitive");
++   }
++
++   valid = nir_iand(b, valid, nir_inot(b, self_restart));
++   valid = nir_iand(b, valid, in_cap);
++   valid = nir_iand(b, valid,
++                    nir_uge(b, vs_cap,
++                            nir_imul(b, nir_iadd_imm(b, s.inst, 1), s.n)));
++
++   s.prim_id = lp;
++   if (reads_prim_id) {
++      nir_variable *before =
++         nir_local_variable_create(impl, glsl_uint_type(), "gs_prims_before");
++      nir_store_var(b, before, zero, 1);
++      nir_push_if(b, restart_en);
++      {
++         nir_variable *q =
++            nir_local_variable_create(impl, glsl_uint_type(), "gs_q");
++         nir_variable *len =
++            nir_local_variable_create(impl, glsl_uint_type(), "gs_len");
++         nir_store_var(b, q, zero, 1);
++         nir_store_var(b, len, zero, 1);
++         nir_push_loop(b);
++         {
++            nir_def *qq = nir_load_var(b, q);
++            nir_break_if(b, nir_uge(b, qq, seg));
++            nir_def *l = nir_load_var(b, len);
++            nir_push_if(b, panvk_gs_is_restart(b, restart_en, gen, qq));
++            {
++               nir_store_var(b, before,
++                             nir_iadd(b, nir_load_var(b, before),
++                                      panvk_gs_prims_in_run(b, prim, l)),
++                             1);
++               nir_store_var(b, len, zero, 1);
++            }
++            nir_push_else(b, NULL);
++            nir_store_var(b, len, nir_iadd_imm(b, l, 1), 1);
++            nir_pop_if(b, NULL);
++            nir_store_var(b, q, nir_iadd_imm(b, qq, 1), 1);
++         }
++         nir_pop_loop(b, NULL);
++      }
++      nir_pop_if(b, NULL);
++      s.prim_id = nir_iadd(b, nir_load_var(b, before), lp);
++   }
++
++   nir_store_var(b, s.vcount, zero, 1);
++   nir_store_var(b, s.ipos, zero, 1);
++
++   nir_if *vif = nir_push_if(b, valid);
++   b->cursor = nir_cf_reinsert(&body, b->cursor);
++   nir_pop_if(b, vif);
++
++   nir_progress(true, impl, nir_metadata_none);
++
++   nir_shader_intrinsics_pass(nir, panvk_gs_lower_intr, nir_metadata_none,
++                              &s);
++
++   nir->info.stage = MESA_SHADER_COMPUTE;
++   memset(&nir->info.cs, 0, sizeof(nir->info.cs));
++   nir->info.workgroup_size[0] = 1;
++   nir->info.workgroup_size[1] = 1;
++   nir->info.workgroup_size[2] = 1;
++   nir->info.outputs_written = 0;
++   nir->info.inputs_read = 0;
++   nir->num_outputs = 0;
++   nir->num_inputs = 0;
++}
++
++static nir_shader *
++panvk_gpu_prerast_gs_passthrough_nir(const nir_shader_compiler_options *options,
++                                     const struct panvk_gpu_prerast_gs_info *gs,
++                                     const struct panvk_gpu_prerast_out_types *t)
++{
++   nir_builder b = nir_builder_init_simple_shader(
++      MESA_SHADER_VERTEX, options, "panvk_gpu_prerast_gs_passthrough");
++   nir_def *base = load_sysval(&b, graphics, 64, gpu_prerast_records);
++   nir_def *record = nir_iadd(
++      &b, base,
++      nir_u2u64(&b, nir_imul_imm(&b, nir_load_vertex_id(&b),
++                                 gs->record_stride)));
++
++   unsigned idx = 0;
++   u_foreach_bit64(location, gs->outputs_written) {
++      if (location == VARYING_SLOT_VIEWPORT)
++         continue;
++      unsigned slot =
++         util_bitcount64(gs->outputs_written & BITFIELD64_MASK(location));
++      unsigned ncomp = 4;
++      nir_alu_type type = t->type[location] ? t->type[location]
++                                            : nir_type_float32;
++      switch (location) {
++      case VARYING_SLOT_PSIZ:
++         ncomp = 1;
++         type = nir_type_float32;
++         break;
++      case VARYING_SLOT_LAYER:
++      case VARYING_SLOT_VIEWPORT:
++      case VARYING_SLOT_PRIMITIVE_ID:
++         ncomp = 1;
++         type = nir_type_int32;
++         break;
++      default:
++         break;
++      }
++      nir_def *value = nir_load_global(&b, ncomp, 32,
++                                       nir_iadd_imm(&b, record, slot * 16),
++                                       .align_mul = 4);
++      nir_store_output(&b, value, nir_imm_int(&b, 0), .base = idx++,
++                       .write_mask = BITFIELD_MASK(ncomp), .src_type = type,
++                       .io_semantics = {.location = location, .num_slots = 1});
++   }
++
++   b.shader->info.outputs_written =
++      gs->outputs_written & ~VARYING_BIT_VIEWPORT;
++   b.shader->num_outputs = idx;
++   return b.shader;
++}
++#undef GS_PARAM
+ #endif
+ 
+ static void
+@@ -2166,6 +2720,7 @@ panvk_compile_shader(struct panvk_device *dev,
+       /* Lowered/passthrough variants only exist on the gpu_prerast path. */
+       const bool want_prerast =
+          PANVK_DEBUG(GPU_PRERAST) ||
++         (info->next_stage_mask & VK_SHADER_STAGE_GEOMETRY_BIT) ||
+          (state && state->rs &&
+           state->rs->polygon_mode != VK_POLYGON_MODE_FILL);
+       const enum panvk_vs_variant last_variant =
+@@ -2263,8 +2818,10 @@ panvk_compile_shader(struct panvk_device *dev,
+                 */
+                shader->gpu_prerast.io.outputs_written =
+                   nir->info.outputs_written;
+-               shader->gpu_prerast.io.record_stride = ALIGN_POT(
+-                  util_bitcount64(nir->info.outputs_written) * 16, 16);
++               shader->gpu_prerast.io.record_stride = MAX2(
++                  ALIGN_POT(util_bitcount64(nir->info.outputs_written) * 16,
++                            16),
++                  16);
+                nir_shader_intrinsics_pass(nir,
+                                           panvk_gpu_prerast_collect_out_type,
+                                           nir_metadata_all, &out_types);
+@@ -2352,6 +2909,75 @@ panvk_compile_shader(struct panvk_device *dev,
+       break;
+    }
+ 
++#if PAN_ARCH >= 10
++   case MESA_SHADER_GEOMETRY: {
++      struct panvk_gpu_prerast_gs_info *gs = &shader->gpu_prerast.gs;
++      struct panvk_gpu_prerast_out_types out_types = {0};
++      nir_shader *nir = info->nir;
++
++      shader->gpu_prerast.io.abi_version = PANVK_GPU_PRERAST_ABI_VERSION;
++      shader->gpu_prerast.has_side_effects = nir->info.writes_memory;
++
++      panvk_lower_nir(dev, nir, info->set_layout_count, info->set_layouts,
++                      info->robustness, state, &shader->desc_info, false);
++      nir_assign_io_var_locations(nir, nir_var_shader_out);
++      panvk_lower_nir_io(nir);
++      NIR_PASS(_, nir, nir_opt_constant_folding);
++      nir_shader_gather_info(nir, nir_shader_get_entrypoint(nir));
++
++      gs->outputs_written = nir->info.outputs_written;
++      gs->record_stride =
++         MAX2(ALIGN_POT(util_bitcount64(gs->outputs_written) * 16, 16), 16);
++      gs->max_vertices = MAX2(nir->info.gs.vertices_out, 1);
++      gs->index_stride = ALIGN_POT(2 * gs->max_vertices, 4);
++      gs->invocations = MAX2(nir->info.gs.invocations, 1);
++      gs->input_prim = nir->info.gs.input_primitive;
++      gs->output_prim = nir->info.gs.output_primitive;
++      nir_shader_intrinsics_pass(nir, panvk_gpu_prerast_collect_out_type,
++                                 nir_metadata_all, &out_types);
++
++      struct panvk_shader_variant *pt =
++         &shader->variants[PANVK_GS_VARIANT_PASSTHROUGH];
++      nir_shader *pt_nir = panvk_gpu_prerast_gs_passthrough_nir(
++         info->nir->options, gs, &out_types);
++      struct panvk_shader_desc_info pt_desc_info = {0};
++      panvk_lower_nir(dev, pt_nir, info->set_layout_count, info->set_layouts,
++                      info->robustness, state, &pt_desc_info, false);
++      NIR_PASS(_, pt_nir, nir_opt_constant_folding);
++      struct pan_varying_layout pt_layout;
++      pan_varying_collect_formats(&pt_layout, pt_nir, inputs.gpu_id);
++      pan_build_varying_layout_compact(&pt_layout, pt_nir, inputs.gpu_id);
++      struct pan_compile_inputs pt_inputs = inputs;
++      pt_inputs.varying_layout = &pt_layout;
++      pt->own_bin = true;
++      result = panvk_compile_nir(dev, pt_nir, info->flags, &pt_inputs, state,
++                                 noperspective_varyings, &pt_desc_info, pt);
++      ralloc_free(pt_nir);
++      if (result != VK_SUCCESS) {
++         panvk_shader_destroy(&dev->vk, &shader->vk, pAllocator);
++         return result;
++      }
++      gs->passthrough_compiled = true;
++
++      panvk_gpu_prerast_lower_gs(nir, gs);
++
++      struct panvk_shader_variant *kernel =
++         &shader->variants[PANVK_GS_VARIANT_KERNEL];
++      struct pan_compile_inputs k_inputs = inputs;
++      k_inputs.varying_layout = NULL;
++      k_inputs.view_mask = 0;
++      kernel->own_bin = true;
++      result = panvk_compile_nir(dev, nir, info->flags, &k_inputs, state, NULL,
++                                 &shader->desc_info, kernel);
++      if (result != VK_SUCCESS) {
++         panvk_shader_destroy(&dev->vk, &shader->vk, pAllocator);
++         return result;
++      }
++      gs->kernel_compiled = true;
++      break;
++   }
++#endif
++
+    case MESA_SHADER_FRAGMENT: {
+       struct panvk_shader_variant *variant =
+          (struct panvk_shader_variant *)panvk_shader_only_variant(shader);
+@@ -3368,6 +3994,20 @@ panvk_cmd_bind_shader(struct panvk_cmd_buffer *cmd, const mesa_shader_stage stag
+          gfx_state_set_dirty(cmd, FS_PUSH_UNIFORMS);
+       }
+       break;
++#if PAN_ARCH >= 10
++   case MESA_SHADER_GEOMETRY:
++      if (cmd->state.gfx.gs.shader != shader) {
++         cmd->state.gfx.gs.shader = shader;
++         gfx_state_set_dirty(cmd, VS);
++         gfx_state_set_dirty(cmd, VS_PUSH_UNIFORMS);
++         gfx_state_set_dirty(cmd, FS);
++      }
++      break;
++#endif
++   case MESA_SHADER_TESS_CTRL:
++   case MESA_SHADER_TESS_EVAL:
++      assert(shader == NULL);
++      break;
+    default:
+       assert(!"Unsupported stage");
+       break;

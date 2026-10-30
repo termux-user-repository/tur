@@ -1,0 +1,42 @@
+From: abhay-byte <zenithblue.dev@gmail.com>
+Subject: [PATCH csf-v11 084] panvk: complete present ids on the X11 software present path
+
+Generated-by: LLM
+
+Purpose: Advance the swapchain present id on the X11 software (xcb_put_image) present path and report vkWaitForPresentKHR timeouts as VK_TIMEOUT instead of VK_ERROR_DEVICE_LOST; biblioklept
+Source/Reference: local, work/mesa-wsi dx-wsi 1451e2d99cc
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/083
+Validation test: Termux:X11 on device: vkWaitForPresentKHR returned VK_ERROR_DEVICE_LOST for every id before, VK_SUCCESS (VK_ERROR_OUT_OF_DATE_KHR across a window resize) after, over Xlib and XCB surfaces
+
+diff --git a/src/vulkan/wsi/wsi_common_x11.c b/src/vulkan/wsi/wsi_common_x11.c
+index 0960ec2f63a..c9d35d31b42 100644
+--- a/src/vulkan/wsi/wsi_common_x11.c
++++ b/src/vulkan/wsi/wsi_common_x11.c
+@@ -1955,6 +1955,15 @@ x11_present_to_x11_sw(struct x11_swapchain *chain, uint32_t image_index)
+    free(err);
+    free(geom);
+ 
++   if (image->present_id) {
++      mtx_lock(&chain->present_progress_mutex);
++      if (image->present_id > chain->present_id) {
++         chain->present_id = image->present_id;
++         u_cnd_monotonic_broadcast(&chain->present_progress_cond);
++      }
++      mtx_unlock(&chain->present_progress_mutex);
++   }
++
+    wsi_queue_push(&chain->acquire_queue, image_index);
+    return result;
+ }
+@@ -3081,7 +3090,7 @@ static VkResult x11_wait_for_present(struct wsi_swapchain *wsi_chain,
+       int ret = u_cnd_monotonic_timedwait(&chain->present_progress_cond,
+                                           &chain->present_progress_mutex,
+                                           &abs_timespec);
+-      if (ret == ETIMEDOUT) {
++      if (ret == thrd_timedout) {
+          result = VK_TIMEOUT;
+          break;
+       }

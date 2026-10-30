@@ -1,0 +1,428 @@
+From 11bfd4459f1c4ec8b2321175638273a11127e349 Mon Sep 17 00:00:00 2001
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: Sat, 3 Oct 2026 10:33:31 +0530
+Subject: [PATCH] panvk: emulate the depth bounds test in the fragment shader
+ biblioklept
+
+There is no hardware depth bounds test. When a pipeline may enable it,
+the FS loads the stored depth of each sample with LD_TILE and clears
+the SampleMask bit of samples outside [min, max]. The sample index is
+kept uniform: LD_TILE returns wrong depths when lanes pass different
+indices. The bounds, the enable and the sample count come from graphics
+sysvals, so static and dynamic state share one variant. The draw only
+declares the depth read while the test is enabled and a depth
+attachment is bound. A device-owned FS that only does this test is
+bound in place of a missing FS, and only runs while the test is on.
+Advertise depthBounds on v10 and v11.
+
+Generated-by: LLM
+---
+ src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c   |  15 +-
+ src/panfrost/vulkan/panvk_cmd_draw.h          |   9 +-
+ src/panfrost/vulkan/panvk_device.h            |   3 +
+ src/panfrost/vulkan/panvk_shader.h            |  13 ++
+ src/panfrost/vulkan/panvk_vX_cmd_draw.c       |  18 +++
+ src/panfrost/vulkan/panvk_vX_device.c         |   8 +
+ .../vulkan/panvk_vX_physical_device.c         |   2 +-
+ src/panfrost/vulkan/panvk_vX_shader.c         | 142 ++++++++++++++++++
+ 8 files changed, 204 insertions(+), 6 deletions(-)
+
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+index 5f908d89b80..5fe4d4d355e 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+@@ -2609,6 +2609,12 @@ build_dcd_flags(struct panvk_cmd_buffer *cmdbuf,
+    bool shader_modifies_coverage = false;
+    uint8_t rt_mask = cmdbuf->state.gfx.render.bound_attachments &
+                      MESA_VK_RP_ATTACHMENT_ANY_COLOR_BITS;
++   /* Must match the ds.enable sysval in cmd_prepare_draw_sysvals. */
++   bool z_read = fs && (z_attachment_read(fs, &dyns->ial) ||
++                        (fs->fs.depth_bounds &&
++                         dyns->ds.depth.bounds_test.enable &&
++                         (cmdbuf->state.gfx.render.bound_attachments &
++                          MESA_VK_RP_ATTACHMENT_DEPTH_BIT)));
+ 
+    if (fs) {
+       out->rt_written = color_attachment_written_mask(fs, &dyns->cal);
+@@ -2636,8 +2642,7 @@ build_dcd_flags(struct panvk_cmd_buffer *cmdbuf,
+          enum pan_earlyzs_zs_tilebuf_read zs_read =
+             PAN_EARLYZS_ZS_TILEBUF_NOT_READ;
+ 
+-         if (z_attachment_read(fs, &dyns->ial) ||
+-             s_attachment_read(fs, &dyns->ial)) {
++         if (z_read || s_attachment_read(fs, &dyns->ial)) {
+             if (writes_z || writes_s || PAN_ARCH != 10)
+                zs_read = PAN_EARLYZS_ZS_TILEBUF_READ_NO_OPT;
+             else
+@@ -2739,7 +2744,7 @@ build_dcd_flags(struct panvk_cmd_buffer *cmdbuf,
+       cfg.write_mask = out->rt_written;
+ #if PAN_ARCH >= 11
+       if (fs) {
+-         cfg.no_shader_depth_read = !z_attachment_read(fs, &dyns->ial);
++         cfg.no_shader_depth_read = !z_read;
+          cfg.no_shader_stencil_read = !s_attachment_read(fs, &dyns->ial);
+       }
+ #endif
+@@ -2809,7 +2814,9 @@ prepare_dcd(struct panvk_cmd_buffer *cmdbuf,
+       panvk_get_cs_builder(cmdbuf, PANVK_SUBQUEUE_VERTEX_TILER);
+    bool dcd2_dirty = fs_user_dirty(cmdbuf) ||
+                      dyn_gfx_state_dirty(cmdbuf, INPUT_ATTACHMENT_MAP) ||
+-                     dyn_gfx_state_dirty(cmdbuf, COLOR_ATTACHMENT_MAP);
++                     dyn_gfx_state_dirty(cmdbuf, COLOR_ATTACHMENT_MAP) ||
++                     dyn_gfx_state_dirty(cmdbuf, DS_DEPTH_BOUNDS_TEST_ENABLE) ||
++                     gfx_state_dirty(cmdbuf, RENDER_STATE);
+ #if PAN_ARCH >= 13
+    dcd2_dirty |= dyn_gfx_state_dirty(cmdbuf, MS_ALPHA_TO_COVERAGE_ENABLE) ||
+                  dyn_gfx_state_dirty(cmdbuf, DS_DEPTH_TEST_ENABLE) ||
+diff --git a/src/panfrost/vulkan/panvk_cmd_draw.h b/src/panfrost/vulkan/panvk_cmd_draw.h
+index c7cd98d6760..8fc677e1e59 100644
+--- a/src/panfrost/vulkan/panvk_cmd_draw.h
++++ b/src/panfrost/vulkan/panvk_cmd_draw.h
+@@ -406,6 +406,11 @@ fs_required(const struct panvk_cmd_graphics_state *state,
+    if (rs->rasterizer_discard_enable || !fs_info)
+       return false;
+ 
++   if (fs->fs.depth_bounds_only)
++      return dyn_state->ds.depth.bounds_test.enable &&
++             (state->render.bound_attachments &
++              MESA_VK_RP_ATTACHMENT_DEPTH_BIT);
++
+    /* If we generally have side effects */
+    if (fs_info->fs.sidefx)
+       return true;
+@@ -464,7 +469,9 @@ cached_fs_required(ASSERTED const struct panvk_cmd_graphics_state *state,
+     dyn_gfx_state_dirty(cmdbuf, CB_ATTACHMENT_COUNT) ||                        \
+     dyn_gfx_state_dirty(cmdbuf, CB_COLOR_WRITE_ENABLES) ||                     \
+     dyn_gfx_state_dirty(cmdbuf, CB_WRITE_MASKS) ||                             \
+-    dyn_gfx_state_dirty(cmdbuf, MS_ALPHA_TO_COVERAGE_ENABLE))
++    dyn_gfx_state_dirty(cmdbuf, MS_ALPHA_TO_COVERAGE_ENABLE) ||               \
++    dyn_gfx_state_dirty(cmdbuf, DS_DEPTH_BOUNDS_TEST_ENABLE) ||               \
++    gfx_state_dirty(cmdbuf, RENDER_STATE))
+ 
+ /* After a draw, all dirty flags are cleared except the FS dirty flag which
+  * needs to be set again if the draw didn't use the fragment shader. */
+diff --git a/src/panfrost/vulkan/panvk_device.h b/src/panfrost/vulkan/panvk_device.h
+index f029ee81c73..67aab839d81 100644
+--- a/src/panfrost/vulkan/panvk_device.h
++++ b/src/panfrost/vulkan/panvk_device.h
+@@ -81,6 +81,9 @@ struct panvk_device {
+ 
+    struct vk_meta_device meta;
+ 
++   /* Bound in place of a missing FS so the depth bounds test still runs. */
++   struct panvk_shader *depth_bounds_fs;
++
+    struct {
+       struct panvk_pool rw;
+       struct panvk_pool rw_nc;
+diff --git a/src/panfrost/vulkan/panvk_shader.h b/src/panfrost/vulkan/panvk_shader.h
+index cba020751aa..10ca9f5df65 100644
+--- a/src/panfrost/vulkan/panvk_shader.h
++++ b/src/panfrost/vulkan/panvk_shader.h
+@@ -29,6 +29,9 @@
+ 
+ extern const struct vk_device_shader_ops panvk_per_arch(device_shader_ops);
+ 
++struct panvk_device;
++VkResult panvk_per_arch(create_depth_bounds_fs)(struct panvk_device *dev);
++
+ #define MAX_RTS 8
+ #define MAX_VS_ATTRIBS 16
+ 
+@@ -153,6 +156,13 @@ struct panvk_graphics_sysvals {
+       } scale, offset;
+    } viewport;
+ 
++   /* Depth bounds test, read by the FS lowering in panvk_vX_shader.c. */
++   struct {
++      float bounds[2];
++      uint32_t enable;
++      uint32_t samples;
++   } ds;
++
+    struct {
+ #if PAN_ARCH < 9
+       int32_t raw_vertex_offset;
+@@ -408,6 +418,9 @@ struct panvk_shader_variant {
+          uint32_t tile_image_color_read;
+          bool tile_image_z_read;
+          bool tile_image_s_read;
++         bool depth_bounds;
++         /* device->depth_bounds_fs: only needed while the test is on. */
++         bool depth_bounds_only;
+       } fs;
+    };
+ 
+diff --git a/src/panfrost/vulkan/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/panvk_vX_cmd_draw.c
+index 3876d95e063..85c55639b4e 100644
+--- a/src/panfrost/vulkan/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/panvk_vX_cmd_draw.c
+@@ -986,6 +986,24 @@ panvk_per_arch(cmd_prepare_draw_sysvals)(struct panvk_cmd_buffer *cmdbuf,
+ 
+ #if PAN_ARCH >= 10
+    panvk_upload_prerast_viewports(cmdbuf, dirty_sysvals);
++
++   {
++      const struct vk_depth_stencil_state *dss =
++         &cmdbuf->vk.dynamic_graphics_state.ds;
++      const bool db_enable =
++         dss->depth.bounds_test.enable &&
++         (cmdbuf->state.gfx.render.bound_attachments &
++          MESA_VK_RP_ATTACHMENT_DEPTH_BIT);
++
++      set_gfx_sysval(cmdbuf, dirty_sysvals, ds.bounds[0],
++                     dss->depth.bounds_test.min);
++      set_gfx_sysval(cmdbuf, dirty_sysvals, ds.bounds[1],
++                     dss->depth.bounds_test.max);
++      set_gfx_sysval(cmdbuf, dirty_sysvals, ds.enable, (uint32_t)db_enable);
++      set_gfx_sysval(
++         cmdbuf, dirty_sysvals, ds.samples,
++         MAX2(cmdbuf->vk.dynamic_graphics_state.ms.rasterization_samples, 1));
++   }
+ #endif
+ 
+    if (dyn_gfx_state_dirty(cmdbuf, INPUT_ATTACHMENT_MAP))
+diff --git a/src/panfrost/vulkan/panvk_vX_device.c b/src/panfrost/vulkan/panvk_vX_device.c
+index 28b29f76836..2a4c78d5d4f 100644
+--- a/src/panfrost/vulkan/panvk_vX_device.c
++++ b/src/panfrost/vulkan/panvk_vX_device.c
+@@ -722,6 +722,10 @@ panvk_per_arch(create_device)(struct panvk_physical_device *physical_device,
+    if (result != VK_SUCCESS)
+       goto err_free_draw_ctx;
+ 
++   result = panvk_per_arch(create_depth_bounds_fs)(device);
++   if (result != VK_SUCCESS)
++      goto err_finish_queues;
++
+    for (unsigned i = 0; i < pCreateInfo->queueCreateInfoCount; i++) {
+       const VkDeviceQueueCreateInfo *queue_create =
+          &pCreateInfo->pQueueCreateInfos[i];
+@@ -755,6 +759,8 @@ err_finish_queues:
+    vk_foreach_queue_safe(queue, &device->vk)
+       panvk_queue_destroy(queue);
+ 
++   if (device->depth_bounds_fs)
++      vk_shader_destroy(&device->vk, &device->depth_bounds_fs->vk, NULL);
+    panvk_meta_cleanup(device);
+ 
+ err_free_draw_ctx:
+@@ -820,6 +826,8 @@ panvk_per_arch(destroy_device)(struct panvk_device *device,
+ #if PAN_ARCH >= 10 && PAN_ARCH < 14
+    panvk_per_arch(device_draw_context_cleanup)(device);
+ #endif
++   if (device->depth_bounds_fs)
++      vk_shader_destroy(&device->vk, &device->depth_bounds_fs->vk, NULL);
+    panvk_meta_cleanup(device);
+    vk_pipeline_cache_destroy(device->vk.mem_cache, NULL);
+    pan_kmod_bo_put(device->sparse_mem.blackhole);
+diff --git a/src/panfrost/vulkan/panvk_vX_physical_device.c b/src/panfrost/vulkan/panvk_vX_physical_device.c
+index c84d77f62f5..90ed3daa229 100644
+--- a/src/panfrost/vulkan/panvk_vX_physical_device.c
++++ b/src/panfrost/vulkan/panvk_vX_physical_device.c
+@@ -323,7 +323,7 @@ panvk_per_arch(get_physical_device_features)(
+       .depthClamp = true,
+       .depthBiasClamp = true,
+       .fillModeNonSolid = PAN_ARCH >= 10,
+-      .depthBounds = false,
++      .depthBounds = PAN_ARCH >= 10 && PAN_ARCH < 12,
+       .wideLines = true,
+       .largePoints = true,
+       .alphaToOne = PAN_ARCH >= 10,
+diff --git a/src/panfrost/vulkan/panvk_vX_shader.c b/src/panfrost/vulkan/panvk_vX_shader.c
+index e148369a18c..f3e2a370fca 100644
+--- a/src/panfrost/vulkan/panvk_vX_shader.c
++++ b/src/panfrost/vulkan/panvk_vX_shader.c
+@@ -2320,6 +2320,101 @@ panvk_gpu_prerast_gs_passthrough_nir(const nir_shader_compiler_options *options,
+ #undef GS_PARAM
+ #endif
+ 
++#if PAN_ARCH >= 10
++/* The FS tests the depth bounds against the tile-resident depth. Lowered
++ * whenever the test may be on: statically enabled, or dynamic.
++ */
++static bool
++panvk_depth_bounds_lowered(const struct vk_features *features,
++                           const struct vk_graphics_pipeline_state *state)
++{
++   if (!features->depthBounds)
++      return false;
++   if (!state)
++      return true;
++   return state->ds &&
++          (BITSET_TEST(state->dynamic,
++                       MESA_VK_DYNAMIC_DS_DEPTH_BOUNDS_TEST_ENABLE) ||
++           state->ds->depth.bounds_test.enable);
++}
++
++/* Clears the SampleMask bit of every sample whose stored depth is
++ * outside [min, max]. The draw makes the depth read and the late ZS update
++ * effective only while the test is enabled (see build_dcd_flags).
++ */
++static void
++panvk_lower_depth_bounds(nir_shader *nir)
++{
++   nir_function_impl *impl = nir_shader_get_entrypoint(nir);
++   nir_builder b = nir_builder_at(nir_before_impl(impl));
++
++   nir_variable *app_mask = nir_find_variable_with_location(
++      nir, nir_var_shader_out, FRAG_RESULT_SAMPLE_MASK);
++   nir_variable *mask_out = nir_variable_create(
++      nir, nir_var_shader_out,
++      app_mask ? app_mask->type : glsl_array_type(glsl_int_type(), 1, 0),
++      "gl_SampleMask");
++   mask_out->data.location = FRAG_RESULT_SAMPLE_MASK;
++
++   nir_def *mask = nir_imm_int(&b, ~0);
++   if (app_mask) {
++      /* The app mask becomes a temporary ANDed into the final mask. */
++      app_mask->data.mode = nir_var_shader_temp;
++      nir_fixup_deref_modes(nir);
++      b.cursor = nir_after_impl(impl);
++      mask = nir_load_array_var_imm(&b, app_mask, 0);
++   }
++   b.cursor = nir_after_impl(impl);
++
++   nir_variable *pass = nir_local_variable_create(impl, glsl_uint_type(),
++                                                  "db_pass");
++   nir_variable *idx = nir_local_variable_create(impl, glsl_uint_type(),
++                                                 "db_sample");
++   nir_store_var(&b, pass, nir_imm_int(&b, ~0), 1);
++   nir_def *bounds = load_sysval(&b, graphics, 32, ds.bounds);
++   nir_def *enable = load_sysval(&b, graphics, 32, ds.enable);
++   nir_push_if(&b, nir_ine_imm(&b, enable, 0));
++   {
++      /* The sample index must be uniform: LD_TILE returns wrong depths when
++       * lanes pass different sample indices (seen on G615 at pixels split
++       * between two triangles).
++       */
++      nir_def *samples = load_sysval(&b, graphics, 32, ds.samples);
++      nir_store_var(&b, idx, nir_imm_int(&b, 0), 1);
++      nir_push_loop(&b);
++      {
++         nir_def *s = nir_load_var(&b, idx);
++         nir_break_if(&b, nir_uge(&b, s, samples));
++         nir_store_var(&b, idx, nir_iadd_imm(&b, s, 1), 1);
++         nir_def *bit = nir_ishl(&b, nir_imm_int(&b, 1), s);
++
++         nir_io_semantics sem = {.location = FRAG_RESULT_DEPTH,
++                                 .num_slots = 1};
++         nir_def *z = nir_load_tile_pan(
++            &b, 1, 32, pan_nir_tile_location_sample(&b, FRAG_RESULT_DEPTH, s),
++            pan_nir_tile_default_coverage(&b), nir_imm_int(&b, 0),
++            .dest_type = nir_type_float32, .access = 0, .io_semantics = sem);
++         nir_def *fail =
++            nir_ior(&b, nir_flt(&b, z, nir_channel(&b, bounds, 0)),
++                    nir_flt(&b, nir_channel(&b, bounds, 1), z));
++         nir_def *p = nir_load_var(&b, pass);
++         nir_store_var(&b, pass,
++                       nir_bcsel(&b, fail, nir_iand(&b, p, nir_inot(&b, bit)),
++                                 p),
++                       1);
++      }
++      nir_pop_loop(&b, NULL);
++   }
++   nir_pop_if(&b, NULL);
++
++   nir_store_array_var_imm(&b, mask_out, 0,
++                           nir_iand(&b, mask, nir_load_var(&b, pass)), 1);
++
++   nir->info.outputs_written |= BITFIELD64_BIT(FRAG_RESULT_SAMPLE_MASK);
++   nir_progress(true, impl, nir_metadata_none);
++}
++#endif
++
+ static void
+ panvk_hash_state(struct vk_physical_device *device,
+                  const struct vk_graphics_pipeline_state *state,
+@@ -2355,6 +2450,8 @@ panvk_hash_state(struct vk_physical_device *device,
+          _mesa_blake3_update(&blake3_ctx, state->ial, sizeof(*state->ial));
+ 
+ #if PAN_ARCH >= 10
++      bool depth_bounds = panvk_depth_bounds_lowered(enabled_features, state);
++      _mesa_blake3_update(&blake3_ctx, &depth_bounds, sizeof(depth_bounds));
+       bool non_solid = (stages & VK_SHADER_STAGE_VERTEX_BIT) && state->rs &&
+                        state->rs->polygon_mode != VK_POLYGON_MODE_FILL;
+       _mesa_blake3_update(&blake3_ctx, &non_solid, sizeof(non_solid));
+@@ -3720,6 +3817,13 @@ panvk_compile_shader(struct panvk_device *dev,
+                &variant->fs.tile_image_z_read,
+                &variant->fs.tile_image_s_read);
+ 
++#if PAN_ARCH >= 10
++      if (panvk_depth_bounds_lowered(&dev->vk.enabled_features, state)) {
++         panvk_lower_depth_bounds(nir);
++         variant->fs.depth_bounds = true;
++      }
++#endif
++
+       /* Lower input intrinsics for fragment shaders early to get the max
+        * number of varying loads, as this number is required during descriptor
+        * lowering for v9+.
+@@ -4079,6 +4183,8 @@ panvk_deserialize_shader_variant(struct vk_device *vk_dev,
+                       sizeof(shader->fs.tile_image_z_read));
+       blob_copy_bytes(blob, &shader->fs.tile_image_s_read,
+                       sizeof(shader->fs.tile_image_s_read));
++      blob_copy_bytes(blob, &shader->fs.depth_bounds,
++                      sizeof(shader->fs.depth_bounds));
+       break;
+ 
+    default:
+@@ -4246,6 +4352,8 @@ panvk_shader_serialize_variant(struct vk_device *vk_dev,
+                        sizeof(shader->fs.tile_image_z_read));
+       blob_write_bytes(blob, &shader->fs.tile_image_s_read,
+                        sizeof(shader->fs.tile_image_s_read));
++      blob_write_bytes(blob, &shader->fs.depth_bounds,
++                       sizeof(shader->fs.depth_bounds));
+       break;
+ 
+    default:
+@@ -4696,6 +4804,38 @@ static const struct vk_shader_ops panvk_shader_ops = {
+       panvk_shader_get_executable_internal_representations,
+ };
+ 
++VkResult
++panvk_per_arch(create_depth_bounds_fs)(struct panvk_device *dev)
++{
++#if PAN_ARCH >= 10
++   if (!dev->vk.enabled_features.depthBounds)
++      return VK_SUCCESS;
++
++   nir_builder b = nir_builder_init_simple_shader(
++      MESA_SHADER_FRAGMENT,
++      panvk_get_nir_options(dev->vk.physical, MESA_SHADER_FRAGMENT, NULL),
++      "panvk-depth-bounds-fs");
++   b.shader->info.internal = true;
++
++   const struct vk_pipeline_robustness_state rs = {0};
++   struct vk_shader_compile_info info = {
++      .stage = MESA_SHADER_FRAGMENT,
++      .nir = b.shader,
++      .robustness = &rs,
++   };
++   struct vk_shader *shader;
++   VkResult result = panvk_compile_shaders(&dev->vk, 1, &info, NULL,
++                                           &dev->vk.enabled_features, NULL,
++                                           &shader);
++   if (result != VK_SUCCESS)
++      return result;
++
++   dev->depth_bounds_fs = container_of(shader, struct panvk_shader, vk);
++   dev->depth_bounds_fs->variants[0].fs.depth_bounds_only = true;
++#endif
++   return VK_SUCCESS;
++}
++
+ static void
+ panvk_cmd_bind_shader(struct panvk_cmd_buffer *cmd, const mesa_shader_stage stage,
+                       struct panvk_shader *shader)
+@@ -4716,6 +4856,8 @@ panvk_cmd_bind_shader(struct panvk_cmd_buffer *cmd, const mesa_shader_stage stag
+       }
+       break;
+    case MESA_SHADER_FRAGMENT:
++      if (!shader)
++         shader = to_panvk_device(cmd->vk.base.device)->depth_bounds_fs;
+       if (cmd->state.gfx.fs.shader != shader) {
+          cmd->state.gfx.fs.shader = shader;
+          gfx_state_set_dirty(cmd, FS);
+-- 
+2.55.0
+

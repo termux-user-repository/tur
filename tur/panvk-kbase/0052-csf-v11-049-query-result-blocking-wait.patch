@@ -1,0 +1,57 @@
+From: abhay-byte <zenithblue.dev@gmail.com>
+Subject: [PATCH csf-v11 049] panvk: block instead of busy-spinning for query results
+Generated-by: LLM
+
+Purpose: Yield the CPU while waiting for GPU query availability; biblioklept
+Source/Reference: local fix, work/mesa cf68902b6fb
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/048
+Validation test: integrated build NINJA_RC=0; pipeline statistics smoke 12/12 (not isolated)
+
+diff --git a/src/panfrost/vulkan/panvk_vX_query_pool.c b/src/panfrost/vulkan/panvk_vX_query_pool.c
+index 65db1d4ef1a..e85e3e83bf5 100644
+--- a/src/panfrost/vulkan/panvk_vX_query_pool.c
++++ b/src/panfrost/vulkan/panvk_vX_query_pool.c
+@@ -5,6 +5,7 @@
+  */
+ 
+ #include "util/macros.h"
++#include "util/os_time.h"
+ #include "vk_log.h"
+ 
+ #include "pan_props.h"
+@@ -157,14 +158,31 @@ panvk_query_wait_for_available(struct panvk_device *dev,
+                                struct panvk_query_pool *pool, uint32_t query)
+ {
+    int64_t abs_timeout_ns = os_time_get_absolute_timeout(PANVK_QUERY_TIMEOUT);
++   int64_t now;
+ 
+-   while (os_time_get_nano() < abs_timeout_ns) {
++   while ((now = os_time_get_nano()) < abs_timeout_ns) {
+       if (panvk_query_is_available(pool, query))
+          return VK_SUCCESS;
+ 
+       VkResult status = vk_device_check_status(&dev->vk);
+       if (status != VK_SUCCESS)
+          return status;
++
++      /* The availability object is written by the GPU with a CSG-scoped
++       * sync, which never wakes the host, so block on the kernel instead of
++       * spinning. On kbase, spinning also starves the CSF event path the
++       * submitted work may depend on (tiler heap growth, scheduling).
++       */
++      int64_t step_ns = MIN2(abs_timeout_ns - now, 1000000);
++#if PAN_ARCH >= 10 && defined(HAVE_PAN_KMOD_KBASE)
++      const struct panvk_physical_device *phys_dev =
++         to_panvk_physical_device(dev->vk.physical);
++
++      if (phys_dev->kbase_node_path[0] &&
++          kbase_kmod_csf_wait_event(dev->kmod.dev, step_ns) == 0)
++         continue;
++#endif
++      os_time_sleep(MAX2(step_ns / 1000, 1));
+    }
+ 
+    return vk_device_set_lost(&dev->vk, "query timeout");

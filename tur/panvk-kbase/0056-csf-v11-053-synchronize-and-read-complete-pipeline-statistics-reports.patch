@@ -1,0 +1,72 @@
+From: abhay-byte <zenithblue.dev@gmail.com>
+Subject: [PATCH csf-v11 053] panvk: synchronize and read complete pipeline statistics reports
+Generated-by: LLM
+
+Purpose: Order GPU statistic updates and invalidate all readback counters; biblioklept
+Source/Reference: local fix, work/mesa be230148967
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/052
+Validation test: pipeline statistics smoke 12/12; integrated build NINJA_RC=0
+
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_dispatch.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_dispatch.c
+index b4382122833..3586e17b18d 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_dispatch.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_dispatch.c
+@@ -354,6 +354,8 @@ cmd_dispatch(struct panvk_cmd_buffer *cmdbuf, struct panvk_dispatch_info *info)
+       panvk_shader_only_variant(cmdbuf->state.compute.shader);
+    VkResult result;
+ 
++   panvk_per_arch(cmd_pstats_dispatch)(cmdbuf, cs, info);
++
+    /* If there's no compute shader, we can skip the dispatch. */
+    if (!panvk_priv_mem_check_alloc(cs->spd))
+       return;
+@@ -417,8 +419,6 @@ cmd_dispatch(struct panvk_cmd_buffer *cmdbuf, struct panvk_dispatch_info *info)
+       cs_flush_stores(b);
+    }
+ 
+-   panvk_per_arch(cmd_pstats_dispatch)(cmdbuf, cs, info);
+-
+    panvk_per_arch(cmd_dispatch_shader)(cmdbuf, cs, cs_desc_state,
+                                        cmdbuf->state.compute.push_uniforms,
+                                        tsd, info);
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_query.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_query.c
+index e252cdd159e..2a6b62d6773 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_query.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_query.c
+@@ -880,7 +880,7 @@ panvk_per_arch(cmd_pstats_draw)(struct panvk_cmd_buffer *cmdbuf,
+    struct panvk_precomp_ctx precomp_ctx = panvk_per_arch(precomp_cs)(cmdbuf);
+ 
+    panlib_update_pstats_draw_struct(&precomp_ctx, panlib_1d(draw_count),
+-                                    PANLIB_BARRIER_NONE, args);
++                                    PANLIB_BARRIER_CSF_SYNC, args);
+ }
+ 
+ void
+@@ -934,7 +934,7 @@ panvk_per_arch(cmd_pstats_dispatch)(struct panvk_cmd_buffer *cmdbuf,
+    struct panvk_precomp_ctx precomp_ctx = panvk_per_arch(precomp_cs)(cmdbuf);
+ 
+    panlib_update_pstats_dispatch_struct(&precomp_ctx, panlib_1d(1),
+-                                        PANLIB_BARRIER_NONE, args);
++                                        PANLIB_BARRIER_CSF_SYNC, args);
+ }
+ 
+ /* ponytail: the fragment shader invocation count is the sample count of the
+diff --git a/src/panfrost/vulkan/panvk_vX_query_pool.c b/src/panfrost/vulkan/panvk_vX_query_pool.c
+index d616627cb8c..bee279c8162 100644
+--- a/src/panfrost/vulkan/panvk_vX_query_pool.c
++++ b/src/panfrost/vulkan/panvk_vX_query_pool.c
+@@ -290,8 +290,9 @@ panvk_per_arch(GetQueryPoolResults)(VkDevice _device, VkQueryPool queryPool,
+       assert(i * stride < dataSize);
+       void *dst = (char *)pData + i * stride;
+ 
+-      panvk_priv_mem_readback(pool->mem, panvk_query_offset(pool, query),
+-                              struct panvk_query_report, src) {
++      panvk_priv_mem_readback_array(pool->mem, panvk_query_offset(pool, query),
++                                    struct panvk_query_report,
++                                    pool->reports_per_query, src) {
+          switch (pool->vk.query_type) {
+          case VK_QUERY_TYPE_OCCLUSION: {
+             if (write_results)

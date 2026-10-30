@@ -1,0 +1,997 @@
+From: abhay-byte <zenithblue.dev@gmail.com>
+Subject: [PATCH csf-v11 076] panvk: honour the geometry shader viewport index on v10+
+
+Generated-by: LLM
+
+Purpose: Apply the geometry-shader-selected viewport transform and scissor in the gpu_prerast passthrough VS when multiViewport is used; biblioklept
+Source/Reference: local, work/mesa-p5 dx-p5 03a0a66f14d
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/075
+Validation test: CTS dEQP-VK.draw.{renderpass,dynamic_rendering.*}.scissor.* 88 Pass 0 Fail (was 18 Fail); 6828-case draw/geometry/clipping sample 0 new Fail
+
+diff --git a/src/panfrost/compiler/bifrost/bifrost_nir.c b/src/panfrost/compiler/bifrost/bifrost_nir.c
+index ad8d9eff27e..5c961e980a7 100644
+--- a/src/panfrost/compiler/bifrost/bifrost_nir.c
++++ b/src/panfrost/compiler/bifrost/bifrost_nir.c
+@@ -867,7 +867,8 @@ bifrost_postprocess_nir(nir_shader *nir,
+       NIR_PASS(_, nir, pan_nir_lower_fs_outputs, skip_atest,
+                inputs->fragcolor_nr_cbufs);
+    } else if (nir->info.stage == MESA_SHADER_VERTEX) {
+-      NIR_PASS(_, nir, nir_lower_viewport_transform);
++      if (!inputs->skip_viewport_transform)
++         NIR_PASS(_, nir, nir_lower_viewport_transform);
+       NIR_PASS(_, nir, nir_lower_point_size, 1.0, 0.0);
+ 
+       /* Copy varying format & Layout */
+diff --git a/src/panfrost/compiler/pan_compiler.h b/src/panfrost/compiler/pan_compiler.h
+index 288b8390806..ce64488dbd5 100644
+--- a/src/panfrost/compiler/pan_compiler.h
++++ b/src/panfrost/compiler/pan_compiler.h
+@@ -36,6 +36,10 @@ struct pan_compile_inputs {
+    uint32_t gpu_variant;
+    bool is_blend, is_blit;
+    bool no_idvs;
++   /* Passthrough already wrote screen-space position for the selected
++    * viewport. Skip nir_lower_viewport_transform so it is not applied twice.
++    */
++   bool skip_viewport_transform;
+    uint32_t view_mask;
+ 
+    /* Number of colour buffers gl_FragColor broadcasts to.  Only useful for
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+index 67d5c620624..201919746a5 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+@@ -877,6 +877,57 @@ prepare_blend(struct panvk_cmd_buffer *cmdbuf)
+    return VK_SUCCESS;
+ }
+ 
++static void
++panvk_full_fb_box(const struct panvk_cmd_buffer *cmdbuf,
++                  uint32_t *max_x, uint32_t *max_y)
++{
++   uint32_t w = cmdbuf->state.gfx.render.fb.layout.width_px;
++   uint32_t h = cmdbuf->state.gfx.render.fb.layout.height_px;
++
++   if (!w)
++      w = MAX_FRAMEBUFFER_DIMENSION;
++   if (!h)
++      h = MAX_FRAMEBUFFER_DIMENSION;
++   *max_x = MIN2(w - 1, (uint32_t)UINT16_MAX);
++   *max_y = MIN2(h - 1, (uint32_t)UINT16_MAX);
++}
++
++static void
++panvk_prerast_depth_union(const struct panvk_cmd_buffer *cmdbuf,
++                          float *z_min, float *z_max)
++{
++   const struct vk_viewport_state *vp = &cmdbuf->vk.dynamic_graphics_state.vp;
++
++   if (vp->depth_clamp_mode == VK_DEPTH_CLAMP_MODE_USER_DEFINED_RANGE_EXT) {
++      *z_min = vp->depth_clamp_range.minDepthClamp;
++      *z_max = vp->depth_clamp_range.maxDepthClamp;
++      return;
++   }
++
++   const struct vk_rasterization_state *rs =
++      &cmdbuf->vk.dynamic_graphics_state.rs;
++   unsigned n = vp->viewport_count ? vp->viewport_count : 1;
++
++   n = MIN2(n, ARRAY_SIZE(vp->viewports));
++   for (unsigned i = 0; i < n; i++) {
++      float sz, oz;
++      float a, b, lo, hi;
++
++      panvk_viewport_z_coeffs(vp, rs, i, &sz, &oz);
++      a = vp->depth_clip_negative_one_to_one ? oz - sz : oz;
++      b = oz + sz;
++      lo = MIN2(a, b);
++      hi = MAX2(a, b);
++      if (i == 0) {
++         *z_min = lo;
++         *z_max = hi;
++      } else {
++         *z_min = MIN2(*z_min, lo);
++         *z_max = MAX2(*z_max, hi);
++      }
++   }
++}
++
+ #if PAN_ARCH >= 12
+ static void
+ prepare_vp(struct panvk_cmd_buffer *cmdbuf)
+@@ -886,29 +937,59 @@ prepare_vp(struct panvk_cmd_buffer *cmdbuf)
+    const VkViewport *viewport =
+       &cmdbuf->vk.dynamic_graphics_state.vp.viewports[0];
+    const VkRect2D *scissor = &cmdbuf->vk.dynamic_graphics_state.vp.scissors[0];
+-
+-   /* XXX: Switch scissor_array_enable to true and use array based variant
+-    * for future proofness */
+-
+-   if (dyn_gfx_state_dirty(cmdbuf, VP_SCISSORS)) {
++   /* decode_csf.c treats scissor_array_enable as a pointer plus a length.
++    * The index source is not documented, and LAYER and VIEWPORT share one
++    * attribute byte, so the array stays off. Per-viewport scissor is four
++    * clip distances in the prerast passthrough. The box below is the
++    * framebuffer, which cannot clip a primitive that belongs to another
++    * viewport. refresh re-emits the index-0 box when that path is left.
++    */
++   const bool indexed =
++      panvk_prerast_viewport_shader(&cmdbuf->state.gfx) != NULL &&
++      cmdbuf->vk.dynamic_graphics_state.vp.viewport_count > 1;
++   const bool refresh = gfx_state_dirty(cmdbuf, VS) ||
++                        dyn_gfx_state_dirty(cmdbuf, VP_VIEWPORT_COUNT) ||
++                        dyn_gfx_state_dirty(cmdbuf, VP_SCISSOR_COUNT);
++   bool scissor_dirty = dyn_gfx_state_dirty(cmdbuf, VP_SCISSORS) || refresh;
++   bool viewport_dirty =
++      dyn_gfx_state_dirty(cmdbuf, VP_VIEWPORTS) ||
++      dyn_gfx_state_dirty(cmdbuf, VP_DEPTH_CLIP_NEGATIVE_ONE_TO_ONE) ||
++      dyn_gfx_state_dirty(cmdbuf, RS_DEPTH_CLIP_ENABLE) ||
++      dyn_gfx_state_dirty(cmdbuf, RS_DEPTH_CLAMP_ENABLE) ||
++      dyn_gfx_state_dirty(cmdbuf, VP_DEPTH_CLAMP_RANGE) || refresh;
++
++   if (indexed && (scissor_dirty || viewport_dirty))
++      scissor_dirty = viewport_dirty = true;
++
++   if (scissor_dirty) {
+       struct mali_scissor_packed scissor_box;
+       pan_pack(&scissor_box, SCISSOR, cfg) {
+-         assert(scissor->offset.x >= 0 && scissor->offset.y >= 0);
+-
+-         int minx = scissor->offset.x;
+-         int miny = scissor->offset.y;
+-         int maxx = scissor->offset.x + scissor->extent.width;
+-         int maxy = scissor->offset.y + scissor->extent.height;
+-
+-         /* Make sure we don't end up with a max < min when width/height is 0 */
+-         maxx = maxx > minx ? maxx - 1 : maxx;
+-         maxy = maxy > miny ? maxy - 1 : maxy;
+-
+-         /* Clamp scissor to valid range */
+-         cfg.scissor_minimum_x = CLAMP(minx, 0, UINT16_MAX);
+-         cfg.scissor_minimum_y = CLAMP(miny, 0, UINT16_MAX);
+-         cfg.scissor_maximum_x = CLAMP(maxx, 0, UINT16_MAX);
+-         cfg.scissor_maximum_y = CLAMP(maxy, 0, UINT16_MAX);
++         if (indexed) {
++            uint32_t maxx, maxy;
++
++            panvk_full_fb_box(cmdbuf, &maxx, &maxy);
++            cfg.scissor_minimum_x = 0;
++            cfg.scissor_minimum_y = 0;
++            cfg.scissor_maximum_x = maxx;
++            cfg.scissor_maximum_y = maxy;
++         } else {
++            assert(scissor->offset.x >= 0 && scissor->offset.y >= 0);
++
++            int minx = scissor->offset.x;
++            int miny = scissor->offset.y;
++            int maxx = scissor->offset.x + scissor->extent.width;
++            int maxy = scissor->offset.y + scissor->extent.height;
++
++            /* Make sure we don't end up with a max < min when width/height is 0 */
++            maxx = maxx > minx ? maxx - 1 : maxx;
++            maxy = maxy > miny ? maxy - 1 : maxy;
++
++            /* Clamp scissor to valid range */
++            cfg.scissor_minimum_x = CLAMP(minx, 0, UINT16_MAX);
++            cfg.scissor_minimum_y = CLAMP(miny, 0, UINT16_MAX);
++            cfg.scissor_maximum_x = CLAMP(maxx, 0, UINT16_MAX);
++            cfg.scissor_maximum_y = CLAMP(maxy, 0, UINT16_MAX);
++         }
+       }
+ 
+       struct mali_scissor_packed *scissor_box_ptr = &scissor_box;
+@@ -916,38 +997,46 @@ prepare_vp(struct panvk_cmd_buffer *cmdbuf)
+                    *((uint64_t *)scissor_box_ptr));
+    }
+ 
+-   if (dyn_gfx_state_dirty(cmdbuf, VP_VIEWPORTS) ||
+-       dyn_gfx_state_dirty(cmdbuf, VP_DEPTH_CLIP_NEGATIVE_ONE_TO_ONE) ||
+-       dyn_gfx_state_dirty(cmdbuf, RS_DEPTH_CLIP_ENABLE) ||
+-       dyn_gfx_state_dirty(cmdbuf, RS_DEPTH_CLAMP_ENABLE) ||
+-       dyn_gfx_state_dirty(cmdbuf, VP_DEPTH_CLAMP_RANGE)) {
++   if (viewport_dirty) {
+       struct mali_viewport_packed mali_viewport;
+       pan_pack(&mali_viewport, VIEWPORT, cfg) {
+-         /* The spec says "width must be greater than 0.0" */
+-         assert(viewport->width >= 0);
+-         int minx = (int)viewport->x;
+-         int maxx = (int)(viewport->x + viewport->width);
+-
+-         /* Viewport height can be negative */
+-         int miny =
+-            MIN2((int)viewport->y, (int)(viewport->y + viewport->height));
+-         int maxy =
+-            MAX2((int)viewport->y, (int)(viewport->y + viewport->height));
+-
+-         /* Make sure we don't end up with a max < min when width/height is 0 */
+-         maxx = maxx > minx ? maxx - 1 : maxx;
+-         maxy = maxy > miny ? maxy - 1 : maxy;
+-
+-         /* Clamp viewport to valid range */
+-         cfg.min_x = CLAMP(minx, 0, UINT16_MAX);
+-         cfg.min_y = CLAMP(miny, 0, UINT16_MAX);
+-         cfg.max_x = CLAMP(maxx, 0, UINT16_MAX);
+-         cfg.max_y = CLAMP(maxy, 0, UINT16_MAX);
+-
+          float z_min, z_max;
+-         panvk_depth_range(&cmdbuf->state.gfx,
+-                           &cmdbuf->vk.dynamic_graphics_state.vp,
+-                           &z_min, &z_max);
++
++         if (indexed) {
++            uint32_t maxx, maxy;
++
++            panvk_full_fb_box(cmdbuf, &maxx, &maxy);
++            cfg.min_x = 0;
++            cfg.min_y = 0;
++            cfg.max_x = maxx;
++            cfg.max_y = maxy;
++            panvk_prerast_depth_union(cmdbuf, &z_min, &z_max);
++         } else {
++            /* The spec says "width must be greater than 0.0" */
++            assert(viewport->width >= 0);
++            int minx = (int)viewport->x;
++            int maxx = (int)(viewport->x + viewport->width);
++
++            /* Viewport height can be negative */
++            int miny =
++               MIN2((int)viewport->y, (int)(viewport->y + viewport->height));
++            int maxy =
++               MAX2((int)viewport->y, (int)(viewport->y + viewport->height));
++
++            /* Make sure we don't end up with a max < min when width/height is 0 */
++            maxx = maxx > minx ? maxx - 1 : maxx;
++            maxy = maxy > miny ? maxy - 1 : maxy;
++
++            /* Clamp viewport to valid range */
++            cfg.min_x = CLAMP(minx, 0, UINT16_MAX);
++            cfg.min_y = CLAMP(miny, 0, UINT16_MAX);
++            cfg.max_x = CLAMP(maxx, 0, UINT16_MAX);
++            cfg.max_y = CLAMP(maxy, 0, UINT16_MAX);
++
++            panvk_depth_range(&cmdbuf->state.gfx,
++                              &cmdbuf->vk.dynamic_graphics_state.vp,
++                              &z_min, &z_max);
++         }
+          cfg.min_depth = z_min;
+          cfg.max_depth = z_max;
+       }
+@@ -968,38 +1057,66 @@ prepare_vp(struct panvk_cmd_buffer *cmdbuf)
+    const VkViewport *viewport =
+       &cmdbuf->vk.dynamic_graphics_state.vp.viewports[0];
+    const VkRect2D *scissor = &cmdbuf->vk.dynamic_graphics_state.vp.scissors[0];
+-
+-   if (dyn_gfx_state_dirty(cmdbuf, VP_VIEWPORTS) ||
+-       dyn_gfx_state_dirty(cmdbuf, VP_SCISSORS)) {
++   /* Same scissor-array rejection as the v12 prepare_vp. The single SCISSOR
++    * register is the framebuffer when the prerast shader selects a viewport.
++    */
++   const bool indexed =
++      panvk_prerast_viewport_shader(&cmdbuf->state.gfx) != NULL &&
++      cmdbuf->vk.dynamic_graphics_state.vp.viewport_count > 1;
++   const bool refresh = gfx_state_dirty(cmdbuf, VS) ||
++                        dyn_gfx_state_dirty(cmdbuf, VP_VIEWPORT_COUNT) ||
++                        dyn_gfx_state_dirty(cmdbuf, VP_SCISSOR_COUNT);
++   bool scissor_dirty = dyn_gfx_state_dirty(cmdbuf, VP_VIEWPORTS) ||
++                        dyn_gfx_state_dirty(cmdbuf, VP_SCISSORS) || refresh;
++   bool depth_dirty =
++      dyn_gfx_state_dirty(cmdbuf, VP_VIEWPORTS) ||
++      dyn_gfx_state_dirty(cmdbuf, VP_DEPTH_CLIP_NEGATIVE_ONE_TO_ONE) ||
++      dyn_gfx_state_dirty(cmdbuf, RS_DEPTH_CLIP_ENABLE) ||
++      dyn_gfx_state_dirty(cmdbuf, RS_DEPTH_CLAMP_ENABLE) ||
++      dyn_gfx_state_dirty(cmdbuf, VP_DEPTH_CLAMP_RANGE) || refresh;
++
++   if (indexed && (scissor_dirty || depth_dirty))
++      scissor_dirty = depth_dirty = true;
++
++   if (scissor_dirty) {
+       struct mali_scissor_packed scissor_box;
+       pan_pack(&scissor_box, SCISSOR, cfg) {
+-
+-         /* The spec says "width must be greater than 0.0" */
+-         assert(viewport->width >= 0);
+-         int minx = (int)viewport->x;
+-         int maxx = (int)(viewport->x + viewport->width);
+-
+-         /* Viewport height can be negative */
+-         int miny =
+-            MIN2((int)viewport->y, (int)(viewport->y + viewport->height));
+-         int maxy =
+-            MAX2((int)viewport->y, (int)(viewport->y + viewport->height));
+-
+-         assert(scissor->offset.x >= 0 && scissor->offset.y >= 0);
+-         minx = MAX2(scissor->offset.x, minx);
+-         miny = MAX2(scissor->offset.y, miny);
+-         maxx = MIN2(scissor->offset.x + scissor->extent.width, maxx);
+-         maxy = MIN2(scissor->offset.y + scissor->extent.height, maxy);
+-
+-         /* Make sure we don't end up with a max < min when width/height is 0 */
+-         maxx = maxx > minx ? maxx - 1 : maxx;
+-         maxy = maxy > miny ? maxy - 1 : maxy;
+-
+-         /* Clamp viewport scissor to valid range */
+-         cfg.scissor_minimum_x = CLAMP(minx, 0, UINT16_MAX);
+-         cfg.scissor_minimum_y = CLAMP(miny, 0, UINT16_MAX);
+-         cfg.scissor_maximum_x = CLAMP(maxx, 0, UINT16_MAX);
+-         cfg.scissor_maximum_y = CLAMP(maxy, 0, UINT16_MAX);
++         if (indexed) {
++            uint32_t maxx, maxy;
++
++            panvk_full_fb_box(cmdbuf, &maxx, &maxy);
++            cfg.scissor_minimum_x = 0;
++            cfg.scissor_minimum_y = 0;
++            cfg.scissor_maximum_x = maxx;
++            cfg.scissor_maximum_y = maxy;
++         } else {
++            /* The spec says "width must be greater than 0.0" */
++            assert(viewport->width >= 0);
++            int minx = (int)viewport->x;
++            int maxx = (int)(viewport->x + viewport->width);
++
++            /* Viewport height can be negative */
++            int miny =
++               MIN2((int)viewport->y, (int)(viewport->y + viewport->height));
++            int maxy =
++               MAX2((int)viewport->y, (int)(viewport->y + viewport->height));
++
++            assert(scissor->offset.x >= 0 && scissor->offset.y >= 0);
++            minx = MAX2(scissor->offset.x, minx);
++            miny = MAX2(scissor->offset.y, miny);
++            maxx = MIN2(scissor->offset.x + scissor->extent.width, maxx);
++            maxy = MIN2(scissor->offset.y + scissor->extent.height, maxy);
++
++            /* Make sure we don't end up with a max < min when width/height is 0 */
++            maxx = maxx > minx ? maxx - 1 : maxx;
++            maxy = maxy > miny ? maxy - 1 : maxy;
++
++            /* Clamp viewport scissor to valid range */
++            cfg.scissor_minimum_x = CLAMP(minx, 0, UINT16_MAX);
++            cfg.scissor_minimum_y = CLAMP(miny, 0, UINT16_MAX);
++            cfg.scissor_maximum_x = CLAMP(maxx, 0, UINT16_MAX);
++            cfg.scissor_maximum_y = CLAMP(maxy, 0, UINT16_MAX);
++         }
+       }
+ 
+       struct mali_scissor_packed *scissor_box_ptr = &scissor_box;
+@@ -1007,14 +1124,15 @@ prepare_vp(struct panvk_cmd_buffer *cmdbuf)
+                    *((uint64_t *)scissor_box_ptr));
+    }
+ 
+-   if (dyn_gfx_state_dirty(cmdbuf, VP_VIEWPORTS) ||
+-       dyn_gfx_state_dirty(cmdbuf, VP_DEPTH_CLIP_NEGATIVE_ONE_TO_ONE) ||
+-       dyn_gfx_state_dirty(cmdbuf, RS_DEPTH_CLIP_ENABLE) ||
+-       dyn_gfx_state_dirty(cmdbuf, RS_DEPTH_CLAMP_ENABLE) ||
+-       dyn_gfx_state_dirty(cmdbuf, VP_DEPTH_CLAMP_RANGE)) {
++   if (depth_dirty) {
+       float z_min, z_max;
+-      panvk_depth_range(&cmdbuf->state.gfx,
+-                        &cmdbuf->vk.dynamic_graphics_state.vp, &z_min, &z_max);
++
++      if (indexed)
++         panvk_prerast_depth_union(cmdbuf, &z_min, &z_max);
++      else
++         panvk_depth_range(&cmdbuf->state.gfx,
++                           &cmdbuf->vk.dynamic_graphics_state.vp, &z_min,
++                           &z_max);
+       cs_move32_to(b, cs_sr_reg32(b, IDVS, LOW_DEPTH_CLAMP), fui(z_min));
+       cs_move32_to(b, cs_sr_reg32(b, IDVS, HIGH_DEPTH_CLAMP), fui(z_max));
+    }
+diff --git a/src/panfrost/vulkan/panvk_cmd_draw.h b/src/panfrost/vulkan/panvk_cmd_draw.h
+index 04e7f31d64b..5baa459a753 100644
+--- a/src/panfrost/vulkan/panvk_cmd_draw.h
++++ b/src/panfrost/vulkan/panvk_cmd_draw.h
+@@ -261,6 +261,17 @@ struct panvk_cmd_graphics_state {
+    BITSET_DECLARE(dirty, PANVK_CMD_GRAPHICS_DIRTY_STATE_COUNT);
+ };
+ 
++#if PAN_ARCH >= 10
++/* Geometry shader whose passthrough selects a viewport, or NULL. */
++static inline const struct panvk_shader *
++panvk_prerast_viewport_shader(const struct panvk_cmd_graphics_state *gfx)
++{
++   const struct panvk_shader *gs = gfx->gs.shader;
++
++   return gs && gs->gpu_prerast.gs.scissor_clip_loc ? gs : NULL;
++}
++#endif
++
+ #define dyn_gfx_state_dirty(__cmdbuf, __name)                                  \
+    BITSET_TEST((__cmdbuf)->vk.dynamic_graphics_state.dirty,                    \
+                MESA_VK_DYNAMIC_##__name)
+@@ -296,6 +307,49 @@ struct panvk_device_draw_context {
+ };
+ #endif
+ 
++/* dEQP-VK.draw.renderpass.inverted_depth_ranges.nodepthclamp_deltazero.
++ * A zero depth range flattens clip-space Z before the viewport clip.
++ */
++#define PANVK_MIN_DEPTH_CLIP_RANGE 37.7E-06f
++
++static inline void
++panvk_viewport_z_coeffs(const struct vk_viewport_state *vp,
++                        const struct vk_rasterization_state *rs,
++                        unsigned index, float *scale_z, float *offset_z)
++{
++   const VkViewport *viewport = &vp->viewports[index];
++   float z_min = viewport->minDepth;
++   float z_max = viewport->maxDepth;
++
++   if (vk_rasterization_state_depth_clip_enable(rs)) {
++      float dz = z_max - z_min;
++
++      if (dz < 0.0f)
++         dz = -dz;
++      if (dz < PANVK_MIN_DEPTH_CLIP_RANGE) {
++         float z_sign = z_min <= z_max ? 1.0f : -1.0f;
++         float z_center = 0.5f * (z_max + z_min);
++         float lo = 0.5f * PANVK_MIN_DEPTH_CLIP_RANGE;
++         float hi = 1.0f - lo;
++
++         if (z_center < lo)
++            z_center = lo;
++         else if (z_center > hi)
++            z_center = hi;
++         z_min = z_center - 0.5f * z_sign * PANVK_MIN_DEPTH_CLIP_RANGE;
++         z_max = z_center + 0.5f * z_sign * PANVK_MIN_DEPTH_CLIP_RANGE;
++      }
++   }
++
++   if (vp->depth_clip_negative_one_to_one) {
++      *scale_z = 0.5f * (z_max - z_min);
++      *offset_z = 0.5f * (z_min + z_max);
++   } else {
++      *scale_z = z_max - z_min;
++      *offset_z = z_min;
++   }
++}
++
+ static inline void
+ panvk_depth_range(const struct panvk_cmd_graphics_state *state,
+                   const struct vk_viewport_state *vp,
+diff --git a/src/panfrost/vulkan/panvk_gpu_prerast.h b/src/panfrost/vulkan/panvk_gpu_prerast.h
+index 73f655d8df3..89c8064a59b 100644
+--- a/src/panfrost/vulkan/panvk_gpu_prerast.h
++++ b/src/panfrost/vulkan/panvk_gpu_prerast.h
+@@ -15,7 +15,7 @@
+ #include "util/macros.h"
+ #include "vulkan/vulkan_core.h"
+ 
+-#define PANVK_GPU_PRERAST_ABI_VERSION 6
++#define PANVK_GPU_PRERAST_ABI_VERSION 7
+ #define PANVK_GPU_PRERAST_MAX_EXECUTION_BYTES (256ull * 1024 * 1024)
+ #define PANVK_GPU_PRERAST_VS_REGION_END (32ull * 1024 * 1024)
+ #define PANVK_GPU_PRERAST_GS_INDEX_OFFSET PANVK_GPU_PRERAST_VS_REGION_END
+@@ -98,6 +98,31 @@ struct panvk_gpu_prerast_record {
+    uint32_t varying_data[];
+ };
+ 
++/* Indexed by gl_ViewportIndex from the prerast passthrough. The scale and
++ * offset match nir_lower_viewport_transform. min/max are the exclusive
++ * window edges of viewport[i] intersected with scissor[i].
++ */
++struct panvk_prerast_viewport {
++   float scale[4];
++   float offset[4];
++   float minx, miny, maxx, maxy;
++};
++
++struct panvk_prerast_vp_table {
++   uint32_t count;
++   uint32_t pad[3];
++   struct panvk_prerast_viewport vp[16];
++};
++
++static_assert(offsetof(struct panvk_prerast_vp_table, vp) == 16,
++              "prerast viewport table header is 16 bytes");
++static_assert(sizeof(struct panvk_prerast_viewport) == 48,
++              "prerast viewport entry is 48 bytes");
++static_assert(offsetof(struct panvk_prerast_viewport, offset) == 16,
++              "prerast viewport offset");
++static_assert(offsetof(struct panvk_prerast_viewport, minx) == 32,
++              "prerast viewport box");
++
+ struct panvk_gpu_prerast_io {
+    uint32_t abi_version;
+    uint32_t record_stride;
+@@ -119,6 +144,7 @@ struct panvk_gpu_prerast_gs_info {
+    bool kernel_compiled;
+    bool passthrough_compiled;
+    bool xfb;
++   uint8_t scissor_clip_loc;
+ };
+ 
+ /* TCS/TES state the tessellation kernels need. The tessellation modes are
+diff --git a/src/panfrost/vulkan/panvk_shader.h b/src/panfrost/vulkan/panvk_shader.h
+index f33581960b8..cba020751aa 100644
+--- a/src/panfrost/vulkan/panvk_shader.h
++++ b/src/panfrost/vulkan/panvk_shader.h
+@@ -166,6 +166,7 @@ struct panvk_graphics_sysvals {
+    aligned_u64 gpu_prerast_params;
+    aligned_u64 gpu_prerast_records;
+    aligned_u64 gpu_prerast_tess;
++   aligned_u64 gpu_prerast_viewports;
+ #endif
+ 
+    struct {
+diff --git a/src/panfrost/vulkan/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/panvk_vX_cmd_draw.c
+index c51fb9a9cef..20ae18a7dbc 100644
+--- a/src/panfrost/vulkan/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/panvk_vX_cmd_draw.c
+@@ -5,6 +5,7 @@
+  */
+ 
+ #include "panvk_buffer.h"
++#include "panvk_cmd_alloc.h"
+ #include "panvk_cmd_buffer.h"
+ #include "panvk_device_memory.h"
+ #include "panvk_entrypoints.h"
+@@ -827,10 +828,85 @@ prepare_iam_sysvals(struct panvk_cmd_buffer *cmdbuf, BITSET_WORD *dirty_sysvals)
+       set_gfx_sysval(cmdbuf, dirty_sysvals, iam[i], iam[i]);
+ }
+ 
+-/* This value has been selected to get
+- * dEQP-VK.draw.renderpass.inverted_depth_ranges.nodepthclamp_deltazero passing.
+- */
+-#define MIN_DEPTH_CLIP_RANGE 37.7E-06f
++#if PAN_ARCH >= 10
++static void
++panvk_upload_prerast_viewports(struct panvk_cmd_buffer *cmdbuf,
++                               BITSET_WORD *dirty_sysvals)
++{
++   if (!panvk_prerast_viewport_shader(&cmdbuf->state.gfx))
++      return;
++
++   /* Not keyed on VS dirty: every generated GS draw sets that bit. */
++   bool dirty =
++      dyn_gfx_state_dirty(cmdbuf, VP_VIEWPORTS) ||
++      dyn_gfx_state_dirty(cmdbuf, VP_SCISSORS) ||
++      dyn_gfx_state_dirty(cmdbuf, VP_VIEWPORT_COUNT) ||
++      dyn_gfx_state_dirty(cmdbuf, VP_SCISSOR_COUNT) ||
++      dyn_gfx_state_dirty(cmdbuf, VP_DEPTH_CLIP_NEGATIVE_ONE_TO_ONE) ||
++      dyn_gfx_state_dirty(cmdbuf, RS_DEPTH_CLIP_ENABLE) ||
++      dyn_gfx_state_dirty(cmdbuf, RS_DEPTH_CLAMP_ENABLE) ||
++      cmdbuf->state.gfx.sysvals.gpu_prerast_viewports == 0;
++   if (!dirty)
++      return;
++
++   const struct vk_viewport_state *vp = &cmdbuf->vk.dynamic_graphics_state.vp;
++   const struct vk_rasterization_state *rs =
++      &cmdbuf->vk.dynamic_graphics_state.rs;
++   struct panvk_prerast_vp_table table = { 0 };
++   uint32_t n = vp->viewport_count ? vp->viewport_count : 1;
++
++   n = MIN2(n, ARRAY_SIZE(table.vp));
++   table.count = n;
++   for (uint32_t i = 0; i < n; i++) {
++      const VkViewport *viewport = &vp->viewports[i];
++      struct panvk_prerast_viewport *out = &table.vp[i];
++
++      out->scale[0] = 0.5f * viewport->width;
++      out->scale[1] = 0.5f * viewport->height;
++      panvk_viewport_z_coeffs(vp, rs, i, &out->scale[2], &out->offset[2]);
++      out->offset[0] = viewport->x + out->scale[0];
++      out->offset[1] = viewport->y + out->scale[1];
++
++      float minx = viewport->x;
++      float maxx = viewport->x + viewport->width;
++      float y0 = viewport->y;
++      float y1 = viewport->y + viewport->height;
++      float miny = MIN2(y0, y1);
++      float maxy = MAX2(y0, y1);
++
++      if (i < vp->scissor_count) {
++         const VkRect2D *sc = &vp->scissors[i];
++
++         minx = MAX2(minx, (float)sc->offset.x);
++         miny = MAX2(miny, (float)sc->offset.y);
++         maxx = MIN2(maxx, (float)sc->offset.x + (float)sc->extent.width);
++         maxy = MIN2(maxy, (float)sc->offset.y + (float)sc->extent.height);
++      } else {
++         maxx = minx - 1.0f;
++         maxy = miny - 1.0f;
++      }
++      /* max <= min must kill every fragment, including a pixel centre. */
++      if (!(maxx > minx && maxy > miny)) {
++         minx = 0.0f;
++         miny = 0.0f;
++         maxx = -1.0f;
++         maxy = -1.0f;
++      }
++      out->minx = minx;
++      out->miny = miny;
++      out->maxx = maxx;
++      out->maxy = maxy;
++   }
++
++   struct pan_ptr ptr =
++      panvk_cmd_alloc_dev_mem(cmdbuf, desc, sizeof(table), 16);
++   if (!ptr.gpu)
++      return;
++
++   memcpy(ptr.cpu, &table, sizeof(table));
++   set_gfx_sysval(cmdbuf, dirty_sysvals, gpu_prerast_viewports, ptr.gpu);
++}
++#endif
+ 
+ void
+ panvk_per_arch(cmd_prepare_draw_sysvals)(struct panvk_cmd_buffer *cmdbuf,
+@@ -874,32 +950,6 @@ panvk_per_arch(cmd_prepare_draw_sysvals)(struct panvk_cmd_buffer *cmdbuf,
+          &cmdbuf->vk.dynamic_graphics_state.vp;
+       const VkViewport *viewport = &vp->viewports[0];
+ 
+-      /* Doing the viewport transform in the vertex shader and then depth
+-       * clipping with the viewport depth range gets a similar result to
+-       * clipping in clip-space, but loses precision when the viewport depth
+-       * range is very small. When minDepth == maxDepth, this completely
+-       * flattens the clip-space depth and results in never clipping.
+-       *
+-       * To work around this, set a lower limit on depth range when clipping is
+-       * enabled. This results in slightly incorrect fragment depth values, and
+-       * doesn't help with the precision loss, but at least clipping isn't
+-       * completely broken.
+-       */
+-      float z_min = viewport->minDepth;
+-      float z_max = viewport->maxDepth;
+-      if (vk_rasterization_state_depth_clip_enable(rs) &&
+-          fabsf(z_max - z_min) < MIN_DEPTH_CLIP_RANGE) {
+-         float z_sign = z_min <= z_max ? 1.0f : -1.0f;
+-
+-         float z_center = 0.5f * (z_max + z_min);
+-         /* Bump offset off-center if necessary, to not go out of range */
+-         z_center = CLAMP(z_center, 0.5f * MIN_DEPTH_CLIP_RANGE,
+-                          1.0f - 0.5f * MIN_DEPTH_CLIP_RANGE);
+-
+-         z_min = z_center - 0.5f * z_sign * MIN_DEPTH_CLIP_RANGE;
+-         z_max = z_center + 0.5f * z_sign * MIN_DEPTH_CLIP_RANGE;
+-      }
+-
+       /* Upload the viewport scale. Defined as (px/2, py/2, pz) at the start of
+        * section 24.5 ("Controlling the Viewport") of the Vulkan spec. At the
+        * end of the section, the spec defines:
+@@ -909,13 +959,13 @@ panvk_per_arch(cmd_prepare_draw_sysvals)(struct panvk_cmd_buffer *cmdbuf,
+        * pz = maxDepth - minDepth         if negativeOneToOne is false
+        * pz = (maxDepth - minDepth) / 2   if negativeOneToOne is true
+        */
++      float z_scale, z_offset;
++      panvk_viewport_z_coeffs(vp, rs, 0, &z_scale, &z_offset);
+       set_gfx_sysval(cmdbuf, dirty_sysvals, viewport.scale.x,
+                      0.5f * viewport->width);
+       set_gfx_sysval(cmdbuf, dirty_sysvals, viewport.scale.y,
+                      0.5f * viewport->height);
+-      set_gfx_sysval(cmdbuf, dirty_sysvals, viewport.scale.z,
+-                     vp->depth_clip_negative_one_to_one ?
+-                        0.5f * (z_max - z_min) : z_max - z_min);
++      set_gfx_sysval(cmdbuf, dirty_sysvals, viewport.scale.z, z_scale);
+ 
+       /* Upload the viewport offset. Defined as (ox, oy, oz) at the start of
+        * section 24.5 ("Controlling the Viewport") of the Vulkan spec. At the
+@@ -930,12 +980,14 @@ panvk_per_arch(cmd_prepare_draw_sysvals)(struct panvk_cmd_buffer *cmdbuf,
+                      (0.5f * viewport->width) + viewport->x);
+       set_gfx_sysval(cmdbuf, dirty_sysvals, viewport.offset.y,
+                      (0.5f * viewport->height) + viewport->y);
+-      set_gfx_sysval(cmdbuf, dirty_sysvals, viewport.offset.z,
+-                     vp->depth_clip_negative_one_to_one ?
+-                        0.5f * (z_min + z_max) : z_min);
++      set_gfx_sysval(cmdbuf, dirty_sysvals, viewport.offset.z, z_offset);
+ 
+    }
+ 
++#if PAN_ARCH >= 10
++   panvk_upload_prerast_viewports(cmdbuf, dirty_sysvals);
++#endif
++
+    if (dyn_gfx_state_dirty(cmdbuf, INPUT_ATTACHMENT_MAP))
+       prepare_iam_sysvals(cmdbuf, dirty_sysvals);
+ 
+@@ -979,6 +1031,23 @@ panvk_per_arch(cmd_prepare_draw_sysvals)(struct panvk_cmd_buffer *cmdbuf,
+    if (!BITSET_IS_EMPTY(dirty_shader_sysvals))
+       gfx_state_set_dirty(cmdbuf, VS_PUSH_UNIFORMS);
+ 
++#if PAN_ARCH >= 10
++   {
++      /* The raster VS for a geometry draw is the GS passthrough, not the
++       * HW VS masked above. Mask that variant too.
++       */
++      const struct panvk_shader *pshader =
++         panvk_prerast_viewport_shader(&cmdbuf->state.gfx);
++      if (pshader) {
++         const struct panvk_shader_variant *pt =
++            &pshader->variants[PANVK_GS_VARIANT_PASSTHROUGH];
++         BITSET_AND(dirty_shader_sysvals, dirty_sysvals, pt->fau.used_sysvals);
++         if (!BITSET_IS_EMPTY(dirty_shader_sysvals))
++            gfx_state_set_dirty(cmdbuf, VS_PUSH_UNIFORMS);
++      }
++   }
++#endif
++
+    if (fs) {
+       BITSET_AND(dirty_shader_sysvals, dirty_sysvals, fs->fau.used_sysvals);
+ 
+diff --git a/src/panfrost/vulkan/panvk_vX_shader.c b/src/panfrost/vulkan/panvk_vX_shader.c
+index 68fc6a34da8..074168afc5c 100644
+--- a/src/panfrost/vulkan/panvk_vX_shader.c
++++ b/src/panfrost/vulkan/panvk_vX_shader.c
+@@ -568,16 +568,20 @@ panvk_lower_clip_cull_vs(nir_shader *nir)
+ }
+ 
+ static bool
+-panvk_lower_clip_cull_fs(nir_shader *nir, uint64_t prev_outputs)
++panvk_lower_clip_cull_fs(nir_shader *nir, uint64_t prev_outputs,
++                         uint8_t scissor_loc)
+ {
+    static const gl_varying_slot locs[4] = {
+       VARYING_SLOT_CLIP_DIST0, VARYING_SLOT_CLIP_DIST1,
+       VARYING_SLOT_CULL_DIST0, VARYING_SLOT_CULL_DIST1,
+    };
+    static const char *names[4] = {"clip0", "clip1", "cull0", "cull1"};
++   const bool extra_scissor = scissor_loc >= VARYING_SLOT_VAR0 &&
++                              scissor_loc < VARYING_SLOT_MAX;
+ 
+    if (!(prev_outputs & (VARYING_BIT_CLIP_DIST0 | VARYING_BIT_CLIP_DIST1 |
+-                         VARYING_BIT_CULL_DIST0 | VARYING_BIT_CULL_DIST1)))
++                         VARYING_BIT_CULL_DIST0 | VARYING_BIT_CULL_DIST1)) &&
++       !extra_scissor)
+       return false;
+ 
+    struct panvk_dist_elem old_clip[8], old_cull[8];
+@@ -601,6 +605,13 @@ panvk_lower_clip_cull_fs(nir_shader *nir, uint64_t prev_outputs)
+       kill = nir_ior(&b, kill, nir_bany(&b, c));
+    }
+ 
++   if (extra_scissor) {
++      nir_variable *var = panvk_create_dist_var(nir, nir_var_shader_in,
++                                                scissor_loc, "vp_scissor");
++      nir_def *v = nir_load_var(&b, var);
++      kill = nir_ior(&b, kill, nir_bany(&b, nir_flt_imm(&b, v, 0.0)));
++   }
++
+    for (unsigned i = 0; i < 8; i++) {
+       if (old_clip[i].var) {
+          nir_def *v = vals[i / 4] ? nir_channel(&b, vals[i / 4], i % 4)
+@@ -1034,6 +1045,95 @@ panvk_gpu_prerast_collect_out_type(nir_builder *b, nir_intrinsic_instr *intr,
+    return false;
+ }
+ 
++/* First free clip-distance slot, else the first free generic. 0 if none.
++ * The stored value is multiplied by clip W so perspective interpolation
++ * yields a window-space edge distance. The FS kills on < 0, which is exact
++ * at pixel centres for an exclusive integer edge.
++ */
++static uint8_t
++panvk_prerast_scissor_slot(uint64_t outputs)
++{
++   if (!(outputs & VARYING_BIT_CLIP_DIST0))
++      return VARYING_SLOT_CLIP_DIST0;
++   if (!(outputs & VARYING_BIT_CLIP_DIST1))
++      return VARYING_SLOT_CLIP_DIST1;
++   for (unsigned i = 0; i < MAX_VARYING; i++) {
++      if (!(outputs & BITFIELD64_BIT(VARYING_SLOT_VAR0 + i)))
++         return VARYING_SLOT_VAR0 + i;
++   }
++   return 0;
++}
++
++struct panvk_prerast_xform {
++   nir_def *screen;
++   nir_def *planes;
++};
++
++/* Match nir_lower_viewport_transform, including the 1/W clamp. Planes are
++ * +1 when fewer than two viewports are active so the HW scissor stays in
++ * charge and this path does not kill anything.
++ */
++static struct panvk_prerast_xform
++panvk_prerast_viewport_xform(nir_builder *b, nir_def *pos, nir_def *vp_index)
++{
++   struct panvk_prerast_xform xf;
++   nir_def *table = load_sysval(b, graphics, 64, gpu_prerast_viewports);
++   nir_def *count = nir_load_global(b, 1, 32, table, .align_mul = 4);
++   nir_def *last = nir_imax(b, nir_iadd_imm(b, count, -1), nir_imm_int(b, 0));
++   nir_def *idx = nir_iclamp(b, vp_index, nir_imm_int(b, 0), last);
++   nir_def *entry = nir_iadd(
++      b, table,
++      nir_u2u64(b, nir_iadd_imm(b,
++         nir_imul_imm(b, idx, sizeof(struct panvk_prerast_viewport)),
++         offsetof(struct panvk_prerast_vp_table, vp))));
++   nir_def *scale = nir_load_global(b, 3, 32, entry, .align_mul = 4);
++   nir_def *offset = nir_load_global(b, 3, 32, nir_iadd_imm(b, entry, 16),
++                                     .align_mul = 4);
++   nir_def *box = nir_load_global(b, 4, 32, nir_iadd_imm(b, entry, 32),
++                                  .align_mul = 16);
++
++   nir_def *w = nir_channel(b, pos, 3);
++   nir_def *w_recip = nir_frcp(b, w);
++   w_recip = nir_fclamp(b, w_recip, nir_imm_float(b, -32768.0f),
++                        nir_imm_float(b, 32768.0f));
++   nir_def *ndc = nir_fmul(b, nir_trim_vector(b, pos, 3), w_recip);
++   nir_def *screen = nir_fadd(b, nir_fmul(b, ndc, scale), offset);
++   xf.screen = nir_vec4(b, nir_channel(b, screen, 0), nir_channel(b, screen, 1),
++                        nir_channel(b, screen, 2), w_recip);
++
++   nir_def *x = nir_channel(b, pos, 0);
++   nir_def *y = nir_channel(b, pos, 1);
++   nir_def *sx = nir_channel(b, scale, 0);
++   nir_def *sy = nir_channel(b, scale, 1);
++   nir_def *ox = nir_channel(b, offset, 0);
++   nir_def *oy = nir_channel(b, offset, 1);
++   nir_def *minx = nir_channel(b, box, 0);
++   nir_def *miny = nir_channel(b, box, 1);
++   nir_def *maxx = nir_channel(b, box, 2);
++   nir_def *maxy = nir_channel(b, box, 3);
++   nir_def *left = nir_fadd(b, nir_fmul(b, x, sx),
++                            nir_fmul(b, nir_fsub(b, ox, minx), w));
++   nir_def *right = nir_fsub(b, nir_fmul(b, nir_fsub(b, maxx, ox), w),
++                             nir_fmul(b, x, sx));
++   nir_def *bottom = nir_fadd(b, nir_fmul(b, y, sy),
++                              nir_fmul(b, nir_fsub(b, oy, miny), w));
++   nir_def *top = nir_fsub(b, nir_fmul(b, nir_fsub(b, maxy, oy), w),
++                           nir_fmul(b, y, sy));
++   nir_def *planes = nir_vec4(b, left, right, bottom, top);
++   xf.planes = nir_bcsel(b, nir_ilt_imm(b, count, 2),
++                         nir_imm_vec4(b, 1.0f, 1.0f, 1.0f, 1.0f), planes);
++   return xf;
++}
++
++static void
++panvk_prerast_store_clip(nir_builder *b, nir_def *planes, unsigned location,
++                         unsigned base)
++{
++   nir_store_output(b, planes, nir_imm_int(b, 0), .base = base,
++                    .write_mask = 0xf, .src_type = nir_type_float32,
++                    .io_semantics = { .location = location, .num_slots = 1 });
++}
++
+ static nir_shader *
+ panvk_gpu_prerast_passthrough_nir(const nir_shader *source, uint64_t outputs,
+                                   const struct panvk_gpu_prerast_out_types *t,
+@@ -2001,7 +2101,8 @@ panvk_gpu_prerast_lower_gs(nir_shader *nir,
+ static nir_shader *
+ panvk_gpu_prerast_gs_passthrough_nir(const nir_shader_compiler_options *options,
+                                      const struct panvk_gpu_prerast_gs_info *gs,
+-                                     const struct panvk_gpu_prerast_out_types *t)
++                                     const struct panvk_gpu_prerast_out_types *t,
++                                     uint8_t scissor_loc)
+ {
+    nir_builder b = nir_builder_init_simple_shader(
+       MESA_SHADER_VERTEX, options, "panvk_gpu_prerast_gs_passthrough");
+@@ -2011,12 +2112,25 @@ panvk_gpu_prerast_gs_passthrough_nir(const nir_shader_compiler_options *options,
+       nir_u2u64(&b, nir_imul_imm(&b, nir_load_vertex_id(&b),
+                                  gs->record_stride)));
+ 
++   nir_def *vp_index = NULL;
++   if (scissor_loc && (gs->outputs_written & VARYING_BIT_VIEWPORT)) {
++      unsigned vp_slot = util_bitcount64(gs->outputs_written &
++                                         BITFIELD64_MASK(VARYING_SLOT_VIEWPORT));
++      vp_index = nir_load_global(&b, 1, 32,
++                                 nir_iadd_imm(&b, record, vp_slot * 16),
++                                 .align_mul = 4);
++   }
++
+    unsigned idx = 0;
++   nir_def *planes = NULL;
+    u_foreach_bit64(location, gs->outputs_written) {
+-      if (location == VARYING_SLOT_VIEWPORT)
+-         continue;
+       unsigned slot =
+          util_bitcount64(gs->outputs_written & BITFIELD64_MASK(location));
++      /* Same position-packet byte as layer. The index stays in the record
++       * and is never written as a HW varying.
++       */
++      if (location == VARYING_SLOT_VIEWPORT)
++         continue;
+       unsigned ncomp = 4;
+       nir_alu_type type = t->type[location] ? t->type[location]
+                                             : nir_type_float32;
+@@ -2037,13 +2151,26 @@ panvk_gpu_prerast_gs_passthrough_nir(const nir_shader_compiler_options *options,
+       nir_def *value = nir_load_global(&b, ncomp, 32,
+                                        nir_iadd_imm(&b, record, slot * 16),
+                                        .align_mul = 4);
++      if (vp_index && location == VARYING_SLOT_POS) {
++         struct panvk_prerast_xform xf =
++            panvk_prerast_viewport_xform(&b, value, vp_index);
++         value = xf.screen;
++         planes = xf.planes;
++         type = nir_type_float32;
++         ncomp = 4;
++      }
+       nir_store_output(&b, value, nir_imm_int(&b, 0), .base = idx++,
+                        .write_mask = BITFIELD_MASK(ncomp), .src_type = type,
+                        .io_semantics = {.location = location, .num_slots = 1});
+    }
+ 
++   if (planes)
++      panvk_prerast_store_clip(&b, planes, scissor_loc, idx++);
++
+    b.shader->info.outputs_written =
+       gs->outputs_written & ~VARYING_BIT_VIEWPORT;
++   if (planes)
++      b.shader->info.outputs_written |= BITFIELD64_BIT(scissor_loc);
+    b.shader->num_outputs = idx;
+    return b.shader;
+ }
+@@ -2984,6 +3111,7 @@ panvk_compile_shader(struct panvk_device *dev,
+                      const struct vk_graphics_pipeline_state *state,
+                      const struct pan_varying_layout *vs_varying_layout,
+                      const uint32_t *noperspective_varyings,
++                     uint8_t scissor_loc,
+                      const VkAllocationCallbacks *pAllocator,
+                      struct vk_shader **shader_out)
+ {
+@@ -3287,8 +3415,12 @@ panvk_compile_shader(struct panvk_device *dev,
+ 
+       struct panvk_shader_variant *pt =
+          &shader->variants[PANVK_GS_VARIANT_PASSTHROUGH];
++      if ((gs->outputs_written & VARYING_BIT_VIEWPORT) &&
++          (gs->outputs_written & VARYING_BIT_POS))
++         gs->scissor_clip_loc = panvk_prerast_scissor_slot(
++            gs->outputs_written & ~VARYING_BIT_VIEWPORT);
+       nir_shader *pt_nir = panvk_gpu_prerast_gs_passthrough_nir(
+-         info->nir->options, gs, &out_types);
++         info->nir->options, gs, &out_types, gs->scissor_clip_loc);
+       struct panvk_shader_desc_info pt_desc_info = {0};
+       panvk_lower_nir(dev, pt_nir, info->set_layout_count, info->set_layouts,
+                       info->robustness, state, &pt_desc_info, false);
+@@ -3298,6 +3430,7 @@ panvk_compile_shader(struct panvk_device *dev,
+       pan_build_varying_layout_compact(&pt_layout, pt_nir, inputs.gpu_id);
+       struct pan_compile_inputs pt_inputs = inputs;
+       pt_inputs.varying_layout = &pt_layout;
++      pt_inputs.skip_viewport_transform = gs->scissor_clip_loc != 0;
+       pt->own_bin = true;
+       result = panvk_compile_nir(dev, pt_nir, info->flags, &pt_inputs, state,
+                                  noperspective_varyings, &pt_desc_info, pt);
+@@ -3399,7 +3532,8 @@ panvk_compile_shader(struct panvk_device *dev,
+                prev_dist_outputs |= BITFIELD64_BIT(slot->location);
+          }
+       }
+-      NIR_PASS(_, nir, panvk_lower_clip_cull_fs, prev_dist_outputs);
++      NIR_PASS(_, nir, panvk_lower_clip_cull_fs, prev_dist_outputs,
++               scissor_loc);
+ 
+       /* We need to lower input attachments before we lower descriptors */
+       NIR_PASS(_, nir, panvk_per_arch(nir_lower_input_attachment_loads),
+@@ -3585,13 +3719,14 @@ compile_shaders(struct vk_device *vk_dev, uint32_t shader_count,
+        * find a varying layout we can use instead of making up our own.
+        */
+       const struct pan_varying_layout *vs_varying_layout = NULL;
++      uint8_t scissor_loc = 0;
+       if (infos[i].stage == MESA_SHADER_FRAGMENT && i > 0 &&
+           infos[i - 1].next_stage_mask == VK_SHADER_STAGE_FRAGMENT_BIT) {
+          struct panvk_shader *prev_shader =
+             container_of(shaders_out[i - 1], struct panvk_shader, vk);
+ 
+          /* The last geometry stage before the FS will always have a HW vertex
+-          * shader variant.
++          * shader variant. Geometry's first vertex variant is the passthrough.
+           */
+          panvk_shader_foreach_variant(prev_shader, variant) {
+             if (variant->info.stage == MESA_SHADER_VERTEX) {
+@@ -3600,11 +3735,15 @@ compile_shaders(struct vk_device *vk_dev, uint32_t shader_count,
+                break;
+             }
+          }
++#if PAN_ARCH >= 10
++         if (prev_shader->vk.stage == MESA_SHADER_GEOMETRY)
++            scissor_loc = prev_shader->gpu_prerast.gs.scissor_clip_loc;
++#endif
+       }
+ 
+       result = panvk_compile_shader(dev, &infos[i], state, vs_varying_layout,
+-                                    noperspective_varyings_ptr, pAllocator,
+-                                    &shaders_out[i]);
++                                    noperspective_varyings_ptr, scissor_loc,
++                                    pAllocator, &shaders_out[i]);
+ 
+       if (result != VK_SUCCESS)
+          goto err_cleanup;
+@@ -4538,7 +4677,7 @@ VkResult panvk_per_arch(create_shader)(
+    panvk_preprocess_nir(dev->vk.physical, nir, &rs);
+ 
+    struct vk_shader *vk_shader;
+-   VkResult result = panvk_compile_shader(dev, &info, NULL, NULL, NULL, NULL,
++   VkResult result = panvk_compile_shader(dev, &info, NULL, NULL, NULL, 0, NULL,
+                                           &vk_shader);
+    if (result != VK_SUCCESS)
+       return result;

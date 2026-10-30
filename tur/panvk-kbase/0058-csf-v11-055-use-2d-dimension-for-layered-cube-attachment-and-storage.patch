@@ -1,0 +1,39 @@
+From: abhay-byte <zenithblue.dev@gmail.com>
+Subject: [PATCH csf-v11 055] panvk: use 2D dimension for layered cube attachment and storage views
+Generated-by: LLM
+
+Purpose: TBD; biblioklept
+Source/Reference: TBD, work/mesa e6d0d6cc0b9
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/054
+Validation test: TBD
+
+diff --git a/src/panfrost/vulkan/panvk_vX_cmd_frame_shaders.c b/src/panfrost/vulkan/panvk_vX_cmd_frame_shaders.c
+index dbf1f79a75f..594237c399a 100644
+--- a/src/panfrost/vulkan/panvk_vX_cmd_frame_shaders.c
++++ b/src/panfrost/vulkan/panvk_vX_cmd_frame_shaders.c
+@@ -359,6 +359,8 @@ fill_textures(struct panvk_cmd_buffer *cmdbuf,
+       }
+ 
+       struct pan_image_view pview = *iview;
++      if (pview.dim == MALI_TEXTURE_DIMENSION_CUBE)
++         pview.dim = MALI_TEXTURE_DIMENSION_2D;
+       if (loc == FRAG_RESULT_DEPTH)
+          pview.format = util_format_get_depth_only(pview.format);
+       else if (loc == FRAG_RESULT_STENCIL)
+diff --git a/src/panfrost/vulkan/panvk_vX_image_view.c b/src/panfrost/vulkan/panvk_vX_image_view.c
+index 46dc621f1a9..72a18e12146 100644
+--- a/src/panfrost/vulkan/panvk_vX_image_view.c
++++ b/src/panfrost/vulkan/panvk_vX_image_view.c
+@@ -52,6 +52,9 @@ panvk_storage_pview(const struct panvk_image_view *view,
+ {
+    struct pan_image_view spview = *pview;
+ 
++   if (spview.dim == MALI_TEXTURE_DIMENSION_CUBE)
++      spview.dim = MALI_TEXTURE_DIMENSION_2D;
++
+    /* A storage view only sees its Z-slice range. The range defaults to the
+     * full view depth, so non-sliced views are left unchanged
+     * (VK_EXT_image_sliced_view_of_3d).

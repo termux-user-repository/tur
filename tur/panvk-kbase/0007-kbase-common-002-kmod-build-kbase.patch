@@ -1,0 +1,32 @@
+From: panvk-kbase-android worker <panvk-worker@localhost>
+Subject: [PATCH kbase-common 002] kmod: compile kbase_kmod.c when kbase KMD
+ selected
+
+Purpose: Build the Kbase backend into libpankmod when
+ -Dpanfrost-kmds includes kbase. Keeps upstream panfrost+panthor files
+ unconditional (unlike the G720 reference, which gates them too — we do
+ not take that behavioral change).
+Source/Reference: https://github.com/wonderkast02/panvk-g720-kbase-csf
+ branch android-candidate-beta-1.9.4
+ (src/panfrost/lib/kmod/meson.build), adapted: upstream file list kept,
+ only the kbase conditional appended.
+Tested GPU: none yet (build plumbing only).
+Tested Kbase UAPI: n/a.
+Mesa base range: 26.3.0-devel (pinned 5a07217f034b3e50d8c7c7794f97a2df1742613b).
+Dependencies: 001-meson-kmds-option.patch (panfrost_kmds variable).
+Validation test: meson setup + ninja build of pankmod_lib with kbase.
+
+diff --git a/src/panfrost/lib/kmod/meson.build b/src/panfrost/lib/kmod/meson.build
+--- a/src/panfrost/lib/kmod/meson.build
++++ b/src/panfrost/lib/kmod/meson.build
+@@ -6,6 +6,10 @@
+   'panfrost_kmod.c',
+   'panthor_kmod.c',
+ )
++
++if panfrost_kmds.contains('kbase')
++  libpankmod_lib_files += files('kbase_kmod.c')
++endif
+
+ libpankmod_lib = static_library(
+   'pankmod_lib',

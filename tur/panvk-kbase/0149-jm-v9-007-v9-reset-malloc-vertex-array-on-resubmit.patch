@@ -1,0 +1,110 @@
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: 2026-10-11
+Subject: [PATCH jm-v9 007] panvk/jm: reset the MALLOC_VERTEX vertex array when a command buffer is resubmitted biblioklept
+
+Purpose: A v9 MALLOC_VERTEX job writes the pointer and strides of the
+vertex packets it allocated into its own Draw "Vertex array" (the CPU only
+sets Packet). The reissue path cleared the job headers and the tiler
+context but left that pointer, so the second run of the same command
+buffer started from a stale allocation and the job faulted: PanProbe
+gpu_prerast_slice "replay" (submit, wait, submit the same command buffer
+again) got VK_ERROR_DEVICE_LOST on the second vkWaitForFences. The batch now
+keeps its MALLOC_VERTEX jobs in a list and the reissue path packs the CPU
+value (Packet = 1, pointer and strides 0) back. A list rather than a job
+type check: the indirect draw patch can turn a MALLOC_VERTEX job into a
+NULL job for one run, and NULL jobs also come from other paths.
+Source/Reference: https://github.com/Noysz/panvk-g99-jm (commit 6ce0d46e419a, MIT; patches/0072-v9-reissue-malloc-vertex-reset)
+Tested GPU: build-checked; device run on Mali-G57 MC2 (Lenovo TB336FU, gpu_id 0x90930010) pending, see worklogs/v9-jm/PROGRESS.md
+Tested Kbase UAPI: JM 11.38
+Mesa base range: 5a07217f + g615-v11-csf series + jm-v9 001-006
+Dependencies: jm-v9/002
+Validation test: PanProbe gpu_prerast_slice (replay case)
+
+---
+diff --git a/src/panfrost/vulkan/jm/panvk_cmd_buffer.h b/src/panfrost/vulkan/jm/panvk_cmd_buffer.h
+index 0e4e117..df33360 100644
+--- a/src/panfrost/vulkan/jm/panvk_cmd_buffer.h
++++ b/src/panfrost/vulkan/jm/panvk_cmd_buffer.h
+@@ -34,6 +34,10 @@
+ struct panvk_batch {
+    struct list_head node;
+    struct util_dynarray jobs;
++#if PAN_ARCH == 9
++   /* MALLOC_VERTEX jobs, the GPU writes their vertex array pointer. */
++   struct util_dynarray malloc_vertex_jobs;
++#endif
+    struct util_dynarray event_ops;
+    struct pan_jc vtc_jc;
+    struct pan_jc frag_jc;
+diff --git a/src/panfrost/vulkan/jm/panvk_vX_cmd_buffer.c b/src/panfrost/vulkan/jm/panvk_vX_cmd_buffer.c
+index 9533f3c..09400e9 100644
+--- a/src/panfrost/vulkan/jm/panvk_vX_cmd_buffer.c
++++ b/src/panfrost/vulkan/jm/panvk_vX_cmd_buffer.c
+@@ -389,6 +389,9 @@ panvk_per_arch(cmd_open_batch)(struct panvk_cmd_buffer *cmdbuf)
+       vk_zalloc(&cmdbuf->vk.pool->alloc, sizeof(*cmdbuf->cur_batch), 8,
+                 VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+    cmdbuf->cur_batch->jobs = UTIL_DYNARRAY_INIT;
++#if PAN_ARCH == 9
++   cmdbuf->cur_batch->malloc_vertex_jobs = UTIL_DYNARRAY_INIT;
++#endif
+    cmdbuf->cur_batch->event_ops = UTIL_DYNARRAY_INIT;
+    assert(cmdbuf->cur_batch);
+    return cmdbuf->cur_batch;
+@@ -436,6 +439,9 @@ panvk_reset_cmdbuf(struct vk_command_buffer *vk_cmdbuf,
+    list_for_each_entry_safe(struct panvk_batch, batch, &cmdbuf->batches, node) {
+       list_del(&batch->node);
+       util_dynarray_fini(&batch->jobs);
++#if PAN_ARCH == 9
++      util_dynarray_fini(&batch->malloc_vertex_jobs);
++#endif
+       util_dynarray_fini(&batch->event_ops);
+ 
+       vk_free(&cmdbuf->vk.pool->alloc, batch);
+@@ -459,6 +465,9 @@ panvk_destroy_cmdbuf(struct vk_command_buffer *vk_cmdbuf)
+    list_for_each_entry_safe(struct panvk_batch, batch, &cmdbuf->batches, node) {
+       list_del(&batch->node);
+       util_dynarray_fini(&batch->jobs);
++#if PAN_ARCH == 9
++      util_dynarray_fini(&batch->malloc_vertex_jobs);
++#endif
+       util_dynarray_fini(&batch->event_ops);
+ 
+       vk_free(&cmdbuf->vk.pool->alloc, batch);
+diff --git a/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c
+index 00cb21d..1f09b17 100644
+--- a/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c
+@@ -2226,6 +2226,7 @@ v9_emit_malloc_vertex_job(struct panvk_cmd_buffer *cmdbuf,
+    if (!job.gpu)
+       return VK_ERROR_OUT_OF_DEVICE_MEMORY;
+    util_dynarray_append(&batch->jobs, job.cpu);
++   util_dynarray_append(&batch->malloc_vertex_jobs, job.cpu);
+ 
+    const struct vk_dynamic_graphics_state *dyns = &cmdbuf->vk.dynamic_graphics_state;
+    const struct vk_rasterization_state *rs = &dyns->rs;
+diff --git a/src/panfrost/vulkan/jm/panvk_vX_gpu_queue.c b/src/panfrost/vulkan/jm/panvk_vX_gpu_queue.c
+index 66857bb..f5e4f06 100644
+--- a/src/panfrost/vulkan/jm/panvk_vX_gpu_queue.c
++++ b/src/panfrost/vulkan/jm/panvk_vX_gpu_queue.c
+@@ -89,6 +89,21 @@ panvk_queue_submit_batch(struct panvk_gpu_queue *queue,
+       util_dynarray_foreach(&batch->jobs, void *, job)
+          memset((*job), 0, 4 * 4);
+ 
++#if PAN_ARCH == 9
++      /* A MALLOC_VERTEX job writes the pointer and strides of the vertex
++       * packets it allocated into its own Draw vertex array (the CPU only
++       * sets Packet). Left in place, the next run of the same command buffer
++       * starts from that stale pointer and the job faults. Put back what
++       * the CPU wrote. */
++      util_dynarray_foreach(&batch->malloc_vertex_jobs, void *, job) {
++         struct mali_vertex_array_packed *va =
++            (void *)((uint8_t *)(*job) +
++                     pan_section_offset(MALLOC_VERTEX_JOB, DRAW) + 2 * 4);
++         pan_pack(va, VERTEX_ARRAY, cfg)
++            cfg.packet = true;
++      }
++#endif
++
+       /* Reset the tiler before re-issuing the batch */
+       if (batch->tiler.ctx_descs.cpu) {
+          memcpy(batch->tiler.heap_desc.cpu, &batch->tiler.heap_templ,

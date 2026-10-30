@@ -1,0 +1,127 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: Tue, 6 Oct 2026 00:30:00 +0530
+Subject: [PATCH] panvk: update ZS after the FS for EarlyFragmentTests with
+ depth bounds on biblioklept
+
+With the test on and EarlyFragmentTests, the early ZS update let the
+emulated test read the fragment's own depth and kept ZS writes of
+samples outside the bounds. Keep the early test but update ZS after the
+FS, unless the app FS itself discards, writes SampleMask or uses
+alpha-to-coverage (those must not gate EFT ZS writes; 092 behaviour).
+Whether the app wrote SampleMask is recorded at lowering time and
+serialized (depth_bounds_app_mask).
+
+The earlier version of this patch also kept the app's FPK, coverage and
+early-ZS LUT for a lowered FS while the test is off. Dropped: the bound
+FS still writes SampleMask then, so the DCD must describe that shader
+(writes_coverage, no FPK); correctness over the FPK win. The file name
+is kept for series stability.
+
+Generated-by: LLM
+---
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+index 0f04c60..a921271 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+@@ -2626,11 +2626,11 @@ build_dcd_flags(struct panvk_cmd_buffer *cmdbuf,
+    uint8_t rt_mask = cmdbuf->state.gfx.render.bound_attachments &
+                      MESA_VK_RP_ATTACHMENT_ANY_COLOR_BITS;
+    /* Must match the ds.enable sysval in cmd_prepare_draw_sysvals. */
+-   bool z_read = fs && (z_attachment_read(fs, &dyns->ial) ||
+-                        (fs->fs.depth_bounds &&
+-                         dyns->ds.depth.bounds_test.enable &&
+-                         (cmdbuf->state.gfx.render.bound_attachments &
+-                          MESA_VK_RP_ATTACHMENT_DEPTH_BIT)));
++   bool db_on = fs && fs->fs.depth_bounds &&
++                dyns->ds.depth.bounds_test.enable &&
++                (cmdbuf->state.gfx.render.bound_attachments &
++                 MESA_VK_RP_ATTACHMENT_DEPTH_BIT);
++   bool z_read = fs && (z_attachment_read(fs, &dyns->ial) || db_on);
+ 
+    if (fs) {
+       out->rt_written = color_attachment_written_mask(fs, &dyns->cal);
+@@ -2692,6 +2692,18 @@ build_dcd_flags(struct panvk_cmd_buffer *cmdbuf,
+             pan_earlyzs_get(fs->fs.earlyzs_lut, writes_zs || oq,
+                             alpha_to_coverage, zs_always_passes, zs_read);
+ 
++         /* EarlyFragmentTests forces an early ZS update, which would let the
++          * emulated test read the fragment's own depth and keep the ZS
++          * writes of samples outside the bounds. Test early, update after
++          * the FS so it reads the old depth and its coverage gates the write.
++          * Not when the app FS discards or writes SampleMask: that must not
++          * gate ZS writes or OQ under EarlyFragmentTests (092 behaviour).
++          */
++         if (db_on && fs->info.fs.early_fragment_tests && (writes_zs || oq) &&
++             !fs->info.fs.can_discard && !fs->fs.depth_bounds_app_mask &&
++             !alpha_to_coverage)
++            out->earlyzs.update = MALI_PIXEL_KILL_FORCE_LATE;
++
+          cfg.pixel_kill_operation = (enum mali_pixel_kill)out->earlyzs.kill;
+          cfg.zs_update_operation = (enum mali_pixel_kill)out->earlyzs.update;
+ 
+diff --git a/src/panfrost/vulkan/panvk_shader.h b/src/panfrost/vulkan/panvk_shader.h
+index 10ca9f5..0a7e06e 100644
+--- a/src/panfrost/vulkan/panvk_shader.h
++++ b/src/panfrost/vulkan/panvk_shader.h
+@@ -419,6 +419,8 @@ struct panvk_shader_variant {
+          bool tile_image_z_read;
+          bool tile_image_s_read;
+          bool depth_bounds;
++         /* The app FS wrote SampleMask itself (before the depth bounds lowering). */
++         bool depth_bounds_app_mask;
+          /* device->depth_bounds_fs: only needed while the test is on. */
+          bool depth_bounds_only;
+       } fs;
+diff --git a/src/panfrost/vulkan/panvk_vX_shader.c b/src/panfrost/vulkan/panvk_vX_shader.c
+index eb2f0ea..c7aee28 100644
+--- a/src/panfrost/vulkan/panvk_vX_shader.c
++++ b/src/panfrost/vulkan/panvk_vX_shader.c
+@@ -2359,8 +2359,9 @@ panvk_depth_bounds_lowered(const struct vk_features *features,
+ /* Clears the SampleMask bit of every sample whose stored depth is
+  * outside [min, max]. The draw makes the depth read and the late ZS update
+  * effective only while the test is enabled (see build_dcd_flags).
++ * Returns whether the app wrote SampleMask itself.
+  */
+-static void
++static bool
+ panvk_lower_depth_bounds(nir_shader *nir)
+ {
+    nir_function_impl *impl = nir_shader_get_entrypoint(nir);
+@@ -2430,6 +2431,7 @@ panvk_lower_depth_bounds(nir_shader *nir)
+ 
+    nir->info.outputs_written |= BITFIELD64_BIT(FRAG_RESULT_SAMPLE_MASK);
+    nir_progress(true, impl, nir_metadata_none);
++   return app_mask != NULL;
+ }
+ #endif
+ 
+@@ -3837,7 +3839,7 @@ panvk_compile_shader(struct panvk_device *dev,
+ 
+ #if PAN_ARCH >= 10
+       if (panvk_depth_bounds_lowered(&dev->vk.enabled_features, state)) {
+-         panvk_lower_depth_bounds(nir);
++         variant->fs.depth_bounds_app_mask = panvk_lower_depth_bounds(nir);
+          variant->fs.depth_bounds = true;
+       }
+ #endif
+@@ -4203,6 +4205,8 @@ panvk_deserialize_shader_variant(struct vk_device *vk_dev,
+                       sizeof(shader->fs.tile_image_s_read));
+       blob_copy_bytes(blob, &shader->fs.depth_bounds,
+                       sizeof(shader->fs.depth_bounds));
++      blob_copy_bytes(blob, &shader->fs.depth_bounds_app_mask,
++                      sizeof(shader->fs.depth_bounds_app_mask));
+       break;
+ 
+    default:
+@@ -4372,6 +4376,8 @@ panvk_shader_serialize_variant(struct vk_device *vk_dev,
+                        sizeof(shader->fs.tile_image_s_read));
+       blob_write_bytes(blob, &shader->fs.depth_bounds,
+                        sizeof(shader->fs.depth_bounds));
++      blob_write_bytes(blob, &shader->fs.depth_bounds_app_mask,
++                       sizeof(shader->fs.depth_bounds_app_mask));
+       break;
+ 
+    default:
+-- 
+2.45.0
