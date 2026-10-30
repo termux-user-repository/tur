@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://github.com/storytold/filmcraft
 TERMUX_PKG_DESCRIPTION="Native open-source video editor in pure Rust (eframe/wgpu)"
 TERMUX_PKG_LICENSE="MIT, Apache-2.0"
 TERMUX_PKG_MAINTAINER="@termux"
-TERMUX_PKG_VERSION="0.13.0"
+TERMUX_PKG_VERSION="0.14.0"
 TERMUX_PKG_SRCURL="https://github.com/storytold/filmcraft/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz"
-TERMUX_PKG_SHA256=6ad642d7e6cc1ad95bd44183ff00813ee978eb78a983fcd38f3f98336b8ef4d1
+TERMUX_PKG_SHA256=6b5ed01cbb1328bfb7c702baf58c7e68af156085a6ded4998ba95b4ebefcde5b
 TERMUX_PKG_DEPENDS="libx11, libxcb, libxcursor, libxi, libxrandr, libxkbcommon, vulkan-loader-android, hicolor-icon-theme, alsa-lib, alsa-plugins"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_AUTO_UPDATE=true
@@ -27,6 +27,14 @@ termux_step_pre_configure() {
 		! -wholename ./vendor/xkbcommon-dl \
 		! -wholename ./vendor/wayland-cursor \
 		! -path './vendor/smithay-client-toolkit*' \
+		! -path './vendor/craft*' \
+		! -path './vendor/winprint*' \
+		! -path './vendor/egui*' \
+		! -path './vendor/epaint*' \
+		! -path './vendor/ecolor*' \
+		! -path './vendor/emath*' \
+		! -path './vendor/hayro*' \
+		! -path './vendor/krilla*' \
 		-exec rm -rf '{}' \;
 
 	patch -p1 -d vendor/wayland-cursor <"$TERMUX_PKG_BUILDER_DIR/wayland-cursor-no-shm.diff"
@@ -49,9 +57,14 @@ termux_step_pre_configure() {
 			-e "s|libxkbcommon-x11.so.0|libxkbcommon-x11.so|g" \
 			-e "s|libxcb.so.1|libxcb.so|g"
 
-	echo "" >>Cargo.toml
-	echo '[patch.crates-io]' >>Cargo.toml
-	for crate in eframe egui-winit arboard rfd cpal winit wgpu wgpu-hal x11rb-protocol xkbcommon-dl wayland-cursor; do
+	for d in vendor/egui vendor/egui-* vendor/egui_* vendor/eframe vendor/epaint* vendor/emath vendor/ecolor; do
+		[ -d "$d" ] || continue
+		crate="$(basename "$d")"
+		sed -i -E "s|^$crate = \{ git = .*\}|$crate = { path = \"./vendor/$crate\" }|" Cargo.toml
+	done
+	sed -i '/git = "https:\/\/github\.com\/storytold\/egui\.git"/d' Cargo.toml
+	sed -i 's|^winit = { git = .* }|winit = { path = "./vendor/winit" }|' Cargo.toml
+	for crate in arboard rfd cpal wgpu wgpu-hal x11rb-protocol xkbcommon-dl wayland-cursor; do
 		echo "$crate = { path = \"./vendor/$crate\" }" >>Cargo.toml
 	done
 	i=0
