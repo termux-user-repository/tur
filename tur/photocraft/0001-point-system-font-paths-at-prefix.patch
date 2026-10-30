@@ -1,8 +1,8 @@
 diff --git a/crates/text/src/cjk.rs b/crates/text/src/cjk.rs
-index 9b70f23..040ad08 100644
+index ab1c7d8..481b679 100644
 --- a/crates/text/src/cjk.rs
 +++ b/crates/text/src/cjk.rs
-@@ -258,38 +258,38 @@ pub fn font_files(script: CjkScript) -> Vec<FontFile> {
+@@ -421,38 +421,38 @@ pub fn font_files(script: CjkScript) -> Vec<FontFile> {
              Korean => "Noto Sans CJK KR",
          };
          let mut v: Vec<FontFile> = [
@@ -61,18 +61,18 @@ index 9b70f23..040ad08 100644
 +                f("@TERMUX_PREFIX@/share/fonts/un-core/UnDotum.ttf", ""),
              ],
          });
-         with_flatpak_host_fonts(v)
-@@ -304,7 +304,7 @@ fn with_flatpak_host_fonts(files: Vec<FontFile>) -> Vec<FontFile> {
+         let mut files = with_flatpak_host_fonts(v);
+@@ -473,7 +473,7 @@ fn with_flatpak_host_fonts(files: Vec<FontFile>) -> Vec<FontFile> {
      for file in files {
          let host = if cfg!(target_os = "linux") {
              file.path
 -                .strip_prefix("/usr/share/fonts")
 +                .strip_prefix("@TERMUX_PREFIX@/share/fonts")
                  .ok()
-                 .map(|relative| FontFile { path: std::path::Path::new("/run/host/fonts").join(relative), family: file.family })
+                 .map(|relative| FontFile { path: std::path::Path::new("/run/host/fonts").join(relative), family: file.family.clone() })
          } else {
-@@ -328,8 +328,8 @@ pub fn last_resort_files() -> Vec<FontFile> {
-         vec![FontFile { path: std::path::Path::new(&dir).join("Fonts").join("ARIALUNI.TTF"), family: "" }]
+@@ -497,8 +497,8 @@ pub fn last_resort_files() -> Vec<FontFile> {
+         vec![FontFile { path: std::path::Path::new(&dir).join("Fonts").join("ARIALUNI.TTF"), family: String::new() }]
      } else {
          with_flatpak_host_fonts(vec![
 -            f("/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf"),
@@ -82,7 +82,7 @@ index 9b70f23..040ad08 100644
          ])
      }
  }
-@@ -512,11 +512,11 @@ mod flatpak_tests {
+@@ -924,11 +924,11 @@ mod flatpak_tests {
              let files = font_files(script);
              let native = &files[0];
              let host = &files[1];
@@ -97,10 +97,10 @@ index 9b70f23..040ad08 100644
                      assert_eq!(pair[1].family, pair[0].family);
                  }
 diff --git a/crates/text/src/fonts.rs b/crates/text/src/fonts.rs
-index 0db7280..9c44d09 100644
+index 416ae78..17a809a 100644
 --- a/crates/text/src/fonts.rs
 +++ b/crates/text/src/fonts.rs
-@@ -533,8 +533,8 @@ fn system_font_dirs() -> Vec<std::path::PathBuf> {
+@@ -981,8 +981,8 @@ pub(crate) fn system_font_dirs() -> Vec<std::path::PathBuf> {
              v.push(PathBuf::from(l).join("Microsoft\\Windows\\Fonts"));
          }
      } else {
