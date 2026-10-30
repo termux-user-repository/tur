@@ -1,8 +1,8 @@
-diff --git a/crates/text/src/fontdb.rs b/crates/text/src/fontdb.rs
-index edd3bcd..32e6b3f 100644
---- a/crates/text/src/fontdb.rs
-+++ b/crates/text/src/fontdb.rs
-@@ -978,7 +978,7 @@ pub fn system_font_dirs() -> Vec<PathBuf> {
+diff --git a/crates/text/src/fontdb/dirs.rs b/crates/text/src/fontdb/dirs.rs
+index 2b39edb..b3eff50 100644
+--- a/crates/text/src/fontdb/dirs.rs
++++ b/crates/text/src/fontdb/dirs.rs
+@@ -151,7 +151,7 @@ pub fn system_font_dirs() -> Vec<PathBuf> {
          #[cfg(windows)]
          dirs.extend(registered_font_files(&dirs));
      } else {
