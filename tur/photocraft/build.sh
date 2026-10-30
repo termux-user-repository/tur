@@ -2,10 +2,10 @@ TERMUX_PKG_HOMEPAGE=https://getartcraft.com/apps/photocraft
 TERMUX_PKG_DESCRIPTION="An open-source, clean-room reimplementation of Adobe Photoshop in pure Rust"
 TERMUX_PKG_LICENSE="MIT, Apache-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="0.16.0"
+TERMUX_PKG_VERSION="0.17.0"
 TERMUX_PKG_SRCURL="https://github.com/storytold/photocraft/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz"
-TERMUX_PKG_SHA256=9e6ce75e785928e0e94a94ae71007103135c0b559fc6ffbb8934c0db0ce5b644
-TERMUX_PKG_DEPENDS="libx11, libxcb, libxcursor, libxi, libxrandr, libxkbcommon, vulkan-loader-android"
+TERMUX_PKG_SHA256=c1a0370920eae0c5517bbff9dc8d748f1cd7698cb8ae11f22e7ddae9aefc5b18
+TERMUX_PKG_DEPENDS="libx11, libxcb, libxcursor, libxi, libxrandr, libxkbcommon, vulkan-loader-android, hicolor-icon-theme"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_AUTO_UPDATE=true
 
@@ -26,6 +26,14 @@ termux_step_pre_configure() {
 		! -wholename ./vendor/xkbcommon-dl \
 		! -wholename ./vendor/wayland-cursor \
 		! -path './vendor/smithay-client-toolkit*' \
+		! -path './vendor/craft*' \
+		! -path './vendor/winprint*' \
+		! -path './vendor/egui*' \
+		! -path './vendor/epaint*' \
+		! -path './vendor/ecolor*' \
+		! -path './vendor/emath*' \
+		! -path './vendor/hayro*' \
+		! -path './vendor/krilla*' \
 		-exec rm -rf '{}' \;
 
 	patch -p1 -d vendor/wayland-cursor <"$TERMUX_PKG_BUILDER_DIR/wayland-cursor-no-shm.diff"
@@ -48,9 +56,14 @@ termux_step_pre_configure() {
 			-e "s|libxkbcommon-x11.so.0|libxkbcommon-x11.so|g" \
 			-e "s|libxcb.so.1|libxcb.so|g"
 
-	echo "" >>Cargo.toml
-	echo '[patch.crates-io]' >>Cargo.toml
-	for crate in eframe egui-winit arboard rfd winit wgpu wgpu-hal x11rb-protocol xkbcommon-dl wayland-cursor; do
+	for d in vendor/egui vendor/egui-* vendor/egui_* vendor/eframe vendor/epaint* vendor/emath vendor/ecolor; do
+		[ -d "$d" ] || continue
+		crate="$(basename "$d")"
+		sed -i -E "s|^$crate = \{ git = .*\}|$crate = { path = \"./vendor/$crate\" }|" Cargo.toml
+	done
+	sed -i '/git = "https:\/\/github\.com\/storytold\/egui\.git"/d' Cargo.toml
+	sed -i 's|^winit = { git = .* }|winit = { path = "./vendor/winit" }|' Cargo.toml
+	for crate in arboard rfd wgpu wgpu-hal x11rb-protocol xkbcommon-dl wayland-cursor; do
 		echo "$crate = { path = \"./vendor/$crate\" }" >>Cargo.toml
 	done
 	i=0
@@ -83,4 +96,7 @@ termux_step_make_install() {
 		"$TERMUX_PREFIX/share/mime/packages/ai.storyteller.photocraft.xml"
 	mkdir -p "$TERMUX_PREFIX/share/icons/"
 	cp -R assets/app-icon/hicolor "$TERMUX_PREFIX/share/icons/"
+
+	install -Dm644 README.md \
+		"$TERMUX_PREFIX/share/doc/$TERMUX_PKG_NAME/README.md"
 }
