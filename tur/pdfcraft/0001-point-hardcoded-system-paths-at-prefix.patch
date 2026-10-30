@@ -1,5 +1,5 @@
 diff --git a/crates/engine/src/text_fonts.rs b/crates/engine/src/text_fonts.rs
-index f4945f7..433c058 100644
+index 859bc1a..6b8cbf7 100644
 --- a/crates/engine/src/text_fonts.rs
 +++ b/crates/engine/src/text_fonts.rs
 @@ -24,7 +24,7 @@ pub fn installed_directories() -> Vec<PathBuf> {
@@ -24,11 +24,11 @@ index 5ce3d97..b8b7819 100644
      }
      #[cfg(not(all(unix, not(target_arch = "wasm32"))))]
      {
-diff --git a/crates/ui-egui/src/system_fonts.rs b/crates/ui-egui/src/system_fonts.rs
-index e2c6a0d..90e10c0 100644
---- a/crates/ui-egui/src/system_fonts.rs
-+++ b/crates/ui-egui/src/system_fonts.rs
-@@ -412,7 +412,7 @@ fn unix_fonts(files: &'static [&'static str]) -> Vec<PathBuf> {
+diff --git a/crates/ui-egui/src/platform/system_fonts.rs b/crates/ui-egui/src/platform/system_fonts.rs
+index 4b5e1ec..14a1585 100644
+--- a/crates/ui-egui/src/platform/system_fonts.rs
++++ b/crates/ui-egui/src/platform/system_fonts.rs
+@@ -410,7 +410,7 @@ fn unix_fonts(files: &'static [&'static str]) -> Vec<PathBuf> {
  
  fn unix_candidates(files: &[&str], installed: &[PathBuf]) -> Vec<PathBuf> {
      let mut paths: Vec<_> =
@@ -37,10 +37,10 @@ index e2c6a0d..90e10c0 100644
      // Fontconfig may point into /nix/store or a user's font directory. Keep the existing
      // candidate names and their preference order; this does not select arbitrary fonts.
      for file in files {
-diff --git a/crates/ui-egui/src/system_fonts/fontconfig.rs b/crates/ui-egui/src/system_fonts/fontconfig.rs
-index dbec74e..10919ad 100644
---- a/crates/ui-egui/src/system_fonts/fontconfig.rs
-+++ b/crates/ui-egui/src/system_fonts/fontconfig.rs
+diff --git a/crates/ui-egui/src/platform/system_fonts/fontconfig.rs b/crates/ui-egui/src/platform/system_fonts/fontconfig.rs
+index 243fec6..0bbaedc 100644
+--- a/crates/ui-egui/src/platform/system_fonts/fontconfig.rs
++++ b/crates/ui-egui/src/platform/system_fonts/fontconfig.rs
 @@ -94,7 +94,7 @@ pub(super) fn config_path() -> PathBuf {
          return file;
      }
