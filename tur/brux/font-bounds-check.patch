@@ -1,0 +1,28 @@
+--- a/rte/src/brux/text.cpp
++++ b/rte/src/brux/text.cpp
+@@ -326,15 +326,21 @@
+ 			else if(text[i] != '~')
+ 				i--;
+ 			else {
+-				c = (int)text[i] - start; // Get current character and apply font offset
++				c = (int)(unsigned char)text[i] - (int)start; // Get current character and apply font offset
+ 				source->draw(c, dx, dy, 0, SDL_FLIP_NONE, 1, 1, alpha, curcol);
+-				dx += cw[c] + kern;
++				if (c >= 0 && c < (int)cw.size())
++					dx += cw[c] + kern;
++				else
++					dx += source->getw() + kern;
+ 			}
+ 		}
+ 		else {
+-			c = (int)text[i] - start; // Get current character and apply font offset
++			c = (int)(unsigned char)text[i] - (int)start; // Get current character and apply font offset
+ 			source->draw(c, dx, dy, 0, SDL_FLIP_NONE, 1, 1, alpha, curcol);
+-			dx += cw[c] + kern;
++			if (c >= 0 && c < (int)cw.size())
++				dx += cw[c] + kern;
++			else
++				dx += source->getw() + kern;
+ 		}
+ 	}
+ };
