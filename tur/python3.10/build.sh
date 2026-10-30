@@ -3,9 +3,9 @@ TERMUX_PKG_DESCRIPTION="Python programming language intended to enable clear pro
 TERMUX_PKG_LICENSE="PythonPL"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 _MAJOR_VERSION=3.10
-TERMUX_PKG_VERSION=${_MAJOR_VERSION}.15
+TERMUX_PKG_VERSION=${_MAJOR_VERSION}.22
 TERMUX_PKG_SRCURL=https://www.python.org/ftp/python/${TERMUX_PKG_VERSION}/Python-${TERMUX_PKG_VERSION}.tar.xz
-TERMUX_PKG_SHA256=aab0950817735172601879872d937c1e4928a57c409ae02369ec3d91dccebe79
+TERMUX_PKG_SHA256=c61fe9b1a1a7ec2a0b0388e664187c378a5325a89e3606d220abf5bdfccb2543
 TERMUX_PKG_DEPENDS="gdbm, libandroid-posix-semaphore, libandroid-support, libbz2, libcrypt, libffi, liblzma, libsqlite, ncurses, ncurses-ui-libs, openssl, readline, zlib"
 TERMUX_PKG_RECOMMENDS="clang, make, pkg-config"
 TERMUX_PKG_SUGGESTS="python${_MAJOR_VERSION}-tkinter"
@@ -89,8 +89,8 @@ termux_step_pre_configure() {
 	# gcc for include paths when finding headers for determining
 	# if extension modules should be built (specifically, the
 	# zlib extension module is not built without this):
-	CPPFLAGS+=" -I$TERMUX_STANDALONE_TOOLCHAIN/sysroot/usr/include"
-	LDFLAGS+=" -L$TERMUX_STANDALONE_TOOLCHAIN/sysroot/usr/lib"
+	CPPFLAGS+=" -I$TERMUX_PREFIX/include -isystem$TERMUX_STANDALONE_TOOLCHAIN/sysroot/usr/include"
+	LDFLAGS+=" -L$TERMUX_PREFIX/lib -L$TERMUX_STANDALONE_TOOLCHAIN/sysroot/usr/lib"
 	if [ $TERMUX_ARCH = x86_64 ]; then LDFLAGS+=64; fi
 
 	if [ "$TERMUX_ON_DEVICE_BUILD" = "true" ]; then
@@ -98,6 +98,9 @@ termux_step_pre_configure() {
 		#    Fatal: you must define __ANDROID_API__
 		# if __ANDROID_API__ is not defined.
 		CPPFLAGS+=" -D__ANDROID_API__=$(getprop ro.build.version.sdk)"
+		# https://github.com/termux-user-repository/tur/pull/2442#issuecomment-4945448006
+		export CPPFLAGS="-I$TERMUX_PREFIX/include $CPPFLAGS"
+		export LDFLAGS="-L$TERMUX_PREFIX/lib $LDFLAGS"
 	fi
 }
 

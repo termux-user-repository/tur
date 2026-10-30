@@ -9,7 +9,6 @@
          else:
              _dir_candidates = []
  
-
 --- a/Modules/_multiprocessing/multiprocessing.c
 +++ b/Modules/_multiprocessing/multiprocessing.c
 @@ -172,7 +172,7 @@
@@ -21,20 +20,6 @@
      _MULTIPROCESSING_SEM_UNLINK_METHODDEF
  #endif
      {NULL}
-
---- a/Modules/_multiprocessing/posixshmem.c
-+++ b/Modules/_multiprocessing/posixshmem.c
-@@ -11,6 +11,9 @@
- #include <sys/mman.h>
- #endif
- 
-+int shm_open(const char *, int, mode_t);
-+int shm_unlink(const char *);
-+
- /*[clinic input]
- module _posixshmem
- [clinic start generated code]*/
-
 --- a/Modules/_multiprocessing/posixshmem.c
 +++ b/Modules/_multiprocessing/posixshmem.c
 @@ -11,6 +11,72 @@
