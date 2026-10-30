@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://getartcraft.com/apps/pdfcraft
 TERMUX_PKG_DESCRIPTION="PDF reader, editor and toolkit; an open-source clean-room PDF application in pure Rust"
 TERMUX_PKG_LICENSE="MIT, Apache-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="0.14.0"
+TERMUX_PKG_VERSION="0.15.0"
 TERMUX_PKG_SRCURL="https://github.com/storytold/pdfcraft/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz"
-TERMUX_PKG_SHA256=68405d6c694fb4fc14e583d9e3726e36f28719857ec96b9c5a225da711a4f2b4
+TERMUX_PKG_SHA256=0e20c8675238a7576883587db144fdccfb968504101d79f82be436a593188536
 TERMUX_PKG_DEPENDS="libx11, libxcb, libxcursor, libxi, libxrandr, libxkbcommon, vulkan-loader-android, hicolor-icon-theme"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_AUTO_UPDATE=true
@@ -13,6 +13,30 @@ termux_step_pre_configure() {
 	termux_setup_rust
 
 	cargo vendor
+	find ./vendor \
+		-mindepth 1 -maxdepth 1 -type d \
+		! -wholename ./vendor/eframe \
+		! -wholename ./vendor/egui-winit \
+		! -wholename ./vendor/arboard \
+		! -wholename ./vendor/rfd \
+		! -wholename ./vendor/winit \
+		! -wholename ./vendor/wgpu \
+		! -wholename ./vendor/wgpu-hal \
+		! -wholename ./vendor/x11rb-protocol \
+		! -wholename ./vendor/xkbcommon-dl \
+		! -wholename ./vendor/wayland-cursor \
+		! -path './vendor/smithay-client-toolkit*' \
+		! -path './vendor/craft*' \
+		! -path './vendor/winprint*' \
+		! -path './vendor/egui*' \
+		! -path './vendor/epaint*' \
+		! -path './vendor/ecolor*' \
+		! -path './vendor/emath*' \
+		! -path './vendor/hayro*' \
+		! -path './vendor/krilla*' \
+		! -path './vendor/lopdf*' \
+		! -path './vendor/vello*' \
+		-exec rm -rf '{}' \;
 
 	patch -p1 -d vendor/wayland-cursor <"$TERMUX_PKG_BUILDER_DIR/wayland-cursor-no-shm.diff"
 	for d in vendor/smithay-client-toolkit vendor/smithay-client-toolkit-*; do
@@ -34,7 +58,14 @@ termux_step_pre_configure() {
 			-e "s|libxkbcommon-x11.so.0|libxkbcommon-x11.so|g" \
 			-e "s|libxcb.so.1|libxcb.so|g"
 
-	for crate in eframe egui-winit arboard rfd wgpu wgpu-hal x11rb-protocol xkbcommon-dl wayland-cursor; do
+	for d in vendor/egui vendor/egui-* vendor/egui_* vendor/eframe vendor/epaint* vendor/emath vendor/ecolor; do
+		[ -d "$d" ] || continue
+		crate="$(basename "$d")"
+		sed -i -E "s|^$crate = \{ git = .*\}|$crate = { path = \"./vendor/$crate\" }|" Cargo.toml
+	done
+	sed -i '/git = "https:\/\/github\.com\/storytold\/egui\.git"/d' Cargo.toml
+	sed -i 's|^winit = { git = .* }|winit = { path = "./vendor/winit" }|' Cargo.toml
+	for crate in arboard rfd wgpu wgpu-hal x11rb-protocol xkbcommon-dl wayland-cursor; do
 		echo "$crate = { path = \"./vendor/$crate\" }" >>Cargo.toml
 	done
 	i=0
