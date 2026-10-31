@@ -1,0 +1,65 @@
+diff --git a/src/logging/code-events.h b/src/logging/code-events.h
+index 7df135c..3263559 100644
+--- a/deps/v8/src/logging/code-events.h
++++ b/deps/v8/src/logging/code-events.h
+@@ -65,7 +65,7 @@ using WasmName = Vector<const char>;
+ class CodeEventListener {
+  public:
+ #define DECLARE_ENUM(enum_item, _) enum_item,
+-  enum LogEventsAndTags {
++  enum LogEventsAndTags : uint8_t {
+     LOG_EVENTS_AND_TAGS_LIST(DECLARE_ENUM) NUMBER_OF_LOG_EVENTS
+   };
+ #undef DECLARE_ENUM
+diff --git a/src/objects/code.h b/src/objects/code.h
+index 6a5ac9f..5e84f18 100644
+--- a/deps/v8/src/objects/code.h
++++ b/deps/v8/src/objects/code.h
+@@ -49,7 +49,7 @@ class Code : public HeapObject {
+   V(WASM_INTERPRETER_ENTRY) \
+   V(C_WASM_ENTRY)
+ 
+-  enum Kind {
++  enum Kind : uint8_t {
+ #define DEFINE_CODE_KIND_ENUM(name) name,
+     CODE_KIND_LIST(DEFINE_CODE_KIND_ENUM)
+ #undef DEFINE_CODE_KIND_ENUM
+diff --git a/src/snapshot/references.h b/src/snapshot/references.h
+index 215db9d..ec2eedf 100644
+--- a/deps/v8/src/snapshot/references.h
++++ b/deps/v8/src/snapshot/references.h
+@@ -38,7 +38,7 @@ constexpr bool IsPreAllocatedSpace(SnapshotSpace space) {
+ 
+ class SerializerReference {
+  private:
+-  enum SpecialValueType {
++  enum SpecialValueType : uint8_t {
+     kInvalidValue,
+     kAttachedReference,
+     kOffHeapBackingStore,
+diff --git a/src/compiler/backend/instruction-codes.h b/src/compiler/backend/instruction-codes.h
+index 589c1bd..c2fa1ab 100644
+--- a/deps/v8/src/compiler/backend/instruction-codes.h
++++ b/deps/v8/src/compiler/backend/instruction-codes.h
+@@ -184,7 +184,7 @@ V8_EXPORT_PRIVATE std::ostream& operator<<(std::ostream& os,
+   V(None)                       \
+   TARGET_ADDRESSING_MODE_LIST(V)
+ 
+-enum AddressingMode {
++enum AddressingMode : uint8_t {
+ #define DECLARE_ADDRESSING_MODE(Name) kMode_##Name,
+   ADDRESSING_MODE_LIST(DECLARE_ADDRESSING_MODE)
+ #undef DECLARE_ADDRESSING_MODE
+diff --git a/src/compiler/backend/instruction.h b/src/compiler/backend/instruction.h
+index 01277a8..34e9328 100644
+--- a/deps/v8/src/compiler/backend/instruction.h
++++ b/deps/v8/src/compiler/backend/instruction.h
+@@ -413,7 +413,7 @@ class ImmediateOperand : public InstructionOperand {
+ 
+ class LocationOperand : public InstructionOperand {
+  public:
+-  enum LocationKind { REGISTER, STACK_SLOT };
++  enum LocationKind : uint8_t { REGISTER, STACK_SLOT };
+ 
+   LocationOperand(InstructionOperand::Kind operand_kind,
+                   LocationOperand::LocationKind location_kind,

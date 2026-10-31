@@ -1,0 +1,20 @@
+--- a/deps/v8/src/base/macros.h
++++ b/deps/v8/src/base/macros.h
+@@ -233,7 +233,7 @@
+       // Trivial non-deleted destructor.
+       std::is_trivially_destructible<T>::value;
+ 
+-#elif defined(__GNUC__) && __GNUC__ < 5
++#elif defined(__GNUC__) && __GNUC__ < 5 && !defined(__clang__)
+   // WARNING:
+   // On older libstdc++ versions, there is no way to correctly implement
+   // is_trivially_copyable. The workaround below is an approximation (neither
+@@ -248,7 +248,7 @@
+   static constexpr bool value = std::is_trivially_copyable<T>::value;
+ #endif
+ };
+-#if defined(__GNUC__) && __GNUC__ < 5
++#if defined(__GNUC__) && __GNUC__ < 5 && !defined(__clang__)
+ // On older libstdc++ versions, base::is_trivially_copyable<T>::value is only an
+ // approximation (see above), so make ASSERT_{NOT_,}TRIVIALLY_COPYABLE a noop.
+ #define ASSERT_TRIVIALLY_COPYABLE(T) static_assert(true, "check disabled")
