@@ -95,10 +95,10 @@ termux_step_get_source() {
 	unzip -d "$TERMUX_PKG_SRCDIR" "$TERMUX_PKG_CACHEDIR/${f}" > /dev/null
 }
 
-source "$TERMUX_SCRIPTDIR/common-files/package-update-scripts/update-bazel.sh"
+source "$TERMUX_SCRIPTDIR/common-files/package-update-scripts/bazel.sh"
 
 termux_pkg_auto_update() {
-	tur_update_bazel 5
+	tur_pkg_update_bazel 5
 }
 
 termux_step_post_get_source() {

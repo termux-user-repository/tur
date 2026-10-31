@@ -5,12 +5,12 @@
 # 	source "$TERMUX_SCRIPTDIR/common-files/package-update-scripts/update-python.sh"
 #
 # 	termux_pkg_auto_update() {
-# 		tur_update_python "${_MAJOR_VERSION}"
+# 		tur_pkg_update_python "${_MAJOR_VERSION}"
 # 	}
 #
 # Requires: curl, grep, sed, sort (from termux-packages scripts environment).
 
-tur_update_python() {
+tur_pkg_update_python() {
 	local series="$1"
 	local latest
 	latest="$(

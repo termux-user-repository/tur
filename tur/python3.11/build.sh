@@ -59,10 +59,10 @@ TERMUX_PKG_UNDEF_SYMBOLS_FILES="
 ./opt/python$_MAJOR_VERSION/cross/lib/python$_MAJOR_VERSION/lib-dynload/*.so
 "
 
-source "$TERMUX_SCRIPTDIR/common-files/package-update-scripts/update-python.sh"
+source "$TERMUX_SCRIPTDIR/common-files/package-update-scripts/python.sh"
 
 termux_pkg_auto_update() {
-	tur_update_python "${_MAJOR_VERSION}"
+	tur_pkg_update_python "${_MAJOR_VERSION}"
 }
 
 termux_step_host_build() {

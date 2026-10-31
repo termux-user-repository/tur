@@ -5,12 +5,12 @@
 # 	source "$TERMUX_SCRIPTDIR/common-files/package-update-scripts/update-bazel.sh"
 #
 # 	termux_pkg_auto_update() {
-# 		tur_update_bazel <major_version>
+# 		tur_pkg_update_bazel <major_version>
 # 	}
 #
 # Requires: curl, jq (from termux-packages scripts environment).
 
-tur_update_bazel() {
+tur_pkg_update_bazel() {
 	local major_version="$1"
 	local tags_api="https://api.github.com/repos/bazelbuild/bazel/git/refs/tags"
 
