@@ -1,7 +1,7 @@
 Add some dependencies required by TUR-on-Device.
 --- a/scripts/setup-termux.sh
 +++ b/scripts/setup-termux.sh
-@@ -45,12 +45,20 @@
+@@ -45,11 +45,19 @@
  PACKAGES+=" xmlto"                      # Needed by git's manpage generation
  PACKAGES+=" zip"
  
@@ -10,7 +10,6 @@ Add some dependencies required by TUR-on-Device.
 +PACKAGES+=" ndk-multilib-native-stubs"
 +
  # Definition of a package manager
- export TERMUX_SCRIPTDIR=$(dirname "$(realpath "$0")")/../
  . $(dirname "$(realpath "$0")")/properties.sh
  source "$TERMUX_PREFIX/bin/termux-setup-package-manager" || true
  
