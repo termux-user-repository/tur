@@ -1,0 +1,92 @@
+diff --git a/script/build.ts b/script/build.ts
+index 52038f6..0b22811 100755
+--- a/script/build.ts
++++ b/script/build.ts
+@@ -67,7 +67,6 @@ import { verifyInjectedSassVariables } from './validate-sass/validate-all'
+ import { join } from 'path'
+ import assert from 'assert'
+ import { copyCopilotDependency } from './copilot'
+-import { removeCurlVersionRequirements } from './remove-curl-version-requirements'
+ import { pruneCopilotDependency } from './copilot-prune'
+ import { assertRelocatableSymlinks } from './verify-symlinks'
+ 
+@@ -404,14 +403,27 @@ function copyDependencies() {
+     { recursive: true, verbatimSymlinks: true }
+   )
+ 
+-  console.log('  Copying copilot…')
+-  copyCopilotDependency(
+-    path.join(projectRoot, 'app', 'node_modules'),
+-    path.join(outRoot, 'copilot'),
+-    process.platform,
+-    getDistArchitecture()
++  // Termux: the Copilot runtime is a prebuilt glibc binary and is not
++  // available for Android, the app works without it.
++  const copilotSdkDir = path.join(
++    projectRoot,
++    'app',
++    'node_modules',
++    '@github',
++    `copilot-sdk-${process.platform}-${getDistArchitecture()}`
+   )
+-  pruneCopilotDependency(path.join(outRoot, 'copilot'))
++  if (existsSync(copilotSdkDir)) {
++    console.log('  Copying copilot…')
++    copyCopilotDependency(
++      path.join(projectRoot, 'app', 'node_modules'),
++      path.join(outRoot, 'copilot'),
++      process.platform,
++      getDistArchitecture()
++    )
++    pruneCopilotDependency(path.join(outRoot, 'copilot'))
++  } else {
++    console.log('  Skipping copilot (runtime not available)…')
++  }
+ 
+   // Dev builds for macOS require a SSH wrapper to use SSH_ASKPASS
+   if (process.platform === 'darwin' && isDevelopmentBuild) {
+@@ -428,39 +440,13 @@ function copyDependencies() {
+     )
+   }
+ 
+-  console.log('  Copying git environment…')
+-  const gitDir = path.resolve(outRoot, 'git')
+-  rmSync(gitDir, { recursive: true, force: true })
+-  mkdirSync(gitDir, { recursive: true })
+-  cpSync(path.resolve(projectRoot, 'app/node_modules/dugite/git'), gitDir, {
+-    recursive: true,
+-    verbatimSymlinks: true,
+-  })
+-
+-  if (process.platform === 'linux') {
+-    // Avoids ld.so warnings on distros without libcurl symbol versioning
+-    removeCurlVersionRequirements(gitDir)
+-  }
+-
++  // Termux: the system git is used (LOCAL_GIT_DIRECTORY is set by the
++  // launcher), so there is no embedded git to copy. Git finds the credential
++  // helper through PATH, see the launcher script.
+   console.log('  Copying desktop credential helper…')
+-  const mingw = getDistArchitecture() === 'x64' ? 'mingw64' : 'clangarm64'
+-  const gitCoreDir =
+-    process.platform === 'win32'
+-      ? path.resolve(outRoot, 'git', mingw, 'libexec', 'git-core')
+-      : path.resolve(outRoot, 'git', 'libexec', 'git-core')
+-
+-  const desktopCredentialHelperTrampolineFile =
+-    process.platform === 'win32'
+-      ? 'desktop-credential-helper-trampoline.exe'
+-      : 'desktop-credential-helper-trampoline'
+-
+-  const desktopCredentialHelperFile = `git-credential-desktop${
+-    process.platform === 'win32' ? '.exe' : ''
+-  }`
+-
+   cpSync(
+-    path.resolve(trampolineSource, desktopCredentialHelperTrampolineFile),
+-    path.resolve(gitCoreDir, desktopCredentialHelperFile),
++    path.resolve(trampolineSource, 'desktop-credential-helper-trampoline'),
++    path.resolve(desktopTrampolineDir, 'git-credential-desktop'),
+     { recursive: true, verbatimSymlinks: true }
+   )
+ 
