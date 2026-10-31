@@ -8,3 +8,13 @@
  #include <string>
  
  // Conversion routines between UT8 and UTF16, used by string-16.{h,cc}. You may
+--- a/deps/v8/src/base/logging.h
++++ b/deps/v8/src/base/logging.h
+@@ -5,6 +5,7 @@
+ #ifndef V8_BASE_LOGGING_H_
+ #define V8_BASE_LOGGING_H_
+ 
++#include <cstdint>
+ #include <cstring>
+ #include <sstream>
+ #include <string>

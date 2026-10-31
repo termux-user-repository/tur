@@ -139,3 +139,105 @@ https://github.com/nodejs/gyp-next/commit/d0504e6700ce48f44957a4d5891b142a60be94
  from jinja2.runtime import Undefined
  from jinja2._compat import text_type, string_types, integer_types
  import decimal
+--- a/configure.py
++++ b/configure.py
+@@ -5,7 +5,10 @@
+ import errno
+ import optparse
+ import os
+-import pipes
++try:
++  from pipes import quote as shlex_quote
++except:
++  from shlex import quote as shlex_quote
+ import pprint
+ import re
+ import shlex
+@@ -13,8 +16,12 @@
+ import shutil
+ import io
+ 
+-from distutils.spawn import find_executable as which
+-from distutils.version import StrictVersion
++try:
++  from distutils.spawn import find_executable as which
++  from distutils.version import StrictVersion
++except:
++  from shutil import which
++  from packaging.version import Version as StrictVersion
+ 
+ # If not run from node/, cd to node/.
+ os.chdir(os.path.dirname(__file__) or '.')
+@@ -1761,7 +1768,7 @@
+       pprint.pformat(output, indent=2) + '\n')
+ 
+ write('config.status', '#!/bin/sh\nset -x\nexec ./configure ' +
+-      ' '.join([pipes.quote(arg) for arg in original_argv]) + '\n')
++      ' '.join([shlex_quote(arg) for arg in original_argv]) + '\n')
+ os.chmod('config.status', 0o775)
+ 
+ 
+--- a/deps/v8/tools/mb/mb.py~
++++ b/deps/v8/tools/mb/mb.py
+@@ -18,7 +18,6 @@
+ import errno
+ import json
+ import os
+-import pipes
+ import platform
+ import pprint
+ import re
+@@ -29,6 +28,11 @@
+ import traceback
+ import urllib2
+ 
++try:
++  from pipes import quote as shlex_quote
++except:
++  from shlex import quote as shlex_quote
++
+ from collections import OrderedDict
+ 
+ CHROMIUM_SRC_DIR = os.path.dirname(os.path.dirname(os.path.dirname(
+@@ -1117,8 +1121,8 @@
+       shell_quoter = QuoteForCmd
+     else:
+       env_prefix = ''
+-      env_quoter = pipes.quote
+-      shell_quoter = pipes.quote
++      env_quoter = shlex_quote
++      shell_quoter = shlex_quote
+ 
+     def print_env(var):
+       if env and var in env:
+--- a/deps/v8/tools/node/node_common.py
++++ b/deps/v8/tools/node/node_common.py
+@@ -7,12 +7,16 @@
+ from __future__ import print_function
+ 
+ import os
+-import pipes
+ import shutil
+ import stat
+ import subprocess
+ import sys
+ 
++try:
++  from pipes import quote as shlex_quote
++except:
++  from shlex import quote as shlex_quote
++
+ DEPOT_TOOLS_URL = \
+   "https://chromium.googlesource.com/chromium/tools/depot_tools.git"
+ 
+@@ -29,8 +33,8 @@
+       print("Checking out depot_tools.")
+       # shell=True needed on Windows to resolve git.bat.
+       subprocess.check_call("git clone {} {}".format(
+-          pipes.quote(DEPOT_TOOLS_URL),
+-          pipes.quote(depot_tools)), shell=True)
++          shlex_quote(DEPOT_TOOLS_URL),
++          shlex_quote(depot_tools)), shell=True)
+       # Using check_output to hide warning messages.
+       subprocess.check_output(
+           [sys.executable, gclient_path, "metrics", "--opt-out"],

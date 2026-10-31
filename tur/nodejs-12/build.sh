@@ -2,10 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://nodejs.org/
 TERMUX_PKG_DESCRIPTION="Open Source, cross-platform JavaScript runtime environment (Version 12, EOL at Apr 05, 2022)"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION=12.18.3
-TERMUX_PKG_REVISION=2
+TERMUX_PKG_VERSION=12.22.12
 TERMUX_PKG_SRCURL=https://nodejs.org/dist/v${TERMUX_PKG_VERSION}/node-v${TERMUX_PKG_VERSION}.tar.xz
-TERMUX_PKG_SHA256=71158026579487422fd13cc2553b34cddb76519098aa6030faab52f88c6e0d0e
+TERMUX_PKG_SHA256=bc42b7f8495b9bfc7f7850dd180bb02a5bdf139cc232b8c6f02a6967e20714f2
 # Note that we do not use a shared libuv to avoid an issue with the Android
 # linker, which does not use symbols of linked shared libraries when resolving
 # symbols on dlopen(). See https://github.com/termux/termux-packages/issues/462.
@@ -20,7 +19,7 @@ $_INSTALL_PREFIX/lib/dtrace
 "
 TERMUX_PKG_BUILD_IN_SRC=true
 # Node.js 12 has been deprecated since 2022-04-05.
-TERMUX_PKG_AUTO_UPDATE=true
+TERMUX_PKG_AUTO_UPDATE=false
 
 source "$TERMUX_SCRIPTDIR/common-files/package-update-scripts/nodejs.sh"
 
