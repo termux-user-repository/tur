@@ -1,0 +1,11 @@
+--- a/test/cctest/test_crypto_clienthello.cc
++++ b/test/cctest/test_crypto_clienthello.cc
+@@ -19,7 +19,7 @@
+ #include <sys/mman.h>
+ #include <unistd.h>
+ #if defined(_SC_PAGE_SIZE) && defined(PROT_NONE) && defined(PROT_READ) &&      \
+-    defined(PROT_WRITE)
++    defined(PROT_WRITE) && !defined(__ANDROID__)
+ #define USE_MPROTECT
+ #endif
+ #elif defined(_WIN32) && defined(_MSC_VER)
