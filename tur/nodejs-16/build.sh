@@ -23,6 +23,14 @@ $_INSTALL_PREFIX/share/systemtap
 $_INSTALL_PREFIX/lib/dtrace
 "
 TERMUX_PKG_BUILD_IN_SRC=true
+# Node.js 16 has been deprecated since 2023-08-08.
+TERMUX_PKG_AUTO_UPDATE=false
+
+source "$TERMUX_SCRIPTDIR/common-files/package-update-scripts/nodejs.sh"
+
+termux_pkg_auto_update() {
+	tur_pkg_update_nodejs "${TERMUX_PKG_VERSION%%.*}"
+}
 
 termux_step_configure() {
 	local DEST_CPU

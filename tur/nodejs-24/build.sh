@@ -19,6 +19,13 @@ $_INSTALL_PREFIX/lib/dtrace
 "
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_HOSTBUILD=true
+TERMUX_PKG_AUTO_UPDATE=true
+
+source "$TERMUX_SCRIPTDIR/common-files/package-update-scripts/nodejs.sh"
+
+termux_pkg_auto_update() {
+	tur_pkg_update_nodejs "${TERMUX_PKG_VERSION%%.*}"
+}
 
 termux_step_post_get_source() {
 	# Prevent caching of host build:
