@@ -95,18 +95,10 @@ termux_step_get_source() {
 	unzip -d "$TERMUX_PKG_SRCDIR" "$TERMUX_PKG_CACHEDIR/${f}" > /dev/null
 }
 
+source "$TERMUX_SCRIPTDIR/common-files/package-update-scripts/update-bazel.sh"
+
 termux_pkg_auto_update() {
-	local api_url="https://api.github.com/repos/bazelbuild/bazel/git/refs/tags"
-	local latest_refs_tags=$(
-		curl -s "$api_url" | jq -r .[].ref | cut -d'/' -f 3 |
-			grep "^6" | grep -v -E "(rc)|(pre)"
-	)
-	if [[ -z "${latest_refs_tags}" ]]; then
-		echo "WARN: Unable to get latest refs tags from upstream. Try again later." >&2
-		return
-	fi
-	local latest_version=$(echo "${latest_refs_tags}" | sort -V | tail -n1)
-	termux_pkg_upgrade_version "${latest_version}"
+	tur_update_bazel 6
 }
 
 termux_step_post_get_source() {
