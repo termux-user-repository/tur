@@ -1,0 +1,12 @@
+diff --git a/desktop-app/src/main/app-updater.ts b/desktop-app/src/main/app-updater.ts
+index 1d94b0d..25f4168 100644
+--- a/desktop-app/src/main/app-updater.ts
++++ b/desktop-app/src/main/app-updater.ts
+@@ -24,7 +24,6 @@ export class AppUpdater {
+ 
+   constructor() {
+     autoUpdater.logger = console;
+-    autoUpdater.checkForUpdatesAndNotify();
+     autoUpdater.on('checking-for-update', () => {
+       this.status = 'CHECKING';
+       this.lastChecked = Date.now();
