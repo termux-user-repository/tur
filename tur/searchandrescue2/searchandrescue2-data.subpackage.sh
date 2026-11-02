@@ -1,0 +1,5 @@
+TERMUX_SUBPKG_DESCRIPTION="Data files for search and rescue 2"
+TERMUX_SUBPKG_PLATFORM_INDEPENDENT=true
+TERMUX_SUBPKG_INCLUDE="
+share/games/sar2
+"

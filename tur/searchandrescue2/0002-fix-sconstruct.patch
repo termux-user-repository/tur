@@ -1,0 +1,87 @@
+Description: Use environment toolchain flags, prune unneeded libs, and install extra desktop files
+Author: Fervi (IntinteDAO) <lordfervi@protonmail.com>
+
+--- a/src/SConscript
++++ b/src/SConscript
+@@ -27,27 +27,29 @@
+ destdir = os.environ.get("DESTDIR")
+ prefix = GetOption('prefix')
+ if prefix is None:
+-    prefix='/usr/local'
++    prefix = '@TERMUX_PREFIX@'
+ 
+-env = Environment(PREFIX = prefix, DESTDIR = destdir)
+-debug = ARGUMENTS.get('debug', 0)
++if destdir is None:
++    destdir = ''
+ 
++env = Environment(
++    ENV = os.environ,
++    CC = os.environ.get('CC', 'clang'),
++    CXX = os.environ.get('CXX', 'clang++'),
++    PREFIX = prefix,
++    DESTDIR = destdir
++)
++
++if 'CFLAGS' in os.environ:
++    env.Append(CCFLAGS = Split(os.environ['CFLAGS']))
++if 'CXXFLAGS' in os.environ:
++    env.Append(CXXFLAGS = Split(os.environ['CXXFLAGS']))
++if 'CPPFLAGS' in os.environ:
++    env.Append(CPPFLAGS = Split(os.environ['CPPFLAGS']))
++if 'LDFLAGS' in os.environ:
++    env.Append(LINKFLAGS = Split(os.environ['LDFLAGS']))
+ 
+-# Build flags in normal or debug mode
+-if bool(debug):
+-    env.Append(CPPFLAGS = ['-g', '-Wall', '-O0', '-finline-functions'])
+-else:
+-    env.Append(CPPFLAGS = ['-O6', '-funroll-loops',
+-                           '-fomit-frame-pointer',
+-                           '-ffast-math', '-finline-functions',
+-                           '-fexpensive-optimizations'])
+-
+-# OSX needs some special treatment
+-if platform == "darwin":
+-    env.Append(CPPFLAGS = ['-I/opt/X11/include',
+-                            '-I/usr/local/opt/openal-soft/include'])
+-    env.Append(LINKFLAGS = ['-L/opt/X11/lib', '-lGL', '-lX11',
+-                            '-L/usr/local/opt/openal-soft/lib'])
++env.Append(CPPFLAGS = ['-DHAVE_LIBXPM', '-DHAVE_XF86_VIDMODE'])
+ 
+ # Default defines and optional flags
+ if optflags:
+@@ -61,10 +63,10 @@
+ 
+ # List of libraries that will be linked with any executable
+ # programs created by this environment.
+-env.Append(LIBS = ['m', 'SDL2', 'SM', 'ICE',
+-                   'X11','Xext','Xmu', 'Xpm',
++env.Append(LIBS = ['m', 'SDL2',
++                   'X11', 'Xext', 'Xpm',
+                    'Xxf86vm',
+-                   'GL', 'GLU', 'pthread', 'alut',
++                   'GL', 'GLU', 'alut',
+                    'vorbisfile', 'openal'])
+ 
+ 
+@@ -179,9 +181,17 @@
+ object_list = env.Object(source = sources)
+ sar2 = env.Program(target='#bin/sar2', source=[object_list])
+ data='#data'
+-man='#man/sar2.6.bz2'
++man='#man/sar2.6'
+ pixmap='#extra/sar2.xpm'
+-env.Alias("install", env.InstallAs('$DESTDIR/$PREFIX/share/sar2', data))
++icon='#extra/sar2.png'
++desktop='#extra/sar2.desktop'
++appdata='#extra/sar2.appdata.xml'
++data_inst = env.InstallAs('$DESTDIR/$PREFIX/share/games/sar2', data)
++env.AlwaysBuild(data_inst)
++env.Alias("install", data_inst)
+ env.Alias("install", env.Install('$DESTDIR/$PREFIX/share/man/man6', man))
+ env.Alias("install", env.Install('$DESTDIR/$PREFIX/share/pixmaps', pixmap))
++env.Alias("install", env.Install('$DESTDIR/$PREFIX/share/icons/hicolor/256x256/apps', icon))
++env.Alias("install", env.Install('$DESTDIR/$PREFIX/share/applications', desktop))
++env.Alias("install", env.Install('$DESTDIR/$PREFIX/share/metainfo', appdata))
+ env.Alias("install", env.Install('$DESTDIR/$PREFIX/bin', sar2))
