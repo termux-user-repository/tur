@@ -318,7 +318,7 @@ index cf7f974fd7..f191de8d0f 100644
 +$(eval $(call symlink_system_library,CURL,libcurl,4))
 +$(eval $(call symlink_system_library,LIBUV,libuv,2))
 +$(eval $(call symlink_system_library,OPENLIBM,libopenlibm,4))
-+$(eval $(call symlink_system_library,LIBGIT2,libgit2,1.6,ALLOW_FAILURE))
++$(eval $(call symlink_system_library,LIBGIT2,libgit2,1.7,ALLOW_FAILURE))
 +$(eval $(call symlink_system_library,ZLIB,libz,1,ALLOW_FAILURE))
 +$(eval $(call symlink_system_library,LIBSUITESPARSE,libamd,3))
 +$(eval $(call symlink_system_library,LIBSUITESPARSE,libcamd,3))
