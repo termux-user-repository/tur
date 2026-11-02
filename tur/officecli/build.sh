@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="CLI for reading and writing Office documents (.docx, .xl
 TERMUX_PKG_LICENSE="Apache-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
 TERMUX_PKG_VERSION="1.0.160"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL="https://github.com/iOfficeAI/OfficeCLI/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz"
 TERMUX_PKG_SHA256=c3ef85d2d759abdc8514a459113941827254f9e495611f16fb930325ef44e0cb
 TERMUX_PKG_BUILD_IN_SRC=true
