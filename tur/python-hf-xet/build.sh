@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://github.com/huggingface/xet-core
 TERMUX_PKG_DESCRIPTION="Fast transfer of large files with the Hugging Face Hub"
 TERMUX_PKG_LICENSE="Apache-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="1.7.1"
+TERMUX_PKG_VERSION="1.8.0"
 TERMUX_PKG_SRCURL="https://github.com/huggingface/xet-core/releases/download/v$TERMUX_PKG_VERSION/hf_xet-$TERMUX_PKG_VERSION.tar.gz"
-TERMUX_PKG_SHA256=89d06f4975e807eefc6f6777180f452cfb86f6c79f2a6caa6fb28809c84c6777
+TERMUX_PKG_SHA256=10ed23b51dacf7917d64f335c25048deb470efa755e9989b218fc0531386138e
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_DEPENDS="libc++, python"
 TERMUX_PKG_PYTHON_COMMON_BUILD_DEPS="'maturin>=1.7,<2.0'"
@@ -18,18 +18,23 @@ termux_step_pre_configure() {
 	export PYO3_CROSS_LIB_DIR="$TERMUX_PREFIX/lib"
 	export PYTHONPATH="$TERMUX_PREFIX/lib/python${TERMUX_PYTHON_VERSION}/site-packages"
 	export ANDROID_API_LEVEL="$TERMUX_PKG_API_LEVEL"
-	export RUSTFLAGS="-C link-arg=-lpython${TERMUX_PYTHON_VERSION} ${RUSTFLAGS:-}"
+	local env_host=$(echo "${CARGO_TARGET_NAME}" | tr '[:lower:]' '[:upper:]' | tr '-' '_')
+	export CARGO_TARGET_${env_host}_RUSTFLAGS+=" -C link-arg=-lpython${TERMUX_PYTHON_VERSION}"
 
 	# rustls-platform-verifier uses Android JNI by default which fails in CLI environments.
 	# Vendor and patch it inside hf_xet (which has its own manifest and lockfile).
 	cd "$TERMUX_PKG_SRCDIR/hf_xet"
 	# gearhash 0.1.3 erroneously enabled x86_64 SIMD intrinsics on 32-bit x86 (i686),
 	# causing compilation failures on i686. Version 0.1.4 fixes x86 gating and adds NEON for aarch64.
+
 	cargo update -p gearhash --precise 0.1.4
 	cargo vendor
 	find ./vendor -mindepth 1 -maxdepth 1 -type d \
 		! -wholename ./vendor/rustls-platform-verifier \
+		! -wholename ./vendor/crc-fast \
 		-exec rm -rf '{}' \;
+	sed -i -z 's/crate-type = \[[^]]*\]/crate-type = ["lib"]/g' \
+		vendor/crc-fast/Cargo.toml
 	find vendor/rustls-platform-verifier -type f -print0 |
 		xargs -0 sed -i \
 			-e 's|"android"|"disabling_this_because_it_is_for_building_an_apk"|g' \
@@ -40,6 +45,7 @@ termux_step_pre_configure() {
 
 		[patch.crates-io]
 		rustls-platform-verifier = { path = "./vendor/rustls-platform-verifier" }
+		crc-fast = { path = "./vendor/crc-fast" }
 	EOF
 	cd "$TERMUX_PKG_SRCDIR"
 }
