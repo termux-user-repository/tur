@@ -1,0 +1,150 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: Wed, 7 Oct 2026 15:00:00 +0530
+Subject: [PATCH] panvk: store RGBA8 BC shadows as AFRC where the GPU has it biblioklept
+
+After csf-v11/150 the BC1/BC2/BC3/BC7 shadow is RGBA8 (AFBC), which
+still needs a full 32 bpp worst-case allocation: 8x BC1 and 4x
+BC3/BC7. AFRC (Arm fixed-rate compression) has a fixed size per coding
+unit, so it cuts the allocation itself.
+
+When pan_query_afrc() reports AFRC (G615: TEXTURE_FEATURES_0 bit 25),
+create the RGBA8 shadow with tiling DRM_FORMAT_MODIFIER_EXT and a
+one-entry modifier list: AFRC, rotation layout, 32-byte coding units
+(4 bits per component, 16 bpp). The decode pass and the sampled view
+use the regular AFRC render target and texture paths in lib/.
+
+PANVK_BC_AFRC selects the coding-unit size: 32 (default), 24 or 16
+(3 or 2 bits per component), 0 turns AFRC off. R8/RG8 (BC4/BC5) and
+the float shadows stay as they are (and cube-compatible images, whose
+AFRC cube sampling is untested): BC4/BC5 at 4 bpc showed 25-50 LSB
+max error on real pictures, too much for height/normal maps, and AFRC
+has no 16-bit or 11/10-bit float modes.
+
+Also fix pan_mod_afrc_init_slice_layout(): the row stride was computed
+from the mip width rounded down to whole AFRC tiles, so any level not a
+multiple of the tile width (32 px for RGBA8) got a short or zero row
+stride and overlapping rows (garbage, and a GPU fault with 24-byte
+coding units). Use the tile-aligned width, as the surface stride does.
+
+Quality, LOD0 of a 1024x1024 game frame encoded to BC, AFRC decode vs
+exact decode (BC's own error vs the source is 35-44 dB):
+
+  CU bytes  BC1 PSNR / max   BC7 PSNR / max
+  32        66-75 dB / 4     64-73 dB / 5
+  24        57-64 dB / 15    56-64 dB / 12
+  16        48-55 dB / 38    48-55 dB / 40
+
+Random-block data (bc_decode, worst case): CU32 max error 13-38 LSB.
+
+Mali-G615 MC6, 2048x2048 full chain, mode E (bandwidth bound), vs
+the 022 compute/LINEAR baseline:
+
+  format   mem MiB         E ms
+  BC1      24.0 -> 13.3    0.544 -> 0.248
+  BC3      26.7 -> 16.0    0.541 -> 0.250
+  BC7      26.7 -> 16.0    0.598 -> 0.249
+
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/150
+Validation test: tests/dxvk/vulkan/bc/bc_decode.c + bc_verify.py
+ (16/16 with PANVK_BC_AFRC=0; device checks pass with AFRC),
+ device/bc-perf.c BCPERF_SRC/BCPERF_DUMP quality runs
+---
+diff --git a/src/panfrost/lib/pan_mod.c b/src/panfrost/lib/pan_mod.c
+index 1548b5bc1ed7c329284db3eddbad1e910556fdbd..ff9eca6ca076e8f1fe99167065056b22e87e9fbc 100644
+--- a/src/panfrost/lib/pan_mod.c
++++ b/src/panfrost/lib/pan_mod.c
+@@ -441,7 +441,7 @@ pan_mod_afrc_init_slice_layout(
+        * the resource width to get the size. */
+       if (!layout_constraints->strict) {
+          slayout->tiled_or_linear.row_stride_B = pan_afrc_row_stride(
+-            props->format, props->modifier, mip_extent_px.width);
++            props->format, props->modifier, aligned_extent_px.width);
+       }
+    } else {
+       /* Align levels to cache-line as a performance improvement for
+@@ -450,7 +450,7 @@ pan_mod_afrc_init_slice_layout(
+          layout_constraints ? layout_constraints->offset_B : 0, align_mask + 1);
+       slayout->tiled_or_linear.row_stride_B =
+          ALIGN_POT(pan_afrc_row_stride(props->format, props->modifier,
+-                                       mip_extent_px.width),
++                                       aligned_extent_px.width),
+                    align_mask + 1);
+    }
+ 
+diff --git a/src/panfrost/vulkan/panvk_image.c b/src/panfrost/vulkan/panvk_image.c
+index a67b7cc5c3a308cd22a2eeb2e5b654587016239f..0abf821f31248116fb81bdc436c95aa9321e2f5d 100644
+--- a/src/panfrost/vulkan/panvk_image.c
++++ b/src/panfrost/vulkan/panvk_image.c
+@@ -448,7 +448,8 @@ panvk_should_checksum(struct panvk_image *image,
+  * bc_decoded. MUTABLE keeps CRC off: the decode never redraws a tile with
+  * the same content, so CRC tracking would be pure overhead. */
+ static void
+-panvk_bc_shadow_info(const struct panvk_image *image, VkImageCreateInfo *info)
++panvk_bc_shadow_info(const struct panvk_image *image, VkImageCreateInfo *info,
++                     VkImageDrmFormatModifierListCreateInfoEXT *afrc)
+ {
+    *info = (VkImageCreateInfo){
+       .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+@@ -466,6 +467,35 @@ panvk_bc_shadow_info(const struct panvk_image *image, VkImageCreateInfo *info)
+       .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+       .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+    };
++
++   /* Fixed-rate AFRC on RGBA8 shadows (BC1/2/3/7) where the GPU has it.
++    * PANVK_BC_AFRC is the coding-unit size in bytes: 32 (default, 4 bits per
++    * component, max 4-5 LSB error on real pictures), 24 or 16 (3 or 2 bits,
++    * lossier), 0 = off. R8/RG8 (BC4/BC5) stay uncompressed: at the same
++    * rate their error is 25-50 LSB, too much for normal and height maps.
++    * Cube-compatible images keep AFBC: AFRC cube sampling is untested. */
++   static const uint64_t afrc_mods[] = {
++      DRM_FORMAT_MOD_ARM_AFRC(AFRC_FORMAT_MOD_CU_SIZE_P0(AFRC_FORMAT_MOD_CU_SIZE_16)),
++      DRM_FORMAT_MOD_ARM_AFRC(AFRC_FORMAT_MOD_CU_SIZE_P0(AFRC_FORMAT_MOD_CU_SIZE_24)),
++      DRM_FORMAT_MOD_ARM_AFRC(AFRC_FORMAT_MOD_CU_SIZE_P0(AFRC_FORMAT_MOD_CU_SIZE_32)),
++   };
++   const struct panvk_physical_device *phys_dev =
++      to_panvk_physical_device(image->vk.base.device->physical);
++   const unsigned cu = debug_get_num_option("PANVK_BC_AFRC", 32);
++
++   if ((cu == 16 || cu == 24 || cu == 32) &&
++       image->bc_format == VK_FORMAT_R8G8B8A8_UNORM &&
++       !(image->vk.create_flags & VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT) &&
++       pan_query_afrc(&phys_dev->kmod.dev->props)) {
++      *afrc = (VkImageDrmFormatModifierListCreateInfoEXT){
++         .sType =
++            VK_STRUCTURE_TYPE_IMAGE_DRM_FORMAT_MODIFIER_LIST_CREATE_INFO_EXT,
++         .drmFormatModifierCount = 1,
++         .pDrmFormatModifiers = &afrc_mods[cu / 8 - 2],
++      };
++      info->tiling = VK_IMAGE_TILING_DRM_FORMAT_MODIFIER_EXT;
++      info->pNext = afrc;
++   }
+ }
+ 
+ static VkResult
+@@ -549,9 +579,10 @@ panvk_image_init_layouts(struct panvk_image *image,
+       /* Lay the decoded plane out exactly as the bc_shadow image created in
+        * panvk_CreateImage() will be, after the raw blocks. */
+       VkImageCreateInfo sci;
++      VkImageDrmFormatModifierListCreateInfoEXT afrc;
+       struct panvk_image tmp = {0};
+ 
+-      panvk_bc_shadow_info(image, &sci);
++      panvk_bc_shadow_info(image, &sci, &afrc);
+       vk_image_init(&dev->vk, &tmp.vk, &sci);
+       VkResult result = panvk_image_init(&tmp, &sci);
+       vk_image_finish(&tmp.vk);
+@@ -942,8 +973,9 @@ panvk_CreateImage(VkDevice device, const VkImageCreateInfo *pCreateInfo,
+ 
+    if (image->bc_gfx) {
+       VkImageCreateInfo sci;
++      VkImageDrmFormatModifierListCreateInfoEXT afrc;
+ 
+-      panvk_bc_shadow_info(image, &sci);
++      panvk_bc_shadow_info(image, &sci, &afrc);
+       result = panvk_CreateImage(device, &sci, pAllocator, &image->bc_shadow);
+       if (result != VK_SUCCESS)
+          goto err_destroy_image;

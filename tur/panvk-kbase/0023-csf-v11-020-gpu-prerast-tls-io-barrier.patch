@@ -1,0 +1,282 @@
+From: panvk-kbase-android worker <panvk-worker@localhost>
+Subject: [PATCH csf-v11 020] panvk: gpu_prerast TLS descriptor, record IO, compute barrier
+Generated-by: LLM
+
+Purpose: Make the GPU prerast lowered VS actually execute and feed IDVS.
+ - Lowered VS (RUN_COMPUTE) got TSD=0 (gfx.tsd is allocated later by
+   prepare_draw) -> CS_FAULT DATA_INVALID_FAULT 0x58 on the COMPUTE group,
+   no record store ran. Allocate a per-dispatch TLS descriptor via
+   cmd_dispatch_prepare_tls and launch through cmd_dispatch_shader.
+ - outputs_written/record_stride were read from info->nir before IO
+   gathering (0) -> empty passthrough. Capture after panvk_lower_nir.
+ - Passthrough: load_vertex_id (load_vertex_id_zero_base has no backend
+   lowering -> SIGSEGV), per-slot output types, 16-bit outputs widened.
+ - With gpu_prerast, COMPUTE subqueue is a consumer of DRAW_INDIRECT /
+   vertex input / pre-raster stages so barriers wait before the dispatch.
+Source/Reference: Mesa poly at 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf, csf-v11/018
+Validation test: tests/dxvk/vulkan/test_gpu_prerast_contracts.py, tests/dxvk/vulkan/gpu_prerast_slice.c
+
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_buffer.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_buffer.c
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_buffer.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_buffer.c
+@@ -335,6 +335,18 @@
+          dst_subqueues |= BITFIELD_BIT(i);
+    }
+
++   /* gpu_prerast runs the lowered VS on the COMPUTE subqueue, which reads
++    * indirect params, vertex inputs and VS resources.  Make it a consumer of
++    * those stages so GPU-written inputs are visible before the dispatch. */
++   if (PANVK_DEBUG(GPU_PRERAST) &&
++       (dst_stages & (VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT |
++                      VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT |
++                      VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT |
++                      VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT |
++                      VK_PIPELINE_STAGE_2_PRE_RASTERIZATION_SHADERS_BIT |
++                      VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT)))
++      dst_subqueues |= BITFIELD_BIT(PANVK_SUBQUEUE_COMPUTE);
++
+    const bool dst_host = dst_stages & VK_PIPELINE_STAGE_2_HOST_BIT;
+
+    /* nothing to wait */
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+@@ -3503,6 +3503,37 @@
+    cs_sync32_add(b, true, MALI_CS_SYNC_SCOPE_CSG, one, addr, cs_now());
+ }
+
++static void
++gpu_prerast_launch_cs(struct panvk_cmd_buffer *cmdbuf,
++                      const struct panvk_shader_variant *cs,
++                      uint64_t push_uniforms, uint64_t tsd,
++                      const struct panvk_dispatch_info *info)
++{
++   /* Same TLS pointer copy as cmd_dispatch(): the global TLS descriptor is
++    * only filled at EndCommandBuffer, so copy its pointer on the GPU.
++    */
++   if (cs->info.tls_size) {
++      struct cs_builder *b =
++         panvk_get_cs_builder(cmdbuf, PANVK_SUBQUEUE_COMPUTE);
++      cs_move64_to(b, cs_scratch_reg64(b, 0), cmdbuf->state.tls.desc.gpu);
++      cs_load64_to(b, cs_scratch_reg64(b, 2), cs_scratch_reg64(b, 0), 8);
++      cs_move64_to(b, cs_scratch_reg64(b, 0), tsd);
++      cs_store64(b, cs_scratch_reg64(b, 2), cs_scratch_reg64(b, 0), 8);
++      cs_flush_stores(b);
++   }
++
++   compute_state_set_dirty(cmdbuf, CS);
++   compute_state_set_dirty(cmdbuf, DESC_STATE);
++   compute_state_set_dirty(cmdbuf, PUSH_UNIFORMS);
++
++   panvk_per_arch(cmd_dispatch_shader)(cmdbuf, cs, &cmdbuf->state.gfx.vs.desc,
++                                       push_uniforms, tsd, info);
++
++   compute_state_set_dirty(cmdbuf, CS);
++   compute_state_set_dirty(cmdbuf, DESC_STATE);
++   compute_state_set_dirty(cmdbuf, PUSH_UNIFORMS);
++}
++
+ static bool
+ gpu_prerast_draw(struct panvk_cmd_buffer *cmdbuf,
+                  const struct panvk_draw_info *source)
+@@ -3516,6 +3547,20 @@
+    panvk_per_arch(cmd_prepare_draw_sysvals)(
+       cmdbuf, source, panvk_shader_only_variant(get_fs(cmdbuf)));
+
++   /* The lowered VS runs as RUN_COMPUTE and needs its own LOCAL_STORAGE
++    * descriptor. gfx.tsd is only allocated by prepare_draw(), which runs
++    * after this point, so reusing it passed TSD=0 and the compute CS raised
++    * DATA_INVALID_FAULT (0x58) before any store executed.
++    */
++   struct pan_compute_dim tls_dim = {source->vertex.count,
++                                     source->instance.count, 1};
++   uint64_t tsd = panvk_per_arch(cmd_dispatch_prepare_tls)(
++      cmdbuf,
++      panvk_shader_gpu_prerast_variant(shader, PANVK_VS_VARIANT_GPU_LOWERED),
++      &tls_dim, source->indirect.buffer_dev_addr != 0);
++   if (!tsd)
++      return true;
++
+    uint64_t arena = panvk_priv_mem_dev_addr(dev->gpu_prerast_arena);
+    uint64_t params = arena + PANVK_GPU_PRERAST_PARAMS_OFFSET;
+    uint64_t records = arena + PANVK_GPU_PRERAST_RECORD_OFFSET;
+@@ -3672,8 +3717,7 @@
+    };
+    if (source->indirect.buffer_dev_addr)
+       dispatch.indirect.buffer_dev_addr = dispatch_params;
+-   launch_gfx_cs(cmdbuf, lowered, &cmdbuf->state.gfx.vs.desc,
+-                 push.gpu, &dispatch);
++   gpu_prerast_launch_cs(cmdbuf, lowered, push.gpu, tsd, &dispatch);
+    gpu_prerast_wait_compute(cmdbuf);
+
+    struct panvk_draw_info generated = *source;
+diff --git a/src/panfrost/vulkan/panvk_vX_shader.c b/src/panfrost/vulkan/panvk_vX_shader.c
+--- a/src/panfrost/vulkan/panvk_vX_shader.c
++++ b/src/panfrost/vulkan/panvk_vX_shader.c
+@@ -647,8 +647,11 @@
+    b->cursor = nir_instr_remove(&intr->instr);
+    nir_io_semantics sem = nir_intrinsic_io_semantics(intr);
+    uint64_t mask = b->shader->info.outputs_written;
++   unsigned location = sem.location;
++   if (nir_src_is_const(intr->src[1]))
++      location += nir_src_as_uint(intr->src[1]);
+    unsigned slot =
+-      util_bitcount64(mask & (((uint64_t)1 << sem.location) - 1));
++      util_bitcount64(mask & (((uint64_t)1 << location) - 1));
+    unsigned nout = util_bitcount64(mask);
+    nir_def *p = nir_load_vertex_param_buffer_poly(b);
+    nir_def *nr_verts = nir_load_global(
+@@ -666,7 +669,16 @@
+       b, out_buf,
+       nir_u2u64(b, nir_iadd_imm(b, nir_imul_imm(b, linear, nout * 16),
+                                 slot * 16 + nir_intrinsic_component(intr) * 4)));
+-   nir_store_global(b, intr->src[0].ssa, addr,
++   /* Records are 32-bit per component; widen mediump values. */
++   nir_def *value = intr->src[0].ssa;
++   if (value->bit_size != 32) {
++      nir_alu_type base =
++         nir_alu_type_get_base_type(nir_intrinsic_src_type(intr));
++      value = base == nir_type_float ? nir_f2f32(b, value)
++              : base == nir_type_int ? nir_i2i32(b, value)
++                                     : nir_u2u32(b, value);
++   }
++   nir_store_global(b, value, addr,
+                     .write_mask = nir_intrinsic_write_mask(intr),
+                     .align_mul = 4);
+    return true;
+@@ -679,37 +691,68 @@
+                                      nir_metadata_control_flow, NULL);
+ }
+
++/* Output slot types seen by the lowered VS, so the passthrough stores each
++ * record slot with the same NIR type the original VS used.
++ */
++struct panvk_gpu_prerast_out_types {
++   nir_alu_type type[VARYING_SLOT_MAX];
++};
++
++static bool
++panvk_gpu_prerast_collect_out_type(nir_builder *b, nir_intrinsic_instr *intr,
++                                   void *data)
++{
++   struct panvk_gpu_prerast_out_types *t = data;
++   if (intr->intrinsic != nir_intrinsic_store_output)
++      return false;
++
++   nir_io_semantics sem = nir_intrinsic_io_semantics(intr);
++   unsigned location = sem.location;
++   if (nir_src_is_const(intr->src[1]))
++      location += nir_src_as_uint(intr->src[1]);
++   if (location < VARYING_SLOT_MAX)
++      t->type[location] =
++         nir_alu_type_get_base_type(nir_intrinsic_src_type(intr)) | 32;
++   return false;
++}
++
+ static nir_shader *
+-panvk_gpu_prerast_passthrough_nir(const nir_shader *source)
++panvk_gpu_prerast_passthrough_nir(const nir_shader *source, uint64_t outputs,
++                                  const struct panvk_gpu_prerast_out_types *t)
+ {
+    nir_builder b = nir_builder_init_simple_shader(
+       MESA_SHADER_VERTEX, source->options, "panvk_gpu_prerast_passthrough");
+     nir_def *base = load_sysval(&b, graphics, 64, gpu_prerast_records);
+     nir_def *params = load_sysval(&b, graphics, 64, gpu_prerast_params);
+     nir_def *stride = nir_u2u64(
+-       &b, nir_imm_int(&b, ALIGN_POT(util_bitcount64(source->info.outputs_written) * 16, 16)));
++       &b, nir_imm_int(&b, ALIGN_POT(util_bitcount64(outputs) * 16, 16)));
+     nir_def *verts = nir_load_global(
+        &b, 1, 32,
+        nir_iadd_imm(&b, params,
+                     offsetof(struct panvk_gpu_prerast_params, vertex_count)),
+        .align_mul = 4);
+-    nir_def *vertex = nir_load_vertex_id_zero_base(&b);
++    /* The generated draw uses indices 0..n-1 with vertexOffset 0, so the
++     * Valhall IDVS vertex ID is the record index. load_vertex_id_zero_base
++     * has no backend lowering here (preprocess already ran).
++     */
++    nir_def *vertex = nir_load_vertex_id(&b);
+     nir_def *linear = nir_iadd(&b, vertex,
+                                nir_imul(&b, nir_load_instance_id(&b), verts));
+     nir_def *record = nir_iadd(&b, base, nir_imul(&b, nir_u2u64(&b, linear), stride));
+
+-    u_foreach_bit64(location, source->info.outputs_written) {
+-       unsigned slot = util_bitcount64(source->info.outputs_written &
+-                                       BITFIELD64_MASK(location));
++    u_foreach_bit64(location, outputs) {
++       unsigned slot = util_bitcount64(outputs & BITFIELD64_MASK(location));
+        nir_def *addr = nir_iadd_imm(&b, record, slot * 16);
+        nir_def *value = nir_load_global(&b, 4, 32, addr, .align_mul = 16);
++       nir_alu_type type = t->type[location] ? t->type[location]
++                                             : nir_type_float32;
+        nir_store_output(&b, value, nir_imm_int(&b, 0), .base = location,
+                         .write_mask = 0xf,
+-                        .src_type = nir_type_uint32,
++                        .src_type = type,
+                         .io_semantics = { .location = location, .num_slots = 1 });
+     }
+
+-   b.shader->info.outputs_written = source->info.outputs_written;
++   b.shader->info.outputs_written = outputs;
+    return b.shader;
+ }
+
+@@ -1680,7 +1723,6 @@
+ #if PAN_ARCH >= 10
+    if (info->stage == MESA_SHADER_VERTEX) {
+       shader->gpu_prerast.io.abi_version = PANVK_GPU_PRERAST_ABI_VERSION;
+-      shader->gpu_prerast.io.outputs_written = info->nir->info.outputs_written;
+       shader->gpu_prerast.io.clip_distance_array_size =
+          info->nir->info.clip_distance_array_size;
+       shader->gpu_prerast.io.cull_distance_array_size =
+@@ -1707,6 +1749,7 @@
+    case MESA_SHADER_VERTEX: {
+ #if PAN_ARCH >= 10
+       const enum panvk_vs_variant last_variant = PANVK_VS_VARIANT_GPU_PASSTHROUGH;
++      struct panvk_gpu_prerast_out_types out_types = {0};
+ #else
+       const enum panvk_vs_variant last_variant = PANVK_VS_VARIANT_HW;
+ #endif
+@@ -1719,7 +1762,10 @@
+ #if PAN_ARCH >= 10
+          const bool clone_nir = true;
+          nir_shader *nir = v == PANVK_VS_VARIANT_GPU_PASSTHROUGH
+-                              ? panvk_gpu_prerast_passthrough_nir(info->nir)
++                              ? panvk_gpu_prerast_passthrough_nir(
++                                   info->nir,
++                                   shader->gpu_prerast.io.outputs_written,
++                                   &out_types)
+                               : nir_shader_clone(NULL, info->nir);
+ #else
+          const bool clone_nir = (v != last_variant);
+@@ -1789,6 +1835,17 @@
+             panvk_lower_nir_io(nir);
+ #if PAN_ARCH >= 10
+             if (gpu_lower) {
++               /* outputs_written is only valid after panvk_lower_nir()
++                * gathered info; info->nir may still report 0. The record
++                * layout and the passthrough variant both key off this mask.
++                */
++               shader->gpu_prerast.io.outputs_written =
++                  nir->info.outputs_written;
++               shader->gpu_prerast.io.record_stride = ALIGN_POT(
++                  util_bitcount64(nir->info.outputs_written) * 16, 16);
++               nir_shader_intrinsics_pass(nir,
++                                          panvk_gpu_prerast_collect_out_type,
++                                          nir_metadata_all, &out_types);
+                NIR_PASS(_, nir, pan_nir_lower_vs_inputs_poly, inputs.gpu_id);
+                NIR_PASS(_, nir, panvk_gpu_prerast_lower_vs_outputs);
+                panvk_gpu_prerast_emit_generated_records(nir);
+@@ -1817,8 +1874,6 @@
+ #if PAN_ARCH >= 10
+             shader->gpu_prerast.io.varyings = varying_layout;
+             shader->gpu_prerast.io.varying_count = nir->num_outputs;
+-            shader->gpu_prerast.io.record_stride =
+-               ALIGN_POT(util_bitcount64(info->nir->info.outputs_written) * 16, 16);
+ #endif
+          }
+

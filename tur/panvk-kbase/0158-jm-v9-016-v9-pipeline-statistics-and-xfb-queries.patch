@@ -1,0 +1,528 @@
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: 2026-10-11
+Subject: [PATCH jm-v9 016] panvk: v9 pipeline statistics, primitives generated and XFB queries biblioklept
+
+Purpose: Expose pipelineStatisticsQuery, transformFeedbackQueries and
+VK_EXT_primitives_generated_query (with rasterizer discard) on v9 JM.
+Same report layout as v10+: two u64 per statistic, summed on read. JM has no
+command stream adds, so every counter is a GPU add: per API draw (once, not
+per layer) panlib_update_pstats_draw counts IA vertices/primitives, VS
+invocations and, without GS/tess, clipping, from a draw command made at
+record time for direct draws (indirect, count buffers and primitive restart
+work the same). Primitives generated is the same kernel with only the IA
+primitive slot. The GS, tess and XFB kernels already count their output.
+Compute invocations come from panlib_update_pstats_dispatch after each
+dispatch. Fragment invocations are the hardware occlusion counter while no
+occlusion query owns it (same ponytail as CSF). Begin zeroes the reports
+with WRITE_VALUE jobs; End closes the batch and writes availability per view.
+The pstats copy kernel reads v9's one-dword availability objects.
+Timestamps stay v10+.
+Source/Reference: csf-v11 query code (MIT); Noysz 0067 reference only
+Tested GPU: build-checked (universal Android build v6-v14); device run on Mali-G57 MC2 (gpu_id 0x90930010) pending, see worklogs/v9-jm/PROGRESS.md
+Tested Kbase UAPI: JM 11.38
+Mesa base range: 5a07217f + g615-v11-csf series + jm-v9 001-015
+Dependencies: jm-v9 011, 012, 014
+Validation test: dEQP-VK.query_pool.statistics_query.*, dEQP-VK.transform_feedback.*query*, dEQP-VK.primitives_generated_query.*
+
+---
+diff --git a/src/panfrost/libpan/query_pool.cl b/src/panfrost/libpan/query_pool.cl
+index 5c9439d..f1387c1 100644
+--- a/src/panfrost/libpan/query_pool.cl
++++ b/src/panfrost/libpan/query_pool.cl
+@@ -91,9 +91,13 @@ panlib_copy_ts_query_result(uint64_t pool_addr, global uint32_t *available_addr,
+       vk_write_query(dst, 1, flags, available);
+ }
+ 
++#endif
++
++#if PAN_ARCH >= 9
+ /* Each report holds stat_count command stream counters followed by
+  * stat_count shader/hardware counters; the result is their sum. The
+- * availability objects are panvk_cs_sync32, two dwords each. */
++ * availability objects are panvk_cs_sync32, two dwords each, on v10+ and
++ * one dword on v9. */
+ KERNEL(1)
+ panlib_copy_pstats_query_result(uint64_t pool_addr,
+                                 global uint32_t *available_addr,
+@@ -109,7 +113,7 @@ panlib_copy_pstats_query_result(uint64_t pool_addr,
+    uintptr_t dst = dst_addr + ((uint64_t)i * dst_stride);
+    global uint64_t *report =
+       (global uint64_t *)(pool_addr + ((uint64_t)i * query_stride));
+-   bool available = available_addr[i * 2] != 0;
++   bool available = available_addr[PAN_ARCH >= 10 ? i * 2 : i] != 0;
+ 
+    if (available || (flags & VK_QUERY_RESULT_PARTIAL_BIT)) {
+       for (uint32_t s = 0; s < stat_count; s++)
+@@ -157,6 +161,9 @@ panlib_copy_query_result(uint64_t pool_addr, global uint32_t *available_addr,
+    if ((flags & VK_QUERY_RESULT_PARTIAL_BIT) || available) {
+       switch (query_type) {
+       case VK_QUERY_TYPE_OCCLUSION:
++#if PAN_ARCH == 9
++      case VK_QUERY_TYPE_PRIMITIVES_GENERATED_EXT:
++#endif
+          write_occlusion_query_result(dst, 0, flags, report_addr, report_count);
+          break;
+       default:
+diff --git a/src/panfrost/vulkan/jm/panvk_vX_cmd_dispatch.c b/src/panfrost/vulkan/jm/panvk_vX_cmd_dispatch.c
+index dcda1aa..038634e 100644
+--- a/src/panfrost/vulkan/jm/panvk_vX_cmd_dispatch.c
++++ b/src/panfrost/vulkan/jm/panvk_vX_cmd_dispatch.c
+@@ -299,6 +299,44 @@ cmd_dispatch(struct panvk_cmd_buffer *cmdbuf, struct panvk_dispatch_info *info)
+                   indirect ? MALI_JOB_TYPE_NOT_STARTED : MALI_JOB_TYPE_COMPUTE,
+                   false, false, 0, copy_desc_dep, &job, false);
+ 
++#if PAN_ARCH == 9
++   /* Compute shader invocations of a pipeline statistics query, counted
++    * on the GPU like CSF cmd_pstats_dispatch() does for indirect ones.
++    * ponytail: vk_meta dispatches are counted too, as on CSF. */
++   const uint64_t cs_invocations = panvk_pstats_counter_addr(
++      &cmdbuf->state.gfx.pstats_query,
++      VK_QUERY_PIPELINE_STATISTIC_COMPUTE_SHADER_INVOCATIONS_BIT, true);
++   if (cs_invocations) {
++      uint64_t cmd = info->indirect.buffer_dev_addr;
++
++      if (!cmd) {
++         struct pan_ptr ptr = panvk_cmd_alloc_dev_mem(
++            cmdbuf, desc, sizeof(VkDispatchIndirectCommand), 16);
++         if (ptr.gpu) {
++            *(VkDispatchIndirectCommand *)ptr.cpu = (VkDispatchIndirectCommand){
++               .x = info->direct.wg_count.x,
++               .y = info->direct.wg_count.y,
++               .z = info->direct.wg_count.z,
++            };
++         }
++         cmd = ptr.gpu;
++      }
++
++      if (cmd) {
++         struct panlib_update_pstats_dispatch_args args = {
++            .counter = cs_invocations,
++            .cmd = cmd,
++            .local_size = cs->cs.local_size.x * cs->cs.local_size.y *
++                          cs->cs.local_size.z,
++         };
++         struct panvk_precomp_ctx ctx = panvk_per_arch(precomp_cs)(cmdbuf);
++
++         panlib_update_pstats_dispatch_struct(&ctx, panlib_1d(1),
++                                              PANLIB_BARRIER_JM_BARRIER, args);
++      }
++   }
++#endif
++
+    panvk_per_arch(cmd_close_batch)(cmdbuf);
+    clear_dirty_after_dispatch(cmdbuf);
+ }
+diff --git a/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c
+index fc176f0..3abd4bf 100644
+--- a/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c
+@@ -3910,6 +3910,110 @@ v9_cmd_draw_layer(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info *info)
+       gfx_state_set_dirty(cmdbuf, VS_PUSH_UNIFORMS);
+ }
+ 
++/* Pipeline statistics and primitives generated queries of one API draw. JM
++ * has no command stream to add with, so a panlib_update_pstats_draw()
++ * workgroup counts every draw on the GPU, direct ones from a
++ * VkDrawIndexedIndirectCommand made here. Same counters as CSF
++ * cmd_pstats_draw(): the GS and tessellation kernels count their own output
++ * (clipping and primitives generated).
++ */
++static void
++v9_count_draw_queries(struct panvk_cmd_buffer *cmdbuf,
++                      const struct panvk_draw_info *draw)
++{
++#define PSTAT(name) VK_QUERY_PIPELINE_STATISTIC_##name##_BIT
++   const struct panvk_pstats_query_state *q = &cmdbuf->state.gfx.pstats_query;
++   const bool kernels_count = cmdbuf->state.gfx.gs.shader ||
++                              cmdbuf->state.gfx.tes.shader;
++   const uint64_t prims_generated =
++      kernels_count ? 0 : cmdbuf->state.gfx.prims_generated_query.ptr;
++   uint32_t counted = 0;
++
++   if (q->report) {
++      counted = q->mask & (PSTAT(INPUT_ASSEMBLY_VERTICES) |
++                           PSTAT(INPUT_ASSEMBLY_PRIMITIVES) |
++                           PSTAT(VERTEX_SHADER_INVOCATIONS));
++      if (!kernels_count)
++         counted |= q->mask & (PSTAT(CLIPPING_INVOCATIONS) |
++                               PSTAT(CLIPPING_PRIMITIVES));
++   }
++
++   if (!counted && !prims_generated)
++      return;
++
++   if (!v9_prerast_reserve_jobs(cmdbuf, 4))
++      return;
++
++   const uint32_t index_size = draw->index.index_size;
++   uint64_t cmd = draw->indirect.buffer_dev_addr;
++   uint32_t cmd_stride = draw->indirect.stride;
++   uint32_t draw_count = draw->indirect.draw_count;
++
++   if (!cmd) {
++      struct pan_ptr ptr = panvk_cmd_alloc_dev_mem(
++         cmdbuf, desc, sizeof(VkDrawIndexedIndirectCommand), 16);
++      if (!ptr.gpu)
++         return;
++
++      /* JM index offsets are in bytes. */
++      *(VkDrawIndexedIndirectCommand *)ptr.cpu = (VkDrawIndexedIndirectCommand){
++         .indexCount = draw->vertex.count,
++         .instanceCount = draw->instance.count,
++         .firstIndex = index_size ? draw->index.offset / index_size : 0,
++         .vertexOffset = draw->vertex.base,
++         .firstInstance = draw->instance.base,
++      };
++      cmd = ptr.gpu;
++      cmd_stride = 0;
++      draw_count = 1;
++   }
++
++   const uint32_t view_mask = cmdbuf->state.gfx.render.view_mask;
++   struct panlib_update_pstats_draw_args args = {
++      .cmd = cmd,
++      .cmd_stride = cmd_stride,
++      .count_buffer = draw->indirect.count_buffer_dev_addr,
++      .draw_index = draw->indirect.draw_index,
++      .index_buffer = cmdbuf->state.gfx.ib.dev_addr,
++      .index_buffer_size_el =
++         index_size ? cmdbuf->state.gfx.ib.size / index_size : 0,
++      .index_size_B = index_size,
++      .restart = index_size && draw->index.restart_enable,
++      .prim = draw->prim,
++      .view_count = view_mask ? util_bitcount(view_mask) : 1,
++      .patch_size = cmdbuf->vk.dynamic_graphics_state.ts.patch_control_points,
++   };
++   struct panvk_precomp_ctx ctx = panvk_per_arch(precomp_cs)(cmdbuf);
++
++   if (counted) {
++      static const uint32_t order[] = {
++         PSTAT(INPUT_ASSEMBLY_VERTICES), PSTAT(INPUT_ASSEMBLY_PRIMITIVES),
++         PSTAT(VERTEX_SHADER_INVOCATIONS), PSTAT(CLIPPING_INVOCATIONS),
++         PSTAT(CLIPPING_PRIMITIVES),
++      };
++
++      args.stats = q->report + util_bitcount(q->mask) * sizeof(uint64_t);
++      args.slots = 0;
++      for (uint32_t i = 0; i < ARRAY_SIZE(order); i++) {
++         uint32_t slot = (counted & order[i])
++                            ? util_bitcount(q->mask & (order[i] - 1))
++                            : 0xf;
++         args.slots |= slot << (i * 4);
++      }
++      panlib_update_pstats_draw_struct(&ctx, panlib_1d(draw_count),
++                                       PANLIB_BARRIER_JM_BARRIER, args);
++   }
++
++   /* The primitives generated query is the IA primitives counter alone. */
++   if (prims_generated) {
++      args.stats = prims_generated;
++      args.slots = 0xfff0f;
++      panlib_update_pstats_draw_struct(&ctx, panlib_1d(draw_count),
++                                       PANLIB_BARRIER_JM_BARRIER, args);
++   }
++#undef PSTAT
++}
++
+ /* Multiview and layered rendering, same scheme as the Bifrost path: the draw
+  * is recorded once per view (or per framebuffer layer when the VS writes
+  * gl_Layer), each copy with its own tiler context and the view or layer in
+@@ -3932,10 +4036,29 @@ v9_cmd_draw(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info *info)
+    if (!view_mask && (!vs || !vs->writes_layer))
+       layer_count = 1;
+ 
++   /* Counted once per API draw, not per layer. */
++   if (!info->pstats_counted)
++      v9_count_draw_queries(cmdbuf, info);
++
++   /* A layered draw re-runs the GS and tessellation kernels per layer: only
++    * the first run counts into the queries. Views count, as on CSF. */
++   const bool layered = !view_mask && layer_count > 1;
++   const struct panvk_pstats_query_state pstats =
++      cmdbuf->state.gfx.pstats_query;
++   const uint64_t prims_generated =
++      cmdbuf->state.gfx.prims_generated_query.ptr;
++
+    for (uint32_t i = 0; i < MAX2(layer_count, 1); i++) {
+       info->layer_id = view_mask ? u_bit_scan(&view_mask) : i;
++      if (layered && i == 1) {
++         cmdbuf->state.gfx.pstats_query.report = 0;
++         cmdbuf->state.gfx.prims_generated_query.ptr = 0;
++      }
+       v9_cmd_draw_layer(cmdbuf, info);
+    }
++
++   cmdbuf->state.gfx.pstats_query = pstats;
++   cmdbuf->state.gfx.prims_generated_query.ptr = prims_generated;
+ }
+ 
+ VKAPI_ATTR void VKAPI_CALL
+diff --git a/src/panfrost/vulkan/jm/panvk_vX_cmd_query.c b/src/panfrost/vulkan/jm/panvk_vX_cmd_query.c
+index e2d79e3..76714f0 100644
+--- a/src/panfrost/vulkan/jm/panvk_vX_cmd_query.c
++++ b/src/panfrost/vulkan/jm/panvk_vX_cmd_query.c
+@@ -127,6 +127,42 @@ panvk_per_arch(CmdWriteTimestamp2)(VkCommandBuffer commandBuffer,
+    panvk_stub();
+ }
+ 
++#if PAN_ARCH == 9
++/* ponytail: as on CSF, the fragment shader invocation count is the sample
++ * count of the hardware occlusion counter, pointed at the report while no
++ * occlusion query owns it. It misses fragments killed by late depth/stencil
++ * tests, counts samples with MSAA, and draws made while an occlusion query is
++ * active are not counted.
++ */
++static void
++pstats_take_oq(struct panvk_cmd_buffer *cmd)
++{
++   uint64_t fs = panvk_pstats_counter_addr(
++      &cmd->state.gfx.pstats_query,
++      VK_QUERY_PIPELINE_STATISTIC_FRAGMENT_SHADER_INVOCATIONS_BIT, true);
++
++   if (!fs ||
++       cmd->state.gfx.occlusion_query.mode != MALI_OCCLUSION_MODE_DISABLED)
++      return;
++
++   cmd->state.gfx.occlusion_query.ptr = fs;
++   cmd->state.gfx.occlusion_query.mode = MALI_OCCLUSION_MODE_COUNTER;
++   gfx_state_set_dirty(cmd, OQ);
++}
++
++/* With multiview, a query takes one slot per view. render.view_mask outlives
++ * the render pass, so stay inside the pool. */
++static uint32_t
++query_view_count(struct panvk_cmd_buffer *cmd, struct panvk_query_pool *pool,
++                 uint32_t query)
++{
++   const uint32_t view_mask = cmd->state.gfx.render.view_mask;
++
++   return MIN2(view_mask ? util_bitcount(view_mask) : 1,
++               pool->vk.query_count - query);
++}
++#endif
++
+ VKAPI_ATTR void VKAPI_CALL
+ panvk_per_arch(CmdBeginQueryIndexedEXT)(VkCommandBuffer commandBuffer,
+                                         VkQueryPool queryPool, uint32_t query,
+@@ -136,12 +172,10 @@ panvk_per_arch(CmdBeginQueryIndexedEXT)(VkCommandBuffer commandBuffer,
+    VK_FROM_HANDLE(panvk_cmd_buffer, cmd, commandBuffer);
+    VK_FROM_HANDLE(panvk_query_pool, pool, queryPool);
+ 
+-   /* TODO: transform feedback */
+-   assert(index == 0);
+-
+    bool had_batch;
+    struct panvk_batch *batch = open_batch(cmd, &had_batch);
+    uint64_t report_addr = panvk_query_report_dev_addr(pool, query);
++   uint32_t zero_queries = 1;
+ 
+    switch (pool->vk.query_type) {
+    case VK_QUERY_TYPE_OCCLUSION: {
+@@ -157,17 +191,42 @@ panvk_per_arch(CmdBeginQueryIndexedEXT)(VkCommandBuffer commandBuffer,
+        *    always starts at zero."
+        *
+        */
+-      for (unsigned i = 0; i < pool->reports_per_query; i++) {
+-         panvk_emit_write_job(
+-            cmd, batch, MALI_WRITE_VALUE_TYPE_IMMEDIATE_64,
+-            report_addr + i * sizeof(struct panvk_query_report), 0);
+-      }
+       break;
+    }
++#if PAN_ARCH == 9
++   case VK_QUERY_TYPE_PRIMITIVES_GENERATED_EXT:
++      cmd->state.gfx.prims_generated_query.ptr = report_addr;
++      zero_queries = query_view_count(cmd, pool, query);
++      break;
++   case VK_QUERY_TYPE_TRANSFORM_FEEDBACK_STREAM_EXT:
++      cmd->state.gfx.xfb.queries[index] = report_addr;
++      break;
++   case VK_QUERY_TYPE_PIPELINE_STATISTICS:
++      cmd->state.gfx.pstats_query = (struct panvk_pstats_query_state){
++         .report = report_addr,
++         .mask = pool->vk.pipeline_statistics,
++      };
++      /* With multiview, the other views' queries are all zero. */
++      zero_queries = query_view_count(cmd, pool, query);
++      pstats_take_oq(cmd);
++      break;
++#endif
+    default:
+       UNREACHABLE("Unsupported query type");
+    }
+ 
++   /* Counters start at zero. The write jobs come before the jobs and
++    * fragment jobs of this batch that count into the report. */
++   for (uint32_t q = 0; q < zero_queries; q++) {
++      for (unsigned i = 0; i < pool->reports_per_query; i++) {
++         panvk_emit_write_job(
++            cmd, batch, MALI_WRITE_VALUE_TYPE_IMMEDIATE_64,
++            panvk_query_report_dev_addr(pool, query + q) +
++               i * sizeof(struct panvk_query_report),
++            0);
++      }
++   }
++
+    close_batch(cmd, had_batch);
+ }
+ 
+@@ -179,9 +238,6 @@ panvk_per_arch(CmdEndQueryIndexedEXT)(VkCommandBuffer commandBuffer,
+    VK_FROM_HANDLE(panvk_cmd_buffer, cmd, commandBuffer);
+    VK_FROM_HANDLE(panvk_query_pool, pool, queryPool);
+ 
+-   /* TODO: transform feedback */
+-   assert(index == 0);
+-
+    bool end_sync = cmd->cur_batch != NULL;
+ 
+    /* Close to ensure we are sync and flush caches */
+@@ -191,21 +247,52 @@ panvk_per_arch(CmdEndQueryIndexedEXT)(VkCommandBuffer commandBuffer,
+    bool had_batch;
+    struct panvk_batch *batch = open_batch(cmd, &had_batch);
+    had_batch |= end_sync;
++   uint32_t view_count = 1;
+ 
+    switch (pool->vk.query_type) {
+    case VK_QUERY_TYPE_OCCLUSION: {
+       cmd->state.gfx.occlusion_query.ptr = 0;
+       cmd->state.gfx.occlusion_query.mode = MALI_OCCLUSION_MODE_DISABLED;
+       gfx_state_set_dirty(cmd, OQ);
++#if PAN_ARCH == 9
++      /* Give the counter back to an active pipeline statistics query. */
++      pstats_take_oq(cmd);
++#endif
+       break;
+    }
++#if PAN_ARCH == 9
++   case VK_QUERY_TYPE_PRIMITIVES_GENERATED_EXT:
++      cmd->state.gfx.prims_generated_query.ptr = 0;
++      view_count = query_view_count(cmd, pool, query);
++      break;
++   case VK_QUERY_TYPE_TRANSFORM_FEEDBACK_STREAM_EXT:
++      cmd->state.gfx.xfb.queries[index] = 0;
++      break;
++   case VK_QUERY_TYPE_PIPELINE_STATISTICS: {
++      uint64_t fs = panvk_pstats_counter_addr(
++         &cmd->state.gfx.pstats_query,
++         VK_QUERY_PIPELINE_STATISTIC_FRAGMENT_SHADER_INVOCATIONS_BIT, true);
++
++      if (fs && cmd->state.gfx.occlusion_query.ptr == fs) {
++         cmd->state.gfx.occlusion_query.ptr = 0;
++         cmd->state.gfx.occlusion_query.mode = MALI_OCCLUSION_MODE_DISABLED;
++         gfx_state_set_dirty(cmd, OQ);
++      }
++      cmd->state.gfx.pstats_query = (struct panvk_pstats_query_state){0};
++      view_count = query_view_count(cmd, pool, query);
++      break;
++   }
++#endif
+    default:
+       UNREACHABLE("Unsupported query type");
+    }
+ 
+-   uint64_t available_addr = panvk_query_available_dev_addr(pool, query);
+-   panvk_emit_write_job(cmd, batch, MALI_WRITE_VALUE_TYPE_IMMEDIATE_32,
+-                        available_addr, 1);
++   /* The batch closed above ran every job and fragment job counting into
++    * the report. */
++   for (uint32_t v = 0; v < view_count; v++) {
++      panvk_emit_write_job(cmd, batch, MALI_WRITE_VALUE_TYPE_IMMEDIATE_32,
++                           panvk_query_available_dev_addr(pool, query + v), 1);
++   }
+ 
+    close_batch(cmd, had_batch);
+ }
+@@ -233,6 +320,28 @@ panvk_meta_copy_query_pool_results(struct panvk_cmd_buffer *cmd,
+    bool had_batch;
+    open_batch(cmd, &had_batch);
+    struct panvk_precomp_ctx precomp_ctx = panvk_per_arch(precomp_cs)(cmd);
++#if PAN_ARCH == 9
++   if (pool->vk.query_type == VK_QUERY_TYPE_PIPELINE_STATISTICS ||
++       pool->vk.query_type == VK_QUERY_TYPE_TRANSFORM_FEEDBACK_STREAM_EXT) {
++      const bool xfb =
++         pool->vk.query_type == VK_QUERY_TYPE_TRANSFORM_FEEDBACK_STREAM_EXT;
++      const struct panlib_copy_pstats_query_result_args pstats = {
++         .pool_addr = panvk_query_report_dev_addr(pool, first_query),
++         .available_addr = panvk_query_available_dev_addr(pool, first_query),
++         .query_stride = pool->query_stride,
++         .query_count = query_count,
++         .dst_addr = dst_addr,
++         .dst_stride = dst_stride,
++         .flags = flags,
++         .stat_count = xfb ? 2 : util_bitcount(pool->vk.pipeline_statistics),
++      };
++
++      panlib_copy_pstats_query_result_struct(
++         &precomp_ctx, panlib_1d(query_count), PANLIB_BARRIER_NONE, pstats);
++      close_batch(cmd, had_batch);
++      return;
++   }
++#endif
+    panlib_copy_query_result_struct(&precomp_ctx, panlib_1d(query_count),
+                                    PANLIB_BARRIER_NONE, push);
+    close_batch(cmd, had_batch);
+diff --git a/src/panfrost/vulkan/panvk_vX_physical_device.c b/src/panfrost/vulkan/panvk_vX_physical_device.c
+index 8d014b0..3cf68c9 100644
+--- a/src/panfrost/vulkan/panvk_vX_physical_device.c
++++ b/src/panfrost/vulkan/panvk_vX_physical_device.c
+@@ -206,7 +206,7 @@ panvk_per_arch(get_physical_device_extensions)(
+ #endif
+       .EXT_private_data = true,
+       .EXT_primitive_topology_list_restart = true,
+-      .EXT_primitives_generated_query = PAN_ARCH >= 10,
++      .EXT_primitives_generated_query = PAN_ARCH >= 9,
+       .EXT_provoking_vertex = true,
+       .EXT_queue_family_foreign = true,
+       .EXT_rasterization_order_attachment_access = PAN_ARCH >= 10,
+@@ -338,7 +338,7 @@ panvk_per_arch(get_physical_device_features)(
+       .textureCompressionBC = has_texture_compression_bc(device) ||
+                               panvk_bc_emul_enabled(device),
+       .occlusionQueryPrecise = true,
+-      .pipelineStatisticsQuery = PAN_ARCH >= 10,
++      .pipelineStatisticsQuery = PAN_ARCH >= 9,
+       /* On v13+, the hardware isn't speculatively referencing to invalid
+          indices anymore. On v9-v12, pre-rasterization stages that write
+          memory run through gpu_prerast compute instead of IDVS. On by default
+@@ -622,8 +622,8 @@ panvk_per_arch(get_physical_device_features)(
+       .primitiveTopologyPatchListRestart = false,
+ 
+       /* VK_EXT_primitives_generated_query */
+-      .primitivesGeneratedQuery = PAN_ARCH >= 10,
+-      .primitivesGeneratedQueryWithRasterizerDiscard = PAN_ARCH >= 10,
++      .primitivesGeneratedQuery = PAN_ARCH >= 9,
++      .primitivesGeneratedQueryWithRasterizerDiscard = PAN_ARCH >= 9,
+       .primitivesGeneratedQueryWithNonZeroStreams = false,
+ 
+       /* VK_EXT_provoking_vertex */
+@@ -1334,8 +1334,7 @@ panvk_per_arch(get_physical_device_properties)(
+       .maxTransformFeedbackStreamDataSize = 512,
+       .maxTransformFeedbackBufferDataSize = 512,
+       .maxTransformFeedbackBufferDataStride = 2048,
+-      /* v9 JM queries are occlusion only. */
+-      .transformFeedbackQueries = PAN_ARCH >= 10,
++      .transformFeedbackQueries = PAN_ARCH >= 9,
+       .transformFeedbackStreamsLinesTriangles = PAN_ARCH >= 9,
+       .transformFeedbackRasterizationStreamSelect =
+          PAN_ARCH >= 10 || (PAN_ARCH == 9 && !PANVK_DEBUG(NO_GS)),
+diff --git a/src/panfrost/vulkan/panvk_vX_query_pool.c b/src/panfrost/vulkan/panvk_vX_query_pool.c
+index 379711e..f2be393 100644
+--- a/src/panfrost/vulkan/panvk_vX_query_pool.c
++++ b/src/panfrost/vulkan/panvk_vX_query_pool.c
+@@ -67,6 +67,8 @@ panvk_per_arch(CreateQueryPool)(VkDevice _device,
+       reports_per_query = PANVK_SUBQUEUE_COUNT + 1;
+       break;
+    }
++#endif
++#if PAN_ARCH >= 9
+    case VK_QUERY_TYPE_PRIMITIVES_GENERATED_EXT: {
+       reports_per_query = 1;
+       break;
+@@ -313,6 +315,8 @@ panvk_per_arch(GetQueryPoolResults)(VkDevice _device, VkQueryPool queryPool,
+                                                 pool->reports_per_query);
+             break;
+          }
++#endif
++#if PAN_ARCH >= 9
+          case VK_QUERY_TYPE_PRIMITIVES_GENERATED_EXT: {
+             if (write_results)
+                cpu_write_query_result(dst, 0, flags, src[0].value);

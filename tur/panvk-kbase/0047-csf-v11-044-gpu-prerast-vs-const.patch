@@ -1,0 +1,25 @@
+From: abhay-byte <zenithblue.dev@gmail.com>
+Subject: [PATCH csf-v11 044] panvk: fix gpu_prerast VS pointer qualifier
+Generated-by: LLM
+
+Purpose: Correct the prerast VS pointer type; biblioklept
+Source/Reference: local fix, work/mesa c8ad8dc0e49
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/043
+Validation test: integrated build NINJA_RC=0; geometry smoke 23/23 without PANVK_DEBUG (not isolated per patch)
+
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+index 434a282452d..a67dd136567 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+@@ -3712,7 +3712,7 @@ gpu_prerast_draw(struct panvk_cmd_buffer *cmdbuf,
+                  const struct panvk_draw_info *source)
+ {
+    struct panvk_device *dev = to_panvk_device(cmdbuf->vk.base.device);
+-   struct panvk_shader *shader = cmdbuf->state.gfx.vs.shader;
++   const struct panvk_shader *shader = cmdbuf->state.gfx.vs.shader;
+    if (!panvk_per_arch(gpu_prerast_can_lower)(cmdbuf, source,
+                                                &shader->gpu_prerast))
+       return false;

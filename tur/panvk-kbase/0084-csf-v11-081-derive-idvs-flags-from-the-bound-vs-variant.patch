@@ -1,0 +1,27 @@
+From: abhay-byte <zenithblue.dev@gmail.com>
+Subject: [PATCH csf-v11 081] panvk: derive IDVS flags from the bound VS variant for gpu_prerast draws
+
+Generated-by: LLM
+
+Purpose: Set the tiler IDVS flags of generated gpu_prerast draws from the passthrough VS variant they bind, not the original VS; biblioklept
+Source/Reference: local, work/mesa-vpsa2-final dx-vpsa2-final da4ab91961a
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/080
+Validation test: CTS dEQP-VK.glsl.atomic_operations.*_vertex* in one process 66 Pass 0 Fail (was 1 Pass 65 Fail)
+
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+index 04fe0b7241f..909b2584fec 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+@@ -2894,7 +2894,8 @@ static void
+ set_tiler_idvs_flags(struct cs_builder *b, struct panvk_cmd_buffer *cmdbuf,
+                      const struct panvk_draw_info *draw)
+ {
+-   const struct panvk_shader_variant *vs = raster_vs_variant(cmdbuf, false);
++   const struct panvk_shader_variant *vs =
++      raster_vs_variant(cmdbuf, draw->gpu_prerast_generated);
+    const struct panvk_shader_variant *fs =
+       panvk_shader_only_variant(get_fs(cmdbuf));
+    const struct vk_dynamic_graphics_state *dyns =

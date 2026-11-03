@@ -1,0 +1,49 @@
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: 2026-10-11
+Subject: [PATCH jm-v9 010] panvk: v9 robustBufferAccess2 and nullDescriptor biblioklept
+
+Purpose: Advertise VK_EXT_robustness2 robustBufferAccess2 and
+nullDescriptor on v9. Noysz 0071 adds a software bounds check for texel
+buffer reads on v9 (LEA_BUF + LD_CVT do not bound the index and get the
+missing-alpha value wrong); our csf-v11/122 already has the same check for
+arch 9 and 10 (bi_lower_robust_texel_buf, PAN_VA_BUF_CVT_NO_ALPHA in the
+buffer descriptor), measured on this G57 with CTS robustness2 buffer cases
+2324 pass / 0 fail. SSBO/UBO loads are bounded by LD_PKA, stores and
+atomics by nir_lower_robust_access, like v10. Null descriptors are the
+Valhall NULL_DESCRIPTOR (Noysz 0045); the v9 vertex path already emits it
+for unbound vertex buffers. robustImageAccess2 stays off on v9.
+Source/Reference: https://github.com/Noysz/panvk-g99-jm (commit 6ce0d46e419a, MIT; patches/0045-v9-EXPERIMENTAL-robustness2-null-descriptor, 0071-v9-texel-buffer-oob-rba2); texel checks from csf-v11/122
+Tested GPU: build-checked; device run on Mali-G57 MC2 (Lenovo TB336FU, gpu_id 0x90930010) pending, see worklogs/v9-jm/PROGRESS.md
+Tested Kbase UAPI: JM 11.38
+Mesa base range: 5a07217f + g615-v11-csf series + jm-v9 001-006
+Dependencies: csf-v11/122 (texel buffer bounds checks)
+Validation test: PanProbe robustness2; worklogs/driver-remaining/122-robustbufferaccess2-v10.md
+
+---
+diff --git a/src/panfrost/vulkan/panvk_vX_physical_device.c b/src/panfrost/vulkan/panvk_vX_physical_device.c
+index 67320af..eb230c3 100644
+--- a/src/panfrost/vulkan/panvk_vX_physical_device.c
++++ b/src/panfrost/vulkan/panvk_vX_physical_device.c
+@@ -211,7 +211,7 @@ panvk_per_arch(get_physical_device_extensions)(
+       .EXT_queue_family_foreign = true,
+       .EXT_rasterization_order_attachment_access = PAN_ARCH >= 10,
+       .EXT_rgba10x6_formats = PAN_ARCH >= 11,
+-      .EXT_robustness2 = PAN_ARCH >= 10,
++      .EXT_robustness2 = PAN_ARCH >= 9,
+       .EXT_sampler_filter_minmax = PAN_ARCH >= 10,
+       .EXT_scalar_block_layout = true,
+       .EXT_separate_stencil_usage = true,
+@@ -648,9 +648,11 @@ panvk_per_arch(get_physical_device_features)(
+       .pipelineExecutableInfo = true,
+ 
+       /* VK_KHR_robustness2 */
+-      .robustBufferAccess2 = PAN_ARCH >= 10,
++      /* v9/v10 texel buffers get software bounds checks
++       * (bi_lower_robust_texel_buf), the rest is the same Valhall path. */
++      .robustBufferAccess2 = PAN_ARCH >= 9,
+       .robustImageAccess2 = PAN_ARCH >= 10,
+-      .nullDescriptor = PAN_ARCH >= 10,
++      .nullDescriptor = PAN_ARCH >= 9,
+ 
+       /* VK_EXT_shader_tile_image */
+       .shaderTileImageColorReadAccess = PAN_ARCH >= 9,

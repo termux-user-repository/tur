@@ -1,0 +1,43 @@
+From: panvk-kbase-android worker <panvk-worker@localhost>
+Subject: [PATCH csf-v11 024] panvk: expose multiViewport (maxViewports = 16)
+Generated-by: LLM
+
+Purpose: DXVK requires multiViewport. No exposed stage can write
+ ViewportIndex (geometryShader = false, shaderOutputViewportIndex = false),
+ so the viewport index of every primitive is 0 and the driver's use of
+ viewports[0]/scissors[0] is the required behaviour. Pipelines and dynamic
+ state with up to 16 viewports/scissors are accepted.
+ Must be revisited when geometryShader or shaderOutputViewportIndex is
+ exposed: per-primitive selection is then required (v10/v11 DCD has
+ "Scissor array enable"; viewport transform is in the VS).
+Source/Reference: Vulkan spec, ViewportIndex default 0; fork idea
+ GunaCharanTeja a966c0d (multiViewport part only)
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/023
+Validation test: tests/dxvk/vulkan/multi-viewport/multi_viewport.c (5/5 IDVS
+ and PANVK_DEBUG=gpu_prerast)
+
+diff --git a/src/panfrost/vulkan/panvk_vX_physical_device.c b/src/panfrost/vulkan/panvk_vX_physical_device.c
+index 85143c16371..b74f9f77ecc 100644
+--- a/src/panfrost/vulkan/panvk_vX_physical_device.c
++++ b/src/panfrost/vulkan/panvk_vX_physical_device.c
+@@ -320,7 +320,7 @@ panvk_per_arch(get_physical_device_features)(
+       .wideLines = true,
+       .largePoints = true,
+       .alphaToOne = false,
+-      .multiViewport = false,
++      .multiViewport = PAN_ARCH >= 10,
+       .samplerAnisotropy = true,
+       .textureCompressionETC2 = has_texture_compression_etc2(device),
+       .textureCompressionASTC_LDR = has_texture_compression_astc_ldr(device),
+@@ -962,7 +962,7 @@ panvk_per_arch(get_physical_device_properties)(
+       .maxDrawIndirectCount = PAN_ARCH >= 10 ? UINT32_MAX : 1,
+       .maxSamplerLodBias = (float)INT16_MAX / 256.0f,
+       .maxSamplerAnisotropy = 16,
+-      .maxViewports = 1,
++      .maxViewports = PAN_ARCH >= 10 ? 16 : 1,
+       .maxViewportDimensions = {MAX_FRAMEBUFFER_DIMENSION, MAX_FRAMEBUFFER_DIMENSION},
+       .viewportBoundsRange = {-2.0f * MAX_FRAMEBUFFER_DIMENSION, 2.0f * MAX_FRAMEBUFFER_DIMENSION - 1.0f},
+       .viewportSubPixelBits = 0,

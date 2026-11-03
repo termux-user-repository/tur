@@ -1,0 +1,135 @@
+From c0de1e9d232f03de9b0004bf338c73fc52686e7d Mon Sep 17 00:00:00 2001
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: Fri, 2 Oct 2026 18:12:12 +0530
+Subject: [PATCH] panvk: use TES primitive ID in tess-fed geometry shaders
+ biblioklept
+
+TES exports VARYING_SLOT_PRIMITIVE_ID containing the patch ID, but
+panvk_gpu_prerast_lower_gs substituted an assembled ordinal primitive ID
+(before + lp + prim_id_base).
+
+In tess-fed geometry shaders, detect VARYING_BIT_PRIMITIVE_ID in the
+incoming vs_outputs mask and load the patch ID from the vertex record,
+preserving chunk and instance offsets without adding prim_id_base.
+Guard the record load with the invocation validity condition (including
+capacity) to prevent invalid primitive invocations (e.g. triangle j=0,1
+whose vin0=j-2 underflows) from performing out-of-bounds memory loads,
+while initializing prim_var to a safe defined zero on invalid invocations.
+Non-tess draws preserve the assembled ordinal computation and restart
+handling.
+
+Generated-by: LLM
+---
+ src/panfrost/vulkan/panvk_vX_shader.c | 88 +++++++++++++++++++--------
+ 1 file changed, 61 insertions(+), 27 deletions(-)
+
+diff --git a/src/panfrost/vulkan/panvk_vX_shader.c b/src/panfrost/vulkan/panvk_vX_shader.c
+index 86c7ab7847e..8a827377566 100644
+--- a/src/panfrost/vulkan/panvk_vX_shader.c
++++ b/src/panfrost/vulkan/panvk_vX_shader.c
+@@ -2032,41 +2032,75 @@ panvk_gpu_prerast_lower_gs(nir_shader *nir,
+ 
+    s.prim_id = lp;
+    if (reads_prim_id) {
+-      nir_variable *before =
+-         nir_local_variable_create(impl, glsl_uint_type(), "gs_prims_before");
+-      nir_store_var(b, before, zero, 1);
+-      nir_push_if(b, restart_en);
++      nir_def *is_tess = nir_ine_imm(
++         b,
++         nir_iand(b, s.vs_outputs,
++                  nir_imm_int64(b, VARYING_BIT_PRIMITIVE_ID)),
++         0);
++      nir_variable *prim_var =
++         nir_local_variable_create(impl, glsl_uint_type(), "gs_prim_id");
++      nir_store_var(b, prim_var, zero, 1);
++      nir_push_if(b, is_tess);
+       {
+-         nir_variable *q =
+-            nir_local_variable_create(impl, glsl_uint_type(), "gs_q");
+-         nir_variable *len =
+-            nir_local_variable_create(impl, glsl_uint_type(), "gs_len");
+-         nir_store_var(b, q, zero, 1);
+-         nir_store_var(b, len, zero, 1);
+-         nir_push_loop(b);
++         nir_push_if(b, valid);
++         {
++            nir_def *slot = nir_bit_count(
++               b, nir_iand(b, s.vs_outputs,
++                           nir_imm_int64(b, BITFIELD64_MASK(VARYING_SLOT_PRIMITIVE_ID))));
++            nir_def *rec = nir_iadd(b, nir_imul(b, s.inst, s.n), s.vin[0]);
++            nir_def *off = nir_iadd(
++               b, nir_imul(b, rec, s.vs_stride),
++               nir_imul_imm(b, slot, 16));
++            nir_def *patch_id = nir_load_global(
++               b, 1, 32,
++               nir_iadd(b, s.vs_records, nir_u2u64(b, off)),
++               .align_mul = 4);
++            nir_store_var(b, prim_var, patch_id, 1);
++         }
++         nir_pop_if(b, NULL);
++      }
++      nir_push_else(b, NULL);
++      {
++         nir_variable *before =
++            nir_local_variable_create(impl, glsl_uint_type(), "gs_prims_before");
++         nir_store_var(b, before, zero, 1);
++         nir_push_if(b, restart_en);
+          {
+-            nir_def *qq = nir_load_var(b, q);
+-            nir_break_if(b, nir_uge(b, qq, seg));
+-            nir_def *l = nir_load_var(b, len);
+-            nir_push_if(b, panvk_gs_is_restart(b, restart_en, gen, qq));
++            nir_variable *q =
++               nir_local_variable_create(impl, glsl_uint_type(), "gs_q");
++            nir_variable *len =
++               nir_local_variable_create(impl, glsl_uint_type(), "gs_len");
++            nir_store_var(b, q, zero, 1);
++            nir_store_var(b, len, zero, 1);
++            nir_push_loop(b);
+             {
+-               nir_store_var(b, before,
+-                             nir_iadd(b, nir_load_var(b, before),
+-                                      panvk_gs_prims_in_run(b, prim, l)),
+-                             1);
+-               nir_store_var(b, len, zero, 1);
++               nir_def *qq = nir_load_var(b, q);
++               nir_break_if(b, nir_uge(b, qq, seg));
++               nir_def *l = nir_load_var(b, len);
++               nir_push_if(b, panvk_gs_is_restart(b, restart_en, gen, qq));
++               {
++                  nir_store_var(b, before,
++                                nir_iadd(b, nir_load_var(b, before),
++                                         panvk_gs_prims_in_run(b, prim, l)),
++                                1);
++                  nir_store_var(b, len, zero, 1);
++               }
++               nir_push_else(b, NULL);
++               nir_store_var(b, len, nir_iadd_imm(b, l, 1), 1);
++               nir_pop_if(b, NULL);
++               nir_store_var(b, q, nir_iadd_imm(b, qq, 1), 1);
+             }
+-            nir_push_else(b, NULL);
+-            nir_store_var(b, len, nir_iadd_imm(b, l, 1), 1);
+-            nir_pop_if(b, NULL);
+-            nir_store_var(b, q, nir_iadd_imm(b, qq, 1), 1);
++            nir_pop_loop(b, NULL);
+          }
+-         nir_pop_loop(b, NULL);
++         nir_pop_if(b, NULL);
++         nir_def *ord = nir_iadd(
++            b, nir_iadd(b, nir_load_var(b, before), lp),
++            GS_PARAM(b, p, 32, prim_id_base));
++         nir_store_var(b, prim_var, ord, 1);
+       }
+       nir_pop_if(b, NULL);
+-      s.prim_id = nir_iadd(b, nir_load_var(b, before), lp);
++      s.prim_id = nir_load_var(b, prim_var);
+    }
+-   s.prim_id = nir_iadd(b, s.prim_id, GS_PARAM(b, p, 32, prim_id_base));
+ 
+    nir_store_var(b, s.vcount, zero, 1);
+    nir_store_var(b, s.ipos, zero, 1);
+-- 
+2.55.0
+

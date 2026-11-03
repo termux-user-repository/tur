@@ -1,0 +1,34 @@
+From: Christian Gmeiner <cgmeiner@igalia.com>
+Subject: [PATCH csf-v11 034] panvk: Zero images built for device-level queries
+
+Purpose: zero images built for device-level queries (dep of 6409a5b16af)
+Source/Reference: upstream Mesa commit 90be04d45a7 (author preserved)
+Backport-of: 90be04d45a7
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/033
+Validation test: icc.c
+
+diff --git a/src/panfrost/vulkan/panvk_image.c b/src/panfrost/vulkan/panvk_image.c
+index 9c6d5bc73ba0382f7e3c5965a782725c9bb99d09..9c2e691419a0f81c4d21f862145073ef609d6faa 100644
+--- a/src/panfrost/vulkan/panvk_image.c
++++ b/src/panfrost/vulkan/panvk_image.c
+@@ -1141,7 +1141,7 @@ panvk_GetDeviceImageMemoryRequirements(VkDevice device,
+       ~VK_IMAGE_CREATE_MULTISAMPLED_RENDER_TO_SINGLE_SAMPLED_BIT_EXT;
+    info.pCreateInfo = &create_info;
+ 
+-   struct panvk_image image;
++   struct panvk_image image = {0};
+    vk_image_init(&dev->vk, &image.vk, &create_info);
+    panvk_image_init(&image, &create_info);
+ 
+@@ -1288,7 +1288,7 @@ panvk_GetDeviceImageSparseMemoryRequirements(VkDevice device,
+ {
+    VK_FROM_HANDLE(panvk_device, dev, device);
+ 
+-   struct panvk_image image;
++   struct panvk_image image = {0};
+    vk_image_init(&dev->vk, &image.vk, pInfo->pCreateInfo);
+    panvk_image_init(&image, pInfo->pCreateInfo);
+ 

@@ -1,0 +1,598 @@
+From: panvk-kbase-android worker <panvk-worker@localhost>
+Subject: [PATCH kbase-common/csf 006] panvk: kbase queue/device/WSI integration
+
+Purpose: Wire the kbase backend through device creation (fresh fd per
+ logical device, AUTO_VA, sparse-bind stub queue), CSF queue/cmd-buffer
+ state (userspace CS rings, seqno cells, progress markers), WSI
+ (dmabuf-aware device options, modifier gating, ordered submits) and
+ csif/flush-id helpers. Deliberately NOT included (kept upstream until
+ runtime-proven on G615): tessellation/fillModeNonSolid/transform_feedback
+ /shaderOutputLayer feature changes, cooperative_matrix/constant_data
+ drift, CRC tracking removal, v11 arch-list drops.
+Source/Reference: https://github.com/wonderkast02/panvk-g720-kbase-csf
+ branch android-candidate-beta-1.9.4, kbase-containing hunks only.
+Tested GPU: none yet (compile-level).
+Tested Kbase UAPI: n/a.
+Mesa base range: 26.3.0-devel (pinned 5a07217f).
+Dependencies: 003/004/005.
+Sync-scope note: upstream pinned removed the cmdbuf->sync_scope member
+ beta threads through draw/buffer sync sites; that hunk is dropped here
+ and SYSTEM-scope selection for kbase moves to queue-local logic (007).
+ Until then, intra-stream syncs use CSG scope.
+Validation test: build with kbase; DRM path unchanged.
+
+--- a/src/panfrost/vulkan/panvk_device.h
++++ b/src/panfrost/vulkan/panvk_device.h
+@@ -20,6 +20,10 @@
+ #include "panvk_utrace_perfetto.h"
+ 
+ #include "kmod/pan_kmod.h"
++#include "kmod/panthor_kmod.h"
++#ifdef HAVE_PAN_KMOD_KBASE
++#include "kmod/kbase_kmod.h"
++#endif
+ #include "util/perf/u_trace.h"
+ 
+ #include "util/simple_mtx.h"
+@@ -140,6 +144,48 @@
+    return container_of(dev, struct panvk_device, vk);
+ }
+ 
++/* CSF interface information, sourced from the panthor uAPI or from the
++ * kbase GLB interface depending on which backend the device came from.
++ * Always use this instead of calling panthor_kmod_get_csif_props()
++ * directly, which reads garbage on a kbase device. */
++static inline const struct drm_panthor_csif_info *
++panvk_get_csif_props(const struct panvk_device *dev)
++{
++#if defined(HAVE_PAN_KMOD_KBASE) && !defined(HAVE_PAN_KMOD_PANTHOR)
++   return kbase_kmod_get_csif_props(dev->kmod.dev);
++#elif defined(HAVE_PAN_KMOD_KBASE)
++   const struct panvk_physical_device *phys_dev =
++      to_panvk_physical_device(dev->vk.physical);
++
++   if (phys_dev->kbase_node_path[0])
++      return kbase_kmod_get_csif_props(dev->kmod.dev);
++
++   return panthor_kmod_get_csif_props(dev->kmod.dev);
++#else
++   return panthor_kmod_get_csif_props(dev->kmod.dev);
++#endif
++}
++
++/* Latest cache-flush ID, sourced from the panthor uAPI or the kbase CSF
++ * USER register page depending on which backend the device came from. */
++static inline uint32_t
++panvk_get_flush_id(const struct panvk_device *dev)
++{
++#if defined(HAVE_PAN_KMOD_KBASE) && !defined(HAVE_PAN_KMOD_PANTHOR)
++   return kbase_kmod_get_flush_id(dev->kmod.dev);
++#elif defined(HAVE_PAN_KMOD_KBASE)
++   const struct panvk_physical_device *phys_dev =
++      to_panvk_physical_device(dev->vk.physical);
++
++   if (phys_dev->kbase_node_path[0])
++      return kbase_kmod_get_flush_id(dev->kmod.dev);
++
++   return panthor_kmod_get_flush_id(dev->kmod.dev);
++#else
++   return panthor_kmod_get_flush_id(dev->kmod.dev);
++#endif
++}
++
+ static inline void
+ panvk_address_binding_report(struct panvk_device *dev,
+                              struct vk_object_base *object, uint64_t base,
+--- a/src/panfrost/vulkan/panvk_vX_device.c
++++ b/src/panfrost/vulkan/panvk_vX_device.c
+@@ -34,6 +34,10 @@
+ #include "genxml/decode.h"
+ #include "genxml/gen_macros.h"
+ 
++#ifdef HAVE_PAN_KMOD_KBASE
++#include <fcntl.h>
++#endif
++
+ #include "kmod/pan_kmod.h"
+ #include "util/os_file.h"
+ #include "util/u_printf.h"
+@@ -294,12 +298,73 @@
+    return VK_SUCCESS;
+ }
+ 
++#ifdef HAVE_PAN_KMOD_KBASE
++/* Sparse binding over kbase (which has no DRM syncobjs and no explicit-VA
++ * vm_bind) is not implemented yet: the BIND queue family is created as a
++ * stub that fails at submit time with a clear message.  The GPU queue
++ * family uses the real kbase CSF submission path. */
++static bool
++panvk_kbase_stub_queues(const struct panvk_device *dev)
++{
++   const struct panvk_physical_device *phys_dev =
++      to_panvk_physical_device(dev->vk.physical);
++
++   return phys_dev->kbase_node_path[0] != '\0';
++}
++
++static VkResult
++panvk_kbase_stub_queue_submit(struct vk_queue *queue,
++                              struct vk_queue_submit *submit)
++{
++   return vk_queue_set_lost(
++      queue, "kbase: sparse binding queues are not implemented yet");
++}
++
++static VkResult
++panvk_kbase_stub_queue_create(struct panvk_device *dev,
++                              const VkDeviceQueueCreateInfo *create_info,
++                              uint32_t queue_idx,
++                              struct vk_queue **out_queue)
++{
++   struct vk_queue *queue = vk_zalloc(&dev->vk.alloc, sizeof(*queue), 8,
++                                      VK_SYSTEM_ALLOCATION_SCOPE_DEVICE);
++   if (!queue)
++      return panvk_error(dev, VK_ERROR_OUT_OF_HOST_MEMORY);
++
++   VkResult result = vk_queue_init(queue, &dev->vk, create_info, queue_idx);
++   if (result != VK_SUCCESS) {
++      vk_free(&dev->vk.alloc, queue);
++      return result;
++   }
++
++   queue->driver_submit = panvk_kbase_stub_queue_submit;
++   *out_queue = queue;
++   return VK_SUCCESS;
++}
++
++static void
++panvk_kbase_stub_queue_destroy(struct vk_queue *queue)
++{
++   struct vk_device *vk_dev = queue->base.device;
++
++   vk_queue_finish(queue);
++   vk_free(&vk_dev->alloc, queue);
++}
++#endif /* HAVE_PAN_KMOD_KBASE */
++
+ static VkResult
+ panvk_queue_create(struct panvk_device *dev,
+                    const VkDeviceQueueCreateInfo *create_info,
+                    uint32_t queue_idx,
+                    struct vk_queue **out_queue)
+ {
++#ifdef HAVE_PAN_KMOD_KBASE
++   if (panvk_kbase_stub_queues(dev) &&
++       create_info->queueFamilyIndex == PANVK_QUEUE_FAMILY_BIND)
++      return panvk_kbase_stub_queue_create(dev, create_info, queue_idx,
++                                           out_queue);
++#endif
++
+    switch (create_info->queueFamilyIndex) {
+    case PANVK_QUEUE_FAMILY_GPU:
+       return panvk_per_arch(create_gpu_queue)(
+@@ -314,6 +379,16 @@
+ static void
+ panvk_queue_destroy(struct vk_queue *queue)
+ {
++#ifdef HAVE_PAN_KMOD_KBASE
++   struct panvk_device *dev = to_panvk_device(queue->base.device);
++
++   if (panvk_kbase_stub_queues(dev) &&
++       queue->queue_family_index == PANVK_QUEUE_FAMILY_BIND) {
++      panvk_kbase_stub_queue_destroy(queue);
++      return;
++   }
++#endif
++
+    switch (queue->queue_family_index) {
+    case PANVK_QUEUE_FAMILY_GPU:
+       panvk_per_arch(destroy_gpu_queue)(queue);
+@@ -392,9 +467,30 @@
+       .free = panvk_kmod_free,
+       .priv = &device->vk.alloc,
+    };
+-   device->kmod.dev = pan_kmod_dev_create(
+-      os_dupfd_cloexec(physical_device->kmod.dev->fd),
+-      physical_device->kmod.dev->flags, &device->kmod.allocator);
++
++#ifdef HAVE_PAN_KMOD_KBASE
++   if (physical_device->kbase_node_path[0]) {
++      /* dup()ing a kbase fd would share the physical device's kbase
++       * context, whose version handshake can only be done once; open a
++       * fresh context instead.  A separate context also means a separate
++       * GPU address space, which matches the per-logical-device VM
++       * semantics of the DRM backends. */
++      int kbase_fd =
++         open(physical_device->kbase_node_path, O_RDWR | O_CLOEXEC);
++      if (kbase_fd >= 0) {
++         device->kmod.dev = pan_kmod_dev_create_with_driver(
++            kbase_fd, physical_device->kmod.dev->flags, "kbase", NULL,
++            &device->kmod.allocator);
++         if (!device->kmod.dev)
++            close(kbase_fd);
++      }
++   } else
++#endif
++   {
++      device->kmod.dev = pan_kmod_dev_create(
++         os_dupfd_cloexec(physical_device->kmod.dev->fd),
++         physical_device->kmod.dev->flags, &device->kmod.allocator);
++   }
+ 
+    if (!device->kmod.dev) {
+       result = panvk_errorf(instance, VK_ERROR_OUT_OF_HOST_MEMORY,
+@@ -402,7 +498,7 @@
+       goto err_finish_dev;
+    }
+ 
+-   if (PANVK_DEBUG(TRACE) || PANVK_DEBUG(SYNC) || PANVK_DEBUG(DUMP)) {
++   if (PANVK_DEBUG(TRACE) || PANVK_DEBUG(SYNC) || PANVK_DEBUG(DUMP) || PANVK_DEBUG(KBASE_DIAG)) {
+       device->debug.decode_ctx = pandecode_create_context(false);
+       pandecode_set_disassemble(device->debug.decode_ctx, pan_disassemble);
+    }
+@@ -414,6 +510,14 @@
+    uint64_t user_va_end = physical_device->memory.max_supported_va;
+    uint32_t vm_flags = PAN_ARCH < 10 ? PAN_KMOD_VM_FLAG_AUTO_VA : 0;
+ 
++#ifdef HAVE_PAN_KMOD_KBASE
++   /* kbase assigns all GPU VAs itself (SAME_VA memory model); mapping at a
++    * caller-chosen address is not possible, so use AUTO_VA regardless of
++    * the architecture. */
++   if (physical_device->kbase_node_path[0])
++      vm_flags = PAN_KMOD_VM_FLAG_AUTO_VA;
++#endif
++
+    device->kmod.vm =
+       pan_kmod_vm_create(device->kmod.dev, vm_flags,
+                          user_va_start, user_va_end - user_va_start);
+--- a/src/panfrost/vulkan/panvk_wsi.c
++++ b/src/panfrost/vulkan/panvk_wsi.c
+@@ -13,6 +13,13 @@
+ #include "panvk_instance.h"
+ #include "panvk_physical_device.h"
+ 
++#include <stdlib.h>
++#include <string.h>
++
++#if defined(HAVE_PAN_KMOD_KBASE)
++#include "lib/kmod/kbase_kmod.h"
++#endif
++
+ #include "vk_util.h"
+ #include "wsi_common.h"
+ 
+@@ -45,17 +52,55 @@
+ {
+    struct panvk_instance *instance =
+       to_panvk_instance(physical_device->vk.instance);
++   const bool uses_kbase = physical_device->kbase_node_path[0] != '\0';
++   const char *dri3_option = getenv("PANVK_KBASE_DRI3");
++   /* The proprietary Termux:X11 layer uses WSI_X11_TERMUX=1 as its
++    * process-wide switch.  Accept the same switch here when no explicit
++    * PanVK override is present, so both ICDs exercise the same raw-FD DRI3
++    * transport instead of silently falling back to the slower SHM path. */
++   const char *termux_wsi = getenv("WSI_X11_TERMUX");
++   const bool termux_raw_dri3 =
++      uses_kbase && !dri3_option && termux_wsi && strcmp(termux_wsi, "0") != 0;
++   const bool kbase_raw_dri3 =
++      termux_raw_dri3 ||
++      (uses_kbase && dri3_option &&
++       (!strcmp(dri3_option, "raw") || !strcmp(dri3_option, "termux")));
++   const bool kbase_dmabuf =
++#if defined(HAVE_PAN_KMOD_KBASE)
++      uses_kbase &&
++      ((!dri3_option && termux_raw_dri3) ||
++       (dri3_option && strcmp(dri3_option, "0") != 0)) &&
++      kbase_kmod_supports_dmabuf(physical_device->kmod.dev);
++#else
++      false;
++#endif
+    VkResult result;
+ 
+    result = wsi_device_init(&physical_device->wsi_device,
+                             panvk_physical_device_to_handle(physical_device),
+                             panvk_wsi_proc_addr, &instance->vk.alloc, -1,
+                             &instance->drirc.options,
+-                            &(struct wsi_device_options){.sw_device = false});
++                            &(struct wsi_device_options){
++                               .sw_device = uses_kbase && !kbase_dmabuf,
++                                  kbase_dmabuf && kbase_raw_dri3,
++                            });
+    if (result != VK_SUCCESS)
+       return result;
+ 
+-   physical_device->wsi_device.supports_modifiers = true;
++   /* kbase syncs carry GPU seqno state in userspace and cannot be copied via
++    * DRM syncobj fd payloads.  Keep even empty WSI submits on the real queue
++    * so present fences are backed by the kbase submission timeline.
++    */
++   physical_device->wsi_device.disable_unordered_submits = uses_kbase;
++
++   /* kbase is not a DRM fd.  The default CPU WSI path presents through
++    * MIT-SHM.  Android dma-heaps can also provide shareable
++    * allocations, but some Android X servers advertise DRI3 while rejecting
++    * standard PixmapFromBuffer.  PANVK_KBASE_DRI3=raw (or termux) uses the
++    * Termux:X11/Winlator private raw-FD modifier instead of DRM modifiers.
++    */
++   physical_device->wsi_device.supports_modifiers =
++      !uses_kbase || (kbase_dmabuf && !kbase_raw_dri3);
+    physical_device->wsi_device.can_present_on_device =
+       panvk_can_present_on_device;
+ 
+--- a/src/panfrost/vulkan/csf/panvk_queue.h
++++ b/src/panfrost/vulkan/csf/panvk_queue.h
+@@ -64,6 +64,46 @@
+          void *host;
+       } addr;
+    } tracebuf;
++
++#ifdef HAVE_PAN_KMOD_KBASE
++   /* kbase-backed queues manage the CS ring buffer in userspace (the
++    * panthor kernel driver does the equivalent in kernel-owned rings). */
++   struct {
++      /* kbase compatibility path: each PanVK subqueue owns a CSG and uses
++       * CSI0.  Some Android kbase stacks accept later CSIs into a scheduled
++       * CSG but never execute them. */
++      uint32_t group_handle;
++
++      struct pan_kmod_bo *ringbuf_bo;
++      void *ringbuf_cpu;
++      uint64_t ringbuf_dev;
++
++      /* USER_IO pages from KBASE_IOCTL_CS_QUEUE_BIND: doorbell page,
++       * input page (CS_INSERT), output page (CS_EXTRACT/CS_ACTIVE). */
++      void *user_io;
++
++      /* Monotonically-increasing byte offset of the next ring entry. */
++      uint64_t insert;
++
++      /* Number of jobs emitted; each bumps the subqueue seqno cell by one
++       * when it retires. */
++      uint64_t emitted_jobs;
++
++      uint32_t last_last_job_offset;
++      uint32_t last_job_offset;
++      uint32_t last_job_size;
++      uint32_t last_job_entry_size;
++      uint32_t last_stream_size;
++      uint32_t last_flush_id;
++      uint64_t last_stream_addr;
++
++      struct panvk_priv_mem init_cs;
++      uint64_t init_stream_addr;
++      uint32_t init_stream_size;
++      uint32_t init_flush_id;
++      uint32_t init_pending;
++   } kbase;
++#endif
+ };
+ 
+ struct panvk_desc_ringbuf {
+@@ -86,6 +126,31 @@
+    struct panvk_desc_ringbuf render_desc_ringbuf;
+    struct panvk_priv_mem syncobjs;
+ 
++#ifdef HAVE_PAN_KMOD_KBASE
++   /* Per-subqueue completion seqno cells (panvk_cs_sync64 layout), bumped
++    * by a SYNC_ADD64 at the end of every ring entry and polled by the CPU.
++    * Must live in GPU-uncached memory: on inner-shareable pages the sync
++    * write can linger in the GPU L2 where the CPU never sees it. */
++   struct {
++      struct pan_kmod_bo *bo;
++      void *cpu;
++      uint64_t dev;
++   } kbase_seqnos;
++   uint32_t kbase_tiler_submit_count;
++   uint64_t kbase_tiler_work_count;
++   /* Tiler heap context retired by the last heap renewal.  The firmware CS
++    * HEAP_SET registers keep pointing at the old context until each graphics
++    * subqueue executes its next ring entry, so the context is only
++    * destroyed once both graphics subqueues have provably re-armed HEAP_SET
++    * (their emitted-job counts passed the values recorded at retirement and
++    * the pre-renewal drain completed).  ctx == 0 means the slot is empty. */
++   struct {
++      uint64_t ctx;
++      uint64_t vt_jobs;
++      uint64_t frag_jobs;
++   } kbase_retired_heap;
++#endif
++
+    struct {
+       struct vk_sync *sync;
+       uint64_t next_value;
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_buffer.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_buffer.c
+@@ -41,6 +42,45 @@
+ #include "vk_format.h"
+ #include "vk_synchronization.h"
+ 
++void
++panvk_per_arch(kbase_mark_progress)(
++   struct panvk_cmd_buffer *cmdbuf, enum panvk_subqueue_id subqueue,
++   enum panvk_kbase_progress_marker marker)
++{
++   /* These stores are breadcrumbs for queue-hang diagnosis, not part of the
++    * queue ABI.  Keeping them in every draw/dispatch stream adds several LS
++    * instructions and a store flush at each marker, which is particularly
++    * costly for draw-heavy applications.  Keep the instrumentation opt-in. */
++   if (!PANVK_DEBUG(KBASE_DIAG))
++      return;
++
++   struct panvk_device *dev = to_panvk_device(cmdbuf->vk.base.device);
++   struct panvk_physical_device *phys_dev =
++      to_panvk_physical_device(dev->vk.physical);
++
++   if (!phys_dev->kbase_node_path[0])
++      return;
++
++   enum {
++      KBASE_MARK_ADDR_REG = 14,
++      KBASE_MARK_VALUE_REG = 16,
++   };
++   STATIC_ASSERT(KBASE_MARK_ADDR_REG + 2 <= CS_REG_SCRATCH_COUNT);
++   STATIC_ASSERT(KBASE_MARK_VALUE_REG + 1 <= CS_REG_SCRATCH_COUNT);
++
++   struct cs_builder *b = panvk_get_cs_builder(cmdbuf, subqueue);
++   struct cs_index addr = cs_scratch_reg64(b, KBASE_MARK_ADDR_REG);
++   struct cs_index value = cs_scratch_reg32(b, KBASE_MARK_VALUE_REG);
++
++   cs_load64_to(b, addr, cs_subqueue_ctx_reg(b),
++                offsetof(struct panvk_cs_subqueue_context,
++                         debug.kbase_progress_addr));
++   cs_move32_to(b, value, marker);
++   // cs_store32(b, value, addr, 0);
++   cs_sync32_add(b, true, MALI_CS_SYNC_SCOPE_CSG, value, addr, cs_now());
++   cs_flush_stores(b);
++}
++
+ static void
+ emit_tls(struct panvk_cmd_buffer *cmdbuf)
+ {
+@@ -105,7 +145,11 @@
+    struct panvk_device *dev = to_panvk_device(cmdbuf->vk.base.device);
+    struct cs_builder *b = panvk_get_cs_builder(cmdbuf, subqueue);
+ 
++   panvk_per_arch(kbase_mark_progress)(
++      cmdbuf, subqueue, PANVK_KBASE_PROGRESS_FINISH_BEFORE_WAIT);
+    cs_wait_slots(b, dev->csf.sb.all_mask);
++   panvk_per_arch(kbase_mark_progress)(
++      cmdbuf, subqueue, PANVK_KBASE_PROGRESS_FINISH_AFTER_WAIT);
+ 
+    /* save CS error if non-zero */
+    if (cmdbuf->vk.level == VK_COMMAND_BUFFER_LEVEL_PRIMARY) {
+@@ -188,6 +232,8 @@
+    panvk_per_arch(panvk_instr_end_work)(
+       subqueue, cmdbuf, PANVK_INSTR_WORK_TYPE_CMDBUF, &instr_info_cmdbuf);
+ 
++   panvk_per_arch(kbase_mark_progress)(
++      cmdbuf, subqueue, PANVK_KBASE_PROGRESS_CMDBUF_DONE);
+    cs_end(&cmdbuf->state.cs[subqueue].builder);
+ }
+ 
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_dispatch.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_dispatch.c
+@@ -215,6 +215,9 @@
+ 
+    struct cs_builder *b = panvk_get_cs_builder(cmdbuf, PANVK_SUBQUEUE_COMPUTE);
+ 
++   panvk_per_arch(kbase_mark_progress)(
++      cmdbuf, PANVK_SUBQUEUE_COMPUTE,
++      PANVK_KBASE_PROGRESS_COMPUTE_ENTER);
+    cs_update_compute_ctx(b) {
+       if (compute_state_dirty(cmdbuf, CS) ||
+           compute_state_dirty(cmdbuf, DESC_STATE))
+@@ -296,9 +299,16 @@
+       }
+    }
+ 
++   panvk_per_arch(kbase_mark_progress)(
++      cmdbuf, PANVK_SUBQUEUE_COMPUTE,
++      PANVK_KBASE_PROGRESS_COMPUTE_BEFORE_ITER);
+    cs_next_iter_sb(cmdbuf, PANVK_SUBQUEUE_COMPUTE,
+                    cs_scratch_reg_tuple(b, 0, 2));
+ 
++   panvk_per_arch(kbase_mark_progress)(
++      cmdbuf, PANVK_SUBQUEUE_COMPUTE,
++      PANVK_KBASE_PROGRESS_COMPUTE_BEFORE_RUN);
++
+    panvk_cond_render(cmdbuf, b)
+    {
+       if (indirect) {
+@@ -325,8 +335,15 @@
+       }
+    }
+ 
++   panvk_per_arch(kbase_mark_progress)(
++      cmdbuf, PANVK_SUBQUEUE_COMPUTE,
++      PANVK_KBASE_PROGRESS_COMPUTE_AFTER_RUN);
+    panvk_per_arch(cmd_signal_barrier)(cmdbuf, info->barrier);
+ 
++   panvk_per_arch(kbase_mark_progress)(
++      cmdbuf, PANVK_SUBQUEUE_COMPUTE,
++      PANVK_KBASE_PROGRESS_COMPUTE_AFTER_SIGNAL);
++
+    clear_dirty_after_dispatch(cmdbuf);
+ }
+ 
+--- a/src/panfrost/vulkan/csf/panvk_cmd_buffer.h
++++ b/src/panfrost/vulkan/csf/panvk_cmd_buffer.h
+@@ -58,6 +51,34 @@
+    uint32_t pad;
+ };
+ 
++enum panvk_kbase_progress_marker {
++   PANVK_KBASE_PROGRESS_CMDBUF_START = 0x001,
++
++   PANVK_KBASE_PROGRESS_VT_BEFORE_RUN_IDVS = 0b10,
++   PANVK_KBASE_PROGRESS_VT_AFTER_RUN_IDVS = 0b100,
++   PANVK_KBASE_PROGRESS_VT_BEFORE_FINISH_TILING = 0b1000,
++   PANVK_KBASE_PROGRESS_VT_AFTER_FINISH_TILING = 0b10000,
++   PANVK_KBASE_PROGRESS_VT_AFTER_VT_END = 0b100000,
++   PANVK_KBASE_PROGRESS_VT_AFTER_SYNC_SIGNAL = 0b1000000,
++
++   PANVK_KBASE_PROGRESS_FRAG_ENTER = 1<<1,
++   PANVK_KBASE_PROGRESS_FRAG_BEFORE_TILING_WAIT = 1<<2,
++   PANVK_KBASE_PROGRESS_FRAG_AFTER_TILING_WAIT = 1<<3,
++   PANVK_KBASE_PROGRESS_FRAG_BEFORE_RUN = 1<<4,
++   PANVK_KBASE_PROGRESS_FRAG_AFTER_RUN = 1<<5,
++   PANVK_KBASE_PROGRESS_FRAG_AFTER_FINISH = 1<<6,
++
++   PANVK_KBASE_PROGRESS_COMPUTE_ENTER = 1<<1,
++   PANVK_KBASE_PROGRESS_COMPUTE_BEFORE_ITER = 1<<2,
++   PANVK_KBASE_PROGRESS_COMPUTE_BEFORE_RUN = 1<<3,
++   PANVK_KBASE_PROGRESS_COMPUTE_AFTER_RUN = 1<<4,
++   PANVK_KBASE_PROGRESS_COMPUTE_AFTER_SIGNAL = 1<<5,
++
++   PANVK_KBASE_PROGRESS_FINISH_BEFORE_WAIT = 1<<28,
++   PANVK_KBASE_PROGRESS_FINISH_AFTER_WAIT = 1<<29,
++   PANVK_KBASE_PROGRESS_CMDBUF_DONE = 1<<30,
++};
++
+ struct panvk_cs_desc_ringbuf {
+    uint64_t syncobj;
+    uint64_t ptr;
+@@ -566,6 +562,9 @@
+       struct panvk_cs_state cs[PANVK_SUBQUEUE_COUNT];
+       struct panvk_tls_state tls;
+       bool contains_timestamp_queries;
++      /* CPU-side estimate used by the kbase queue to choose a conservative
++       * tiler-heap renewal cadence. */
++      uint64_t tiler_work_estimate;
+ 
+       struct panvk_cond_render_state cond_render;
+    } state;
+@@ -1001,6 +1000,10 @@
+ void panvk_per_arch(emit_barrier)(struct panvk_cmd_buffer *cmdbuf,
+                                   struct panvk_cs_deps deps);
+ 
++void panvk_per_arch(kbase_mark_progress)(
++   struct panvk_cmd_buffer *cmdbuf, enum panvk_subqueue_id subqueue,
++   enum panvk_kbase_progress_marker marker);
++
+ #if PAN_ARCH >= 14
+ static inline void
+ cs_emit_layer_fragment_state(struct cs_builder *b, struct cs_index fbd_ptr)
+--- a/src/panfrost/vulkan/csf/panvk_cmd_buffer.h
++++ b/src/panfrost/vulkan/csf/panvk_cmd_buffer.h
+@@ -197,4 +197,5 @@
+       struct {
+          uint64_t cs;
+       } tracebuf;
++   uint64_t kbase_progress_addr;
+    } debug;
+--- a/src/panfrost/vulkan/panvk_vX_physical_device.c
++++ b/src/panfrost/vulkan/panvk_vX_physical_device.c
+@@ -292,9 +292,12 @@
+ void
+ panvk_per_arch(get_physical_device_features)(
+    const struct panvk_instance *instance,
+    const struct panvk_physical_device *device, struct vk_features *features)
+ {
+-   bool has_sparse = PAN_ARCH >= 10;
++   /* The kbase backend does not have a sparse bind queue implementation yet.
++    * Do not advertise sparse support there, otherwise CTS will exercise sparse
++    * binding paths that can only fail at submit time. */
++   bool has_sparse = PAN_ARCH >= 10 && !device->kbase_node_path[0];
+ 
+    *features = (struct vk_features){
+       /* Vulkan 1.0 */

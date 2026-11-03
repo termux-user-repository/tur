@@ -1,0 +1,74 @@
+From: abhay-byte <zenithblue.dev@gmail.com>
+Subject: [PATCH csf-v11 056] panvk: cache the memory budget query for 100 ms
+Generated-by: LLM
+
+Purpose: TBD; biblioklept
+Source/Reference: TBD, work/mesa 4d495826b17
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/055
+Validation test: TBD
+
+diff --git a/src/panfrost/vulkan/panvk_physical_device.c b/src/panfrost/vulkan/panvk_physical_device.c
+index 2555e1416e2..3a85310cca9 100644
+--- a/src/panfrost/vulkan/panvk_physical_device.c
++++ b/src/panfrost/vulkan/panvk_physical_device.c
+@@ -25,6 +25,7 @@
+ 
+ #include "util/disk_cache.h"
+ #include "util/os_misc.h"
++#include "util/os_time.h"
+ #include "util/u_atomic.h"
+ #include "git_sha1.h"
+ 
+@@ -1620,6 +1621,24 @@ panvk_GetPhysicalDeviceCooperativeMatrixPropertiesKHR(
+    return vk_outarray_status(&out);
+ }
+ 
++static uint64_t
++panvk_available_system_memory(struct panvk_physical_device *physical_device)
++{
++   uint64_t now = os_time_get_nano();
++   uint64_t last = p_atomic_read(&physical_device->memory.available_ns);
++
++   if (last && now - last < 100000000ull)
++      return p_atomic_read(&physical_device->memory.available);
++
++   uint64_t available;
++   if (!os_get_available_system_memory(&available))
++      return 0;
++
++   p_atomic_set(&physical_device->memory.available, available);
++   p_atomic_set(&physical_device->memory.available_ns, now);
++   return available;
++}
++
+ VKAPI_ATTR void VKAPI_CALL
+ panvk_GetPhysicalDeviceMemoryProperties2(
+    VkPhysicalDevice physicalDevice,
+@@ -1659,8 +1678,9 @@ panvk_GetPhysicalDeviceMemoryProperties2(
+          p->heapUsage[0] = used;
+ 
+          /* Set the budget at 90% of available to avoid thrashing */
+-         p->heapBudget[0] = vk_physical_device_heap_budget_from_system(
+-            &physical_device->vk, 0.9f, heap_size, used);
++         p->heapBudget[0] = vk_physical_device_heap_budget(
++            panvk_available_system_memory(physical_device), 0.9f, heap_size,
++            used);
+ 
+          /* From the Vulkan 1.3.278 spec:
+           *
+diff --git a/src/panfrost/vulkan/panvk_physical_device.h b/src/panfrost/vulkan/panvk_physical_device.h
+index f840aefcd3d..bf7e00e0c56 100644
+--- a/src/panfrost/vulkan/panvk_physical_device.h
++++ b/src/panfrost/vulkan/panvk_physical_device.h
+@@ -72,6 +72,8 @@ struct panvk_physical_device {
+ 
+       uint64_t max_supported_va;
+       alignas(8) uint64_t heap_used;
++      alignas(8) uint64_t available;
++      alignas(8) uint64_t available_ns;
+    } memory;
+ 
+    struct vk_sync_type drm_syncobj_type;

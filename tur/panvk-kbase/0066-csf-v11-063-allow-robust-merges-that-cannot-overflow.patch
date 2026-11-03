@@ -1,0 +1,32 @@
+From: abhay-byte <zenithblue.dev@gmail.com>
+Subject: [PATCH csf-v11 063] nir/opt_load_store_vectorize: allow robust merges that cannot overflow
+Generated-by: LLM
+
+Purpose: TBD; biblioklept
+Source/Reference: TBD, work/mesa 16914ae7537
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/062
+Validation test: TBD
+
+diff --git a/src/compiler/nir/nir_opt_load_store_vectorize.c b/src/compiler/nir/nir_opt_load_store_vectorize.c
+index e71d43c9b28..42fdc2a6c24 100644
+--- a/src/compiler/nir/nir_opt_load_store_vectorize.c
++++ b/src/compiler/nir/nir_opt_load_store_vectorize.c
+@@ -1441,6 +1441,15 @@ check_for_robustness(struct vectorize_ctx *ctx, struct entry *low, uint64_t high
+    if (low->info->base_src < 0)
+       return true;
+ 
++   nir_def *base = low->intrin->src[low->info->base_src].ssa;
++   if (base->bit_size == 32 && base->num_components == 1 &&
++       high_offset <= UINT32_MAX && get_offset_scale(low) == 1 &&
++       (!nir_intrinsic_has_base(low->intrin) ||
++        nir_intrinsic_base(low->intrin) == 0) &&
++       !nir_addition_might_overflow(ctx->shader, &ctx->uub_ht,
++                                    nir_get_scalar(base, 0), high_offset))
++      return false;
++
+    /* Second, use information about the factors from address calculation (offset_defs_mul). These
+     * are not guaranteed to be power-of-2.
+     */

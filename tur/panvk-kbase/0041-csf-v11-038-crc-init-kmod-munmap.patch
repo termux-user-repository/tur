@@ -1,0 +1,26 @@
+From: abhay-byte <zenithblue.dev@gmail.com>
+Subject: [PATCH csf-v11 038] panvk: unmap CRC init mapping through pan_kmod_bo_munmap
+Generated-by: LLM
+
+Purpose: CRC state init unmaps through pan_kmod_bo_munmap; os_munmap tore down the kbase SAME_VA GPU mapping (CSF fault 0xc3, mmap ENOMEM on realloc)
+Source/Reference: local fix, work/mesa deef0f1aea7
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/037
+Validation test: icc.c ICC_FAILS=0 (faulted before); memprobe alloc/free loop
+
+diff --git a/src/panfrost/vulkan/panvk_image.c b/src/panfrost/vulkan/panvk_image.c
+index acaec08e90d02c09f1a3b52be0317bd4f74f65b0..a3facfb68ede2eee6b2a22e35ccd45dea3954da2 100644
+--- a/src/panfrost/vulkan/panvk_image.c
++++ b/src/panfrost/vulkan/panvk_image.c
+@@ -724,7 +724,8 @@ panvk_image_plane_bind_mem(struct panvk_device *dev,
+                                  crc_size, PAN_KMOD_BO_SYNC_CPU_CACHE_FLUSH);
+ 
+       if (temporary_map) {
+-         int ret = os_munmap(cpu_map, pan_kmod_bo_size(mem->bo));
++         int ret =
++            pan_kmod_bo_munmap(mem->bo, cpu_map, pan_kmod_bo_size(mem->bo));
+          assert(!ret);
+       }
+    }

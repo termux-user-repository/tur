@@ -1,0 +1,279 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: Wed, 7 Oct 2026 09:00:00 +0530
+Subject: [PATCH] panvk: advertise robustBufferAccess2 on v10 biblioklept
+
+robustBufferAccess2 was gated on PAN_ARCH >= 11. Most of the robust
+buffer path does not depend on v11:
+
+- SSBO and UBO loads go through LEA_PKA/LD_PKA on the Buffer
+  descriptor, which the hardware bounds checks. The descriptor's Size
+  field is the same on v9, v10 and v11 (v11 only adds Size hi).
+- SSBO stores and atomics get software bounds checks from
+  nir_lower_robust_access, which has no arch gate.
+- The UBO descriptor index is clamped, and the robust size alignments
+  (4 for storage, 16 for uniform) are the same on every arch.
+
+Texel buffers are the exception. On v9/v10 they are accessed through
+LEA_BUF and LD_CVT/ST_CVT with no bounds check, so out-of-bounds loads
+return whatever memory is there and out-of-bounds stores land outside
+the view. A v9 (Mali-G57) build with the feature forced on fails every
+robustness2 uniform_texel_buffer and storage_texel_buffer case (342),
+while every SSBO and UBO case passes.
+
+Add a software check for v9/v10 when robust buffer access is on.
+Texel buffer loads, stores and atomics (uniform texel buffers follow
+the uniform buffer robustness, storage texel buffers the storage
+buffer robustness) run only when the index is below the element count
+of the Buffer descriptor. Out-of-bounds loads return zero, with alpha
+set to 1 when the view format has no alpha channel, atomics return
+zero and stores are dropped. The format is not known at compile time,
+so pan_buffer_texture_emit records "no alpha" in bit 31 of dword 7,
+the software-only word that holds the conversion. Shaders mask that
+bit off before using the conversion. Null descriptors have size 0, so
+all their accesses take the out-of-bounds path and read zero.
+
+v11+ shaders and descriptors are unchanged. EXT_robustness2 and
+nullDescriptor are already exposed on v10, and robustImageAccess2
+stays off. With the gate at 10, Bachata S4 can admit v10 GPUs
+(robustBufferAccess2 is its only hard requirement that v10 missed).
+
+Proxy evidence: the same v9 build with this change passes all 7,823
+robustness2 buffer cases it supports, including the 342 texel buffer
+cases, see worklogs/driver-remaining/122-robustbufferaccess2-v10.md.
+No v10 hardware run yet.
+
+Purpose: robustBufferAccess2 on v10 (Mali-G610/G710/G510), Bachata S4 hard requirement
+Tested GPU: Mali-G615 MC6 (Poco X6 Pro, no change on v11); Mali-G57 MC2 (v9 proxy, feature forced on in a local build); v10 untested on hardware
+Tested Kbase UAPI: CSF 1.21 / MediaTek; JM 11.38 (v9 proxy)
+Dependencies: none
+Generated-by: LLM
+---
+diff --git a/src/panfrost/compiler/bifrost/bifrost_nir.c b/src/panfrost/compiler/bifrost/bifrost_nir.c
+index 5c961e9..0a9d7eb 100644
+--- a/src/panfrost/compiler/bifrost/bifrost_nir.c
++++ b/src/panfrost/compiler/bifrost/bifrost_nir.c
+@@ -802,6 +802,104 @@ nir_shader_has_local_variables(const nir_shader *nir)
+    return false;
+ }
+ 
++/*
++ * LEA_BUF does not bounds check texel buffer accesses on v9/v10. With robust
++ * buffer access, run them only when the index is below the element count of
++ * the Buffer descriptor. Out-of-bounds loads return zero, with alpha 1 when
++ * the format has no alpha (PAN_VA_BUF_CVT_NO_ALPHA, robustBufferAccess2),
++ * atomics return zero and stores are dropped. v11+ checks this in hardware.
++ */
++static bool
++bi_lower_robust_texel_buf(nir_builder *b, nir_instr *instr, void *data)
++{
++   const nir_variable_mode *modes = data;
++   nir_alu_type dest_type = nir_type_invalid;
++   nir_def *handle, *index, *def = NULL;
++
++   if (instr->type == nir_instr_type_intrinsic) {
++      nir_intrinsic_instr *intr = nir_instr_as_intrinsic(instr);
++
++      switch (intr->intrinsic) {
++      case nir_intrinsic_image_load:
++         dest_type = nir_intrinsic_dest_type(intr);
++         FALLTHROUGH;
++      case nir_intrinsic_image_store:
++      case nir_intrinsic_image_atomic:
++      case nir_intrinsic_image_atomic_swap:
++         break;
++      default:
++         return false;
++      }
++
++      /* Storage texel buffers follow the storage buffer robustness. */
++      if (nir_intrinsic_image_dim(intr) != GLSL_SAMPLER_DIM_BUF ||
++          !(*modes & nir_var_mem_ssbo))
++         return false;
++
++      b->cursor = nir_before_instr(instr);
++      handle = intr->src[0].ssa;
++      index = nir_channel(b, intr->src[1].ssa, 0);
++      if (nir_intrinsic_infos[intr->intrinsic].has_dest)
++         def = &intr->def;
++   } else if (instr->type == nir_instr_type_tex) {
++      nir_tex_instr *tex = nir_instr_as_tex(instr);
++
++      /* Uniform texel buffers follow the uniform buffer robustness. */
++      if (tex->op != nir_texop_txf ||
++          tex->sampler_dim != GLSL_SAMPLER_DIM_BUF ||
++          !(*modes & nir_var_mem_ubo))
++         return false;
++
++      b->cursor = nir_before_instr(instr);
++      int h = nir_tex_instr_src_index(tex, nir_tex_src_texture_handle);
++      if (h < 0)
++         h = nir_tex_instr_src_index(tex, nir_tex_src_texture_offset);
++      handle = h >= 0 ? nir_iadd_imm(b, tex->src[h].src.ssa, tex->texture_index)
++                      : nir_imm_int(b, tex->texture_index);
++      int c = nir_tex_instr_src_index(tex, nir_tex_src_coord);
++      index = nir_channel(b, tex->src[c].src.ssa, 0);
++      dest_type = tex->dest_type;
++      def = &tex->def;
++   } else {
++      return false;
++   }
++
++   /* Null descriptors have size and stride 0, so every access is out of
++    * bounds and loads return zero.
++    */
++   nir_def *size = pan_nir_load_va_desc(b, 1, 32, handle, 1 * 4);
++   nir_def *stride = pan_nir_load_va_desc(b, 1, 32, handle, 4 * 4);
++   nir_def *size_el = nir_udiv(b, size, nir_umax(b, stride, nir_imm_int(b, 1)));
++   nir_def *in_bounds = nir_ult(b, index, size_el);
++
++   nir_def *oob = NULL;
++   if (def) {
++      oob = nir_imm_zero(b, def->num_components, def->bit_size);
++      if (dest_type != nir_type_invalid && def->num_components == 4) {
++         nir_def *cvt = pan_nir_load_va_desc(b, 1, 32, handle, 7 * 4);
++         nir_def *one =
++            nir_alu_type_get_base_type(dest_type) == nir_type_float
++               ? nir_imm_floatN_t(b, 1.0, def->bit_size)
++               : nir_imm_intN_t(b, 1, def->bit_size);
++         nir_def *alpha =
++            nir_bcsel(b, nir_test_mask(b, cvt, PAN_VA_BUF_CVT_NO_ALPHA), one,
++                      nir_imm_zero(b, 1, def->bit_size));
++         oob = nir_vector_insert_imm(b, oob, alpha, 3);
++      }
++   }
++
++   nir_push_if(b, in_bounds);
++   nir_instr *clone = nir_instr_clone(b->shader, instr);
++   nir_builder_instr_insert(b, clone);
++   nir_pop_if(b, NULL);
++
++   if (def)
++      nir_def_rewrite_uses(def, nir_if_phi(b, nir_instr_def(clone), oob));
++
++   nir_instr_remove(instr);
++   return true;
++}
++
+ static bool pan_nir_lower_buf_image_access(nir_shader *nir, unsigned arch);
+ static bool bi_should_idvs(nir_shader *nir, const struct pan_compile_inputs *inputs);
+ static bool bifrost_nir_lower_vs_atomics(nir_shader *nir);
+@@ -819,6 +917,13 @@ bifrost_postprocess_nir(nir_shader *nir,
+    if (gpu_arch >= 9)
+       NIR_PASS(_, nir, pan_nir_lower_image_64bit);
+ 
++   if ((gpu_arch == 9 || gpu_arch == 10) &&
++       (inputs->robust_modes & (nir_var_mem_ssbo | nir_var_mem_ubo))) {
++      nir_variable_mode robust_modes = inputs->robust_modes;
++      NIR_PASS(_, nir, nir_shader_instructions_pass, bi_lower_robust_texel_buf,
++               nir_metadata_none, &robust_modes);
++   }
++
+    NIR_PASS(_, nir, nir_lower_image_atomics_to_global, NULL, NULL);
+ 
+    /* on Bifrost, lower MSAA load/stores to 3D load/stores */
+@@ -1084,7 +1189,7 @@ lower_buf_image_access(nir_builder *b, nir_intrinsic_instr *intr, void *data)
+    nir_def *texel_addr, *icd;
+    if (*arch >= 9) {
+       texel_addr = nir_lea_buf_pan(b, res_handle, buf_index);
+-      icd = pan_nir_load_va_buf_cvt(b, res_handle);
++      icd = pan_nir_load_va_buf_cvt(b, res_handle, *arch);
+    } else {
+       nir_def *attr = nir_lea_attr_pan(b, res_handle, buf_index,
+                                        nir_imm_int(b, 0),
+diff --git a/src/panfrost/compiler/pan_compiler.h b/src/panfrost/compiler/pan_compiler.h
+index ce64488..b71fac1 100644
+--- a/src/panfrost/compiler/pan_compiler.h
++++ b/src/panfrost/compiler/pan_compiler.h
+@@ -642,6 +642,14 @@ pan_res_handle(unsigned table, unsigned index)
+    return (table << 24) | index;
+ }
+ 
++/*
++ * Software flag in dword 7 of a v9/v10 texel buffer descriptor, next to the
++ * conversion. Set when the format has no alpha channel, so that robust
++ * out-of-bounds loads can return (0, 0, 0, 1). It is not part of the
++ * conversion and is masked off before the conversion is used.
++ */
++#define PAN_VA_BUF_CVT_NO_ALPHA BITFIELD_BIT(31)
++
+ void pan_disassemble(FILE *fp, const void *code, size_t size, uint64_t gpu_id,
+                      bool verbose);
+ 
+diff --git a/src/panfrost/compiler/pan_nir.h b/src/panfrost/compiler/pan_nir.h
+index 7c870ef..7b53fc6 100644
+--- a/src/panfrost/compiler/pan_nir.h
++++ b/src/panfrost/compiler/pan_nir.h
+@@ -79,7 +79,7 @@ pan_nir_load_va_desc(nir_builder *b, unsigned num_components, unsigned bit_size,
+ }
+ 
+ static inline nir_def *
+-pan_nir_load_va_buf_cvt(nir_builder *b, nir_def *handle)
++pan_nir_load_va_buf_cvt(nir_builder *b, nir_def *handle, unsigned arch)
+ {
+    /* Dword 7 of the buffer descriptor type is unused by hardware and is
+     * reserved for software to do whatever it wants with it.  By convention,
+@@ -87,6 +87,10 @@ pan_nir_load_va_buf_cvt(nir_builder *b, nir_def *handle)
+     */
+    nir_def *cvt = pan_nir_load_va_desc(b, 1, 32, handle, 7 * 4);
+ 
++   /* v9/v10 also keep PAN_VA_BUF_CVT_NO_ALPHA there. */
++   if (arch < 11)
++      cvt = nir_iand_imm(b, cvt, ~PAN_VA_BUF_CVT_NO_ALPHA);
++
+    /* CONSTANT 0000 L */
+    nir_def *zero_cvt = nir_imm_int(b, 95 << 12 | 231);
+    cvt = nir_bcsel(b, nir_ieq_imm(b, cvt, 0), zero_cvt, cvt);
+diff --git a/src/panfrost/compiler/pan_nir_lower_tex.c b/src/panfrost/compiler/pan_nir_lower_tex.c
+index 7aceb2d..b9a87e7 100644
+--- a/src/panfrost/compiler/pan_nir_lower_tex.c
++++ b/src/panfrost/compiler/pan_nir_lower_tex.c
+@@ -704,7 +704,7 @@ va_lower_txf_buf(nir_builder *b, nir_tex_instr *tex, uint64_t gpu_id)
+ 
+    nir_def *addr = nir_pack_64_2x32(b,
+       nir_lea_buf_pan(b, srcs.tex_h, srcs.coord));
+-   nir_def *cvt = pan_nir_load_va_buf_cvt(b, srcs.tex_h);
++   nir_def *cvt = pan_nir_load_va_buf_cvt(b, srcs.tex_h, pan_arch(gpu_id));
+    nir_def *val = nir_load_global_cvt_pan(b, tex->def.num_components,
+                                           tex->def.bit_size, addr, cvt,
+                                           tex->dest_type);
+diff --git a/src/panfrost/lib/pan_buffer.c b/src/panfrost/lib/pan_buffer.c
+index 8ffd671..b3a29ad 100644
+--- a/src/panfrost/lib/pan_buffer.c
++++ b/src/panfrost/lib/pan_buffer.c
+@@ -12,6 +12,7 @@
+  */
+ 
+ #include "pan_buffer.h"
++#include "compiler/pan_compiler.h"
+ #include "pan_desc.h"
+ #include "pan_format.h"
+ #include "pan_texture.h"
+@@ -46,6 +47,11 @@ GENX(pan_buffer_texture_emit)(const struct pan_buffer_view *bview,
+       cfg.stride = stride;
+       cfg.conversion = conv;
+    }
++
++#if PAN_ARCH < 11
++   if (!util_format_has_alpha(bview->format))
++      out->opaque[7] |= PAN_VA_BUF_CVT_NO_ALPHA;
++#endif
+ }
+ 
+ #elif PAN_ARCH >= 6
+diff --git a/src/panfrost/vulkan/panvk_vX_physical_device.c b/src/panfrost/vulkan/panvk_vX_physical_device.c
+index a9f6300..bf68afe 100644
+--- a/src/panfrost/vulkan/panvk_vX_physical_device.c
++++ b/src/panfrost/vulkan/panvk_vX_physical_device.c
+@@ -648,7 +648,7 @@ panvk_per_arch(get_physical_device_features)(
+       .pipelineExecutableInfo = true,
+ 
+       /* VK_KHR_robustness2 */
+-      .robustBufferAccess2 = PAN_ARCH >= 11,
++      .robustBufferAccess2 = PAN_ARCH >= 10,
+       .robustImageAccess2 = false,
+       .nullDescriptor = PAN_ARCH >= 10,
+ 
+--
+2.51.0
+

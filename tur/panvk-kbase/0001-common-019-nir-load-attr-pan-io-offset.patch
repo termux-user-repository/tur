@@ -1,0 +1,26 @@
+From: panvk-kbase-android worker <panvk-worker@localhost>
+Subject: [PATCH common 019] nir: load_attr_pan io offset is src 2
+Generated-by: LLM
+
+Purpose: nir_get_io_offset_src(load_attr_pan) must return handle (src 2),
+ not NULL. gather_func_info was SIGSEGV on nir_src.ssa at NULL+0x18.
+ Source/Reference: Mesa nir_intrinsics.py load("attr_pan") srcs
+ {vertex_id, instance_id, handle} at 5a07217f034b3e50d8c7c7794f97a2df1742613b
+ Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+ Tested Kbase UAPI: 1.21
+ Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+ Dependencies: none
+ Validation test: tests/dxvk/vulkan/test_nir_load_attr_pan_io_offset.py
+
+diff --git a/src/compiler/nir/nir_lower_io.c b/src/compiler/nir/nir_lower_io.c
+index 5fc4c3e1e21..efba35ab6b9 100644
+--- a/src/compiler/nir/nir_lower_io.c
++++ b/src/compiler/nir/nir_lower_io.c
+@@ -1114,6 +1114,7 @@ nir_get_io_offset_src_number(const nir_intrinsic_instr *instr)
+    case nir_intrinsic_store_ssbo_intel:
+    case nir_intrinsic_store_global_amd:
+    case nir_intrinsic_global_atomic_amd:
++   case nir_intrinsic_load_attr_pan:
+       return 2;
+    case nir_intrinsic_load_ssbo_ir3:
+       /* This intrinsic has 2 offsets (src1 bytes, src2 dwords), we return the

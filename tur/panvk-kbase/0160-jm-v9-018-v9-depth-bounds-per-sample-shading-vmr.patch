@@ -1,0 +1,182 @@
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: 2026-10-11
+Subject: [PATCH jm-v9 018] panvk: v9 depth bounds emulation, per-sample shading, alpha-to-coverage and variableMultisampleRate biblioklept
+
+Purpose: Expose depthBounds and variableMultisampleRate on v9 JM for
+DXVK FL11, and close the v9 per-sample shading and alpha-to-coverage gaps.
+Depth bounds: enable the csf-v11 092/116 fragment shader emulation on v9
+(LD_TILE depth read, ds.bounds/enable/samples sysvals, SampleMask write,
+dev->depth_bounds_fs when no FS is bound). The 116 FPK/coverage rules are
+kept: an early-fragment-tests shader that writes ZS or feeds an occlusion
+query is forced to late pixel kill while bounds are enabled.
+The v9 DCD now sets Evaluate per-sample (sample shading or blend shader
+with rasterizationSamples > 1) and Alpha-to-coverage from dynamic state.
+VMR: an attachmentless draw whose rasterizationSamples differs from the
+batch sample count closes the batch (if its FBD exists) and opens a new
+one with the new count, as CSF does per render pass (Noysz 0059).
+Source/Reference: csf-v11 074/092/095/114/116 (MIT), Noysz 0059 (MIT)
+Tested GPU: build-checked (universal Android build v6-v14); G615 (v11) PanProbe regression with the universal .so; device run on Mali-G57 MC2 (gpu_id 0x90930010) pending, see worklogs/v9-jm/PROGRESS.md
+Tested Kbase UAPI: JM 11.38
+Mesa base range: 5a07217f + g615-v11-csf series + jm-v9 001-017
+Dependencies: jm-v9 001-017
+Validation test: PanProbe depth_bounds, vmr_secondary, sample_shading (pending G57)
+
+---
+diff --git a/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c
+index 2519522..0f0a236 100644
+--- a/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c
+@@ -2435,6 +2435,39 @@ v9_emit_malloc_vertex_job(struct panvk_cmd_buffer *cmdbuf,
+             late_zs ? MALI_PIXEL_KILL_FORCE_LATE : MALI_PIXEL_KILL_FORCE_EARLY;
+          cfg.flags_0.zs_update_operation =
+             late_zs ? MALI_PIXEL_KILL_FORCE_LATE : MALI_PIXEL_KILL_FORCE_EARLY;
++         /* Depth bounds emulation (csf-v11 092/116): the lowered FS reads the
++          * tile depth and clears SampleMask bits outside the bounds, which
++          * already makes ZS late without EarlyFragmentTests. With them, an
++          * early update would let the FS read its own depth and keep the
++          * writes of samples outside the bounds: test early, update after
++          * the FS. Not when the app FS discards, writes SampleMask or uses
++          * alpha-to-coverage (those must not gate EFT ZS writes). Same
++          * condition as the ds.enable sysval. */
++         const bool db_on = fs->fs.depth_bounds &&
++                            dyns->ds.depth.bounds_test.enable &&
++                            (cmdbuf->state.gfx.render.bound_attachments &
++                             MESA_VK_RP_ATTACHMENT_DEPTH_BIT);
++         const bool writes_zs_or_oq =
++            ((cmdbuf->state.gfx.render.bound_attachments &
++              MESA_VK_RP_ATTACHMENT_DEPTH_BIT) &&
++             dyns->ds.depth.test_enable && dyns->ds.depth.write_enable) ||
++            ((cmdbuf->state.gfx.render.bound_attachments &
++              MESA_VK_RP_ATTACHMENT_STENCIL_BIT) &&
++             dyns->ds.stencil.test_enable) ||
++            cmdbuf->state.gfx.occlusion_query.mode !=
++               MALI_OCCLUSION_MODE_DISABLED;
++         if (db_on && fs->info.fs.early_fragment_tests && writes_zs_or_oq &&
++             !fs->info.fs.can_discard && !fs->fs.depth_bounds_app_mask &&
++             !dyns->ms.alpha_to_coverage_enable)
++            cfg.flags_0.zs_update_operation = MALI_PIXEL_KILL_FORCE_LATE;
++         /* Per-sample shading (sampleShadingEnable, gl_SampleID and friends),
++          * and with MSAA for a blend shader, which writes one sample at a
++          * time: CSF build_dcd_flags(). After Noysz/panvk-g99-jm 0059. */
++         cfg.flags_0.evaluate_per_sample =
++            (fs->info.fs.sample_shading ||
++             cmdbuf->state.gfx.cb.info.needs_shader) &&
++            dyns->ms.rasterization_samples > 1;
++         cfg.flags_0.alpha_to_coverage = dyns->ms.alpha_to_coverage_enable;
+          /* the GPU must wait for the shader's coverage (discard,
+           * sample mask, alpha-to-coverage) before updating depth/stencil. */
+          cfg.flags_0.shader_modifies_coverage = !v61a_no_smc() &&
+@@ -4121,9 +4154,38 @@ v9_count_draw_queries(struct panvk_cmd_buffer *cmdbuf,
+  * gl_Layer), each copy with its own tiler context and the view or layer in
+  * the layer_id sysval. The fragment jobs are emitted per layer when the
+  * batch is closed. */
++/* variableMultisampleRate: an attachment-less pass takes the sample count of
++ * its draws. The FBD and tiler context of a batch have one, so a draw with
++ * another count closes the batch (its fragment job keeps the old count) and
++ * the next one is laid out with the new count. Secondaries are replayed into
++ * the primary on JM, so this covers them too. The JM form of csf-v11
++ * 074/095/114. */
++static void
++v9_attachmentless_samples(struct panvk_cmd_buffer *cmdbuf)
++{
++   struct panvk_rendering_state *render = &cmdbuf->state.gfx.render;
++   const struct vk_dynamic_graphics_state *dyns =
++      &cmdbuf->vk.dynamic_graphics_state;
++   const uint32_t samples = MAX2(dyns->ms.rasterization_samples, 1);
++
++   if (render->bound_attachments || dyns->rs.rasterizer_discard_enable ||
++       samples == render->fb.nr_samples)
++      return;
++
++   if (cmdbuf->cur_batch && cmdbuf->cur_batch->fb.desc.gpu) {
++      panvk_per_arch(cmd_close_batch)(cmdbuf);
++      panvk_per_arch(cmd_open_batch)(cmdbuf);
++   }
++   render->fb.nr_samples = samples;
++   /* cmd_select_tile_size() picks the tile size for the new count. */
++   render->fb.layout.sample_count = 0;
++}
++
+ static void
+ v9_cmd_draw(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info *info)
+ {
++   v9_attachmentless_samples(cmdbuf);
++
+    uint32_t view_mask = cmdbuf->state.gfx.render.view_mask;
+    uint32_t layer_count = view_mask ? util_bitcount(view_mask)
+                                     : cmdbuf->state.gfx.render.layer_count;
+diff --git a/src/panfrost/vulkan/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/panvk_vX_cmd_draw.c
+index f66c9ed..b2b80c8 100644
+--- a/src/panfrost/vulkan/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/panvk_vX_cmd_draw.c
+@@ -993,7 +993,7 @@ panvk_per_arch(cmd_prepare_draw_sysvals)(struct panvk_cmd_buffer *cmdbuf,
+    panvk_upload_prerast_viewports(cmdbuf, dirty_sysvals);
+ #endif
+ 
+-#if PAN_ARCH >= 10
++#if PAN_ARCH >= 9
+    {
+       const struct vk_depth_stencil_state *dss =
+          &cmdbuf->vk.dynamic_graphics_state.ds;
+diff --git a/src/panfrost/vulkan/panvk_vX_physical_device.c b/src/panfrost/vulkan/panvk_vX_physical_device.c
+index 3cf68c9..0a9fd1f 100644
+--- a/src/panfrost/vulkan/panvk_vX_physical_device.c
++++ b/src/panfrost/vulkan/panvk_vX_physical_device.c
+@@ -327,7 +327,7 @@ panvk_per_arch(get_physical_device_features)(
+       .depthClamp = true,
+       .depthBiasClamp = true,
+       .fillModeNonSolid = PAN_ARCH >= 10,
+-      .depthBounds = PAN_ARCH >= 10,
++      .depthBounds = PAN_ARCH >= 9,
+       .wideLines = true,
+       .largePoints = true,
+       .alphaToOne = PAN_ARCH >= 10,
+@@ -374,7 +374,7 @@ panvk_per_arch(get_physical_device_features)(
+       .sparseResidency8Samples = false,
+       .sparseResidency16Samples = false,
+       .sparseResidencyAliased = false, /* https://gitlab.freedesktop.org/panfrost/mesa/-/issues/237 */
+-      .variableMultisampleRate = PAN_ARCH >= 10,
++      .variableMultisampleRate = PAN_ARCH >= 9,
+       .inheritedQueries = false,
+ 
+       /* Vulkan 1.1 */
+diff --git a/src/panfrost/vulkan/panvk_vX_shader.c b/src/panfrost/vulkan/panvk_vX_shader.c
+index f2a6e7f..53778f6 100644
+--- a/src/panfrost/vulkan/panvk_vX_shader.c
++++ b/src/panfrost/vulkan/panvk_vX_shader.c
+@@ -2351,7 +2351,7 @@ panvk_gpu_prerast_gs_passthrough_nir(const nir_shader_compiler_options *options,
+ #undef GS_PARAM
+ #endif
+ 
+-#if PAN_ARCH >= 10
++#if PAN_ARCH >= 9
+ /* The FS tests the depth bounds against the tile-resident depth. Lowered
+  * whenever the test may be on: statically enabled, or dynamic.
+  */
+@@ -2482,7 +2482,7 @@ panvk_hash_state(struct vk_physical_device *device,
+       if (state->ial)
+          _mesa_blake3_update(&blake3_ctx, state->ial, sizeof(*state->ial));
+ 
+-#if PAN_ARCH >= 10
++#if PAN_ARCH >= 9
+       bool depth_bounds = panvk_depth_bounds_lowered(enabled_features, state);
+       _mesa_blake3_update(&blake3_ctx, &depth_bounds, sizeof(depth_bounds));
+       bool non_solid = (stages & VK_SHADER_STAGE_VERTEX_BIT) && state->rs &&
+@@ -3861,7 +3861,7 @@ panvk_compile_shader(struct panvk_device *dev,
+                &variant->fs.tile_image_z_read,
+                &variant->fs.tile_image_s_read);
+ 
+-#if PAN_ARCH >= 10
++#if PAN_ARCH >= 9
+       if (panvk_depth_bounds_lowered(&dev->vk.enabled_features, state)) {
+          variant->fs.depth_bounds_app_mask = panvk_lower_depth_bounds(nir);
+          variant->fs.depth_bounds = true;
+@@ -4861,7 +4861,7 @@ static const struct vk_shader_ops panvk_shader_ops = {
+ VkResult
+ panvk_per_arch(create_depth_bounds_fs)(struct panvk_device *dev)
+ {
+-#if PAN_ARCH >= 10
++#if PAN_ARCH >= 9
+    if (!dev->vk.enabled_features.depthBounds)
+       return VK_SUCCESS;
+ 

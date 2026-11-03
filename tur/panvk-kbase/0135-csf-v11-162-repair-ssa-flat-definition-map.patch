@@ -1,0 +1,180 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: Wed, 7 Oct 2026 20:00:00 +0530
+Subject: [PATCH] pan/bi: repair SSA with one flat definition map instead of a hash table per block biblioklept
+
+bi_repair_ssa() records the definition of every variable at the end of
+every block it passes, in one mesa hash_table_u64 per block with a
+ralloc'd copy of each bi_index. On shaders with many blocks (DXVK D3D9
+shaders under GPL turn spec constants into runtime branches) this was
+about half of the SSA spiller's time.
+
+Use one open-addressing map keyed by (block, variable) holding the
+bi_index inline. Lookups and inserts behave the same, so the output is
+identical on all 67539 corpus shaders. Host: SSA repair 12.4 -> 3.1 ms
+on 18 NFS-range synthetic shaders, 375 -> 131 ms on 65 very large ones.
+---
+diff --git a/src/panfrost/compiler/bifrost/bi_repair_ssa.c b/src/panfrost/compiler/bifrost/bi_repair_ssa.c
+--- a/src/panfrost/compiler/bifrost/bi_repair_ssa.c
++++ b/src/panfrost/compiler/bifrost/bi_repair_ssa.c
+@@ -11,7 +11,6 @@
+  * https://link.springer.com/content/pdf/10.1007/978-3-642-37051-9_6.pdf
+  */
+ 
+-#include "util/hash_table.h"
+ #include "util/ralloc.h"
+ #include "util/u_dynarray.h"
+ #include "bi_builder.h"
+@@ -21,14 +20,57 @@
+ struct repair_block {
+    /* For a loop header, whether phis operands have been added */
+    bool sealed;
++};
+ 
+-   /* Sparse map: variable name -> bi_index.
+-    *
+-    * Definition of a variable at the end of the block.
+-    */
+-   struct hash_table_u64 *defs;
++/* Sparse map: (block, variable name) -> bi_index, the definition of a
++ * variable at the end of a block. Open addressing; a key is never 0 as
++ * variables are offset by 1.
++ */
++struct repair_map {
++   uint64_t *keys;
++   bi_index *vals;
++   unsigned cap, count;
+ };
+ 
++static inline uint64_t
++repair_map_key(bi_block *block, unsigned node)
++{
++   return ((uint64_t)block->index << 32) | (node + 1);
++}
++
++static inline unsigned
++repair_map_slot(const struct repair_map *m, uint64_t key)
++{
++   unsigned i = (key * 0x9e3779b97f4a7c15ull) >> 32;
++
++   for (;; ++i) {
++      i &= m->cap - 1;
++      if (m->keys[i] == key || !m->keys[i])
++         return i;
++   }
++}
++
++static void
++repair_map_grow(struct repair_map *m)
++{
++   struct repair_map old = *m;
++
++   m->cap = MAX2(old.cap * 2, 1024);
++   m->keys = calloc(m->cap, sizeof(*m->keys));
++   m->vals = malloc(m->cap * sizeof(*m->vals));
++
++   for (unsigned i = 0; i < old.cap; ++i) {
++      if (old.keys[i]) {
++         unsigned j = repair_map_slot(m, old.keys[i]);
++         m->keys[j] = old.keys[i];
++         m->vals[j] = old.vals[i];
++      }
++   }
++
++   free(old.keys);
++   free(old.vals);
++}
++
+ struct repair_ctx {
+    bi_context *shader;
+ 
+@@ -37,6 +79,8 @@ struct repair_ctx {
+ 
+    /* Information on blocks indexed in source order */
+    struct repair_block *blocks;
++
++   struct repair_map *defs;
+ };
+ 
+ static inline struct repair_block *
+@@ -58,9 +102,19 @@ record_write(struct repair_ctx *ctx, bi_block *block, unsigned node,
+    val.neg = false;
+    val.abs = false;
+ 
+-   struct hash_table_u64 *defs = repair_block(ctx, block)->defs;
+-   _mesa_hash_table_u64_insert(defs, node,
+-                               ralloc_memdup(defs, &val, sizeof(val)));
++   struct repair_map *m = ctx->defs;
++   if ((m->count + 1) * 2 > m->cap)
++      repair_map_grow(m);
++
++   uint64_t key = repair_map_key(block, node);
++   unsigned i = repair_map_slot(m, key);
++
++   if (!m->keys[i]) {
++      m->keys[i] = key;
++      m->count++;
++   }
++
++   m->vals[i] = val;
+ }
+ 
+ static void add_phi_operands(struct repair_ctx *ctx, bi_block *block,
+@@ -73,11 +127,15 @@ resolve_read(struct repair_ctx *ctx, bi_block *block, bi_index node)
+ 
+    /* Local value numbering */
+    assert(node.type == BI_INDEX_NORMAL);
+-   bi_index *local = _mesa_hash_table_u64_search(rb->defs, node.value);
++   struct repair_map *m = ctx->defs;
+ 
+-   if (local) {
+-      assert(!bi_is_null(*local));
+-      return *local;
++   if (m->cap) {
++      unsigned i = repair_map_slot(m, repair_map_key(block, node.value));
++
++      if (m->keys[i]) {
++         assert(!bi_is_null(m->vals[i]));
++         return m->vals[i];
++      }
+    }
+ 
+    /* Global value numbering. readValueRecursive in the paper */
+@@ -245,11 +303,7 @@ bi_repair_ssa(bi_context *ctx)
+    struct repair_block *blocks =
+       rzalloc_array(NULL, struct repair_block, ctx->num_blocks);
+ 
+-   bi_foreach_block(ctx, block) {
+-      struct repair_block *rb = &blocks[block->index];
+-      rb->defs = _mesa_hash_table_u64_create(blocks);
+-   }
+-
++   struct repair_map defs = {0};
+    unsigned n = ctx->ssa_alloc;
+ 
+    bi_foreach_block(ctx, block) {
+@@ -257,6 +311,7 @@ bi_repair_ssa(bi_context *ctx)
+          .shader = ctx,
+          .n = n,
+          .blocks = blocks,
++         .defs = &defs,
+       };
+ 
+       bi_foreach_instr_in_block(block, I) {
+@@ -321,6 +376,7 @@ bi_repair_ssa(bi_context *ctx)
+                .shader = ctx,
+                .n = n,
+                .blocks = blocks,
++               .defs = &defs,
+             };
+ 
+             bi_replace_src(phi, s,
+@@ -330,6 +386,8 @@ bi_repair_ssa(bi_context *ctx)
+    }
+ 
+    ralloc_free(blocks);
++   free(defs.keys);
++   free(defs.vals);
+ 
+    bi_opt_trivial_phi(ctx);
+    bi_reindex_ssa(ctx);
