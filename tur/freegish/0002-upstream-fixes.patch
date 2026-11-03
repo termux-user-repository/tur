@@ -1,0 +1,263 @@
+Description: Backport bugfixes from upstream master for Linux/GCC/Clang and startup crash
+Author: jose1711 <jose1711@mail.ru>
+Origin: upstream, https://github.com/freegish/freegish/commits/master
+
+--- a/src/audio/audio.h
++++ b/src/audio/audio.h
+@@ -38,6 +38,7 @@
+ int streamogg(int buffernum);
+ void shutdownaudio(void);
+ void loadwav(int buffernum,char *filename);
++void loadwavs(void);
+ 
+ extern ALCcontext *alcontext;
+ extern ALCdevice *aldevice;
+--- a/src/game/animation.c
++++ b/src/game/animation.c
+@@ -27,6 +27,7 @@
+ #endif
+ 
+ #include <math.h>
++#include <stdio.h>
+ #include <string.h>
+ 
+ #include "../game/animation.h"
+--- a/src/game/config.c
++++ b/src/game/config.c
+@@ -145,7 +145,7 @@
+   for (count = 0; count < CONTROLS_LENGTH; count++){
+     control[count].joysticknum = -1;
+     for (count2 = 0; count2 < KEYALIAS_LENGTH; count2++){
+-        control[count].key[count2] = -1;
++        control[count].key[count2] = SDL_SCANCODE_UNKNOWN;
+         control[count].button[count2] = -1;
+     }
+     for (count2 = 0; count2 < 4; count2++){
+@@ -195,7 +195,7 @@
+ 
+   for (count=0;count<numkeyboardpresets;count++){
+     sprintf(tempstr,"keyboardpreset%dname=",count+1);
+-    optionreadstring(&keyboardpresets[count].name, tempstr, 32);
++    optionreadstring(keyboardpresets[count].name, tempstr, 32);
+     for (count2=0;count2<KEYALIAS_LENGTH;count2++){
+       sprintf(tempstr,"keyboardpreset%dkey%d=",count+1,count2+1);
+       optionreadint((int*)&keyboardpresets[count].key[count2],tempstr);
+@@ -203,7 +203,7 @@
+   }
+   for (count=0; count<numjoystickpresets;count++){
+     sprintf(tempstr,"joystickpreset%dname=",count+1);
+-    optionreadstring(&joystickpresets[count].name, tempstr, 32);
++    optionreadstring(joystickpresets[count].name, tempstr, 32);
+     sprintf(tempstr,"joystickpreset%djoysticknum=",count+1);
+     optionreadint(&joystickpresets[count].joysticknum,tempstr);
+ 
+@@ -218,6 +218,9 @@
+       optionreadint(&joystickpresets[count].button[count2],tempstr);
+       }
+   }
++  // menus read control[0] before any presets are bound to players
++  control[0] = keyboardpresets[0];
++
+   optionreadint(&versus_numplayers,"versus_numplayers=");
+   for (count=0; count<versus_numplayers;count++){
+     sprintf(tempstr,"versus_is_joystick%d=",count+1);
+@@ -301,7 +304,7 @@
+     optionwriteint(fp, &joystickpresets[count].joysticknum,tempstr);
+ 
+     for (count2=0;count2<KEYALIAS_LENGTH;count2++)
+-        joystickpresets[count].key[count2] = -1;
++        joystickpresets[count].key[count2] = SDL_SCANCODE_UNKNOWN;
+     for (count2=0;count2<4;count2++)
+       {
+       sprintf(tempstr,"joystickpreset%daxis%d=",count+1,count2+1);
+--- a/src/game/custom.c
++++ b/src/game/custom.c
+@@ -157,7 +157,7 @@
+   int pagenum;
+   char path[PATH_MAX];
+ 
+-  listfiles(userpath(path,"level",NULL),"*.lvl",levellist,0);
++  listfiles(userpath(path,"level",NULL),"*.lvl",levellist,1024,0);
+ 
+   numoffiles=0;
+   while (levellist[numoffiles][0]!=0)
+@@ -253,7 +253,7 @@
+   int pagenum;
+   char path[PATH_MAX];
+ 
+-  listfiles(userpath(path,"level",NULL),"*.gmp",levellist,0);
++  listfiles(userpath(path,"level",NULL),"*.gmp",levellist,1024,0);
+ 
+   numoffiles=0;
+   while (levellist[numoffiles][0]!=0)
+--- a/src/game/options.c
++++ b/src/game/options.c
+@@ -26,12 +26,16 @@
+ #include "../game/debug.h"
+ #include "../game/config.h"
+ #include "../game/options.h"
++#include "../game/animation.h"
++#include "../game/music.h"
+ #include "../game/english.h"
+ #include "../input/keyboard.h"
+ #include "../input/mouse.h"
+ #include "../input/joystick.h"
++#include "../audio/audio.h"
+ #include "../menu/menu.h"
+ #include "../sdl/event.h"
++#include "../sdl/file.h"
+ #include "../sdl/video.h"
+ #include "../video/text.h"
+ #include "../video/texture.h"
+@@ -492,9 +496,9 @@
+             menuitem[create_button].active = 0;
+         }
+         if (menuitem[datapack_picker].active || menuitem[loaded_datapack_item].active){
+-            char path[MAX_PATH];
++            char path[PATH_MAX];
+             strcpy(path, datapacks_folder);
+-            listfiles(path,"*",known_datapacks,1);
++            listfiles(path,"*",known_datapacks,32,1);
+             num_known_datapacks=0;
+             while (known_datapacks[num_known_datapacks][0]!=0)
+               num_known_datapacks++;
+@@ -582,13 +586,13 @@
+     setmenuitem(MO_HOTKEY,SCAN_A);
+ 
+     count2=64;
+-    sprintf_s(restext, 64, "%d videomodes found", numofsdlvideomodes);
++    snprintf(restext, 64, "%d videomodes found", numofsdlvideomodes);
+     drawtext(restext, 0, 32, 16, 1.0f, 1.0f, 1.0f, 1.0f);
+     for (count=numofsdlvideomodes-1;count>=0;count--)
+     if (sdlvideomode[count].resolutionx>=640)
+     if (sdlvideomode[count].bitsperpixel==32)
+       {
+-      sprintf_s(restext, 64, "%dx%d:%d", sdlvideomode[count].resolutionx, sdlvideomode[count].resolutiony, sdlvideomode[count].bitsperpixel);
++      snprintf(restext, 64, "%dx%d:%d", sdlvideomode[count].resolutionx, sdlvideomode[count].resolutiony, sdlvideomode[count].bitsperpixel);
+       createmenuitem(restext,0,count2,16,1.0f,1.0f,1.0f,1.0f);
+       setmenuitem(MO_SET,&videomodenum,count);
+ 
+--- a/src/game/replay.c
++++ b/src/game/replay.c
+@@ -196,7 +196,7 @@
+   int pagenum;
+   char path[PATH_MAX];
+ 
+-  listfiles(userpath(path,"replay",NULL),"*.gre",levellist,0);
++  listfiles(userpath(path,"replay",NULL),"*.gre",levellist,1024,0);
+ 
+   numoffiles=0;
+   while (levellist[numoffiles][0]!=0)
+--- a/src/main.c
++++ b/src/main.c
+@@ -180,8 +180,7 @@
+     {
+     notsupportedmenu();
+ 
+-    SDL_MinimizeWindow(globalwindow);
+-    SDL_Quit();
++    shutdownvideo();
+     return(0);
+     }
+     
+@@ -200,8 +199,7 @@
+   if (config.sound)
+     shutdownaudio();
+ 
+-  SDL_MinimizeWindow(globalwindow);
+-  SDL_Quit();
++  shutdownvideo();
+ 
+   return(0);
+   }
+--- a/src/sdl/file.c
++++ b/src/sdl/file.c
+@@ -65,7 +65,7 @@
+   return(1);
+   }
+ 
+-void listfiles(char *path,char *filespec,char filelist[1024][32],int directories)
++void listfiles(char *path,char *filespec,char filelist[][32],int maxfiles,int directories)
+   {
+ #ifdef WINDOWS
+   int count,count2;
+@@ -81,7 +81,7 @@
+ 
+   count=0;
+   count2=handle;
+-  while (count2!=-1 && count<1024)
++  while (count2!=-1 && count<maxfiles-1)
+     {
+     if (!directories)
+       {
+@@ -124,7 +124,7 @@
+   count=0;
+   if (dfd!=NULL)
+     {
+-    while ((dp=readdir(dfd))!=NULL)
++    while (count<maxfiles-1 && (dp=readdir(dfd))!=NULL)
+       {
+       strncpy(path+len+1,dp->d_name,PATH_MAX-len-1);
+       path[PATH_MAX-1] = '\0'; /* Safety first! */
+--- a/src/sdl/file.h
++++ b/src/sdl/file.h
+@@ -25,7 +25,7 @@
+ 
+ int comparestrings(const void *arg1,const void *arg2);
+ int checkfilespec(char *filespec,char *filename);
+-void listfiles(char *path,char *filespec,char filelist[1024][32],int directories);
++void listfiles(char *path,char *filespec,char filelist[][32],int maxfiles,int directories);
+ extern size_t (*fread2)(void *,size_t,size_t,FILE *);
+ extern size_t (*fwrite2)(const void *,size_t,size_t,FILE *);
+ size_t freadswap(void *ptr,size_t psize,size_t pnum,FILE *pfp);
+--- a/src/sdl/video.c
++++ b/src/sdl/video.c
+@@ -88,3 +88,18 @@
+         }
+     }
+   }
++
++void shutdownvideo(void)
++  {
++  if (globalwindow!=NULL)
++    {
++    // leave fullscreen first so the desktop video mode gets restored
++    SDL_SetWindowFullscreen(globalwindow, 0);
++    if (glcontext!=NULL)
++      SDL_GL_DeleteContext(glcontext);
++    SDL_DestroyWindow(globalwindow);
++    glcontext=NULL;
++    globalwindow=NULL;
++    }
++  SDL_Quit();
++  }
+--- a/src/sdl/video.h
++++ b/src/sdl/video.h
+@@ -25,6 +25,7 @@
+ #include "../sdl/video.h"
+ 
+ void listvideomodes(void);
++void shutdownvideo(void);
+ 
+ typedef struct
+   {
+--- a/src/video/texture.c
++++ b/src/video/texture.c
+@@ -38,6 +38,8 @@
+ #include "../game/animation.h"
+ #include "../game/english.h" // just for drawing Loading... when loading all textures
+ #include "../game/options.h"
++#include "../game/mainmenu.h"
++#include "../game/lighting.h"
+ #include "../game/debug.h"
+ #include "../sdl/endian.h"
+ #include "../sdl/file.h"
+@@ -627,7 +629,7 @@
+ 	for (int foldercount = 0; foldercount < 8; foldercount++)
+ 	for (int extensioncount = 0; extensioncount < 2; extensioncount++){
+ 		strcpy(current_folder, folders[foldercount]);
+-	    listfiles(current_folder, extensions[extensioncount], texturelist, 0); // should memset 0 texturelist or not??
++	    listfiles(current_folder, extensions[extensioncount], texturelist, 1024, 0); // should memset 0 texturelist or not??
+ 	    numoftextures = 0;
+         while (texturelist[numoftextures][0]!=0)
+             numoftextures++;
