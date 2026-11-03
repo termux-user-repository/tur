@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="model/vnd.blockbench.bbmodel">
+    <comment>Blockbench Project</comment>
+    <glob pattern="*.bbmodel"/>
+  </mime-type>
+</mime-info>
