@@ -1,0 +1,20 @@
+Description: Install datapacks directory instead of obsolete directories
+ Since assets were moved into datapacks/freegish, install the datapacks
+ directory directly so cmake install does not fail looking for missing
+ animation, level, sound, and texture directories.
+Author: Fervi (IntinteDAO) <lordfervi@protonmail.com>
+
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -19,10 +19,7 @@
+     set(EXECUTABLE_OUTPUT_PATH "${PROJECT_SOURCE_DIR}")
+ endif()
+ 
+-install(DIRECTORY animation DESTINATION share/freegish)
+-install(DIRECTORY level DESTINATION share/freegish)
+-install(DIRECTORY sound DESTINATION share/freegish)
+-install(DIRECTORY texture DESTINATION share/freegish)
++install(DIRECTORY datapacks DESTINATION share/freegish)
+ install(FILES "freegish.bmp" DESTINATION share/freegish)
+ install(FILES "icons/freegish.svg" DESTINATION share/icons/hicolor/scalable/apps)
+ install(FILES "icons/freegish.xpm" DESTINATION share/pixmaps)
