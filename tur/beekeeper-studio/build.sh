@@ -4,11 +4,11 @@ TERMUX_PKG_LICENSE="GPL-3.0, custom"
 TERMUX_PKG_LICENSE_FILE="LICENSE.md, LICENSE-COMMERCIAL.md"
 TERMUX_PKG_MAINTAINER="Gouranga Das Samrat <gouranga.das.khulna@gmail.com>"
 TERMUX_PKG_VERSION="6.2.0"
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_REVISION=2
 TERMUX_PKG_SRCURL="https://github.com/beekeeper-studio/beekeeper-studio/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz"
 TERMUX_PKG_SHA256=cac9dfd4c8bf44608baaa4bc03dccc768926610c8239f4e586b67fc47df3f926
-TERMUX_PKG_DEPENDS="electron42, libx11"
-TERMUX_PKG_BUILD_DEPENDS="electron42-headers, pkg-config, yarn"
+TERMUX_PKG_DEPENDS="electron43, libx11"
+TERMUX_PKG_BUILD_DEPENDS="electron43-headers, pkg-config, yarn"
 TERMUX_PKG_BUILD_IN_SRC=true
 # Chromium/Electron don't support i686 on Linux.
 TERMUX_PKG_EXCLUDED_ARCHES="i686"
