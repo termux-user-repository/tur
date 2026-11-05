@@ -1,0 +1,26 @@
+Description: Remove duplicate __stack_chk_guard definition
+ Upstream hardcoded a custom __stack_chk_guard, which collides with Bionic's
+ stack protector implementation and breaks PIE linking on 32-bit ARM.
+Author: Fervi (IntinteDAO) <lordfervi@protonmail.com>
+
+--- a/rte/src/brux/global.hpp
++++ b/rte/src/brux/global.hpp
+@@ -31,7 +31,6 @@
+ 
+ #define pi 3.14159265f
+ 
+-extern int __stack_chk_guard;
+ extern bool gvQuit;
+ extern int gvMouseX;
+ extern int gvMouseY;
+--- a/rte/src/brux/global.cpp
++++ b/rte/src/brux/global.cpp
+@@ -25,8 +25,6 @@
+ #include "brux/text.hpp"
+ #include "brux/shapes.hpp"
+ 
+-int __stack_chk_guard = 0xdeadbeef;
+-
+ // Used to detect a request to close the application
+ 
+ bool gvQuit = false;

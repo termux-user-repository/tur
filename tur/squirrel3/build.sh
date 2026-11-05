@@ -1,0 +1,10 @@
+TERMUX_PKG_HOMEPAGE="https://github.com/SuperTux/squirrel"
+TERMUX_PKG_DESCRIPTION="Lightweight, high-level, embeddable programming language (SuperTux fork)"
+TERMUX_PKG_LICENSE="MIT"
+TERMUX_PKG_MAINTAINER="@IntinteDAO"
+_COMMIT=abab32a2077397c3739c70fc8b5b22a18bc2b5de
+TERMUX_PKG_VERSION=2024.12.31
+TERMUX_PKG_SRCURL="https://github.com/SuperTux/squirrel/archive/${_COMMIT}.tar.gz"
+TERMUX_PKG_SHA256=a43f6ee60e28e7a463c3d49a4139c4fd7d6a4fec93eb5904c5ffe8ae80416fea
+TERMUX_PKG_AUTO_UPDATE=false
+TERMUX_PKG_EXTRA_CONFIGURE_ARGS="-DSQ_DISABLE_INTERPRETER=ON"
