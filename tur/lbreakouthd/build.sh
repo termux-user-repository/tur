@@ -1,0 +1,12 @@
+TERMUX_PKG_HOMEPAGE="http://lgames.sourceforge.net/LBreakoutHD/"
+TERMUX_PKG_DESCRIPTION="A classic ball-and-paddle arcade game (remake of LBreakout2)"
+TERMUX_PKG_LICENSE="GPL-3.0"
+TERMUX_PKG_MAINTAINER="@IntinteDAO"
+TERMUX_PKG_VERSION="1.2.4"
+TERMUX_PKG_SRCURL="https://downloads.sourceforge.net/lgames/lbreakouthd-${TERMUX_PKG_VERSION}.tar.gz"
+TERMUX_PKG_SHA256="4732c3852ba0030fecca65689591ac582c86af46b1a21b274640ffc6cd8fc826"
+TERMUX_PKG_AUTO_UPDATE=true
+TERMUX_PKG_DEPENDS="sdl2, sdl2-image, sdl2-mixer, sdl2-ttf"
+TERMUX_PKG_GROUPS="games"
+TERMUX_PKG_BUILD_IN_SRC=true
+TERMUX_PKG_RM_AFTER_INSTALL="var"
