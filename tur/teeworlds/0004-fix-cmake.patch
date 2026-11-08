@@ -1,0 +1,112 @@
+Description: Fix CMake cross-compilation and package detection
+Author: IntinteDAO <lordfervi@protonmail.com>
+
+--- a/CMakeLists.txt	2026-11-08 16:26:32.854064629 +0100
++++ b/CMakeLists.txt	2026-11-08 16:26:45.506687587 +0100
+@@ -1,4 +1,4 @@
+-cmake_minimum_required(VERSION 2.8)
++cmake_minimum_required(VERSION 3.5)
+ 
+ file(STRINGS src/game/version.h VERSION_LINE
+   LIMIT_COUNT 1
+@@ -287,11 +287,7 @@
+   endif()
+ endfunction()
+ 
+-if(CMAKE_CROSSCOMPILING)
+-  set(CROSSCOMPILING_NO_CMAKE_SYSTEM_PATH NO_CMAKE_SYSTEM_PATH)
+-else()
+-  set(CROSSCOMPILING_NO_CMAKE_SYSTEM_PATH)
+-endif()
++set(CROSSCOMPILING_NO_CMAKE_SYSTEM_PATH)
+ 
+ function(is_bundled VARIABLE PATH)
+   if(PATH)
+@@ -306,11 +302,7 @@
+   endif()
+ endfunction()
+ 
+-if(NOT CMAKE_CROSSCOMPILING)
+-  # Check for PkgConfig once so all the other `find_package` calls can do it
+-  # quietly.
+-  find_package(PkgConfig)
+-endif()
++find_package(PkgConfig)
+ find_package(ZLIB)
+ find_package(Crypto)
+ find_package(Freetype)
+@@ -415,8 +407,10 @@
+   find_package(X11)
+   set(PLATFORM_CLIENT_LIBS ${OPENGL_gl_LIBRARY} ${X11_X11_LIB})
+   set(PLATFORM_CLIENT_INCLUDE_DIRS ${OPENGL_INCLUDE_DIR} ${X11_X11_INCLUDE_PATH})
+-  if(TARGET_OS STREQUAL "linux")
+-    set(PLATFORM_LIBS rt) # clock_gettime for glibc < 2.17
++  if(CMAKE_SYSTEM_NAME STREQUAL "Android")
++    set(PLATFORM_LIBS m)
++  elseif(TARGET_OS STREQUAL "linux")
++    set(PLATFORM_LIBS rt m) # clock_gettime for glibc < 2.17
+   else()
+     set(PLATFORM_LIBS)
+   endif()
+--- a/cmake/FindSDL2.cmake	2026-11-08 16:26:32.856799055 +0100
++++ b/cmake/FindSDL2.cmake	2026-11-08 16:26:45.506918063 +0100
+@@ -8,10 +8,8 @@
+   endif()
+ endif()
+ 
+-if(NOT CMAKE_CROSSCOMPILING)
+-  find_package(PkgConfig QUIET)
+-  pkg_check_modules(PC_SDL2 sdl2)
+-endif()
++find_package(PkgConfig QUIET)
++pkg_check_modules(PC_SDL2 sdl2)
+ 
+ set_extra_dirs_lib(SDL2 sdl)
+ find_library(SDL2_LIBRARY
+@@ -25,7 +23,7 @@
+ # Looking for 'SDL.h' directly might accidentally find a SDL 1 instead of SDL 2
+ # installation. Look for a header file only present in SDL 2 instead.
+ find_path(SDL2_INCLUDEDIR SDL_assert.h
+-  PATH_SUFFIXES SDL
++  PATH_SUFFIXES SDL2 SDL
+   HINTS ${HINTS_SDL2_INCLUDEDIR} ${SDL2_INCLUDE_DIRS} ${PC_SDL2_INCLUDEDIR} ${PC_SDL2_INCLUDE_DIRS}
+   PATHS ${PATHS_SDL2_INCLUDEDIR}
+ )
+--- a/cmake/FindFreetype.cmake	2026-11-08 16:26:32.858992560 +0100
++++ b/cmake/FindFreetype.cmake	2026-11-08 16:26:45.507039657 +0100
+@@ -1,7 +1,5 @@
+-if(NOT CMAKE_CROSSCOMPILING)
+-  find_package(PkgConfig QUIET)
+-  pkg_check_modules(PC_FREETYPE freetype2)
+-endif()
++find_package(PkgConfig QUIET)
++pkg_check_modules(PC_FREETYPE freetype2)
+ 
+ set_extra_dirs_lib(FREETYPE freetype)
+ find_library(FREETYPE_LIBRARY
+--- a/cmake/FindWavpack.cmake	2026-11-08 16:26:32.861449367 +0100
++++ b/cmake/FindWavpack.cmake	2026-11-08 16:26:45.507160273 +0100
+@@ -1,8 +1,6 @@
+ if(NOT PREFER_BUNDLED_LIBS)
+-  if(NOT CMAKE_CROSSCOMPILING)
+-    find_package(PkgConfig QUIET)
+-    pkg_check_modules(PC_WAVPACK wavpack)
+-  endif()
++  find_package(PkgConfig QUIET)
++  pkg_check_modules(PC_WAVPACK wavpack)
+ 
+   find_library(WAVPACK_LIBRARY
+     NAMES wavpack
+--- a/cmake/FindPnglite.cmake	2026-11-08 16:26:32.863632535 +0100
++++ b/cmake/FindPnglite.cmake	2026-11-08 16:26:45.507269994 +0100
+@@ -1,8 +1,6 @@
+ if(NOT PREFER_BUNDLED_LIBS)
+-  if(NOT CMAKE_CROSSCOMPILING)
+-    find_package(PkgConfig QUIET)
+-    pkg_check_modules(PC_PNGLITE pnglite)
+-  endif()
++  find_package(PkgConfig QUIET)
++  pkg_check_modules(PC_PNGLITE pnglite)
+ 
+   find_library(PNGLITE_LIBRARY
+     NAMES pnglite
