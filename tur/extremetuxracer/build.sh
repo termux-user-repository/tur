@@ -1,0 +1,11 @@
+TERMUX_PKG_HOMEPAGE="https://sourceforge.net/projects/extremetuxracer/"
+TERMUX_PKG_DESCRIPTION="A 3D downhill racing game starring Tux, the Linux penguin"
+TERMUX_PKG_LICENSE="GPL-2.0"
+TERMUX_PKG_MAINTAINER="@IntinteDAO"
+TERMUX_PKG_VERSION="0.8.4"
+TERMUX_PKG_SRCURL="https://downloads.sourceforge.net/project/extremetuxracer/releases/${TERMUX_PKG_VERSION}/etr-${TERMUX_PKG_VERSION}.tar.xz"
+TERMUX_PKG_SHA256="fa3285cc0c755a5aff529f3f2cea3516481114c6b4b8e1ec0769feeff04773e5"
+TERMUX_PKG_AUTO_UPDATE=true
+TERMUX_PKG_DEPENDS="glu, opengl, sfml, extremetuxracer-data"
+TERMUX_PKG_GROUPS="games"
+TERMUX_PKG_RM_AFTER_INSTALL="share/doc/etr"
