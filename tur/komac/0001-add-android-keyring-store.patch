@@ -1,0 +1,11 @@
+--- a/src/token.rs
++++ b/src/token.rs
+@@ -156,6 +156,7 @@
+                 any(target_os = "linux", target_os = "freebsd", target_os = "openbsd") => {
+                     dbus_secret_service_keyring_store::Store::new()?
+                 },
+                 target_os = "macos" => apple_native_keyring_store::keychain::Store::new()?,
++                target_os = "android" => keyring_core::mock::Store::new()?,
+             });
+ 
+             DEFAULT_STORE_SET.store(true, Ordering::Relaxed);
