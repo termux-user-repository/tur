@@ -1,0 +1,14 @@
+Description: Fix multiple definition of text_input with GCC 10+ and Clang
+Author: IntinteDAO <lordfervi@protonmail.com>
+
+--- a/share/text.h
++++ b/share/text.h
+@@ -15,7 +15,7 @@
+ 
+ /*---------------------------------------------------------------------------*/
+ 
+-char text_input[MAXSTR];
++extern char text_input[MAXSTR];
+ 
+ void text_input_start(void (*cb)(int typing));
+ void text_input_stop(void);

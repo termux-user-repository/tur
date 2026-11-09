@@ -1,0 +1,23 @@
+Description: Use compiler built-in endianness macros to remove SDL dependency from binary.c
+Author: IntinteDAO <lordfervi@protonmail.com>
+
+--- a/share/binary.c
++++ b/share/binary.c
+@@ -16,7 +16,17 @@
+ #include <stdlib.h>
+ #include <string.h>
+ 
++#if defined(__BYTE_ORDER__) && defined(__ORDER_BIG_ENDIAN__)
++#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
++#define SDL_BYTEORDER 4321
++#define SDL_BIG_ENDIAN 4321
++#else
++#define SDL_BYTEORDER 1234
++#define SDL_BIG_ENDIAN 4321
++#endif
++#else
+ #include <SDL_endian.h>
++#endif
+ 
+ #include "fs.h"
+ 
