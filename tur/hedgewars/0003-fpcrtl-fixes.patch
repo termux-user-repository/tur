@@ -1,0 +1,41 @@
+Fix fpcrtl runtime for Android/Termux:
+- Include GL/glext.h and define GL_GLEXT_PROTOTYPES to provide OpenGL function prototypes.
+- Include GL.h in misc.c to resolve OpenGL symbols.
+- Fix uninitialized buffer usage in FormatDateTime.
+
+--- a/project_files/hwc/rtl/GL.h
++++ b/project_files/hwc/rtl/GL.h
+@@ -1,8 +1,13 @@
+ #pragma once
+ 
++#ifndef GL_GLEXT_PROTOTYPES
++#define GL_GLEXT_PROTOTYPES 1
++#endif
++
+ #if defined(__APPLE__) && !defined(EMSCRIPTEN)
+ #include <OpenGL/gl.h>
+ #else
+-#include "GL/gl.h"
++#include <GL/gl.h>
++#include <GL/glext.h>
+ #endif
+ 
+--- a/project_files/hwc/rtl/misc.c
++++ b/project_files/hwc/rtl/misc.c
+@@ -1,4 +1,5 @@
+ #include "misc.h"
++#include "GL.h"
+ #include <stdio.h>
+ #include <stdarg.h>
+ #include <string.h>
+--- a/project_files/hwc/rtl/sysutils.c
++++ b/project_files/hwc/rtl/sysutils.c
+@@ -83,7 +83,7 @@
+ // Semi-dummy implementation of FormatDateTime
+ string255 fpcrtl_formatDateTime(string255 FormatStr, TDateTime DateTime)
+ {
+-    string255 buffer = STRINIT(FormatStr.str);
++    string255 buffer;
+     time_t rawtime;
+     struct tm* my_tm;
+ 

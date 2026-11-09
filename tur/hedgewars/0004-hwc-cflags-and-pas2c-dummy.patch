@@ -1,0 +1,31 @@
+Description: Invoke host pas2c from PATH and adjust CFLAGS for Clang
+ In cross-compilation, pas2c is built natively during termux_step_host_build
+ and added to PATH. CMake invokes pas2c from PATH to translate the Pascal
+ engine sources to C99.
+ Also disable strict pointer warnings in Clang to allow C99 engine build.
+Author: Termux User Repository
+Forwarded: not-needed
+--- a/project_files/hwc/CMakeLists.txt
++++ b/project_files/hwc/CMakeLists.txt
+@@ -84,10 +84,9 @@
+ 
+ #invoke pas2c on main module, it will call all the others
+ add_custom_command(OUTPUT ${engine_sources}
+-                   COMMAND "${EXECUTABLE_OUTPUT_PATH}/pas2c${CMAKE_EXECUTABLE_SUFFIX}"
++                   COMMAND pas2c
+                    ARGS ${pas2c_args}
+-                   DEPENDS pas2c                     #converter tool
+-                           ${engine_sources_pas}     #original pascal file
++                   DEPENDS ${engine_sources_pas}     #original pascal file
+                   )
+ 
+ #wrap conversion for all source in this command
+@@ -100,7 +99,7 @@
+ 
+ #compile the c files
+ add_definitions(-DPAS2C)
+-add_definitions(-Werror=incompatible-pointer-types)
++add_definitions(-Wno-incompatible-pointer-types -Wno-shift-count-overflow -Wno-pointer-sign)
+ 
+ add_executable(hwengine WIN32 ${engine_sources})
+ 
