@@ -1,0 +1,16 @@
+Description: Undefine PASS_MAX before solid draw pass enum to avoid clash with Bionic limits.h
+Author: IntinteDAO <lordfervi@protonmail.com>
+
+--- a/share/solid_draw.h
++++ b/share/solid_draw.h
+@@ -28,6 +28,10 @@
+ 
+ /* Named rendering pass indices. */
+ 
++#ifdef PASS_MAX
++#undef PASS_MAX
++#endif
++
+ enum
+ {
+     PASS_OPAQUE = 0,

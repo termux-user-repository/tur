@@ -1,0 +1,109 @@
+Description: Support cross-compilation and host mapc generation in Makefile
+Author: IntinteDAO <lordfervi@protonmail.com>
+
+--- a/Makefile
++++ b/Makefile
+@@ -20,9 +20,9 @@
+ #------------------------------------------------------------------------------
+ # Paths (packagers might want to set DATADIR and LOCALEDIR)
+ 
+-USERDIR   := .neverball
+-DATADIR   := ./data
+-LOCALEDIR := ./locale
++USERDIR   ?= .neverball
++DATADIR   ?= ./data
++LOCALEDIR ?= ./locale
+ 
+ ifeq ($(PLATFORM),mingw)
+ 	USERDIR := Neverball
+@@ -40,9 +40,9 @@
+ 	CXXFLAGS := -g
+ 	CPPFLAGS :=
+ else
+-	CFLAGS   := -O2
+-	CXXFLAGS := -O2
+-	CPPFLAGS := -DNDEBUG
++	CFLAGS   ?= -O2
++	CXXFLAGS ?= -O2
++	CPPFLAGS ?= -DNDEBUG
+ endif
+ 
+ #------------------------------------------------------------------------------
+@@ -64,8 +64,10 @@
+ 
+ # Preprocessor...
+ 
+-SDL_CPPFLAGS := $(shell sdl2-config --cflags)
+-PNG_CPPFLAGS := $(shell libpng-config --cflags)
++PKG_CONFIG ?= pkg-config
++
++SDL_CPPFLAGS := $(shell $(PKG_CONFIG) --cflags sdl2 2>/dev/null || sdl2-config --cflags)
++PNG_CPPFLAGS := $(shell $(PKG_CONFIG) --cflags libpng 2>/dev/null || libpng-config --cflags)
+ 
+ ALL_CPPFLAGS := $(SDL_CPPFLAGS) $(PNG_CPPFLAGS) -Ishare
+ 
+@@ -124,8 +126,8 @@
+ #------------------------------------------------------------------------------
+ # Libraries
+ 
+-SDL_LIBS := $(shell sdl2-config --libs)
+-PNG_LIBS := $(shell libpng-config --libs)
++SDL_LIBS := $(shell $(PKG_CONFIG) --libs sdl2 2>/dev/null || sdl2-config --libs)
++PNG_LIBS := $(shell $(PKG_CONFIG) --libs libpng 2>/dev/null || libpng-config --libs)
+ 
+ ifeq ($(ENABLE_FS),stdio)
+ FS_LIBS :=
+@@ -138,7 +140,7 @@
+ # you prefer). Please be sure to  override ALL of them for each target
+ # system in the conditional parts below.
+ 
+-INTL_LIBS :=
++INTL_LIBS ?=
+ 
+ ifeq ($(ENABLE_TILT),wii)
+ 	TILT_LIBS := -lcwiimote -lbluetooth
+@@ -196,11 +198,13 @@
+ MAPC_TARG := mapc$(EXT)
+ BALL_TARG := neverball$(EXT)
+ PUTT_TARG := neverputt$(EXT)
++HOST_CC   ?= gcc
++MAPC_HOST ?= ./mapc-host$(EXT)
+ 
+ ifeq ($(PLATFORM),mingw)
+ 	MAPC := $(WINE) ./$(MAPC_TARG)
+ else
+-	MAPC := ./$(MAPC_TARG)
++	MAPC ?= $(MAPC_HOST)
+ endif
+ 
+ #------------------------------------------------------------------------------
+@@ -398,7 +402,7 @@
+ 	$(CXX) $(ALL_CXXFLAGS) $(ALL_CPPFLAGS) -MM -MP -MF $*.d -MT "$@" $<
+ 	$(CXX) $(ALL_CXXFLAGS) $(ALL_CPPFLAGS) -o $@ -c $<
+ 
+-%.sol : %.map $(MAPC_TARG)
++%.sol : %.map $(MAPC)
+ 	$(MAPC) $< data
+ 
+ %.desktop : %.desktop.in
+@@ -426,6 +430,11 @@
+ $(MAPC_TARG) : $(MAPC_OBJS)
+ 	$(CC) $(ALL_CFLAGS) -o $(MAPC_TARG) $(MAPC_OBJS) $(LDFLAGS) $(MAPC_LIBS)
+ 
++MAPC_HOST_SRCS := $(subst share/fs_physfs.c,share/fs_stdio.c,$(MAPC_OBJS:.o=.c))
++
++$(MAPC_HOST) : $(MAPC_HOST_SRCS)
++	$(HOST_CC) -O2 -Ishare -DENABLE_FS=stdio $^ -lpng -ljpeg -lm -o $@
++
+ # Work around some extremely helpful sdl-config scripts.
+ 
+ ifeq ($(PLATFORM),mingw)
+@@ -442,7 +451,7 @@
+ desktops : $(DESKTOPS)
+ 
+ clean-src :
+-	$(RM) $(BALL_TARG) $(PUTT_TARG) $(MAPC_TARG)
++	$(RM) $(BALL_TARG) $(PUTT_TARG) $(MAPC_TARG) $(MAPC_HOST)
+ 	find . \( -name '*.o' -o -name '*.d' \) -delete
+ 
+ clean : clean-src
