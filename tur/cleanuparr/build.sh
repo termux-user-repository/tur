@@ -2,14 +2,14 @@ TERMUX_PKG_HOMEPAGE="https://cleanuparr.com"
 TERMUX_PKG_DESCRIPTION="Queue cleaner and management companion for the *arr suite"
 TERMUX_PKG_LICENSE="GPL-3.0"
 TERMUX_PKG_MAINTAINER="@termux"
-TERMUX_PKG_VERSION="2.10.12"
+TERMUX_PKG_VERSION="2.11.0"
 TERMUX_PKG_SRCURL=(
 	"https://github.com/Cleanuparr/Cleanuparr/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz"
 	"https://github.com/Cleanuparr/Transmission.API.RPC/archive/1d2548c3c888a2d8b0a2bf4fbefe2f91e981e263.tar.gz"
 	"https://github.com/Cleanuparr/qbittorrent-net-client/archive/b36a3ca40c83776f9f1b86a56e46ae718e2cf96f.tar.gz"
 )
 TERMUX_PKG_SHA256=(
-	82f01f9dfd48468274fbd0b632e7868ba6b65192f1e5ef2d108592ef46faf92c
+	a66d6f18f4f1eebbee3a6f7ca1d670c7a4eba018259c389b14400b9902ee9e99
 	f300d496200dc1f35f58c1966e9aaa2442487f66b2b9b4188948d81e159488ea
 	25ff0192ff04c38fea7a9527f44c45729a0b5d206110105ee874e2a308ff1393
 )
