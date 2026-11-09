@@ -2,15 +2,19 @@ TERMUX_PKG_HOMEPAGE=https://getartcraft.com/apps/pdfcraft
 TERMUX_PKG_DESCRIPTION="PDF reader, editor and toolkit; an open-source clean-room PDF application in pure Rust"
 TERMUX_PKG_LICENSE="MIT, Apache-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="0.19.0"
+TERMUX_PKG_VERSION="0.20.0"
 TERMUX_PKG_SRCURL="https://github.com/storytold/pdfcraft/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz"
-TERMUX_PKG_SHA256=90baad3d8f54ae289bc12197c075134c8ede28f074c57d92e0f1f08354ceea70
+TERMUX_PKG_SHA256=5d5461e3b35f54d0e7b4f265d8cfb7d59910401f4ff8880aadf5f8c2b4c44747
 TERMUX_PKG_DEPENDS="libx11, libxcb, libxcursor, libxi, libxrandr, libxkbcommon, vulkan-loader-android, hicolor-icon-theme"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_AUTO_UPDATE=true
 
 termux_step_pre_configure() {
 	termux_setup_rust
+
+	mv vendor vendor-upstream
+	sed -i 's|path = "vendor/|path = "vendor-upstream/|g' Cargo.toml
+	sed -i 's|"vendor"|"vendor", "vendor-upstream"|g' Cargo.toml
 
 	cargo vendor
 	find ./vendor \
@@ -32,10 +36,6 @@ termux_step_pre_configure() {
 		! -path './vendor/epaint*' \
 		! -path './vendor/ecolor*' \
 		! -path './vendor/emath*' \
-		! -path './vendor/hayro*' \
-		! -path './vendor/krilla*' \
-		! -path './vendor/lopdf*' \
-		! -path './vendor/vello*' \
 		-exec rm -rf '{}' \;
 
 	patch -p1 -d vendor/wayland-cursor <"$TERMUX_PKG_BUILDER_DIR/wayland-cursor-no-shm.diff"

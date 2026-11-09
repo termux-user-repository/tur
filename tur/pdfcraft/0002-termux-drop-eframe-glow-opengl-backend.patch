@@ -1,9 +1,9 @@
 diff --git a/apps/pdfcraft/Cargo.toml b/apps/pdfcraft/Cargo.toml
-index 966af35..9b1bbc8 100644
+index 5e4010f..1689540 100644
 --- a/apps/pdfcraft/Cargo.toml
 +++ b/apps/pdfcraft/Cargo.toml
-@@ -16,7 +16,7 @@ pdfcraft-ui-egui = { workspace = true }
- pdfcraft-engine = { workspace = true }
+@@ -18,7 +18,7 @@ pdfcraft-engine = { workspace = true }
+ pdfcraft-platform = { workspace = true }
  # wgpu draws; OpenGL (glow) is the fallback when wgpu can't start on an old or unusual GPU or
  # driver (#461, #435, #392), and can be chosen with PDFCRAFT_RENDERER=gl.
 -eframe = { workspace = true, features = ["default_fonts", "wgpu", "glow", "accesskit", "wayland", "x11", "persistence", "links", "clipboard"] }
@@ -12,10 +12,10 @@ index 966af35..9b1bbc8 100644
  serde_json = { workspace = true }
  # Records from every crate go to standard error and the log file (src/logging.rs).
 diff --git a/apps/pdfcraft/src/main.rs b/apps/pdfcraft/src/main.rs
-index f8e4e5b..c86ada9 100644
+index 837a803..edbe9ce 100644
 --- a/apps/pdfcraft/src/main.rs
 +++ b/apps/pdfcraft/src/main.rs
-@@ -277,7 +277,7 @@ fn main() -> eframe::Result {
+@@ -271,7 +271,7 @@ fn main() -> eframe::Result {
      let apple_events = apple_events::AppleEvents::install();
      // Set once the app is created, which is after the renderer has started.
      let started = Rc::new(Cell::new(false));
@@ -24,7 +24,7 @@ index f8e4e5b..c86ada9 100644
      let result = eframe::run_native(
          "PdfCraft",
          native_options(launch.integrated, launch.window_controls.is_some(), first),
-@@ -298,7 +298,7 @@ fn main() -> eframe::Result {
+@@ -292,7 +292,7 @@ fn main() -> eframe::Result {
              log::error!("the GPU renderer (wgpu) didn't start: {e}. Starting with OpenGL instead; set PDFCRAFT_RENDERER=gl to skip wgpu.");
              eframe::run_native(
                  "PdfCraft",
@@ -34,7 +34,7 @@ index f8e4e5b..c86ada9 100644
                      launch,
                      started,
 diff --git a/apps/pdfcraft/src/tests.rs b/apps/pdfcraft/src/tests.rs
-index c6e6f36..05755cf 100644
+index 7c1f111..92279ba 100644
 --- a/apps/pdfcraft/src/tests.rs
 +++ b/apps/pdfcraft/src/tests.rs
 @@ -127,14 +127,14 @@ fn opengl_is_the_fallback_unless_a_renderer_was_chosen() {
@@ -55,3 +55,12 @@ index c6e6f36..05755cf 100644
  }
  
  #[test]
+@@ -143,7 +143,7 @@ fn the_window_and_windows_taskbar_icons_load_from_the_bundled_png() {
+     assert!(icon.width > 0 && icon.height > 0);
+     assert_eq!(icon.rgba.len(), (icon.width as usize) * (icon.height as usize) * 4);
+     #[cfg(not(target_os = "windows"))]
+-    assert_eq!(super::native_options(false, false, eframe::Renderer::Glow).viewport.icon.as_deref(), Some(&icon));
++    assert_eq!(super::native_options(false, false, eframe::Renderer::Wgpu).viewport.icon.as_deref(), Some(&icon));
+     #[cfg(target_os = "windows")]
+     {
+         // None would load eframe's default icon; only the explicit empty sentinel prevents
