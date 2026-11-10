@@ -1,0 +1,46 @@
+Author: Fervi (IntinteDAO) <lordfervi@protonmail.com>
+Subject: Fix build with OpenVDB 14
+Description: OpenVDB 14 removed delayLoad argument from openvdb::io::File::open(),
+ taking 0 arguments instead of 1.
+Forwarded: not-needed
+
+--- a/source/blender/blenkernel/intern/volume_grid_file_cache.cc
++++ b/source/blender/blenkernel/intern/volume_grid_file_cache.cc
+@@ -95,7 +95,11 @@ static FileCache create_file_cache(const
+ #  ifdef OPENVDB_USE_DELAYED_LOADING
+     file.setCopyMaxBytes(0);
+ #  endif
++#  if OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER >= 14
++    file.open();
++#  else
+     file.open(delay_load);
++#  endif
+     vdb_grids = *(file.readAllGridMetadata());
+     file_cache.meta_data = *file.getMetadata();
+   }
+@@ -194,7 +198,11 @@ openvdb::GridBase::Ptr load_grid_from_di
+ #  ifdef OPENVDB_USE_DELAYED_LOADING
+   file.setCopyMaxBytes(0);
+ #  endif
++#  if OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER >= 14
++  file.open();
++#  else
+   file.open(delay_load);
++#  endif
+   return file.readGrid(grid_name);
+ }
+ 
+--- a/intern/cycles/hydra/field.cpp
++++ b/intern/cycles/hydra/field.cpp
+@@ -33,7 +33,11 @@ class HdCyclesVolumeLoader : public VDBI
+ #  ifdef OPENVDB_USE_DELAYED_LOADING
+       file.setCopyMaxBytes(0);
+ #  endif
++#  if OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER >= 14
++      if (file.open()) {
++#  else
+       if (file.open(delay_load)) {
++#  endif
+         grid = file.readGrid(gridName);
+       }
+     }
