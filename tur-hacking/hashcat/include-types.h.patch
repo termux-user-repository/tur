@@ -1,9 +1,13 @@
-diff -uNr hashcat-6.2.6/include/types.h hashcat-6.2.6.mod/include/types.h
---- hashcat-6.2.6/include/types.h	2022-09-02 22:58:13.000000000 +0800
-+++ hashcat-6.2.6.mod/include/types.h	2023-06-10 09:57:29.232857095 +0800
-@@ -870,7 +870,7 @@
-  * structs
-  */
+Description: Rename struct user to avoid clash with Bionic sys/user.h
+ Bionic libc headers for 32-bit architectures (arm, i686) define struct user
+ in <sys/user.h>. Renaming to struct user_hashcat avoids conflicting types.
+Author: Termux User Repository
+Forwarded: not-needed
+--- a/include/types.h
++++ b/include/types.h
+@@ -1335,7 +1335,7 @@
+ 
+ } dynamicx_t;
  
 -typedef struct user
 +typedef struct user_hashcat
