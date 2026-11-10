@@ -1,0 +1,17 @@
+Author: Fervi (IntinteDAO) <lordfervi@protonmail.com>
+Subject: Replace -Weverything with -Wall for Clang
+Description: Clang's -Weverything enables all experimental diagnostics,
+ which can cause build failures across newer compiler toolchains.
+ Replace with -Wall.
+Forwarded: not-needed
+
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -253,7 +253,7 @@
+ if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+   set(warn_disable_flags
+-    "-Weverything"
++    "-Wall"
+ 
+     # Disabled warnings that are overly verbose right now or just do not make sense.
+     "-Wno-c++98-compat"
