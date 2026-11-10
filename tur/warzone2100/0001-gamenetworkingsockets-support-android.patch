@@ -1,0 +1,33 @@
+--- a/3rdparty/GameNetworkingSockets/CMakeLists.txt
++++ b/3rdparty/GameNetworkingSockets/CMakeLists.txt
+@@ -154,5 +154,5 @@ function(set_target_common_gns_properties TGT)
+-	if(CMAKE_SYSTEM_NAME MATCHES Linux)
++	if(CMAKE_SYSTEM_NAME MATCHES "Linux|Android")
+ 		target_compile_definitions(${TGT} PUBLIC LINUX)
+ 	elseif(CMAKE_SYSTEM_NAME MATCHES Darwin)
+ 		target_compile_definitions(${TGT} PUBLIC OSX)
+ 	elseif(CMAKE_SYSTEM_NAME MATCHES FreeBSD)
+--- a/3rdparty/GameNetworkingSockets/src/CMakeLists.txt
++++ b/3rdparty/GameNetworkingSockets/src/CMakeLists.txt
+@@ -289,5 +289,5 @@ macro(set_clientlib_target_properties GNS_TARGET)
+-	if(CMAKE_SYSTEM_NAME MATCHES Linux)
++	if(CMAKE_SYSTEM_NAME MATCHES "Linux|Android")
+ 		#if(USE_STEAMWEBRTC AND NOT STEAMWEBRTC_USE_STATIC_LIBS)
+ 		#	target_link_libraries(${GNS_TARGET} PRIVATE dl)
+ 		#endif()
+ 	elseif(CMAKE_SYSTEM_NAME MATCHES Darwin)
+--- a/lib/ivis_opengl/CMakeLists.txt
++++ b/lib/ivis_opengl/CMakeLists.txt
+@@ -178,3 +178,10 @@ option(WZ_USE_SYSTEM_LIBJPEG_TURBO "Build with the system libjpeg-turbo library" ${_DEFAULT_WZ_USE_SYSTEM_LIBJPEG_TURBO_VALUE})
+ if (WZ_USE_SYSTEM_LIBJPEG_TURBO)
+-	find_package(libjpeg-turbo CONFIG REQUIRED)
+-	target_link_libraries(ivis-opengl PRIVATE $<IF:$<TARGET_EXISTS:libjpeg-turbo::turbojpeg>,libjpeg-turbo::turbojpeg,libjpeg-turbo::turbojpeg-static>)
++	if (CMAKE_SYSTEM_NAME MATCHES Android)
++		find_path(LIBJPEG_TURBO_INCLUDE_DIR NAMES turbojpeg.h REQUIRED)
++		find_library(LIBJPEG_TURBO_LIBRARY NAMES turbojpeg REQUIRED)
++		target_include_directories(ivis-opengl PRIVATE "${LIBJPEG_TURBO_INCLUDE_DIR}")
++		target_link_libraries(ivis-opengl PRIVATE "${LIBJPEG_TURBO_LIBRARY}")
++	else()
++		find_package(libjpeg-turbo CONFIG REQUIRED)
++		target_link_libraries(ivis-opengl PRIVATE $<IF:$<TARGET_EXISTS:libjpeg-turbo::turbojpeg>,libjpeg-turbo::turbojpeg,libjpeg-turbo::turbojpeg-static>)
++	endif()
