@@ -1,5 +1,5 @@
 diff --git a/crates/engine/src/text_fonts.rs b/crates/engine/src/text_fonts.rs
-index 859bc1a..6b8cbf7 100644
+index e2b413d..cc4338a 100644
 --- a/crates/engine/src/text_fonts.rs
 +++ b/crates/engine/src/text_fonts.rs
 @@ -24,7 +24,7 @@ pub fn installed_directories() -> Vec<PathBuf> {
@@ -12,7 +12,7 @@ index 859bc1a..6b8cbf7 100644
              dirs.extend([home.join(".local/share/fonts"), home.join(".fonts")]);
          }
 diff --git a/crates/print/src/spool.rs b/crates/print/src/spool.rs
-index 5ce3d97..b8b7819 100644
+index a83da3e..2b4ba0c 100644
 --- a/crates/print/src/spool.rs
 +++ b/crates/print/src/spool.rs
 @@ -19,7 +19,7 @@ pub fn printer_options(printer: &str) -> Vec<PrinterOption> {
@@ -24,11 +24,24 @@ index 5ce3d97..b8b7819 100644
      }
      #[cfg(not(all(unix, not(target_arch = "wasm32"))))]
      {
+diff --git a/crates/render/src/system_font.rs b/crates/render/src/system_font.rs
+index 8fcd167..39c946c 100644
+--- a/crates/render/src/system_font.rs
++++ b/crates/render/src/system_font.rs
+@@ -265,7 +265,7 @@ fn candidates(script: Script, family: ChineseFamily, bold: bool) -> Vec<Candidat
+                 "arphic-uming/uming.ttc",
+             ],
+         };
+-        ["/usr/share/fonts", "/usr/local/share/fonts"].iter().flat_map(|dir| names.iter().map(move |f| Path::new(dir).join(f))).collect()
++        ["@TERMUX_PREFIX@/share/fonts", "@TERMUX_PREFIX@/local/share/fonts"].iter().flat_map(|dir| names.iter().map(move |f| Path::new(dir).join(f))).collect()
+     };
+     files.into_iter().map(|path| Candidate { path, region }).collect()
+ }
 diff --git a/crates/ui-egui/src/platform/system_fonts.rs b/crates/ui-egui/src/platform/system_fonts.rs
-index 4b5e1ec..14a1585 100644
+index 570e5de..c1ef2e2 100644
 --- a/crates/ui-egui/src/platform/system_fonts.rs
 +++ b/crates/ui-egui/src/platform/system_fonts.rs
-@@ -410,7 +410,7 @@ fn unix_fonts(files: &'static [&'static str]) -> Vec<PathBuf> {
+@@ -425,7 +425,7 @@ fn unix_fonts(files: &'static [&'static str]) -> Vec<PathBuf> {
  
  fn unix_candidates(files: &[&str], installed: &[PathBuf]) -> Vec<PathBuf> {
      let mut paths: Vec<_> =
