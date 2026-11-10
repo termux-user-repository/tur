@@ -1,0 +1,13 @@
+Remove hardcoded -lstdc++ link flag on Android.
+Android NDK provides and defaults to libc++ (LLVM runtime).
+
+--- a/QTfrontend/CMakeLists.txt
++++ b/QTfrontend/CMakeLists.txt
+@@ -191,7 +191,6 @@
+ endif()
+ 
+ if(CMAKE_CXX_COMPILER MATCHES "clang*")
+-    list(APPEND HW_LINK_LIBS stdc++ m)
+     if(NOT APPLE)
+         list(APPEND HW_LINK_LIBS atomic)
+     endif()

@@ -1,0 +1,48 @@
+Description: Fix pas2c source compatibility with modern GHC 9.x and Parsec
+ Import Control.Monad (liftM, when, etc.) needed with modern base.
+ Hide 'string'' from Text.Parsec to resolve ambiguity with newer Parsec.
+Author: Termux User Repository
+Forwarded: not-needed
+--- a/tools/pas2c/Pas2C.hs
++++ b/tools/pas2c/Pas2C.hs
+@@ -7,6 +7,7 @@ import Data.Maybe
+ import Data.Char
+ import Text.Parsec.Prim hiding (State)
+ import Control.Monad.State
++import Control.Monad
+ import System.IO
+ import PascalPreprocessor
+ import Control.Exception
+--- a/tools/pas2c/PascalBasics.hs
++++ b/tools/pas2c/PascalBasics.hs
+@@ -2,7 +2,7 @@
+ module PascalBasics where
+ 
+ import Text.Parsec.Combinator
+-import Text.Parsec.Char
++import Text.Parsec.Char hiding (string')
+ import Text.Parsec.Prim
+ import Text.Parsec.Token
+ import Text.Parsec.Language
+--- a/tools/pas2c/PascalParser.hs
++++ b/tools/pas2c/PascalParser.hs
+@@ -4,7 +4,7 @@ module PascalParser (
+     )
+     where
+ 
+-import Text.Parsec
++import Text.Parsec hiding (string')
+ import Text.Parsec.Token
+ import Text.Parsec.Expr
+ import Control.Monad
+--- a/tools/pas2c/PascalPreprocessor.hs
++++ b/tools/pas2c/PascalPreprocessor.hs
+@@ -1,7 +1,7 @@
+ {-# LANGUAGE ScopedTypeVariables #-}
+ module PascalPreprocessor where
+ 
+-import Text.Parsec
++import Text.Parsec hiding (string')
+ import Control.Monad.IO.Class
+ import Control.Monad
+ import System.IO

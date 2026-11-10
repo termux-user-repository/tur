@@ -1,0 +1,23 @@
+Prevent CMake from overriding cross-compilers with host Clang, and
+avoid building tools/pas2c inside the CMake tree (pas2c targets the host
+and is compiled separately during post_configure).
+
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -188,8 +188,6 @@
+         message(FATAL_ERROR "LLVM/Clang compiler required version is 3.0 but version ${CLANG_VERSION} was found!")
+     endif()
+ 
+-    set(CMAKE_C_COMPILER ${CLANG_EXECUTABLE})
+-    set(CMAKE_CXX_COMPILER ${CLANG_EXECUTABLE})
+ endif()
+ 
+ 
+@@ -259,7 +257,6 @@
+ #maybe this could be merged inside hedgewars/CMakeLists.txt
+ if(BUILD_ENGINE_C)
+     #pascal to c converter
+-    add_subdirectory(tools/pas2c)
+     add_subdirectory(project_files/hwc)
+ else()
+     #main pascal engine
