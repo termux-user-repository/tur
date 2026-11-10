@@ -8,8 +8,10 @@ TERMUX_PKG_SRCURL="https://github.com/frankheckenbach/ftgl/archive/refs/tags/v${
 TERMUX_PKG_SHA256=aa97da1c3442a8fd3941037655df18016d70b5266381c81d81e8b5335f196ea8
 TERMUX_PKG_DEPENDS="freetype, glu, opengl"
 TERMUX_PKG_AUTO_UPDATE=true
+TERMUX_PKG_UPDATE_TAG_TYPE="newest-tag"
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 -DCMAKE_SYSTEM_NAME=Linux
+-DCMAKE_POLICY_VERSION_MINIMUM=3.5
 "
 
 termux_step_post_massage() {
