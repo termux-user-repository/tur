@@ -1,0 +1,17 @@
+Description: Add missing battery struct fields when compiling without eeze
+Author: fervi <fervi@users.noreply.github.com>
+Forwarded: not-needed
+
+--- a/src/modules/battery/e_mod_main.h
++++ b/src/modules/battery/e_mod_main.h
+@@ -111,6 +111,10 @@
+    double        time_full;
+    double        time_left;
+ #else
++   Eina_Bool     present E_BITFIELD;
++   Eina_Bool     charging E_BITFIELD;
++   Eina_Bool     is_micro_watts E_BITFIELD;
++   double        power_now;
+    int           percent;
+    int           current_charge;
+    int           design_charge;

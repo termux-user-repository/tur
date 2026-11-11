@@ -1,0 +1,40 @@
+Description: Disable eeze-based hardware watching in e_system if HAVE_EEZE is not defined
+Author: fervi <fervi@users.noreply.github.com>
+Forwarded: not-needed
+
+--- a/src/bin/system/e_system_acpi.c
++++ b/src/bin/system/e_system_acpi.c
+@@ -1,5 +1,5 @@
+ #include "e_system.h"
+-#if defined __OpenBSD__
++#if defined __OpenBSD__ || !defined HAVE_EEZE
+ // no local funcs
+ #elif defined __FreeBSD__
+ // no local funcs
+@@ -232,7 +232,7 @@
+ void
+ e_system_acpi_init(void)
+ {
+-#  if defined __OpenBSD__
++#  if defined __OpenBSD__ || !defined HAVE_EEZE
+ // no local funcs
+ #  elif defined __FreeBSD__
+ // no local funcs
+--- a/src/bin/system/e_system_battery.c
++++ b/src/bin/system/e_system_battery.c
+@@ -1,5 +1,5 @@
+ #include "e_system.h"
+-#if defined __OpenBSD__
++#if defined __OpenBSD__ || !defined HAVE_EEZE
+ // no local funcs
+ #elif defined __FreeBSD__
+ // no local funcs
+@@ -107,7 +107,7 @@
+ void
+ e_system_battery_init(void)
+ {
+-#if defined __OpenBSD__
++#if defined __OpenBSD__ || !defined HAVE_EEZE
+ // no local funcs
+ #elif defined __FreeBSD__
+ // no local funcs

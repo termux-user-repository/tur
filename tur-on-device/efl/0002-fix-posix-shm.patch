@@ -1,0 +1,61 @@
+--- a/src/modules/ecore_evas/engines/extn/ecore_evas_extn_buf.c	2026-11-04 15:05:41.385881490 +0100
++++ b/src/modules/ecore_evas/engines/extn/ecore_evas_extn_buf.c	2026-11-04 15:05:41.388472881 +0100
+@@ -4,6 +4,58 @@
+ # define O_BINARY 0
+ #endif
+ 
++#if defined(__ANDROID__)
++# include <errno.h>
++# include <alloca.h>
++
++static int termux_shm_unlink(const char *name) {
++    size_t namelen;
++    char *fname;
++
++    while (name[0] == '/') ++name;
++    if (name[0] == '\0') {
++        errno = EINVAL;
++        return -1;
++    }
++
++    namelen = strlen(name);
++    fname = (char *) alloca(sizeof("@TERMUX_PREFIX@/tmp/") - 1 + namelen + 1);
++    memcpy(fname, "@TERMUX_PREFIX@/tmp/", sizeof("@TERMUX_PREFIX@/tmp/") - 1);
++    memcpy(fname + sizeof("@TERMUX_PREFIX@/tmp/") - 1, name, namelen + 1);
++
++    return unlink(fname);
++}
++
++static int termux_shm_open(const char *name, int oflag, mode_t mode) {
++    size_t namelen;
++    char *fname;
++    int fd;
++
++    while (name[0] == '/') ++name;
++    if (name[0] == '\0') {
++        errno = EINVAL;
++        return -1;
++    }
++
++    namelen = strlen(name);
++    fname = (char *) alloca(sizeof("@TERMUX_PREFIX@/tmp/") - 1 + namelen + 1);
++    memcpy(fname, "@TERMUX_PREFIX@/tmp/", sizeof("@TERMUX_PREFIX@/tmp/") - 1);
++    memcpy(fname + sizeof("@TERMUX_PREFIX@/tmp/") - 1, name, namelen + 1);
++
++    fd = open(fname, oflag, mode);
++    if (fd != -1) {
++        int flags = fcntl(fd, F_GETFD, 0);
++        if (flags != -1) {
++            fcntl(fd, F_SETFD, flags | FD_CLOEXEC);
++        }
++    }
++    return fd;
++}
++
++# define shm_open(name, oflag, mode) termux_shm_open(name, oflag, mode)
++# define shm_unlink(name) termux_shm_unlink(name)
++#endif
++
+ struct _Extnbuf
+ {
+    const char *file, *lock;
