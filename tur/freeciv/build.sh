@@ -13,19 +13,8 @@ TERMUX_PKG_GROUPS="games"
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 --enable-client=gtk3.22,sdl2
 --enable-fcmp=gtk3,cli
---enable-fcdb=sqlite3
---enable-sdl-mixer=sdl2
 --disable-ruledit
---enable-freeciv-manual
---enable-freeciv-ruleup
---enable-sys-lua
---enable-sys-tolua-cmd
 --with-sqlite3-prefix=$TERMUX_PREFIX
---with-libbz2
---with-liblzma
---with-libzstd
---with-readline
---without-magickwand
 "
 
 termux_step_host_build() {
