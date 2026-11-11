@@ -2,7 +2,7 @@ TERMUX_PKG_HOMEPAGE=https://stashapp.cc
 TERMUX_PKG_DESCRIPTION="Locally hosted web-based app written in Go which organizes and serves your Adult Video"
 TERMUX_PKG_LICENSE="AGPL-3.0-only"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="0.31.1"
+TERMUX_PKG_VERSION="0.32.0"
 TERMUX_PKG_SRCURL=git+https://github.com/stashapp/stash
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_AUTO_UPDATE=true
@@ -35,7 +35,7 @@ termux_step_host_build() {
 	termux_setup_golang
 	go get -u golang.org/x/tools
 	go mod tidy
-	GODEBUG=gotypesalias=0 go generate ./cmd/stash
+	go generate ./cmd/stash
 
 	cd ui/v2.5
 	pnpm run gqlgen
