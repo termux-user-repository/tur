@@ -1,0 +1,69 @@
+Description: Use system physfs, simplesquirrel, and squirrel libraries, drop unused libgit2, and fix install directories
+Author: Fervi (IntinteDAO) <lordfervi@protonmail.com>
+
+--- a/rte/meson.build
++++ b/rte/meson.build
+@@ -1,4 +1,4 @@
+-project('brux-gdk', 'cpp', 'c', default_options: ['cpp_std=c++17', 'buildtype=release', 'default_library=shared', 'prefix=/', 'bindir=', 'datadir='], meson_version: '>=1.0.1')
++project('brux-gdk', 'cpp', 'c', default_options: ['cpp_std=c++17', 'buildtype=release', 'default_library=shared'], meson_version: '>=1.0.1')
+ 
+ # CMake module. Needed for physfs and simplesquirrel modules.
+ cmake = import('cmake')
+@@ -34,30 +34,13 @@
+ 	curl = dependency('libcurl', required: true)
+ endif
+ 
+-physfs = dependency('physfs', required: false)
++physfs = dependency('physfs')
+ 
+-if (not physfs.found())
+-	physfs_proj = cmake.subproject('physfs')
+-
+-	physfs_lib = physfs_proj.get_variable('physfs')
+-	physfs = declare_dependency(link_with: physfs_lib, include_directories: physfs_proj.include_directories('physfs'))
+-endif
+-
+-simplesquirrel = dependency('simplesquirrel', required: false)
+-
+-if (not simplesquirrel.found())
+-	opts = cmake.subproject_options()
+-
+-	opts.add_cmake_defines({'CMAKE_POLICY_VERSION_MINIMUM': '3.5', 'SSQ_USE_SQ_SUBMODULE': true})
+-
+-	simplesquirrel_proj = cmake.subproject('simplesquirrel', options: opts)
+-
+-	simplesquirrel_lib = simplesquirrel_proj.get_variable('simplesquirrel_static')
+-	squirrel_lib = simplesquirrel_proj.get_variable('squirrel_static')
+-	sqstdlib = simplesquirrel_proj.get_variable('sqstdlib_static')
+-
+-	simplesquirrel = declare_dependency(link_with: [simplesquirrel_lib, squirrel_lib, sqstdlib], include_directories: simplesquirrel_proj.include_directories('simplesquirrel_static'))
+-endif
++cpp = meson.get_compiler('cpp')
++simplesquirrel_lib = cpp.find_library('simplesquirrel', required: true)
++squirrel_lib = cpp.find_library('squirrel', required: true)
++sqstdlib_lib = cpp.find_library('sqstdlib', required: true)
++simplesquirrel = declare_dependency(dependencies: [simplesquirrel_lib, squirrel_lib, sqstdlib_lib])
+ 
+ sdl2_gfx = dependency('SDL2_gfx', required: false)
+ 
+@@ -80,12 +63,7 @@
+ 	simplesquirrel
+ ]
+ 
+-git2 = dependency(
+-	'libgit2',
+-	fallback : ['libgit2', 'libgit2_dep']
+-)
+ 
+-deps = [sdl, sdl_image, sdl_net, sdl2_gfx, audio_lib, curl, git2, physfs, simplesquirrel]
+ 
+ # TODO: allow swapping of audio backend in a more clean manner
+ src = [
+@@ -100,6 +78,4 @@
+ 
+ executable('brux', src, dependencies: deps, include_directories: include_directories('src'), install: true)
+ 
+-#install_data('test/test.nut', install_dir: get_option('datadir'))
+-install_data('test/test.nut', install_dir: 'test')
+-install_subdir('test/res', install_dir: 'test')
++
