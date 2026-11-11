@@ -1,0 +1,104 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -11,7 +11,7 @@
+ # To redistribute this file separately, substitute the full license texts
+ # for the above references.
+ 
+-cmake_minimum_required (VERSION 3.0.2)
++cmake_minimum_required (VERSION 3.5.1)
+ 
+ # Don't allow people to build "Release" builds because there's no reason to do that.
+ # Use one of RelWithDebInfo or MinSizeRel instead.
+@@ -167,7 +167,7 @@
+ endif()
+ 
+ if(UNIX)
+-	add_definitions("-DOC_SYSTEM_DATA_DIR=\"${CMAKE_INSTALL_PREFIX}/share/games/openclonk\"")
++	add_definitions("-DOC_SYSTEM_DATA_DIR=\"${CMAKE_INSTALL_PREFIX}/share/openclonk\"")
+ endif()
+ 
+ if(APPLE)
+@@ -1051,7 +1051,7 @@
+ if(HAVE_PTHREAD)
+ 	target_link_libraries(libmisc pthread)
+ endif()
+-if(UNIX AND NOT APPLE)
++if(UNIX AND NOT APPLE AND NOT ANDROID)
+ 	target_link_libraries(libmisc rt)
+ endif()
+ 
+@@ -1387,7 +1387,6 @@
+ ############################################################################
+ # Miscellaneous
+ ############################################################################
+-add_subdirectory(tests)
+ 
+ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.h.cmake ${CMAKE_CURRENT_BINARY_DIR}/config.h)
+ 
+@@ -1510,6 +1509,7 @@
+ 	list(APPEND OC_C4GROUPS Music.ocg)
+ endif()
+ 
++set(PREV_GROUP "${native_c4group}")
+ foreach(group ${OC_C4GROUPS})
+ 	if (APPLE)
+ 		if (CMAKE_GENERATOR STREQUAL Xcode)
+@@ -1534,16 +1534,17 @@
+ 			OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${group}
+ 			COMMAND "${native_c4group}" ARGS "${CMAKE_CURRENT_SOURCE_DIR}/planet/${group}" -t "${CMAKE_CURRENT_BINARY_DIR}/${group}"
+ 			MAIN_DEPENDENCY ${CMAKE_CURRENT_SOURCE_DIR}/planet/${group}
+-			DEPENDS "${native_c4group}"
++			DEPENDS "${PREV_GROUP}"
+ 			VERBATIM
+ 		)
+-		install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${group} DESTINATION share/games/openclonk)
++		set(PREV_GROUP "${CMAKE_CURRENT_BINARY_DIR}/${group}")
++		install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${group} DESTINATION share/openclonk)
+ 	endif()
+ endforeach()
+ 
+ if(NOT APPLE)
+ 	if(NOT HEADLESS_ONLY)
+-		install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/planet/Music.ocg DESTINATION share/games/openclonk)
++		install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/planet/Music.ocg DESTINATION share/openclonk)
+ 	endif()
+ 	# group files (game data)
+ 	add_custom_target(groups DEPENDS ${OC_C4GROUPS})
+@@ -1563,7 +1564,7 @@
+ 		install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/openclonk.appdata.xml DESTINATION share/appdata)
+ 
+ 		# Install binaries
+-		install(TARGETS openclonk DESTINATION games)
++		install(TARGETS openclonk DESTINATION bin)
+ 	else()
+ 		install(TARGETS openclonk
+ 			BUNDLE DESTINATION .
+--- a/thirdparty/blake2/CMakeLists.txt
++++ b/thirdparty/blake2/CMakeLists.txt
+@@ -18,26 +18,7 @@
+ target_sources(blake2
+ 	PRIVATE
+ 	blake2b.c
+-	blake2bp.c
+-	blake2s.c
+-	blake2sp.c
+-	blake2xb.c
+-	blake2xs.c
+-	blake2b-load-sse2.h
+-	blake2b-load-sse41.h
+-	blake2b-round.h
+-	blake2s-load-sse2.h
+-	blake2s-load-sse41.h
+-	blake2s-load-xop.h
+-	blake2s-round.h
+-	blake2-config.h
+ 	blake2-impl.h
+ )
+ 
+-include(CheckCCompilerFlag)
+-CHECK_C_COMPILER_FLAG("-msse2" HAVE_CFLAG_MSSE2)
+-target_compile_definitions(blake2 PRIVATE -DHAVE_SSE2)
+-if(HAVE_CFLAG_MSSE2)
+-	target_compile_options(blake2 PUBLIC -msse2)
+-endif()
+ target_include_directories(blake2 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

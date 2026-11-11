@@ -1,0 +1,10 @@
+--- a/src/platform/C4MusicFile.h
++++ b/src/platform/C4MusicFile.h
+@@ -67,7 +67,6 @@
+ };
+ 
+ #if AUDIO_TK == AUDIO_TK_SDL_MIXER
+-typedef struct _Mix_Music Mix_Music;
+ class C4MusicFileSDL : public C4MusicFile
+ {
+ public:

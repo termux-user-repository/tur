@@ -1,0 +1,10 @@
+--- a/src/C4Include.h
++++ b/src/C4Include.h
+@@ -25,6 +25,7 @@
+ #ifndef INC_C4Include
+ #define INC_C4Include
+ 
++#include <limits>
+ #include "platform/PlatformAbstraction.h"
+ 
+ constexpr bool DEBUGREC_SCRIPT = true;
