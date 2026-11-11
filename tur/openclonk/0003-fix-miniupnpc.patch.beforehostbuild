@@ -1,6 +1,15 @@
+From: Lukas Werling <lukas@lwrl.de>
+Date: Sat, 11 Jan 2025 23:55:07 +0100
+Subject: Fix build with miniupnpc 2.2.8
+
+Origin: upstream, https://github.com/openclonk/openclonk/commit/4649651c69c437b075013a711da50b22de30c19c
+---
+ src/network/C4Network2UPnPLinux.cpp | 5 +++++
+ 1 file changed, 5 insertions(+)
+
 --- a/src/network/C4Network2UPnPLinux.cpp
 +++ b/src/network/C4Network2UPnPLinux.cpp
-@@ -77,7 +77,12 @@
+@@ -77,7 +77,12 @@ void C4Network2UPnPP::Init()
  	if ((devlist = upnpDiscover(2000, nullptr, nullptr, UPNP_LOCAL_PORT_ANY, 0, 2, &error)))
  #endif
  	{
