@@ -1,0 +1,19 @@
+Description: Use GCC atomic builtins on GCC and Clang
+ On modern GCC and Clang compilers, use GCC atomic builtins instead of
+ non-existent library functions on 32-bit architectures.
+Author: Fervi <lordfervi@protonmail.com>
+
+--- a/src/modules/graphic/osggraph/Utils/OsgAtomic.h
++++ b/src/modules/graphic/osggraph/Utils/OsgAtomic.h
+@@ -21,10 +21,8 @@
+ namespace osggraph {
+ 
+-#if defined(__GNUC__) && ((4 < __GNUC__)||(4 == __GNUC__ && 1 <= __GNUC_MINOR__)) && (defined(__x86_64__) || defined(__powerpc64__) || defined(__aarch64__))
++#if defined(__GNUC__) || defined(__clang__)
+ // No need to include something. Is a Compiler API ...
+ # define SDATOMIC_USE_GCC4_BUILTINS
+-#elif defined(__GNUC__) && (defined(__i386__) || defined(__arm__))
+-# define SDATOMIC_USE_LIBRARY_FUNCTIONS
+ #elif defined(__sgi) && defined(_COMPILER_VERSION) && (_COMPILER_VERSION>=730)
+ // No need to include something. Is a Compiler API ...
+ # define SDATOMIC_USE_MIPSPRO_BUILTINS

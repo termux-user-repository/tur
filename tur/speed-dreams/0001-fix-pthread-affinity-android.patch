@@ -1,0 +1,15 @@
+Description: Fix build on Android by skipping pthread_setaffinity_np
+ pthread_setaffinity_np is restricted or unavailable on Android.
+Author: Fervi <lordfervi@protonmail.com>
+
+--- a/src/libs/tgf/linuxspec.cpp
++++ b/src/libs/tgf/linuxspec.cpp
+@@ -741,7 +741,7 @@
+ linuxSetThreadAffinity(int nCPUId)
+ {
+ 	// MacOS X, OpenBSD, NetBSD, etc ...
+-#if defined(__APPLE__) || defined(__OpenBSD__) || defined(__NetBSD__) || defined(__HAIKU__)
++#if defined(__APPLE__) || defined(__OpenBSD__) || defined(__NetBSD__) || defined(__HAIKU__) || defined(__ANDROID__)
+ 
+ 	GfLogWarning("Thread affinity not yet implemented on Mac OS X or BSD or Haiku.\n");
+ 	// TODO.

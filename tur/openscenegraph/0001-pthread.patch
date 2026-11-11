@@ -1,0 +1,17 @@
+Description: Disable pthread cancellation functions not present in Android Bionic
+Author: Fervi (IntinteDAO) <lordfervi@protonmail.com>
+
+--- a/src/OpenThreads/pthreads/PThread.cpp
++++ b/src/OpenThreads/pthreads/PThread.cpp
+@@ -21,6 +21,11 @@
+ #include <sys/types.h>
+ #include <unistd.h>
+ #include <pthread.h>
++#if defined(__ANDROID__)
++#undef HAVE_PTHREAD_TESTCANCEL
++#undef HAVE_PTHREAD_CANCEL
++#undef HAVE_PTHREAD_SETCANCELSTATE
++#endif
+ #if defined(HAVE_PTHREAD_SETAFFINITY_NP) && defined(__FreeBSD__)
+     #include <pthread_np.h>
+ #endif
