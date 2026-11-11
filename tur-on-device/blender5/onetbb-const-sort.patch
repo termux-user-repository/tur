@@ -1,0 +1,13 @@
+Author: Fervi (IntinteDAO) <lordfervi@protonmail.com>
+Subject: Build: resolve failure with OneTBB
+Description: OneTBB requires const arguments for the comparison function.
+Origin: upstream, commit:af82c3ca2d0f94978bc8b4178c623fbed9767068
+Forwarded: not-needed
+
+--- a/source/blender/modifiers/intern/MOD_grease_pencil_build.cc
++++ b/source/blender/modifiers/intern/MOD_grease_pencil_build.cc
+@@ -471,3 +471,3 @@
+   parallel_sort(
+-      distances.begin(), distances.end(), [](Pair &a, Pair &b) { return a.value < b.value; });
++      distances.begin(), distances.end(), [](const Pair &a, const Pair &b) { return a.value < b.value; });
+ 
