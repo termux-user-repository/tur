@@ -36,6 +36,12 @@
     "component": "tur-multilib",
     "url": "https://tur.kcubeterm.com"
   },
+  "tur-nightly": {
+    "name": "tur-nightly",
+    "distribution": "tur-packages",
+    "component": "tur-nightly",
+    "url": "https://tur.kcubeterm.com"
+  },
   "root-packages": {
     "name": "termux-root",
     "distribution": "root",

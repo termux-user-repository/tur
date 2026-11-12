@@ -25,12 +25,14 @@ on:
     - 'tur/**'
     - 'tur-on-device/**'
     - 'tur-multilib/**'
+    - 'tur-nightly/**'
     - 'tur-hacking/**'
   pull_request:
     paths:
     - 'tur/**'
     - 'tur-on-device/**'
     - 'tur-multilib/**'
+    - 'tur-nightly/**'
     - 'tur-hacking/**'
   schedule:
     - cron: "0 */6 * * *"

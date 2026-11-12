@@ -18,7 +18,7 @@ Only search packages from TUR repository when auto-updating.
  if [[ "$1" == "@all" ]]; then
  	declare -a PACKAGE_LIST=()
 -	for channel in $(jq --raw-output 'del(.pkg_format) | keys | .[]' "${TERMUX_SCRIPTDIR}/repo.json"); do
-+	for channel in "tur" "tur-on-device" "tur-multilib" "tur-hacking"; do
++	for channel in "tur" "tur-on-device" "tur-multilib" "tur-hacking" "tur-nightly"; do
  		for pkg_dir in "${channel}"/*; do
  			PACKAGE_LIST+=("$pkg_dir")
  		done
@@ -27,7 +27,7 @@ Only search packages from TUR repository when auto-updating.
  	pkg_dir="${pkg}"
  	if [[ ! -d "${pkg}" ]]; then # If only package name is given, try to find its directory.
 -		for channel in $(jq --raw-output 'del(.pkg_format) | keys | .[]' "${TERMUX_SCRIPTDIR}/repo.json"); do
-+		for channel in "tur" "tur-on-device" "tur-multilib" "tur-hacking"; do
++		for channel in "tur" "tur-on-device" "tur-multilib" "tur-hacking" "tur-nightly"; do
  			if [[ -d "${channel}/${pkg}" ]]; then
  				pkg_dir="${channel}/${pkg}"
  				break
@@ -55,7 +55,7 @@ Do not run check-updated step, which will make it easy to reach GitHub rate limi
  	if [[ -z "${latest_tag}" ]]; then
 --- a/scripts/bin/build-package-dry-run-simulation.sh
 +++ b/scripts/bin/build-package-dry-run-simulation.sh
-@@ -12,6 +12,10 @@ TERMUX_PACKAGES_DIRECTORIES="
+@@ -12,6 +12,11 @@ TERMUX_PACKAGES_DIRECTORIES="
  packages
  root-packages
  x11-packages
@@ -63,6 +63,7 @@ Do not run check-updated step, which will make it easy to reach GitHub rate limi
 +tur-on-device
 +tur-multilib
 +tur-hacking
++tur-nightly
  )
  
  # Please keep synchronized with the logic of lines 468-547 of 'build-package.sh'.
