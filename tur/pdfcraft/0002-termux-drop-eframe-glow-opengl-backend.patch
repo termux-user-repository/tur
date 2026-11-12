@@ -12,7 +12,7 @@ index 5e4010f..1689540 100644
  serde_json = { workspace = true }
  # Records from every crate go to standard error and the log file (src/logging.rs).
 diff --git a/apps/pdfcraft/src/main.rs b/apps/pdfcraft/src/main.rs
-index 837a803..edbe9ce 100644
+index 797e14e..cee7d6a 100644
 --- a/apps/pdfcraft/src/main.rs
 +++ b/apps/pdfcraft/src/main.rs
 @@ -271,7 +271,7 @@ fn main() -> eframe::Result {
