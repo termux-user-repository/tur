@@ -1,0 +1,54 @@
+diff --git a/Cargo.lock b/Cargo.lock
+index c4e08c1..1f7833c 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -4671,7 +4671,7 @@ dependencies = [
+  "pdfcraft-render",
+  "skrifa 0.44.0",
+  "thiserror 2.0.21",
+- "winprint 0.2.1 (git+https://github.com/storytold/winprint.rs?rev=5f80b9baf6b58937c401656634e42d33f00ddf49)",
++ "winprint 0.2.1 (git+https://github.com/storytold/winprint.rs?rev=bc06a7c48b768eb27a828c7986f6d2868b245ee0)",
+ ]
+ 
+ [[package]]
+@@ -8321,27 +8321,6 @@ dependencies = [
+  "memchr",
+ ]
+ 
+-[[package]]
+-name = "winprint"
+-version = "0.2.1"
+-source = "git+https://github.com/storytold/winprint.rs?rev=5f80b9baf6b58937c401656634e42d33f00ddf49#5f80b9baf6b58937c401656634e42d33f00ddf49"
+-dependencies = [
+- "flate2",
+- "fmt-derive",
+- "reqwest",
+- "scopeguard",
+- "sigstore-trust-root",
+- "sigstore-types",
+- "sigstore-verify",
+- "strum",
+- "tar",
+- "thiserror 2.0.21",
+- "windows",
+- "windows-core",
+- "windows-implement",
+- "xml",
+-]
+-
+ [[package]]
+ name = "winprint"
+ version = "0.2.1"
+diff --git a/crates/print/Cargo.toml b/crates/print/Cargo.toml
+index 9d349b6..a952d54 100644
+--- a/crates/print/Cargo.toml
++++ b/crates/print/Cargo.toml
+@@ -17,7 +17,7 @@ pdfcraft-model = { workspace = true }
+ thiserror = { workspace = true }
+ 
+ [target.'cfg(windows)'.dependencies]
+-winprint = { version = "0.2.1", git = "https://github.com/storytold/winprint.rs", rev = "5f80b9baf6b58937c401656634e42d33f00ddf49", default-features = false }
++winprint = { version = "0.2.1", git = "https://github.com/storytold/winprint.rs", rev = "bc06a7c48b768eb27a828c7986f6d2868b245ee0", default-features = false }
+ 
+ [dev-dependencies]
+ pdfcraft-render = { workspace = true }

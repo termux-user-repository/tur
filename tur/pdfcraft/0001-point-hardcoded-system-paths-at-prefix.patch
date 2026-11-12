@@ -12,15 +12,33 @@ index e2b413d..cc4338a 100644
              dirs.extend([home.join(".local/share/fonts"), home.join(".fonts")]);
          }
 diff --git a/crates/print/src/spool.rs b/crates/print/src/spool.rs
-index a83da3e..2b4ba0c 100644
+index 598a9a8..fdc79ab 100644
 --- a/crates/print/src/spool.rs
 +++ b/crates/print/src/spool.rs
-@@ -19,7 +19,7 @@ pub fn printer_options(printer: &str) -> Vec<PrinterOption> {
+@@ -136,7 +136,7 @@ pub fn printer_options(printer: &str) -> Vec<PrinterOption> {
  pub fn printer_options_in(printer: &str, lang: &str) -> Vec<PrinterOption> {
      #[cfg(all(unix, not(target_arch = "wasm32")))]
      {
 -        printer_options_via_within(printer, std::path::Path::new("/etc/cups/ppd"), std::process::Command::new("lpoptions"), LPOPTIONS_LIMIT, lang)
 +        printer_options_via_within(printer, std::path::Path::new("@TERMUX_PREFIX@/etc/cups/ppd"), std::process::Command::new("lpoptions"), LPOPTIONS_LIMIT, lang)
+     }
+     #[cfg(not(all(unix, not(target_arch = "wasm32"))))]
+     {
+@@ -420,7 +420,7 @@ pub(crate) fn with_job_info(job: &Job, owner: Option<&str>) -> Job {
+ /// The job as the system spooler takes it.
+ fn spooled(job: &Job) -> Job {
+     #[cfg(all(unix, not(target_arch = "wasm32")))]
+-    let job = &with_ppd_media(job, |printer| ppd_papers_in(printer, std::path::Path::new("/etc/cups/ppd")));
++    let job = &with_ppd_media(job, |printer| ppd_papers_in(printer, std::path::Path::new("@TERMUX_PREFIX@/etc/cups/ppd")));
+     #[cfg(target_os = "macos")]
+     {
+         with_job_info(job, std::env::var("USER").ok().as_deref())
+@@ -538,7 +538,7 @@ pub fn printer_papers(printer: &str) -> Vec<Paper> {
+ fn cups_paper_info(printer: &str) -> (Vec<Paper>, Option<Paper>) {
+     #[cfg(all(unix, not(target_arch = "wasm32")))]
+     {
+-        cups_paper_info_in(printer, std::path::Path::new("/etc/cups/ppd"))
++        cups_paper_info_in(printer, std::path::Path::new("@TERMUX_PREFIX@/etc/cups/ppd"))
      }
      #[cfg(not(all(unix, not(target_arch = "wasm32"))))]
      {
