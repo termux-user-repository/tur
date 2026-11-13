@@ -1,0 +1,39 @@
+--- a/src/config/C4Config.cpp
++++ b/src/config/C4Config.cpp
+@@ -463,12 +463,12 @@
+ 		TempPath.AppendBackslash();
+ 	}
+ 	else
+-		TempPath = "/tmp/";
++		TempPath = "@TERMUX_PREFIX@/tmp/";
+ #else
+ 	// Mac: Just use the working directory as ExePath.
+ 	ExePath = GetWorkingDirectory();
+ 	ExePath.AppendBackslash();
+-	TempPath = "/tmp/";
++	TempPath = "@TERMUX_PREFIX@/tmp/";
+ #endif
+ 
+ 	// Find system-wide data path
+--- a/src/platform/PlatformAbstraction.h
++++ b/src/platform/PlatformAbstraction.h
+@@ -108,7 +108,7 @@
+ #if defined(_DEBUG) && defined(_MSC_VER)
+ // use inline assembler to invoke the "breakpoint exception"
+ #  define BREAKPOINT_HERE __debugbreak()
+-#elif defined(_DEBUG) && defined(__GNUC__)
++#elif defined(_DEBUG) && defined(__GNUC__) && (defined(__i386__) || defined(__x86_64__))
+ #  define BREAKPOINT_HERE asm volatile("int $3")
+ #elif defined(_DEBUG) && defined(HAVE_SIGNAL_H)
+ #  include <signal.h>
+@@ -152,6 +152,10 @@
+ #elif defined(__linux__)
+ #if defined(__x86_64__)
+ #define C4_OS "linux-x86_64"
++#elif defined(__aarch64__)
++#define C4_OS "linux-arm64"
++#elif defined(__arm__)
++#define C4_OS "linux-arm"
+ #else
+ #define C4_OS "linux-x86"
+ #endif

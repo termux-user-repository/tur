@@ -1,0 +1,20 @@
+From: Bo YU <tsu.yubo@gmail.com>
+Date: Fri, 23 Dec 2022 21:49:46 +0800
+Subject: fix ftbfs on gcc-11
+
+Bug-Debian: https://bugs.debian.org/984274 
+Last-Update: 2022-12-23
+---
+ src/C4Include.h | 1 +
+ 1 file changed, 1 insertion(+)
+
+--- a/src/C4Include.h
++++ b/src/C4Include.h
+@@ -25,6 +25,7 @@ don't need to include this file or any of the files it includes. */
+ #ifndef INC_C4Include
+ #define INC_C4Include
+ 
++#include <limits>
+ #include "platform/PlatformAbstraction.h"
+ 
+ constexpr bool DEBUGREC_SCRIPT = true;
