@@ -2,10 +2,9 @@ TERMUX_PKG_HOMEPAGE="https://upbrr.com"
 TERMUX_PKG_DESCRIPTION="Guided upload preparation app for private-tracker workflows"
 TERMUX_PKG_LICENSE="GPL-2.0-or-later"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="0.4.1"
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_VERSION="0.4.2"
 TERMUX_PKG_SRCURL="https://github.com/autobrr/upbrr/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz"
-TERMUX_PKG_SHA256=894439578fdd0a0530902d36047375b970cf012ed7bc066b68214facdc6d778d
+TERMUX_PKG_SHA256=f0ada9b302f3f192e1a7361f81b00576f74c476bd4ebfc531ee3a2d431bc93c2
 TERMUX_PKG_DEPENDS="ffmpeg"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_AUTO_UPDATE=true
@@ -40,6 +39,11 @@ termux_step_host_build() {
 
 termux_step_make() {
 	termux_setup_golang
+
+	export GOTOOLCHAIN=local
+	local _go_ver
+	_go_ver="$(go env GOVERSION)"
+	go mod edit -go="${_go_ver#go}" -toolchain=none
 
 	local ldflags="-w -s -X main.version=v${TERMUX_PKG_VERSION}"
 
