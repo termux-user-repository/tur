@@ -5,10 +5,11 @@ TERMUX_PKG_LICENSE="custom"
 TERMUX_PKG_LICENSE_FILE="LICENSE"
 TERMUX_PKG_MAINTAINER="Gouranga Das Samrat <gouranga.das.khulna@gmail.com>"
 TERMUX_PKG_VERSION="1.53.2"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL="https://github.com/mongodb-js/compass/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz"
 TERMUX_PKG_SHA256=83216825b5ac1aa807ec47e217cdd1eb11c97a6f431456355b1554e11f02267d
-TERMUX_PKG_DEPENDS="electron42, krb5, libx11"
-TERMUX_PKG_BUILD_DEPENDS="electron42-headers"
+TERMUX_PKG_DEPENDS="electron43, krb5, libx11"
+TERMUX_PKG_BUILD_DEPENDS="electron43-headers"
 TERMUX_PKG_BUILD_IN_SRC=true
 # Chromium/Electron don't support i686 on Linux.
 TERMUX_PKG_EXCLUDED_ARCHES="i686"
