@@ -1,0 +1,416 @@
+From: Valentine Burley <valentine.burley@collabora.com>
+Subject: [PATCH csf-v11 032] panvk: Query modifier capabilities for format property advertisement
+
+Purpose: format properties from modifier caps; BC stays optimal-only (dep of 6409a5b16af)
+Source/Reference: upstream Mesa commit 98ed811046b (author preserved)
+Backport-of: 98ed811046b
+Conflict: csf-v11/022 BC formats stay optimal-only; no DRM modifiers advertised for BC
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/031
+Validation test: device matrix; icc.c modifier cases
+
+diff --git a/src/panfrost/vulkan/panvk_image.c b/src/panfrost/vulkan/panvk_image.c
+index a86597c8532959183f33ce85bc3c692785b300c8..9c6d5bc73ba0382f7e3c5965a782725c9bb99d09 100644
+--- a/src/panfrost/vulkan/panvk_image.c
++++ b/src/panfrost/vulkan/panvk_image.c
+@@ -33,44 +33,6 @@
+ #include "vk_object.h"
+ #include "vk_util.h"
+ 
+-bool
+-panvk_image_can_use_afbc(
+-   struct panvk_physical_device *phys_dev, VkFormat fmt,
+-   VkImageUsageFlags usage, VkImageType type, VkImageTiling tiling,
+-   VkImageCreateFlags flags)
+-{
+-   unsigned arch = pan_arch(phys_dev->kmod.dev->props.gpu_id);
+-   enum pipe_format pfmt = vk_format_to_pipe_format(fmt);
+-
+-   /* Disallow AFBC if either of these is true
+-    * - PANVK_DEBUG does not have the 'afbc' flag set
+-    * - storage image views are requested
+-    * - host image copies are requested
+-    * - the GPU doesn't support AFBC
+-    * - the format is not AFBC-able
+-    * - tiling is set to linear
+-    * - this is a 1D image
+-    * - this is a 3D image on a pre-v7 GPU
+-    * - this is a mutable format image on v7- (format re-interpretation is
+-    *   not possible on Bifrost hardware)
+-    * - this is a sparse image
+-    *
+-    * Some of these checks are redundant with tests provided by the AFBC mod
+-    * handler when pan_image_test_props() is called, but we need them because
+-    * panvk_image_can_use_afbc() is also called from
+-    * GetPhysicalDeviceImageFormatProperties2() and we don't have enough
+-    * information to conduct a full image property check in this context.
+-    */
+-   return !PANVK_DEBUG(NO_AFBC) &&
+-          !(usage &
+-            (VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_HOST_TRANSFER_BIT)) &&
+-          pan_query_afbc(&phys_dev->kmod.dev->props) &&
+-          pan_afbc_supports_format(arch, pfmt) &&
+-          tiling != VK_IMAGE_TILING_LINEAR && type != VK_IMAGE_TYPE_1D &&
+-          (type != VK_IMAGE_TYPE_3D || arch >= 7) &&
+-          (!(flags & VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT) || arch >= 9) &&
+-          (!(flags & VK_IMAGE_CREATE_SPARSE_BINDING_BIT));
+-}
+ 
+ static enum mali_texture_dimension
+ panvk_image_type_to_mali_tex_dim(VkImageType type)
+diff --git a/src/panfrost/vulkan/panvk_image.h b/src/panfrost/vulkan/panvk_image.h
+index 4602e3b7b12580522a1414fcd21c804deef10970..9dbf8dcaf89b108751b53b8797146a8ae200c32d 100644
+--- a/src/panfrost/vulkan/panvk_image.h
++++ b/src/panfrost/vulkan/panvk_image.h
+@@ -58,14 +58,6 @@ struct panvk_image {
+ VK_DEFINE_NONDISP_HANDLE_CASTS(panvk_image, vk.base, VkImage,
+                                VK_OBJECT_TYPE_IMAGE)
+ 
+-/* Check whether it is possible that images in a given configuration may use
+- * AFBC tiling. This function does not have access to all of the relevant
+- * image configuration, and returns true if any images with the specified
+- * configuration subset may use AFBC. */
+-bool panvk_image_can_use_afbc(
+-   struct panvk_physical_device *phys_dev, VkFormat fmt,
+-   VkImageUsageFlags usage, VkImageType type, VkImageTiling tiling,
+-   VkImageCreateFlags flags);
+ 
+ static inline bool
+ panvk_format_is_bc(VkFormat format)
+diff --git a/src/panfrost/vulkan/panvk_physical_device.c b/src/panfrost/vulkan/panvk_physical_device.c
+index e5ed4733463d04bbafc3f55bedcf6f886cfa947f..f067574ee496872f38249f6810888ae58ae1cf93 100644
+--- a/src/panfrost/vulkan/panvk_physical_device.c
++++ b/src/panfrost/vulkan/panvk_physical_device.c
+@@ -2017,13 +2017,27 @@ get_buffer_format_features(struct panvk_physical_device *physical_device,
+    return features;
+ }
+ 
++static uint32_t
++panvk_get_mod_format_caps(const struct panvk_physical_device *pdev,
++                          enum pipe_format pfmt, uint64_t mod)
++{
++   const unsigned arch = pan_arch(pdev->kmod.dev->props.gpu_id);
++   const struct pan_mod_handler *mod_handler = pan_mod_get_handler(arch, mod);
++   if (!mod_handler)
++      return 0;
++
++   if (drm_is_afbc(mod) && !PANVK_DEBUG(WSI_AFBC))
++      return 0;
++
++   return mod_handler->get_format_caps(&pdev->kmod.dev->props, pfmt, mod);
++}
++
+ VKAPI_ATTR void VKAPI_CALL
+ panvk_GetPhysicalDeviceFormatProperties2(VkPhysicalDevice physicalDevice,
+                                          VkFormat format,
+                                          VkFormatProperties2 *pFormatProperties)
+ {
+    VK_FROM_HANDLE(panvk_physical_device, physical_device, physicalDevice);
+-   const unsigned arch = pan_arch(physical_device->kmod.dev->props.gpu_id);
+ 
+    VkFormatFeatureFlags2 tex =
+       get_image_format_features(physical_device, format);
+@@ -2051,89 +2065,82 @@ panvk_GetPhysicalDeviceFormatProperties2(VkPhysicalDevice physicalDevice,
+    }
+ 
+    const uint32_t plane_count = vk_format_get_plane_count(format);
++   enum pipe_format pfmt = vk_format_to_pipe_format(format);
+ 
+    PAN_SUPPORTED_MODIFIERS(supported);
+-   uint64_t afbc_modifiers[ARRAY_SIZE(supported)];
+-   uint32_t afbc_modifier_count = 0;
+-   if (PANVK_DEBUG(WSI_AFBC) &&
+-         pan_afbc_supports_format(arch, vk_format_to_pipe_format(format))) {
+-      for (uint32_t mi = 0; mi < ARRAY_SIZE(supported); mi++) {
+-         if (drm_is_afbc(supported[mi]))
+-            afbc_modifiers[afbc_modifier_count++] = supported[mi];
+-      }
+-   }
+    VkDrmFormatModifierPropertiesListEXT *list = vk_find_struct(
+       pFormatProperties->pNext, DRM_FORMAT_MODIFIER_PROPERTIES_LIST_EXT);
+    if (list) {
+-      VkFormatFeatureFlags optimal_features =
+-         pFormatProperties->formatProperties.optimalTilingFeatures;
+-      VkFormatFeatureFlags linear_features =
+-         pFormatProperties->formatProperties.linearTilingFeatures;
+-
+       VK_OUTARRAY_MAKE_TYPED(VkDrmFormatModifierPropertiesEXT, out,
+                               list->pDrmFormatModifierProperties,
+                               &list->drmFormatModifierCount);
+ 
+-      if (optimal_features) {
+-         /* Multi-planar AFBC is not supported. */
+-         assert(!afbc_modifier_count || plane_count == 1);
++      if (tex && !optimal_only) {
++         for (uint32_t mi = 0; mi < ARRAY_SIZE(supported); mi++) {
++            uint64_t mod = supported[mi];
++            uint32_t caps =
++               panvk_get_mod_format_caps(physical_device, pfmt, mod);
++
++            if (!(caps & PAN_MOD_FORMAT_CAP_WSI))
++               continue;
++
++            VkFormatFeatureFlags mod_features =
++               pFormatProperties->formatProperties.optimalTilingFeatures;
++            if (!(caps & PAN_MOD_FORMAT_CAP_DEPTH_STENCIL))
++               mod_features &= ~VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT;
++            if (!(caps & PAN_MOD_FORMAT_CAP_STORAGE_IMAGE))
++               mod_features &= ~VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT;
+ 
+-         for (uint32_t i = 0; i < afbc_modifier_count; i++) {
+             vk_outarray_append_typed(VkDrmFormatModifierPropertiesEXT, &out,
+                                        mod_props)
+             {
+-               mod_props->drmFormatModifier = afbc_modifiers[i];
++               mod_props->drmFormatModifier = mod;
+                mod_props->drmFormatModifierPlaneCount = plane_count;
+-               mod_props->drmFormatModifierTilingFeatures = optimal_features;
++               mod_props->drmFormatModifierTilingFeatures = mod_features;
+             }
+          }
+       }
+ 
+-      if (linear_features) {
+-         vk_outarray_append_typed(VkDrmFormatModifierPropertiesEXT, &out,
+-                                    mod_props)
+-         {
+-            mod_props->drmFormatModifier = DRM_FORMAT_MOD_LINEAR;
+-            mod_props->drmFormatModifierPlaneCount = plane_count;
+-            mod_props->drmFormatModifierTilingFeatures = linear_features;
+-         }
+-      }
+    }
+    VkDrmFormatModifierPropertiesList2EXT *list2 = vk_find_struct(
+       pFormatProperties->pNext, DRM_FORMAT_MODIFIER_PROPERTIES_LIST_2_EXT);
+    if (list2) {
+-      VkFormatFeatureFlags2 optimal_features2 = tex;
+-      VkFormatFeatureFlags2 linear_features2 = optimal_only ? 0 : tex;
+-
+       VK_OUTARRAY_MAKE_TYPED(VkDrmFormatModifierProperties2EXT, out,
+                               list2->pDrmFormatModifierProperties,
+                               &list2->drmFormatModifierCount);
+ 
+-      if (optimal_features2) {
+-         /* Multi-planar AFBC is not supported. */
+-         assert(!afbc_modifier_count || plane_count == 1);
++      if (tex && !optimal_only) {
++         for (uint32_t mi = 0; mi < ARRAY_SIZE(supported); mi++) {
++            uint64_t mod = supported[mi];
++            uint32_t caps =
++               panvk_get_mod_format_caps(physical_device, pfmt, mod);
++
++            if (!(caps & PAN_MOD_FORMAT_CAP_WSI))
++               continue;
++
++            VkFormatFeatureFlags2 mod_features = tex;
++            if (!(caps & PAN_MOD_FORMAT_CAP_DEPTH_STENCIL))
++               mod_features &= ~VK_FORMAT_FEATURE_2_DEPTH_STENCIL_ATTACHMENT_BIT;
++            if (!(caps & PAN_MOD_FORMAT_CAP_HOST_COPY))
++               mod_features &= ~VK_FORMAT_FEATURE_2_HOST_IMAGE_TRANSFER_BIT;
++            if (!(caps & PAN_MOD_FORMAT_CAP_STORAGE_IMAGE)) {
++               mod_features &=
++                  ~(VK_FORMAT_FEATURE_2_STORAGE_IMAGE_BIT |
++                    VK_FORMAT_FEATURE_2_STORAGE_READ_WITHOUT_FORMAT_BIT |
++                    VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT |
++                    VK_FORMAT_FEATURE_2_STORAGE_IMAGE_ATOMIC_BIT);
++            }
+ 
+-         for (uint32_t i = 0; i < afbc_modifier_count; i++) {
+             vk_outarray_append_typed(VkDrmFormatModifierProperties2EXT, &out,
+                                        mod_props)
+             {
+-               mod_props->drmFormatModifier = afbc_modifiers[i];
++               mod_props->drmFormatModifier = mod;
+                mod_props->drmFormatModifierPlaneCount = plane_count;
+-               mod_props->drmFormatModifierTilingFeatures =
+-                  optimal_features2;
++               mod_props->drmFormatModifierTilingFeatures = mod_features;
+             }
+          }
+       }
+ 
+-      if (linear_features2) {
+-         vk_outarray_append_typed(VkDrmFormatModifierProperties2EXT, &out,
+-                                    mod_props)
+-         {
+-            mod_props->drmFormatModifier = DRM_FORMAT_MOD_LINEAR;
+-            mod_props->drmFormatModifierPlaneCount = plane_count;
+-            mod_props->drmFormatModifierTilingFeatures = linear_features2;
+-         }
+-      }
+    }
+ 
+    VkSubpassResolvePerformanceQueryEXT *subpass_resolve_perf = vk_find_struct(
+@@ -2218,6 +2225,26 @@ get_image_format_properties(struct panvk_physical_device *physical_device,
+          goto unsupported;
+    }
+ 
++   /* For the purposes of these checks, we don't care about all the extra
++    * YCbCr features and we just want the intersection of features available
++    * to all planes of the given format.
++    */
++   if (ycbcr_info == NULL) {
++      format_feature_flags =
++         get_image_format_features(physical_device, info->format);
++   } else {
++      format_feature_flags = ~0u;
++      assert(ycbcr_info->n_planes > 0);
++      for (uint8_t plane = 0; plane < ycbcr_info->n_planes; plane++) {
++         const VkFormat plane_format = ycbcr_info->planes[plane].format;
++         format_feature_flags &=
++            get_image_format_features(physical_device, plane_format);
++      }
++   }
++
++   if (format_feature_flags == 0)
++      goto unsupported;
++
+    switch (info->tiling) {
+    case VK_IMAGE_TILING_LINEAR:
+    case VK_IMAGE_TILING_OPTIMAL:
+@@ -2226,25 +2253,36 @@ get_image_format_properties(struct panvk_physical_device *physical_device,
+       const VkPhysicalDeviceImageDrmFormatModifierInfoEXT *mod_info =
+          vk_find_struct_const(
+             info->pNext, PHYSICAL_DEVICE_IMAGE_DRM_FORMAT_MODIFIER_INFO_EXT);
++      if (!mod_info)
++         goto unsupported;
+ 
+-      /* TODO: switch to using a more generic function for checking mod support here
+-       * when adding new modifiers, so that this case doesn't become too big. */
+-      const bool can_use_afbc = 
+-         PANVK_DEBUG(WSI_AFBC) &&
+-         panvk_image_can_use_afbc(physical_device, info->format, info->usage,
+-                                  info->type, info->tiling, 0);
+-      const bool supported = (drm_is_afbc(mod_info->drmFormatModifier) && can_use_afbc) ||
+-         mod_info->drmFormatModifier == DRM_FORMAT_MOD_LINEAR;
+-      if (!supported)
++      uint32_t caps = panvk_get_mod_format_caps(
++         physical_device, format, mod_info->drmFormatModifier);
++      if (!(caps & PAN_MOD_FORMAT_CAP_WSI))
+          goto unsupported;
+ 
+-      /* The only difference between optimal and linear is currently whether
+-       * depth/stencil attachments are allowed on depth/stencil formats.
+-       * There's no reason to allow importing depth/stencil textures, so just
+-       * disallow it and then this annoying edge case goes away.
+-       */
++      if (info->type == VK_IMAGE_TYPE_1D && !(caps & PAN_MOD_FORMAT_CAP_DIM_1D))
++         goto unsupported;
++      if (info->type == VK_IMAGE_TYPE_2D && !(caps & PAN_MOD_FORMAT_CAP_DIM_2D))
++         goto unsupported;
++      if (info->type == VK_IMAGE_TYPE_3D && !(caps & PAN_MOD_FORMAT_CAP_DIM_3D))
++         goto unsupported;
++
++      /* Depth/stencil formats are not supported for DRM format modifier tiling. */
+       if (util_format_is_depth_or_stencil(format))
+          goto unsupported;
++
++      if (!(caps & PAN_MOD_FORMAT_CAP_DEPTH_STENCIL))
++         format_feature_flags &= ~VK_FORMAT_FEATURE_2_DEPTH_STENCIL_ATTACHMENT_BIT;
++      if (!(caps & PAN_MOD_FORMAT_CAP_HOST_COPY))
++         format_feature_flags &= ~VK_FORMAT_FEATURE_2_HOST_IMAGE_TRANSFER_BIT;
++      if (!(caps & PAN_MOD_FORMAT_CAP_STORAGE_IMAGE)) {
++         format_feature_flags &=
++            ~(VK_FORMAT_FEATURE_2_STORAGE_IMAGE_BIT |
++              VK_FORMAT_FEATURE_2_STORAGE_READ_WITHOUT_FORMAT_BIT |
++              VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT |
++              VK_FORMAT_FEATURE_2_STORAGE_IMAGE_ATOMIC_BIT);
++      }
+       break;
+    }
+    default:
+@@ -2254,26 +2292,6 @@ get_image_format_properties(struct panvk_physical_device *physical_device,
+       goto unsupported;
+    }
+ 
+-   /* For the purposes of these checks, we don't care about all the extra
+-    * YCbCr features and we just want the intersection of features available
+-    * to all planes of the given format.
+-    */
+-   if (ycbcr_info == NULL) {
+-      format_feature_flags =
+-         get_image_format_features(physical_device, info->format);
+-   } else {
+-      format_feature_flags = ~0u;
+-      assert(ycbcr_info->n_planes > 0);
+-      for (uint8_t plane = 0; plane < ycbcr_info->n_planes; plane++) {
+-         const VkFormat plane_format = ycbcr_info->planes[plane].format;
+-         format_feature_flags &=
+-            get_image_format_features(physical_device, plane_format);
+-      }
+-   }
+-
+-   if (format_feature_flags == 0)
+-      goto unsupported;
+-
+    if (panvk_format_is_bc(info->format) &&
+        (info->tiling != VK_IMAGE_TILING_OPTIMAL ||
+         info->type == VK_IMAGE_TYPE_1D ||
+@@ -2319,9 +2337,12 @@ get_image_format_properties(struct panvk_physical_device *physical_device,
+       goto unsupported;
+    }
+ 
+-   if (ycbcr_info)
++   if (ycbcr_info || info->tiling == VK_IMAGE_TILING_DRM_FORMAT_MODIFIER_EXT)
+       maxMipLevels = 1;
+ 
++   if (info->tiling == VK_IMAGE_TILING_DRM_FORMAT_MODIFIER_EXT)
++      maxArraySize = 1;
++
+    if (info->tiling == VK_IMAGE_TILING_OPTIMAL &&
+        info->type == VK_IMAGE_TYPE_2D && ycbcr_info == NULL &&
+        (format_feature_flags &
+@@ -2463,7 +2484,6 @@ panvk_GetPhysicalDeviceImageFormatProperties2(
+    VkImageFormatProperties2 *base_props)
+ {
+    VK_FROM_HANDLE(panvk_physical_device, physical_device, physicalDevice);
+-   const VkImageStencilUsageCreateInfo *stencil_usage_info = NULL;
+    const VkPhysicalDeviceExternalImageFormatInfo *external_info = NULL;
+    const VkPhysicalDeviceImageViewImageFormatInfoEXT *image_view_info = NULL;
+    VkExternalImageFormatProperties *external_props = NULL;
+@@ -2482,9 +2502,6 @@ panvk_GetPhysicalDeviceImageFormatProperties2(
+    /* Extract input structs */
+    vk_foreach_struct_const(sType, s, base_info->pNext) {
+       switch (sType) {
+-      case VK_STRUCTURE_TYPE_IMAGE_STENCIL_USAGE_CREATE_INFO:
+-         stencil_usage_info = s;
+-         break;
+       case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_IMAGE_FORMAT_INFO:
+          external_info = s;
+          break;
+@@ -2565,17 +2582,25 @@ panvk_GetPhysicalDeviceImageFormatProperties2(
+    }
+ 
+    if (hic_props) {
+-      VkImageUsageFlags stencil_usage = stencil_usage_info ?
+-         stencil_usage_info->stencilUsage : base_info->usage;
+-
+       /* We don't support AFBC for images used for host transfer. So, if an
+        * image could have been tiled as AFBC if it weren't for host transfer,
+        * report suboptimal access. */
+-      VkImageUsageFlags usage = base_info->usage | stencil_usage;
+-      usage &= ~VK_IMAGE_USAGE_HOST_TRANSFER_BIT;
+-      bool can_use_afbc = panvk_image_can_use_afbc(
+-         physical_device, base_info->format, usage, base_info->type,
+-         base_info->tiling, base_info->flags);
++      enum pipe_format pfmt = vk_format_to_pipe_format(base_info->format);
++      bool can_use_afbc = false;
++      if (PANVK_DEBUG(WSI_AFBC) &&
++          base_info->tiling != VK_IMAGE_TILING_LINEAR &&
++          base_info->type != VK_IMAGE_TYPE_1D &&
++          pan_query_afbc(&physical_device->kmod.dev->props)) {
++         PAN_SUPPORTED_MODIFIERS(supported);
++         for (unsigned i = 0; i < ARRAY_SIZE(supported); i++) {
++            if (drm_is_afbc(supported[i]) &&
++                pan_image_test_modifier_with_format(
++                   &physical_device->kmod.dev->props, supported[i], pfmt)) {
++               can_use_afbc = true;
++               break;
++            }
++         }
++      }
+       hic_props->optimalDeviceAccess = !can_use_afbc;
+ 
+       /* FIXME: we only support host transfer with certain modifiers and for now

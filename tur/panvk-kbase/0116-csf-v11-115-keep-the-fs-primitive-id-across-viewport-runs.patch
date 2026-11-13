@@ -1,0 +1,265 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: Tue, 6 Oct 2026 00:30:00 +0530
+Subject: [PATCH] panvk: keep the FS primitive ID across VS viewport runs
+ biblioklept
+
+A VS that writes ViewportIndex is drawn as one IDVS draw per viewport
+run, and the hardware primitive ID restarts at each run (and did not
+restart per instance, the run list flattens instances). When the FS
+reads PrimitiveID and the VS has no PrimitiveID output, the run builder
+packs the primitive ID (per instance, across restarts, plus the CPU
+chunk's primitive base) into index bits 16+; the vp passthrough reads
+the record from bits 0-15 and outputs PrimitiveID, which the tiler
+uses through primitive_index_override. Run draws have restart off. TES
+already outputs its patch ID and is unchanged. Host test extended.
+
+Generated-by: LLM
+---
+diff --git a/src/panfrost/libpan/draw_helper_vp.h b/src/panfrost/libpan/draw_helper_vp.h
+--- a/src/panfrost/libpan/draw_helper_vp.h
++++ b/src/panfrost/libpan/draw_helper_vp.h
+@@ -12,6 +12,12 @@
+ #define PANLIB_VP_RUN_BYTES 12u
+ #define PANLIB_VP_MAX_VIEWPORTS 16u
+ #define PANLIB_VP_RESTART 0xffffffffu
++/* pack_prim_id: run index = record | (primitive ID & 0xffff) << 16. Records
++ * are capped at 65536 (PANVK_GPU_PRERAST_MAX_INVOCATIONS). Run draws have
++ * primitive restart off, so any value is a vertex.
++ */
++#define PANLIB_VP_PRIM_ID_SHIFT 16u
++#define PANLIB_VP_PACKED_RECORD_MASK 0xffffu
+ #define PANLIB_VP_MAX_INPUT_INDICES (1u << 24)
+ #define PANLIB_VP_MAX_OUT_INDICES (1u << 24)
+ #define PANLIB_VP_MAX_RUNS ((UINT32_MAX - PANLIB_VP_RUN_HEADER_BYTES) / PANLIB_VP_RUN_BYTES)
+diff --git a/src/panfrost/libpan/tests/vp_runs.c b/src/panfrost/libpan/tests/vp_runs.c
+--- a/src/panfrost/libpan/tests/vp_runs.c
++++ b/src/panfrost/libpan/tests/vp_runs.c
+@@ -354,7 +354,7 @@
+       for (uint32_t i = 0; i < 2; i++)
+          idx[i] += 20;
+       panlib_vp_runs_n(idx, 2, rec, STRIDE, outs, 4, MESA_PRIM_POINTS, 0, 64,
+-                       8, out, &buf.h, 2, 2);
++                       8, out, &buf.h, 2, 2, 0, 0);
+       CHECK(!buf.h.overflow && buf.h.index_count == 4 && buf.h.run_count == 3);
+       CHECK(out[0] == 20 && out[1] == 21 && out[2] == 22 && out[3] == 23);
+       CHECK(buf.r[0].viewport == 0 && buf.r[0].index_count == 1);
+@@ -363,8 +363,37 @@
+       CHECK(buf.r[2].viewport == 0 && buf.r[2].first_index == 3);
+       /* the instance offset must not wrap */
+       panlib_vp_runs_n(idx, 2, rec, STRIDE, outs, 4, MESA_PRIM_POINTS, 0, 64,
+-                       8, out, &buf.h, 2, 0xffffffffu);
++                       8, out, &buf.h, 2, 0xffffffffu, 0, 0);
+       CHECK(buf.h.overflow == 1 && buf.h.run_count == 0);
++
++      /* pack_prim_id: the primitive ID rides in bits 16+, per instance. */
++      panlib_vp_runs_n(idx, 2, rec, STRIDE, outs, 4, MESA_PRIM_POINTS, 0, 64,
++                       8, out, &buf.h, 2, 2, 1, 0);
++      CHECK(!buf.h.overflow && buf.h.index_count == 4 && buf.h.run_count == 3);
++      CHECK(out[0] == 20 && out[1] == (21 | 1u << 16) && out[2] == 22 &&
++            out[3] == (23 | 1u << 16));
++   }
++
++   /* pack_prim_id counts across a restart, and a record past 16 bits
++    * discards the draw.
++    */
++   {
++      uint32_t idx[] = {20, PANLIB_VP_RESTART, 21};
++      panlib_vp_runs_n(idx, 3, rec, STRIDE, outs, 4, MESA_PRIM_POINTS, 0, 64,
++                       8, out, &buf.h, 1, 0, 1, 0);
++      CHECK(!buf.h.overflow && buf.h.index_count == 2);
++      CHECK(out[0] == 20 && out[1] == (21 | 1u << 16));
++
++      uint32_t big[] = {0x10000};
++      panlib_vp_runs_n(big, 1, NULL, 0, 0, 4, MESA_PRIM_POINTS, 0, 64, 8, out,
++                       &buf.h, 1, 0, 1, 0);
++      CHECK(buf.h.overflow == 1);
++
++      /* A CPU-split chunk starts at its primitive base, IDs wrap at 16 bits. */
++      uint32_t two[] = {20, 21};
++      panlib_vp_runs_n(two, 2, rec, STRIDE, outs, 4, MESA_PRIM_POINTS, 0, 64,
++                       8, out, &buf.h, 1, 0, 1, 0xffff);
++      CHECK(!buf.h.overflow && out[0] == (20 | 0xffffu << 16) && out[1] == 21);
+    }
+ 
+    free(rec);
+diff --git a/src/panfrost/libpan/vp_runs.cl b/src/panfrost/libpan/vp_runs.cl
+--- a/src/panfrost/libpan/vp_runs.cl
++++ b/src/panfrost/libpan/vp_runs.cl
+@@ -70,7 +70,7 @@
+         uint32_t prim, bool provoking_last, uint32_t p, uint32_t num_prims,
+         uint32_t base, uint32_t rec_base, VP_GLOBAL uint32_t *out_indices,
+         VP_GLOBAL struct panlib_vp_run *runs, uint32_t *nidx, uint32_t *nrun,
+-        uint32_t index_cap, uint32_t run_cap)
++        uint32_t index_cap, uint32_t run_cap, bool pack_prim_id, uint32_t pid)
+ {
+    uint32_t k = mesa_vertices_per_prim((enum mesa_prim)prim);
+    uint32_t vtx[3];
+@@ -92,10 +92,23 @@
+       if (!vp_add_u32(in_indices[at], rec_base, &vtx[v]))
+          return false;
+    }
+-   return vp_emit(out_indices, runs, nidx, nrun, index_cap, run_cap,
+-                  vp_prim_viewport(records, record_stride, vp_slot, has_vp,
+-                                   vtx[prov], count),
+-                  k, vtx);
++   uint32_t vp = vp_prim_viewport(records, record_stride, vp_slot, has_vp,
++                                  vtx[prov], count);
++
++   /* The FS primitive ID restarts with each run draw: carry it in the index
++    * bits 16+ instead (PANLIB_VP_PRIM_ID_SHIFT), the passthrough VS outputs
++    * it. ponytail: 16 bits, IDs wrap past 65535; widen with a side buffer
++    * indexed by the record if an app cares.
++    */
++   if (pack_prim_id) {
++      for (uint32_t v = 0; v < k; v++) {
++         if (vtx[v] > PANLIB_VP_PACKED_RECORD_MASK)
++            return false;
++         vtx[v] |= pid << PANLIB_VP_PRIM_ID_SHIFT;
++      }
++   }
++   return vp_emit(out_indices, runs, nidx, nrun, index_cap, run_cap, vp, k,
++                  vtx);
+ }
+ 
+ /* instances > 1 repeats the index list once per instance, instance k reading
+@@ -110,7 +123,8 @@
+                  uint32_t index_capacity, uint32_t run_capacity,
+                  VP_GLOBAL uint32_t *out_indices,
+                  VP_GLOBAL struct panlib_vp_run_header *header,
+-                 uint32_t instances, uint32_t instance_stride)
++                 uint32_t instances, uint32_t instance_stride,
++                 uint32_t pack_prim_id, uint32_t prim_base)
+ {
+    bool has_vp = (outputs_written & VARYING_BIT_VIEWPORT) != 0;
+    uint32_t vp_slot = util_bitcount64(outputs_written &
+@@ -146,6 +160,10 @@
+    uint64_t rec64 = (uint64_t)inst * instance_stride;
+    uint32_t rec_base = (uint32_t)rec64;
+    uint32_t needle = 0;
++   /* Primitive ID: counts across restarts, restarts with each instance.
++    * prim_base is the first primitive of a CPU-split chunk (one instance).
++    */
++   uint32_t pid = prim_base;
+ 
+    if (rec64 > UINT32_MAX - 1)
+       overflow = true;
+@@ -163,11 +181,12 @@
+       uint32_t prims =
+          u_decomposed_prims_for_vertices((enum mesa_prim)prim, (int)len);
+ 
+-      for (uint32_t p = 0; p < prims && !overflow; p++) {
++      for (uint32_t p = 0; p < prims && !overflow; p++, pid++) {
+          overflow = !vp_prim(in_indices, records, record_stride, vp_slot,
+                              has_vp, count, prim, prov_last, p, prims,
+                              needle, rec_base, out_indices, runs, &nidx,
+-                             &nrun, index_capacity, run_capacity);
++                             &nrun, index_capacity, run_capacity,
++                             pack_prim_id != 0, pid & 0xffffu);
+       }
+       if (!vp_add_u32(next, 1, &needle))
+          overflow = true;
+@@ -190,7 +209,8 @@
+ {
+    panlib_vp_runs_n(in_indices, index_count, records, record_stride,
+                     outputs_written, viewport_count, prim, provoking_last,
+-                    index_capacity, run_capacity, out_indices, header, 1, 0);
++                    index_capacity, run_capacity, out_indices, header, 1, 0,
++                    0, 0);
+ }
+ 
+ #ifndef PANLIB_VP_HOST
+@@ -204,7 +224,8 @@
+                      uint32_t record_stride, uint32_t viewport_count,
+                      uint32_t prim, uint32_t provoking_last,
+                      uint32_t index_bound, uint32_t index_capacity,
+-                     uint32_t run_capacity, uint32_t per_instance)
++                     uint32_t run_capacity, uint32_t per_instance,
++                     uint32_t pack_prim_id, uint32_t prim_base)
+ {
+    uint32_t n = *((global const uint32_t *)counts);
+    /* A VS draw: counts is {vertex count, instance count}, and instance k
+@@ -224,6 +245,6 @@
+                     index_capacity, run_capacity,
+                     (global uint32_t *)out_indices,
+                     (global struct panlib_vp_run_header *)header, instances,
+-                    per_instance ? n : 0);
++                    per_instance ? n : 0, pack_prim_id, prim_base);
+ }
+ #endif
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+@@ -4705,6 +4705,8 @@
+    const struct panvk_shader *gs = cmdbuf->state.gfx.gs.shader;
+    const struct panvk_shader *vps =
+       panvk_prerast_viewport_shader(&cmdbuf->state.gfx);
++   const struct panvk_shader_variant *fs =
++      panvk_shader_only_variant(get_fs(cmdbuf));
+ 
+    if (!vps)
+       return false;
+@@ -4816,6 +4818,13 @@
+       .index_capacity = out_count,
+       .run_capacity = run_capacity,
+       .per_instance = per_instance,
++      /* A VS has no PrimitiveID output (a TES has one, see panvk_lower_tes):
++       * give the FS one that does not restart with each run.
++       */
++      .pack_prim_id = per_instance && fs &&
++                      fs->info.fs.reads_primitive_id &&
++                      !(outputs & VARYING_BIT_PRIMITIVE_ID),
++      .prim_base = source->gpu_prerast_prim_base,
+    };
+    return true;
+ }
+diff --git a/src/panfrost/vulkan/panvk_vX_shader.c b/src/panfrost/vulkan/panvk_vX_shader.c
+--- a/src/panfrost/vulkan/panvk_vX_shader.c
++++ b/src/panfrost/vulkan/panvk_vX_shader.c
+@@ -22,6 +22,7 @@
+ #include "panvk_shader.h"
+ #if PAN_ARCH >= 10
+ #include "panvk_gpu_prerast.h"
++#include "libpan/draw_helper_vp.h"
+ #include "poly/nir/poly_nir.h"
+ #include "libpoly.h"
+ #endif
+@@ -1225,7 +1226,15 @@
+       nir_iadd_imm(&b, params,
+                    offsetof(struct panvk_gpu_prerast_params, vertex_count)),
+       .align_mul = 4);
+-   nir_def *linear = nir_iadd(&b, nir_load_vertex_id(&b),
++   /* A VS has no PrimitiveID output: run draws carry it in the index bits
++    * 16+ (panlib_vp_runs pack_prim_id), the record index is below. Unpacked
++    * indices are records < 65536, which only lose the meaningless ID.
++    */
++   const bool add_prim_id = !(outputs & VARYING_BIT_PRIMITIVE_ID);
++   nir_def *vid = nir_load_vertex_id(&b);
++   if (add_prim_id)
++      vid = nir_iand_imm(&b, vid, PANLIB_VP_PACKED_RECORD_MASK);
++   nir_def *linear = nir_iadd(&b, vid,
+                               nir_imul(&b, nir_load_instance_id(&b), verts));
+    nir_def *record =
+       nir_iadd(&b, base, nir_imul(&b, nir_u2u64(&b, linear), stride));
+@@ -1272,9 +1281,18 @@
+                        .io_semantics = {.location = location, .num_slots = 1});
+    }
+ 
++   if (add_prim_id) {
++      nir_store_output(
++         &b, nir_ushr_imm(&b, nir_load_vertex_id(&b), PANLIB_VP_PRIM_ID_SHIFT),
++         nir_imm_int(&b, 0), .base = idx++, .write_mask = 0x1,
++         .src_type = nir_type_int32,
++         .io_semantics = {.location = VARYING_SLOT_PRIMITIVE_ID,
++                          .num_slots = 1});
++   }
+    panvk_prerast_store_clip(&b, planes, scissor_loc, idx++);
+    b.shader->info.outputs_written =
+-      (outputs & ~VARYING_BIT_VIEWPORT) | BITFIELD64_BIT(scissor_loc);
++      (outputs & ~VARYING_BIT_VIEWPORT) | BITFIELD64_BIT(scissor_loc) |
++      (add_prim_id ? VARYING_BIT_PRIMITIVE_ID : 0);
+    b.shader->num_outputs = idx;
+    return b.shader;
+ }
+-- 
+2.45.0

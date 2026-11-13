@@ -1,0 +1,51 @@
+From: abhay-byte <zenithblue.dev@gmail.com>
+Subject: [PATCH csf-v11 039] panvk: BC GPU decode on by default when HW lacks BC (no_bc_emul opts out)
+Generated-by: LLM
+
+Purpose: BC GPU compute decode on by default when HW lacks BC; PANVK_DEBUG=no_bc_emul opts out
+Source/Reference: local fix, work/mesa 33e70442a20
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/038
+Validation test: tests/dxvk/vulkan/bc/bc_decode.c (16 formats raw/copy/blit, BC_DEVICE_FAILS=0) + bc_verify.py (BC_VERIFY_FAILS=0)
+
+diff --git a/src/panfrost/vulkan/panvk_instance.c b/src/panfrost/vulkan/panvk_instance.c
+index 8c3148a58cd8493d53578471714f10ba8c2e7bfa..c0d1b3c2ccdf7c779d61f9d9b1a171145f5c36df 100644
+--- a/src/panfrost/vulkan/panvk_instance.c
++++ b/src/panfrost/vulkan/panvk_instance.c
+@@ -62,7 +62,7 @@ static const struct debug_control panvk_debug_options[] = {
+    {"no_crc", PANVK_DEBUG_NO_CRC},
+    {"kbase_diag", PANVK_DEBUG_KBASE_DIAG},
+    {"gpu_prerast", PANVK_DEBUG_GPU_PRERAST},
+-   {"bc_emul", PANVK_DEBUG_BC_EMUL},
++   {"no_bc_emul", PANVK_DEBUG_NO_BC_EMUL},
+    {NULL, 0},
+ };
+ 
+diff --git a/src/panfrost/vulkan/panvk_instance.h b/src/panfrost/vulkan/panvk_instance.h
+index aded0f48ac0590d8a87a4efde1dbd8607d610827..8474961fdf6b325a2d8047a34adf5c7b3aee3f88 100644
+--- a/src/panfrost/vulkan/panvk_instance.h
++++ b/src/panfrost/vulkan/panvk_instance.h
+@@ -37,7 +37,7 @@ enum panvk_debug_flags {
+    PANVK_DEBUG_NO_CRC = 1 << 19,
+    PANVK_DEBUG_KBASE_DIAG = 1 << 20,
+    PANVK_DEBUG_GPU_PRERAST = 1 << 21,
+-   PANVK_DEBUG_BC_EMUL = 1 << 22,
++   PANVK_DEBUG_NO_BC_EMUL = 1 << 22,
+ };
+ 
+ extern uint64_t panvk_debug;
+diff --git a/src/panfrost/vulkan/panvk_physical_device.c b/src/panfrost/vulkan/panvk_physical_device.c
+index f2b4c5a52e9f25f5727cfbf732025847d5cbcd0e..2555e1416e2019cb8e704a619cf593d293812e78 100644
+--- a/src/panfrost/vulkan/panvk_physical_device.c
++++ b/src/panfrost/vulkan/panvk_physical_device.c
+@@ -1756,7 +1756,7 @@ format_is_supported(struct panvk_physical_device *physical_device,
+ bool
+ panvk_bc_emul_enabled(const struct panvk_physical_device *physical_device)
+ {
+-   if (!PANVK_DEBUG(BC_EMUL))
++   if (PANVK_DEBUG(NO_BC_EMUL))
+       return false;
+ 
+    const struct pan_format fmt =

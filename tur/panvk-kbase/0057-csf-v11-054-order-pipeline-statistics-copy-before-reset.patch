@@ -1,0 +1,31 @@
+From: abhay-byte <zenithblue.dev@gmail.com>
+Subject: [PATCH csf-v11 054] panvk: order pipeline statistics copy before reset
+Generated-by: LLM
+
+Purpose: Order copy before reset across compute and fragment queues; biblioklept
+Source/Reference: local fix, work/mesa d33a343037f
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/053
+Validation test: targeted CTS copy/reset group 8 Pass, 0 Fail, 16 NotSupported; integrated build NINJA_RC=0
+
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_query.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_query.c
+index 2a6b62d6773..d24fa287620 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_query.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_query.c
+@@ -1142,6 +1142,14 @@ panvk_copy_pstats_query_results(struct panvk_cmd_buffer *cmd,
+ 
+    panlib_copy_pstats_query_result_struct(&precomp_ctx, panlib_1d(query_count),
+                                           PANLIB_BARRIER_CSF_SYNC, push);
++
++   struct panvk_device *dev = to_panvk_device(cmd->vk.base.device);
++   struct panvk_cs_deps post = {0};
++   post.src[PANVK_SUBQUEUE_COMPUTE].wait_sb_mask =
++      dev->csf.sb.all_iters_mask | SB_MASK(LS);
++   post.dst[PANVK_SUBQUEUE_FRAGMENT].wait_subqueue_mask =
++      BITFIELD_BIT(PANVK_SUBQUEUE_COMPUTE);
++   panvk_per_arch(emit_barrier)(cmd, post);
+ }
+ 
+ VKAPI_ATTR void VKAPI_CALL

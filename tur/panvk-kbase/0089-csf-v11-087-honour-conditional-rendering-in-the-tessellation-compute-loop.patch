@@ -1,0 +1,224 @@
+From: abhay-byte <zenithblue.dev@gmail.com>
+Subject: [PATCH csf-v11 087] panvk: honour conditional rendering in the tessellation compute loop
+
+Generated-by: LLM
+
+Purpose: The gpu_prerast tessellation loops dispatch VS/TCS/tessellator and the TES draw without the conditional-render predicate. A skipped predicate still has to run both loops and release the arenas, or the next tess draw deadlocks on the arena and ready/free syncs. Zero the copied draw on the first compute iteration when the predicate fails, and skip the vertex/tiler rasterization. Direct draws preserve an immutable recorded source in device memory so td->in_draw zeroing does not destroy replay submissions; the execution-time flag reset clears pass_mem[1] on every submit. Non-inverted executes when the predicate is non-zero, inverted when it is zero; an inherited secondary uses the normalized subqueue flag; biblioklept
+Source/Reference: local, work/mesa 1451e2d99cc, work/mesa-tess-predicate
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 1451e2d99ccb144a35fe958b24eaf121fad4288b
+Dependencies: csf-v11/065
+Validation test: host tests/tess-cond-render-predicate.c (AST/source guard verification, panlib_tess_setup and panlib_tess_step replay, direct draw replay immutability, indirect reload, inverted/non-inverted/inherited modes over 1000 repetitions, mutant suite); Android aarch64 NDK r30 build of csf_panvk_vX_cmd_draw.c.o PAN_ARCH=11 in /tmp/panvk-087
+
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+index 7b40ea4fd06..d6bcf58eb02 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+@@ -4440,6 +4440,40 @@ gpu_prerast_load_flag(struct cs_builder *b, uint64_t addr)
+    return flag;
+ }
+ 
++/* Conditional rendering says draws should run. Non-inverted executes when the
++ * predicate is non-zero, inverted when it is zero. An inherited secondary has
++ * the already-normalized flag in the subqueue context. Scratch 0 is clobbered.
++ */
++static struct cs_index
++gpu_prerast_cond_render_pass(struct panvk_cmd_buffer *cmdbuf,
++                             struct cs_builder *b)
++{
++   struct cs_index pass = cs_scratch_reg32(b, 0);
++
++   if (cmdbuf->state.cond_render.enabled) {
++      struct cs_index addr = cs_scratch_reg64(b, 2);
++
++      cs_move64_to(b, addr, cmdbuf->state.cond_render.addr);
++      cs_load32_to(b, pass, addr, 0);
++      cs_wait_slot(b, SB_ID(LS));
++      if (cmdbuf->state.cond_render.exec_cond == MALI_CS_CONDITION_EQUAL) {
++         /* Inverted: the draw runs only when the predicate is zero. */
++         cs_if(b, MALI_CS_CONDITION_EQUAL, pass)
++            cs_move32_to(b, pass, 1);
++         cs_else(b)
++            cs_move32_to(b, pass, 0);
++      }
++   } else if (cmdbuf->state.cond_render.inherited) {
++      cs_load32_to(b, pass, cs_subqueue_ctx_reg(b),
++                   offsetof(struct panvk_cs_subqueue_context, cond_render_flag));
++      cs_wait_slot(b, SB_ID(LS));
++   } else {
++      cs_move32_to(b, pass, 1);
++   }
++
++   return pass;
++}
++
+ /* GPU tessellation, as one CS loop on each of the compute and vertex/tiler
+  * queues, handshaking through the queue's tessellation ready/free syncs.
+  * Each compute iteration either runs VS -> TCS -> tessellator on the next
+@@ -4549,10 +4583,23 @@ gpu_prerast_tess(struct panvk_cmd_buffer *cmdbuf,
+    struct panvk_gpu_prerast_tess_layout l;
+    panvk_gpu_prerast_tess_layout(arena, max_patches, tc->stride_el * 4, &l);
+ 
+-   struct pan_ptr td = panvk_cmd_alloc_dev_mem(
+-      cmdbuf, desc, sizeof(struct panlib_tess_draw), 16);
+-   if (!td.gpu)
+-      return;
++    struct pan_ptr td = panvk_cmd_alloc_dev_mem(
++       cmdbuf, desc, sizeof(struct panlib_tess_draw), 16);
++    /* pass_mem[0] is the predicate, pass_mem[1] the once-only flag. Both are
++     * written by the GPU on every execution: a record-time zero would stay
++     * one after the first submit, and a simultaneous replay would then run
++     * the draw the predicate had skipped.
++     */
++    struct pan_ptr pass_mem = panvk_cmd_alloc_dev_mem(cmdbuf, desc, 8, 8);
++    /* Direct draws have no app buffer to re-read. This copy is the recorded
++     * source; the GPU zeroes td->in_draw, never this.
++     */
++    struct pan_ptr direct_draw = {0};
++    if (!indirect)
++       direct_draw = panvk_cmd_alloc_dev_mem(cmdbuf, desc, 5 * sizeof(uint32_t),
++                                             4);
++    if (!td.gpu || !pass_mem.gpu || (!indirect && !direct_draw.gpu))
++       return;
+ 
+ #define TD(f) (td.gpu + offsetof(struct panlib_tess_draw, f))
+    const struct panvk_pstats_query_state *pstats =
+@@ -4592,20 +4639,23 @@ gpu_prerast_tess(struct panvk_cmd_buffer *cmdbuf,
+    t->range = range;
+    t->verts_per_prim = vpp;
+ 
+-   uint64_t src = draw->indirect.buffer_dev_addr;
+-   if (!indirect) {
+-      t->in_draw[0] = draw->vertex.count;
+-      t->in_draw[1] = draw->instance.count;
+-      if (indexed) {
+-         t->in_draw[2] = draw->index.offset;
+-         t->in_draw[3] = draw->vertex.base;
+-         t->in_draw[4] = draw->instance.base;
+-      } else {
+-         t->in_draw[2] = draw->vertex.base;
+-         t->in_draw[3] = draw->instance.base;
+-      }
+-      src = TD(in_draw);
+-   }
++    uint64_t src = draw->indirect.buffer_dev_addr;
++    if (!indirect) {
++       uint32_t *rec = direct_draw.cpu;
++
++       rec[0] = draw->vertex.count;
++       rec[1] = draw->instance.count;
++       if (indexed) {
++          rec[2] = draw->index.offset;
++          rec[3] = draw->vertex.base;
++          rec[4] = draw->instance.base;
++       } else {
++          rec[2] = draw->vertex.base;
++          rec[3] = draw->instance.base;
++          rec[4] = 0;
++       }
++       src = direct_draw.gpu;
++    }
+ 
+    struct cs_builder *b = panvk_get_cs_builder(cmdbuf, PANVK_SUBQUEUE_COMPUTE);
+    struct cs_builder *vt =
+@@ -4685,6 +4735,27 @@ gpu_prerast_tess(struct panvk_cmd_buffer *cmdbuf,
+    gpu_prerast_acquire_arena(cmdbuf, arena);
+    if (nested)
+       gpu_prerast_acquire_arena(cmdbuf, prerast_arena);
++
++   /* A skipped predicate still has to run both loops and release the arenas,
++    * or the next tess draw deadlocks on the arena and ready/free syncs.
++    * panlib_tess_setup copies src_draw afterwards, so the zeroing that makes
++    * every iteration an empty handshake lives in the loop, after setup.
++    * The pass flag sits in device memory: scratch is clobbered by the
++    * kernels and there is no register both arches keep across them.
++    */
++    struct cs_index pass = gpu_prerast_cond_render_pass(cmdbuf, b);
++    struct cs_index pass_addr = cs_scratch_reg64(b, 2);
++    struct cs_index once_reset = cs_scratch_reg32(b, 4);
++
++    cs_move64_to(b, pass_addr, pass_mem.gpu);
++    cs_store32(b, pass, pass_addr, 0);
++    /* Clear the once-flag at execution time. The previous submit left it
++     * set, and a simultaneous replay shares this allocation.
++     */
++    cs_move32_to(b, once_reset, 0);
++    cs_store32(b, once_reset, pass_addr, 4);
++    cs_flush_stores(b);
++
+    panlib_tess_setup(&ctx, panlib_1d(1), PANLIB_BARRIER_NONE, td.gpu, src,
+                      draw->indirect.count_buffer_dev_addr,
+                      draw->indirect.buffer_dev_addr ? draw->indirect.draw_index : 0);
+@@ -4698,6 +4769,45 @@ gpu_prerast_tess(struct panvk_cmd_buffer *cmdbuf,
+       gpu_prerast_sync32_take(cmdbuf, PANVK_SUBQUEUE_COMPUTE,
+                               PANVK_QUEUE_TESS_FREE_SYNC_OFFSET);
+ 
++      /* First iteration only: setup has copied the API draw. Drop it when
++       * the predicate says not to render. Later iterations already see
++       * total_patches == 0. pass_mem[1] is the once-only flag.
++       */
++      {
++         struct cs_index once = gpu_prerast_load_flag(b, pass_mem.gpu + 4);
++         struct cs_index zero = cs_scratch_reg32(b, 2);
++         struct cs_index dst = cs_scratch_reg64(b, 4);
++         struct cs_index pred = cs_scratch_reg32(b, 6);
++
++         cs_if(b, MALI_CS_CONDITION_EQUAL, once) {
++            cs_move64_to(b, dst, pass_mem.gpu);
++            cs_load32_to(b, pred, dst, 0);
++            cs_wait_slot(b, SB_ID(LS));
++            cs_if(b, MALI_CS_CONDITION_EQUAL, pred) {
++               struct cs_index z64 = cs_scratch_reg64(b, 8);
++
++               cs_move32_to(b, zero, 0);
++               cs_move64_to(b, z64, 0);
++               cs_move64_to(b, dst, TD(in_draw));
++               for (unsigned i = 0; i < 2; i++)
++                  cs_store32(b, zero, dst, i * 4);
++               cs_move64_to(b, dst, TD(patches_per_instance));
++               cs_store32(b, zero, dst, 0);
++               cs_store32(b, zero, dst, 4);
++               /* total_patches is the uint64_t after the 32-bit fields. */
++               cs_store64(b, z64, dst,
++                          offsetof(struct panlib_tess_draw, total_patches) -
++                             offsetof(struct panlib_tess_draw,
++                                      patches_per_instance));
++               cs_flush_stores(b);
++            }
++            cs_move64_to(b, dst, pass_mem.gpu + 4);
++            cs_move32_to(b, zero, 1);
++            cs_store32(b, zero, dst, 0);
++            cs_flush_stores(b);
++         }
++      }
++
+       panlib_tess_step(&ctx, panlib_1d(1), PANLIB_BARRIER_NONE, td.gpu,
+                        tcs_stat);
+       cs_wait_slots(b, dev->csf.sb.all_iters_mask);
+@@ -4779,10 +4889,21 @@ gpu_prerast_tess(struct panvk_cmd_buffer *cmdbuf,
+       cmdbuf->state.gfx.vs.shader = tes;
+       gfx_state_set_dirty(cmdbuf, VS);
+       gfx_state_set_dirty(cmdbuf, VS_PUSH_UNIFORMS);
+-      if (nested)
+-         gpu_prerast_draw_generated(cmdbuf, &raster, prerast_arena, poly_mode);
+-      else
+-         panvk_cmd_draw(cmdbuf, raster);
++      /* Same predicate as the compute loop. panvk_cmd_draw does not see it:
++       * this draw is not PATCHES, and skipping the whole loop would leave
++       * the compute side waiting on the free sync.
++       */
++      {
++         struct cs_index pred = gpu_prerast_load_flag(vt, pass_mem.gpu);
++
++         cs_if(vt, MALI_CS_CONDITION_NEQUAL, pred) {
++            if (nested)
++               gpu_prerast_draw_generated(cmdbuf, &raster, prerast_arena,
++                                          poly_mode);
++            else
++               panvk_cmd_draw(cmdbuf, raster);
++         }
++      }
+       cmdbuf->state.gfx.vs.shader = vs;
+       gfx_state_set_dirty(cmdbuf, VS);
+       gfx_state_set_dirty(cmdbuf, VS_PUSH_UNIFORMS);

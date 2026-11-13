@@ -1,0 +1,65 @@
+From: panvk-kbase-android worker <panvk-worker@localhost>
+Subject: [PATCH kbase-common 001] build: add panfrost-kmds option and
+ HAVE_PAN_KMOD_* defines
+
+Purpose: Allow selecting which Panfrost kernel-mode drivers to build
+ (panfrost/panthor upstream, kbase new) and expose the selection to C
+ code. Required before any kbase backend file can compile.
+Source/Reference: https://github.com/wonderkast02/panvk-g720-kbase-csf
+ branch android-candidate-beta-1.9.4 (meson.options hunk + meson.build
+ panfrost_kmds block), adapted to pinned Mesa (context verified identical).
+Tested GPU: none yet (build plumbing only).
+Tested Kbase UAPI: n/a.
+Mesa base range: 26.3.0-devel (pinned 5a07217f034b3e50d8c7c7794f97a2df1742613b).
+Dependencies: none.
+Validation test: meson setup configures with
+ -Dpanfrost-kmds=panfrost,panthor,kbase; config shows HAVE_PAN_KMOD_KBASE.
+
+diff --git a/meson.options b/meson.options
+--- a/meson.options
++++ b/meson.options
+@@ -226,10 +226,19 @@
+   description : 'List of kernel-mode drivers to enable for freedreno ' +
+                 'gallium and vulkan driver',
+ )
+
+ option(
++  'panfrost-kmds',
++  type : 'array',
++  value : ['panfrost', 'panthor'],
++  choices : ['panfrost', 'panthor', 'kbase'],
++  description : 'List of kernel-mode drivers to enable for panfrost ' +
++                'gallium and vulkan driver',
++)
++
++option(
+   'amdgpu-virtio',
+   type : 'boolean',
+   value : false,
+   description : 'use experimental virtio backend for radeonsi/radv',
+ )
+ diff --git a/meson.build b/meson.build
+--- a/meson.build
++++ b/meson.build
+@@ -338,6 +338,21 @@
+     system_has_kms_drm = false
+   endif
+ endif
+
++panfrost_kmds = get_option('panfrost-kmds')
++if (with_gallium_panfrost or with_panfrost_vk) and panfrost_kmds.length() == 0
++  error('At least one Panfrost KMD must be enabled when building Panfrost.')
++endif
++
++if panfrost_kmds.contains('panfrost')
++  pre_args += '-DHAVE_PAN_KMOD_PANFROST'
++endif
++if panfrost_kmds.contains('panthor')
++  pre_args += '-DHAVE_PAN_KMOD_PANTHOR'
++endif
++if panfrost_kmds.contains('kbase')
++  pre_args += '-DHAVE_PAN_KMOD_KBASE'
++endif
++
+ # This has to be below the freedreno_kmds check since that can change system_has_kms_drm
+ with_gallium_kmsro = with_gallium_drm or (system_has_kms_drm and with_gallium_zink)

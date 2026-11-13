@@ -1,0 +1,472 @@
+From: Valentine Burley <valentine.burley@collabora.com>
+Subject: [PATCH csf-v11 031] pan/mod: Introduce modifier layout capabilities query
+
+Purpose: modifier layout capability query (dep of 6409a5b16af)
+Source/Reference: upstream Mesa commit 2042227efab (author preserved)
+Backport-of: 2042227efab
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/030
+Validation test: device matrix; icc.c
+
+diff --git a/src/panfrost/lib/pan_image.h b/src/panfrost/lib/pan_image.h
+index 642f4a6f4276ce6c283d69569faa2645806316cf..1a279d1883f7508578e787e2fb0b51bf65a245f0 100644
+--- a/src/panfrost/lib/pan_image.h
++++ b/src/panfrost/lib/pan_image.h
+@@ -344,13 +344,49 @@ pan_image_test_props(const struct pan_kmod_dev_props *dprops,
+       .mod_handler = pan_mod_get_handler(arch, iprops->modifier),
+    };
+ 
+-   if (!image.mod_handler)
++   if (!image.mod_handler || !image.mod_handler->get_format_caps)
+       return PAN_MOD_NOT_SUPPORTED;
+ 
+-   enum pan_mod_support ret =
+-      image.mod_handler->test_props(dprops, &image.props, iusage);
+-   if (ret == PAN_MOD_NOT_SUPPORTED)
+-      return ret;
++   uint32_t caps =
++      image.mod_handler->get_format_caps(dprops, iprops->format, iprops->modifier);
++   if (!caps)
++      return PAN_MOD_NOT_SUPPORTED;
++
++   if (iprops->dim == MALI_TEXTURE_DIMENSION_1D &&
++       !(caps & PAN_MOD_FORMAT_CAP_DIM_1D))
++      return PAN_MOD_NOT_SUPPORTED;
++   if (iprops->dim == MALI_TEXTURE_DIMENSION_2D &&
++       !(caps & PAN_MOD_FORMAT_CAP_DIM_2D))
++      return PAN_MOD_NOT_SUPPORTED;
++   if (iprops->dim == MALI_TEXTURE_DIMENSION_3D &&
++       !(caps & PAN_MOD_FORMAT_CAP_DIM_3D))
++      return PAN_MOD_NOT_SUPPORTED;
++
++   if (iprops->nr_samples > 1 && !(caps & PAN_MOD_FORMAT_CAP_MSAA))
++      return PAN_MOD_NOT_SUPPORTED;
++
++   if (iusage) {
++      if ((iusage->bind & PAN_BIND_STORAGE_IMAGE) &&
++          !(caps & PAN_MOD_FORMAT_CAP_STORAGE_IMAGE))
++         return PAN_MOD_NOT_SUPPORTED;
++      if ((iusage->bind & PAN_BIND_DEPTH_STENCIL) &&
++          !(caps & PAN_MOD_FORMAT_CAP_DEPTH_STENCIL))
++         return PAN_MOD_NOT_SUPPORTED;
++      if (iusage->standard_sparse_mapping_granularity &&
++          !(caps & PAN_MOD_FORMAT_CAP_SPARSE_MAP))
++         return PAN_MOD_NOT_SUPPORTED;
++      if (iusage->host_copy && !(caps & PAN_MOD_FORMAT_CAP_HOST_COPY))
++         return PAN_MOD_NOT_SUPPORTED;
++      if (iusage->wsi && !(caps & PAN_MOD_FORMAT_CAP_WSI))
++         return PAN_MOD_NOT_SUPPORTED;
++   }
++
++   enum pan_mod_support ret = PAN_MOD_OPTIMAL;
++   if (image.mod_handler->test_props) {
++      ret = image.mod_handler->test_props(dprops, &image.props, iusage);
++      if (ret == PAN_MOD_NOT_SUPPORTED)
++         return ret;
++   }
+ 
+    /* Now make sure the layout can be properly initialized on all planes. */
+    uint32_t plane_count = util_format_get_num_planes(image.props.format);
+@@ -371,24 +407,12 @@ static inline bool
+ pan_image_test_modifier_with_format(const struct pan_kmod_dev_props *dprops,
+                                     uint64_t modifier, enum pipe_format format)
+ {
+-   /* To check if a <modifier,format> pair is supported, we define the smallest
+-    * possible 2D image (or 3D image if this is a 3D compressed format). */
+-   const struct pan_image_props iprops = {
+-      .modifier = modifier,
+-      .format = format,
+-      .extent_px = {
+-            .width = util_format_get_blockwidth(format),
+-            .height = util_format_get_blockheight(format),
+-            .depth = util_format_get_blockdepth(format),
+-      },
+-      .nr_samples = 1,
+-      .dim = util_format_get_blockdepth(format) > 1 ? MALI_TEXTURE_DIMENSION_3D
+-                                                    : MALI_TEXTURE_DIMENSION_2D,
+-      .nr_slices = 1,
+-      .array_size = 1,
+-   };
++   const unsigned arch = pan_arch(dprops->gpu_id);
++   const struct pan_mod_handler *handler = pan_mod_get_handler(arch, modifier);
++   if (!handler || !handler->get_format_caps)
++      return false;
+ 
+-   return pan_image_test_props(dprops, &iprops, NULL) != PAN_MOD_NOT_SUPPORTED;
++   return handler->get_format_caps(dprops, format, modifier) != 0;
+ }
+ 
+ #ifdef __cplusplus
+diff --git a/src/panfrost/lib/pan_mod.c b/src/panfrost/lib/pan_mod.c
+index 59a82e7f490075438b9428218638cfdb3ec5c204..1548b5bc1ed7c329284db3eddbad1e910556fdbd 100644
+--- a/src/panfrost/lib/pan_mod.c
++++ b/src/panfrost/lib/pan_mod.c
+@@ -177,56 +177,53 @@ pan_mod_afbc_init_slice_layout(
+    return true;
+ }
+ 
+-static enum pan_mod_support
+-pan_mod_afbc_test_props(const struct pan_kmod_dev_props *dprops,
+-                        const struct pan_image_props *iprops,
+-                        const struct pan_image_usage *iusage)
++static uint32_t
++pan_mod_afbc_get_format_caps(const struct pan_kmod_dev_props *dprops,
++                             enum pipe_format format, uint64_t modifier)
+ {
+    /* AFBC not supported. */
+    if (!pan_query_afbc(dprops))
+-      return PAN_MOD_NOT_SUPPORTED;
++      return 0;
+ 
+    /* Not all architectures support tiled mode */
+-   if ((iprops->modifier & AFBC_FORMAT_MOD_TILED) && !pan_afbc_can_tile(PAN_ARCH))
+-      return PAN_MOD_NOT_SUPPORTED;
++   if ((modifier & AFBC_FORMAT_MOD_TILED) && !pan_afbc_can_tile(PAN_ARCH))
++      return 0;
+ 
+    /* ... or split mode */
+-   if ((iprops->modifier & AFBC_FORMAT_MOD_SPLIT) && !pan_afbc_can_split(PAN_ARCH))
+-      return PAN_MOD_NOT_SUPPORTED;
++   if ((modifier & AFBC_FORMAT_MOD_SPLIT) && !pan_afbc_can_split(PAN_ARCH))
++      return 0;
+ 
+    /* Check compatibility between formats and parameters */
+-   unsigned plane_count = util_format_get_num_planes(iprops->format);
++   unsigned plane_count = util_format_get_num_planes(format);
+    for (unsigned p = 0; p < plane_count; p++) {
+-      enum pan_afbc_mode mode = pan_afbc_format(PAN_ARCH, iprops->format, p);
++      enum pan_afbc_mode mode = pan_afbc_format(PAN_ARCH, format, p);
+       if (mode == PAN_AFBC_MODE_INVALID)
+-         return PAN_MOD_NOT_SUPPORTED;
+-      if (!pan_afbc_check_params(mode, iprops->modifier))
+-         return PAN_MOD_NOT_SUPPORTED;
++         return 0;
++      if (!pan_afbc_check_params(mode, modifier))
++         return 0;
+    }
+ 
+-   /* AFBC can't do multisampling. */
+-   if (iprops->nr_samples > 1)
+-      return PAN_MOD_NOT_SUPPORTED;
++   unsigned sw = pan_afbc_superblock_width(modifier);
++   bool is_split = modifier & AFBC_FORMAT_MOD_SPLIT;
++   bool is_ytr = modifier & AFBC_FORMAT_MOD_YTR;
+ 
+-   /* AFBC(2D) or AFBC(3D) on v7+ only. */
+-   if ((iprops->dim == MALI_TEXTURE_DIMENSION_3D && PAN_ARCH < 7) ||
+-       iprops->dim != MALI_TEXTURE_DIMENSION_2D)
+-      return PAN_MOD_NOT_SUPPORTED;
++   uint32_t caps = PAN_MOD_FORMAT_CAP_DIM_2D |
++                   PAN_MOD_FORMAT_CAP_WSI;
+ 
+-   /* No image store. */
+-   if (iusage && iusage->bind & PAN_BIND_STORAGE_IMAGE)
+-      return PAN_MOD_NOT_SUPPORTED;
+-
+-   /* ZS buffer descriptors can't pass split/wide/YTR modifiers. */
+-   if (iusage && (iusage->bind & PAN_BIND_DEPTH_STENCIL) &&
+-       (pan_afbc_superblock_width(iprops->modifier) != 16 ||
+-        (iprops->modifier & (AFBC_FORMAT_MOD_SPLIT | AFBC_FORMAT_MOD_YTR))))
+-      return PAN_MOD_NOT_SUPPORTED;
++   if (sw == 16 && !(is_split || is_ytr)) {
++      caps |= PAN_MOD_FORMAT_CAP_DEPTH_STENCIL;
++      if (PAN_ARCH >= 9)
++         caps |= PAN_MOD_FORMAT_CAP_DEPTH_STENCIL_INTERLEAVED;
++   }
+ 
+-   /* We don't implement mapping individual tiles with AFBC. */
+-   if (iusage && iusage->standard_sparse_mapping_granularity)
+-      return PAN_MOD_NOT_SUPPORTED;
++   return caps;
++}
+ 
++static enum pan_mod_support
++pan_mod_afbc_test_props(const struct pan_kmod_dev_props *dprops,
++                        const struct pan_image_props *iprops,
++                        const struct pan_image_usage *iusage)
++{
+    struct pan_image_block_size superblock_extent_px = pan_afbc_superblock_size(iprops->modifier);
+ 
+    if (iprops->modifier & AFBC_FORMAT_MOD_TILED) {
+@@ -326,35 +323,27 @@ pan_mod_afrc_match(uint64_t mod)
+    return drm_is_afrc(mod);
+ }
+ 
+-static enum pan_mod_support
+-pan_mod_afrc_test_props(const struct pan_kmod_dev_props *dprops,
+-                        const struct pan_image_props *iprops,
+-                        const struct pan_image_usage *iusage)
++static uint32_t
++pan_mod_afrc_get_format_caps(const struct pan_kmod_dev_props *dprops,
++                             enum pipe_format format, uint64_t modifier)
+ {
+    /* AFRC not supported. */
+    if (!pan_query_afrc(dprops))
+-      return PAN_MOD_NOT_SUPPORTED;
++      return 0;
+ 
+    /* Format not AFRC-able. */
+-   if (!pan_afrc_supports_format(iprops->format))
+-      return PAN_MOD_NOT_SUPPORTED;
+-
+-   /* AFRC does not support layered multisampling. */
+-   if (iprops->nr_samples > 1)
+-      return PAN_MOD_NOT_SUPPORTED;
++   if (!pan_afrc_supports_format(format))
++      return 0;
+ 
+-   /* No image store. */
+-   if (iusage && iusage->bind & PAN_BIND_STORAGE_IMAGE)
+-      return PAN_MOD_NOT_SUPPORTED;
+-
+-   /* We don't implement mapping individual tiles with AFRC. */
+-   if (iusage && iusage->standard_sparse_mapping_granularity)
+-      return PAN_MOD_NOT_SUPPORTED;
+-
+-   /* We can't write to an AFRC resource directly. */
+-   if (iusage && iusage->host_copy)
+-      return PAN_MOD_NOT_SUPPORTED;
++   return PAN_MOD_FORMAT_CAP_DIM_2D |
++          PAN_MOD_FORMAT_CAP_DIM_3D;
++}
+ 
++static enum pan_mod_support
++pan_mod_afrc_test_props(const struct pan_kmod_dev_props *dprops,
++                        const struct pan_image_props *iprops,
++                        const struct pan_image_usage *iusage)
++{
+    /* Host updates require an extra blit which we would rather avoid. */
+    if (iusage && iusage->frequent_host_updates)
+       return PAN_MOD_NOT_OPTIMAL;
+@@ -489,21 +478,31 @@ pan_mod_u_tiled_match(uint64_t mod)
+    return mod == DRM_FORMAT_MOD_ARM_16X16_BLOCK_U_INTERLEAVED;
+ }
+ 
++static uint32_t
++pan_mod_u_tiled_get_format_caps(const struct pan_kmod_dev_props *dprops,
++                                enum pipe_format format, uint64_t modifier)
++{
++   assert(GENX(pan_format_from_pipe_format)(format)->hw);
++
++   /* YUV not supported. */
++   if (pan_format_is_yuv(format))
++      return 0;
++
++   return PAN_MOD_FORMAT_CAP_DIM_1D |
++          PAN_MOD_FORMAT_CAP_DIM_2D |
++          PAN_MOD_FORMAT_CAP_DIM_3D |
++          PAN_MOD_FORMAT_CAP_MSAA |
++          PAN_MOD_FORMAT_CAP_STORAGE_IMAGE |
++          PAN_MOD_FORMAT_CAP_DEPTH_STENCIL |
++          PAN_MOD_FORMAT_CAP_DEPTH_STENCIL_INTERLEAVED |
++          PAN_MOD_FORMAT_CAP_HOST_COPY;
++}
++
+ static enum pan_mod_support
+ pan_mod_u_tiled_test_props(const struct pan_kmod_dev_props *dprops,
+                            const struct pan_image_props *iprops,
+                            const struct pan_image_usage *iusage)
+ {
+-   assert(GENX(pan_format_from_pipe_format)(iprops->format)->hw);
+-
+-   /* YUV not supported. */
+-   if (pan_format_is_yuv(iprops->format))
+-      return PAN_MOD_NOT_SUPPORTED;
+-
+-   /* We don't implement mapping individual tiles in this layout. */
+-   if (iusage && iusage->standard_sparse_mapping_granularity)
+-      return PAN_MOD_NOT_SUPPORTED;
+-
+    /* The purpose of tiling is improving locality in both X- and
+     * Y-directions. If there is only a single pixel in either direction,
+     * tiling does not make sense; using a linear layout instead is optimal
+@@ -678,7 +677,8 @@ pan_mod_interleaved_64k_init_slice_layout(
+    const struct pan_image_layout_constraints *layout_constraints,
+    struct pan_image_slice_layout *slayout)
+ {
+-   assert(!(layout_constraints && layout_constraints->wsi_row_pitch_B));
++   const bool use_explicit_layout =
++      layout_constraints && layout_constraints->wsi_row_pitch_B;
+ 
+    struct pan_image_block_size tile_extent_el =
+       pan_interleaved_64k_tile_size_el(props->format);
+@@ -694,7 +694,17 @@ pan_mod_interleaved_64k_init_slice_layout(
+       mip_extent_px.depth,
+    };
+ 
+-   uint64_t row_stride_B = mip_extent_tiles.width * tile_size_B;
++   uint64_t min_row_stride_B = mip_extent_tiles.width * tile_size_B;
++   uint64_t row_stride_B = min_row_stride_B;
++
++   if (use_explicit_layout) {
++      row_stride_B = layout_constraints->wsi_row_pitch_B;
++      if (row_stride_B < min_row_stride_B || (row_stride_B % tile_size_B) != 0) {
++         mesa_loge("Interleaved 64k pitch invalid or too small");
++         return false;
++      }
++   }
++
+    uint64_t surf_stride_B = mip_extent_tiles.height * row_stride_B;
+ 
+    slayout->offset_B = layout_constraints ? layout_constraints->offset_B : 0;
+@@ -709,7 +719,9 @@ static uint32_t
+ pan_mod_interleaved_64k_get_wsi_row_pitch(const struct pan_image *image,
+                                           unsigned plane_idx, unsigned mip_level)
+ {
+-   UNREACHABLE("interleaved 64k cannot be used for wsi");
++   const struct pan_image_layout *layout = &image->planes[plane_idx]->layout;
++
++   return layout->slices[mip_level].tiled_or_linear.row_stride_B;
+ }
+ 
+ static bool
+@@ -718,33 +730,34 @@ pan_mod_interleaved_64k_match(uint64_t mod)
+    return mod == DRM_FORMAT_MOD_ARM_INTERLEAVED_64K;
+ }
+ 
+-static enum pan_mod_support
+-pan_mod_interleaved_64k_test_props(const struct pan_kmod_dev_props *dprops,
+-                                   const struct pan_image_props *iprops,
+-                                   const struct pan_image_usage *iusage)
++static uint32_t
++pan_mod_interleaved_64k_get_format_caps(const struct pan_kmod_dev_props *dprops,
++                                        enum pipe_format format, uint64_t modifier)
+ {
+-   assert(GENX(pan_format_from_pipe_format)(iprops->format)->hw);
++   assert(GENX(pan_format_from_pipe_format)(format)->hw);
+ 
+    /* YUV not supported. */
+-   if (pan_format_is_yuv(iprops->format))
+-      return PAN_MOD_NOT_SUPPORTED;
++   if (pan_format_is_yuv(format))
++      return 0;
+ 
+    /* Non-po2 byte texel blocks not supported. */
+-   if (!util_is_power_of_two_nonzero(util_format_get_blocksize(iprops->format)))
+-      return PAN_MOD_NOT_SUPPORTED;
+-
+-   /* We don't implement multisampling with this layout. */
+-   if (iprops->nr_samples > 1)
+-      return PAN_MOD_NOT_SUPPORTED;
+-
+-   /* We don't implement tiling/detiling of this layout on host. */
+-   if (iusage && iusage->host_copy)
+-      return PAN_MOD_NOT_SUPPORTED;
+-
+-   /* We don't respect wsi_row_pitch_B so this layout is not usable for WSI. */
+-   if (iusage && iusage->wsi)
+-      return PAN_MOD_NOT_SUPPORTED;
++   if (!util_is_power_of_two_nonzero(util_format_get_blocksize(format)))
++      return 0;
++
++   return PAN_MOD_FORMAT_CAP_DIM_1D |
++          PAN_MOD_FORMAT_CAP_DIM_2D |
++          PAN_MOD_FORMAT_CAP_DIM_3D |
++          PAN_MOD_FORMAT_CAP_STORAGE_IMAGE |
++          PAN_MOD_FORMAT_CAP_DEPTH_STENCIL |
++          PAN_MOD_FORMAT_CAP_DEPTH_STENCIL_INTERLEAVED |
++          PAN_MOD_FORMAT_CAP_SPARSE_MAP;
++}
+ 
++static enum pan_mod_support
++pan_mod_interleaved_64k_test_props(const struct pan_kmod_dev_props *dprops,
++                                   const struct pan_image_props *iprops,
++                                   const struct pan_image_usage *iusage)
++{
+    struct pan_image_block_size tile_extent_el =
+       pan_interleaved_64k_tile_size_el(iprops->format);
+    struct pan_image_block_size tile_extent_px = {
+@@ -814,28 +827,38 @@ pan_mod_linear_match(uint64_t mod)
+    return mod == DRM_FORMAT_MOD_LINEAR;
+ }
+ 
+-static enum pan_mod_support
+-pan_mod_linear_test_props(const struct pan_kmod_dev_props *dprops,
+-                          const struct pan_image_props *iprops,
+-                          const struct pan_image_usage *iusage)
++static uint32_t
++pan_mod_linear_get_format_caps(const struct pan_kmod_dev_props *dprops,
++                               enum pipe_format format, uint64_t modifier)
+ {
+-   assert(GENX(pan_format_from_pipe_format)(iprops->format)->hw);
++   assert(GENX(pan_format_from_pipe_format)(format)->hw);
+ 
+-   switch (iprops->format) {
++   switch (format) {
+    case PIPE_FORMAT_R8G8B8_420_UNORM_PACKED:
+    case PIPE_FORMAT_R10G10B10_420_UNORM_PACKED:
+    case PIPE_FORMAT_X6R10X6G10_X6R10X6B10_422_UNORM:
+       /* These formats have no linear representation. */
+-      return PAN_MOD_NOT_SUPPORTED;
++      return 0;
+    default:
+       break;
+    }
+ 
+-   /* We can't implement mapping of tiles at standard sparse granularity using
+-    * this layout. */
+-   if (iusage && iusage->standard_sparse_mapping_granularity)
+-      return PAN_MOD_NOT_SUPPORTED;
++   return PAN_MOD_FORMAT_CAP_DIM_1D |
++          PAN_MOD_FORMAT_CAP_DIM_2D |
++          PAN_MOD_FORMAT_CAP_DIM_3D |
++          PAN_MOD_FORMAT_CAP_MSAA |
++          PAN_MOD_FORMAT_CAP_STORAGE_IMAGE |
++          PAN_MOD_FORMAT_CAP_DEPTH_STENCIL |
++          PAN_MOD_FORMAT_CAP_DEPTH_STENCIL_INTERLEAVED |
++          PAN_MOD_FORMAT_CAP_HOST_COPY |
++          PAN_MOD_FORMAT_CAP_WSI;
++}
+ 
++static enum pan_mod_support
++pan_mod_linear_test_props(const struct pan_kmod_dev_props *dprops,
++                          const struct pan_image_props *iprops,
++                          const struct pan_image_usage *iusage)
++{
+    /* We assume that all "better" mods have been tested before linear, and
+     * declare it as optimal so it's always picked when tested, unless it's
+     * not supported.
+@@ -993,6 +1016,7 @@ pan_mod_linear_init_slice_layout(
+ #define PAN_MOD_DEF(__name)                                                    \
+    {                                                                           \
+       .match = pan_mod_##__name##_match,                                       \
++      .get_format_caps = pan_mod_##__name##_get_format_caps,                   \
+       .test_props = pan_mod_##__name##_test_props,                             \
+       .supports_msaa_average = pan_mod_##__name##_supports_msaa_average,       \
+       .get_wsi_row_pitch = pan_mod_##__name##_get_wsi_row_pitch,               \
+diff --git a/src/panfrost/lib/pan_mod.h b/src/panfrost/lib/pan_mod.h
+index 2f44bc5caa40da85c9c3d5586d535452e0608d94..a898b583a03a2159bea455a3e45fd5af4e59be50 100644
+--- a/src/panfrost/lib/pan_mod.h
++++ b/src/panfrost/lib/pan_mod.h
+@@ -27,9 +27,29 @@ enum pan_mod_support {
+    PAN_MOD_OPTIMAL,
+ };
+ 
++enum pan_mod_format_caps {
++   PAN_MOD_FORMAT_CAP_DIM_1D = 1 << 0,
++   PAN_MOD_FORMAT_CAP_DIM_2D = 1 << 1,
++   PAN_MOD_FORMAT_CAP_DIM_3D = 1 << 2,
++   PAN_MOD_FORMAT_CAP_MSAA = 1 << 3,
++   PAN_MOD_FORMAT_CAP_STORAGE_IMAGE = 1 << 4,
++   PAN_MOD_FORMAT_CAP_DEPTH_STENCIL = 1 << 5,
++   PAN_MOD_FORMAT_CAP_DEPTH_STENCIL_INTERLEAVED = 1 << 6,
++   PAN_MOD_FORMAT_CAP_HOST_COPY = 1 << 7,
++   PAN_MOD_FORMAT_CAP_SPARSE_MAP = 1 << 8,
++   PAN_MOD_FORMAT_CAP_WSI = 1 << 9,
++};
++
+ struct pan_mod_handler {
+    bool (*match)(uint64_t mod);
+ 
++   /* Get the capabilities for a specific format/modifier pair. Returns 0
++    * if this combination is not valid on this platform, or a bitmask of
++    * PAN_MOD_FORMAT_CAP_* flags if valid.
++    */
++   uint32_t (*get_format_caps)(const struct pan_kmod_dev_props *dprops,
++                               enum pipe_format format, uint64_t modifier);
++
+    /* Used to check if a set of image properties is valid. Passing a NULL iusage
+     * is valid and means "optimal set of usage for this mod". This implies
+     * that some non-supported cases can't be detected or can be reported as

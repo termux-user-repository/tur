@@ -1,0 +1,51 @@
+From: abhay-byte <zenithblue.dev@gmail.com>
+Subject: [PATCH csf-v11 048] panvk: enable geometry shaders by default
+Generated-by: LLM
+
+Purpose: Expose GPU geometry shaders on v10+ by default; biblioklept
+Source/Reference: local fix, work/mesa cf5aa478003
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/047
+Validation test: integrated build NINJA_RC=0; geometry smoke 23/23 without PANVK_DEBUG (not isolated per patch)
+
+diff --git a/src/panfrost/vulkan/panvk_instance.c b/src/panfrost/vulkan/panvk_instance.c
+index e20a15a6920..cdf7e7c4709 100644
+--- a/src/panfrost/vulkan/panvk_instance.c
++++ b/src/panfrost/vulkan/panvk_instance.c
+@@ -63,7 +63,7 @@ static const struct debug_control panvk_debug_options[] = {
+    {"kbase_diag", PANVK_DEBUG_KBASE_DIAG},
+    {"gpu_prerast", PANVK_DEBUG_GPU_PRERAST},
+    {"no_bc_emul", PANVK_DEBUG_NO_BC_EMUL},
+-   {"gs", PANVK_DEBUG_GS},
++   {"no_gs", PANVK_DEBUG_NO_GS},
+    {NULL, 0},
+ };
+ 
+diff --git a/src/panfrost/vulkan/panvk_instance.h b/src/panfrost/vulkan/panvk_instance.h
+index 267028a9e0c..0b8d10a07f5 100644
+--- a/src/panfrost/vulkan/panvk_instance.h
++++ b/src/panfrost/vulkan/panvk_instance.h
+@@ -38,7 +38,7 @@ enum panvk_debug_flags {
+    PANVK_DEBUG_KBASE_DIAG = 1 << 20,
+    PANVK_DEBUG_GPU_PRERAST = 1 << 21,
+    PANVK_DEBUG_NO_BC_EMUL = 1 << 22,
+-   PANVK_DEBUG_GS = 1 << 23,
++   PANVK_DEBUG_NO_GS = 1 << 23,
+ };
+ 
+ extern uint64_t panvk_debug;
+diff --git a/src/panfrost/vulkan/panvk_vX_physical_device.c b/src/panfrost/vulkan/panvk_vX_physical_device.c
+index 81b33336141..499e13d4413 100644
+--- a/src/panfrost/vulkan/panvk_vX_physical_device.c
++++ b/src/panfrost/vulkan/panvk_vX_physical_device.c
+@@ -308,7 +308,7 @@ panvk_per_arch(get_physical_device_features)(
+       .fullDrawIndexUint32 = true,
+       .imageCubeArray = true,
+       .independentBlend = true,
+-      .geometryShader = PAN_ARCH >= 10 && PANVK_DEBUG(GS),
++      .geometryShader = PAN_ARCH >= 10 && !PANVK_DEBUG(NO_GS),
+       .tessellationShader = false,
+       .sampleRateShading = true,
+       .dualSrcBlend = true,

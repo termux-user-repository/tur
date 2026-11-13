@@ -1,0 +1,76 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: Tue, 6 Oct 2026 01:10:00 +0530
+Subject: [PATCH] kbase: size the EXEC_VA/JIT zones and host imports in kernel
+ pages
+
+This completes csf-v11/110 for code that jm-v9 adds or moves after it
+in the series.
+- EXEC_INIT (4 GiB) and JIT_INIT (128 GiB va/phys) take page counts in
+  kernel PAGE_SIZE units. With 16 KiB pages, the 4 KiB counts ask for 4x
+  the zone, and EXEC_INIT exceeds the kernel maximum (EINVAL).
+- The JM user-buffer import (kbase_kmod_bo_import_host) sizes the BO from
+  va_pages.
+- jm-v9/001's JM mutex cleanup goes back to the gpu_id error path. 110
+  shifted the line offsets, so the hunk landed in the identical CSF-only
+  csif error block.
+On 4 KiB pages the values are unchanged (1 << 25 and 0x100000 pages).
+
+Purpose: 16 KiB page support for zone/import sizes (split from csf-v11/110 because jm-v9 is applied after csf-v11); biblioklept
+Source/Reference: public mali_base_kernel.h LOCAL_PAGE_SHIFT = PAGE_SHIFT; KBASE_REG_ZONE_EXEC_VA_MAX_PAGES = 4G >> PAGE_SHIFT
+Tested GPU: Mali-G57 MC2 (v9 JM): deqp memory.allocation.basic 102/102, page_size=4096
+Tested Kbase UAPI: JM 11.38
+Mesa base range: 5a07217f
+Dependencies: csf-v11/110, jm-v9/004
+Validation test: universal Android ICD build; logcat "kbase: ... page_size=" and no EXEC_INIT/JIT_INIT failure
+---
+ src/panfrost/lib/kmod/kbase_kmod.c | 18 ++++++++++--------
+ 1 file changed, 10 insertions(+), 8 deletions(-)
+
+diff --git a/src/panfrost/lib/kmod/kbase_kmod.c b/src/panfrost/lib/kmod/kbase_kmod.c
+index 912d8d3..2ccb370 100644
+--- a/src/panfrost/lib/kmod/kbase_kmod.c
++++ b/src/panfrost/lib/kmod/kbase_kmod.c
+@@ -1467,7 +1467,9 @@ kbase_kmod_dev_create(int fd, uint32_t flags,
+     * (0x100000 pages) is the kernel maximum and matches panfork; without
+     * the zone, GPU_EX allocations fall back to CUSTOM_VA, so failure is
+     * not fatal. */
+-   struct kbase_ioctl_mem_exec_init exec_init = { .va_pages = 0x100000 };
++   struct kbase_ioctl_mem_exec_init exec_init = {
++      .va_pages = (4ull << 30) / kbase_kmod_page_size(),
++   };
+    if (ioctl(fd, KBASE_IOCTL_MEM_EXEC_INIT, &exec_init)) {
+       if (errno == EPERM || errno == EINVAL)
+          mesa_logd("kbase: KBASE_IOCTL_MEM_EXEC_INIT: %s (zone exists or "
+@@ -1486,9 +1488,9 @@ kbase_kmod_dev_create(int fd, uint32_t flags,
+     * panfork's.  Failure is non-fatal for enumeration but breaks tiler
+     * heaps, so warn. */
+    struct kbase_ioctl_mem_jit_init jit_init = {
+-      .va_pages = 1ull << 25,
++      .va_pages = (128ull << 30) / kbase_kmod_page_size(),
+       .max_allocations = 255,
+-      .phys_pages = 1ull << 25,
++      .phys_pages = (128ull << 30) / kbase_kmod_page_size(),
+    };
+    if (ioctl(fd, KBASE_IOCTL_MEM_JIT_INIT, &jit_init)) {
+       mesa_logw("kbase: KBASE_IOCTL_MEM_JIT_INIT failed: %s "
+@@ -1546,6 +1546,10 @@ kbase_kmod_dev_create(int fd, uint32_t flags,
+       kbase_dev->base.flags &= ~PAN_KMOD_DEV_FLAG_OWNS_FD;
+       pan_kmod_dev_cleanup(&kbase_dev->base);
+       simple_mtx_destroy(&kbase_dev->kcpu.lock);
++      if (!is_csf) {
++         simple_mtx_destroy(&kbase_dev->atoms_read_lock);
++         simple_mtx_destroy(&kbase_dev->atoms_lock);
++      }
+       pan_kmod_free(allocator, kbase_dev);
+       return NULL;
+    }
+@@ -1745,7 +1747,7 @@ kbase_kmod_bo_import_host(struct pan_kmod_dev *dev, void *host_ptr,
+ {
+    struct kbase_kmod_dev *kbase_dev =
+       container_of(dev, struct kbase_kmod_dev, base);
+-   const uint64_t page_size = 4096;
++   const uint64_t page_size = kbase_kmod_page_size();
+ 
+    if (kbase_dev->is_csf) {
+       errno = ENOTSUP;

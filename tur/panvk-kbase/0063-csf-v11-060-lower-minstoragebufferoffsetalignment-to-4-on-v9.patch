@@ -1,0 +1,39 @@
+From: abhay-byte <zenithblue.dev@gmail.com>
+Subject: [PATCH csf-v11 060] panvk: lower minStorageBufferOffsetAlignment to 4 on v9+
+Generated-by: LLM
+
+Purpose: TBD; biblioklept
+Source/Reference: TBD, work/mesa b23f1549414
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/059
+Validation test: TBD
+
+diff --git a/src/panfrost/vulkan/panvk_vX_physical_device.c b/src/panfrost/vulkan/panvk_vX_physical_device.c
+index f51d215217d..3df5506c693 100644
+--- a/src/panfrost/vulkan/panvk_vX_physical_device.c
++++ b/src/panfrost/vulkan/panvk_vX_physical_device.c
+@@ -976,8 +976,7 @@ panvk_per_arch(get_physical_device_properties)(
+       .minTexelBufferOffsetAlignment = 16,
+       /* Always aligned on a uniform slot (vec4). */
+       .minUniformBufferOffsetAlignment = 16,
+-      /* LOAD.i128 and LD_PKA.i128 which require 16B alignment */
+-      .minStorageBufferOffsetAlignment = 16,
++      .minStorageBufferOffsetAlignment = PAN_ARCH >= 9 ? 4 : 16,
+       /* Signed 4-bit value. */
+       .minTexelOffset = -8,
+       .maxTexelOffset = 7,
+diff --git a/src/panfrost/vulkan/panvk_vX_shader.c b/src/panfrost/vulkan/panvk_vX_shader.c
+index ebfe1149b55..618228c33ec 100644
+--- a/src/panfrost/vulkan/panvk_vX_shader.c
++++ b/src/panfrost/vulkan/panvk_vX_shader.c
+@@ -426,7 +426,7 @@ panvk_get_spirv_options(UNUSED struct vk_physical_device *vk_pdev,
+       .phys_ssbo_addr_format = nir_address_format_64bit_global,
+       .shared_addr_format = nir_address_format_32bit_offset,
+       .min_ubo_alignment = 16,
+-      .min_ssbo_alignment = 16,
++      .min_ssbo_alignment = PAN_ARCH >= 9 ? 4 : 16,
+       .debug_info = pan_want_debug_info(PAN_ARCH),
+    };
+ }

@@ -1,0 +1,101 @@
+From: panvk-kbase-android worker <panvk-worker@localhost>
+Subject: [PATCH kbase-common 010] panvk: unmap BOs via backend hook
+
+Purpose: Route every BO CPU-unmap through pan_kmod_bo_munmap() instead of
+ raw os_munmap(). On kbase SAME_VA the mapping is owned by the BO and
+ lives until bo_free; raw munmap destroys the GPU mapping too, so the
+ next Map returns a dead address (SEGV on CPU write, GPU hangs). Fixes
+ the Gate E multi-iteration crash (iter 0 fence-wait passed, iter 1
+ write faulted at the same VA).
+Source/Reference: https://github.com/wonderkast02/panvk-g720-kbase-csf
+ branch android-candidate-beta-1.9.4 (munmap call sites only).
+Tested GPU: Poco X6 Pro / G615 (fixes Gate E crash).
+Tested Kbase UAPI: CSF 1.21.
+Mesa base range: 26.3.0-devel (pinned 5a07217f).
+Dependencies: 003 (hook), 007 (gpu_queue context).
+Validation test: Gate E compute 10/10 with map/unmap per iteration.
+
+--- a/src/panfrost/vulkan/panvk_device_memory.c
++++ b/src/panfrost/vulkan/panvk_device_memory.c
+@@ -269,11 +269,13 @@
+                             pan_kmod_bo_size(mem->bo));
+ 
+       if (mem->debug.host_mapping)
+-         os_munmap(mem->debug.host_mapping, pan_kmod_bo_size(mem->bo));
++         pan_kmod_bo_munmap(mem->bo, mem->debug.host_mapping,
++                            pan_kmod_bo_size(mem->bo));
+    }
+ 
+    if (mem->addr.host) {
+-      ASSERTED int ret = os_munmap(mem->addr.host, pan_kmod_bo_size(mem->bo));
++      ASSERTED int ret = pan_kmod_bo_munmap(mem->bo, mem->addr.host,
++                                            pan_kmod_bo_size(mem->bo));
+       assert(!ret);
+    }
+ 
+@@ -388,7 +390,8 @@
+          return panvk_errorf(device, VK_ERROR_MEMORY_MAP_FAILED,
+                              "Failed to reserve VA on unmap.");
+    } else {
+-      ASSERTED int ret = os_munmap(mem->addr.host, pan_kmod_bo_size(mem->bo));
++      ASSERTED int ret = pan_kmod_bo_munmap(mem->bo, mem->addr.host,
++                                            pan_kmod_bo_size(mem->bo));
+       assert(!ret);
+    }
+ 
+--- a/src/panfrost/vulkan/panvk_host_copy.c
++++ b/src/panfrost/vulkan/panvk_host_copy.c
+@@ -261,7 +261,8 @@
+       /* No need to call pan_kmod_flush_bo_map_syncs() even if we've written to
+        * the image. This will be done just before the next submit. */
+       ASSERTED int ret =
+-         os_munmap(plane_ptrs[i], pan_kmod_bo_size(img->planes[i].mem->bo));
++         pan_kmod_bo_munmap(img->planes[i].mem->bo, plane_ptrs[i],
++                            pan_kmod_bo_size(img->planes[i].mem->bo));
+       assert(!ret);
+ 
+       /* Make sure we reset all mapping entries pointing to the same virtual
+--- a/src/panfrost/vulkan/panvk_image.c
++++ b/src/panfrost/vulkan/panvk_image.c
+--- a/src/panfrost/vulkan/panvk_priv_bo.c
++++ b/src/panfrost/vulkan/panvk_priv_bo.c
+@@ -99,7 +99,7 @@
+ 
+ err_munmap_bo:
+    if (priv_bo->addr.host) {
+-      ret = os_munmap(priv_bo->addr.host, pan_kmod_bo_size(bo));
++      ret = pan_kmod_bo_munmap(bo, priv_bo->addr.host, pan_kmod_bo_size(bo));
+       assert(!ret);
+    }
+ 
+@@ -159,7 +159,8 @@
+    }
+ 
+    if (priv_bo->addr.host) {
+-      ret = os_munmap(priv_bo->addr.host, pan_kmod_bo_size(priv_bo->bo));
++      ret = pan_kmod_bo_munmap(priv_bo->bo, priv_bo->addr.host,
++                               pan_kmod_bo_size(priv_bo->bo));
+       assert(!ret);
+    }
+ 
+--- a/src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c
+@@ -1147,7 +1147,7 @@
+ 
+    if (ringbuf->addr.host) {
+       ASSERTED int ret =
+-         os_munmap(ringbuf->addr.host, ringbuf->size);
++         pan_kmod_bo_munmap(ringbuf->bo, ringbuf->addr.host, ringbuf->size);
+       assert(!ret);
+    }
+ 
+@@ -1347,7 +1347,8 @@
+ 
+    if (subq->tracebuf.addr.host) {
+       ASSERTED int ret =
+-         os_munmap(subq->tracebuf.addr.host, subq->tracebuf.size);
++         pan_kmod_bo_munmap(subq->tracebuf.bo, subq->tracebuf.addr.host,
++                            subq->tracebuf.size);
+       assert(!ret);
+    }
+ 

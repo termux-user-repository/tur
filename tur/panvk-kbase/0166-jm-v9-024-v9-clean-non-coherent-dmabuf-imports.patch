@@ -1,0 +1,192 @@
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: 2026-10-11
+Subject: [PATCH jm-v9 024] panvk/kbase: v9 clean non-coherent dma-buf imports before submit biblioklept
+
+Purpose: Keep HOST_COHERENT memory coherent on v9 JM kernels that do not
+make dma-buf imports CPU-coherent.
+On JM, host-visible memory is a dma-heap buffer imported into kbase with
+BASE_MEM_COHERENT_SYSTEM requested; the CPU writes through its own cached
+dma-buf mapping (this is also the placed-map path). When the kernel does
+not grant COHERENT_SYSTEM, writes can stay in the CPU cache while the GPU
+reads memory: faux123 reports black dashes in 32-bit DXVK games on a
+Dimensity G77, fixed by a cache clean of imported memory before submit.
+Such imports (CPU-mapped, not WB_MMAP, non-coherent, v9 JM) are kept on
+a list; each vkQueueSubmit with command buffers runs DMA_BUF_IOCTL_SYNC
+(END | WRITE) on them, which makes the exporter clean the CPU caches for
+its device attachments (kbase's included). Coherent kernels (out flags
+with COHERENT_SYSTEM) are not affected. PANVK_KBASE_IMPORT_SYNC=0
+disables it. EINTR/EAGAIN are retried; other failures are logged once
+and the submit goes ahead. GPU-to-CPU invalidation is not added.
+Source/Reference: faux123 rp4pro v0.15.0 release notes (fact only, no
+source published); panvk-local
+Tested GPU: build-checked (universal Android build v6-v14); G615 (v11) PanProbe regression with the universal .so; Mali-G57 run pending (none attached)
+Tested Kbase UAPI: JM 11.38 (pending: logcat shows whether imports are coherent)
+Mesa base range: 5a07217f + g615-v11-csf series + jm-v9 001-023
+Dependencies: jm-v9 001
+Validation test: logcat "dma-buf imports are not CPU-coherent" on a G57; 32-bit DXVK title (pending)
+
+---
+ src/panfrost/lib/kmod/kbase_kmod.c          | 67 +++++++++++++++++++++++++++++
+ src/panfrost/lib/kmod/kbase_kmod.h          |  1 +
+ src/panfrost/vulkan/jm/panvk_vX_gpu_queue.c |  2 +
+ 3 files changed, 70 insertions(+)
+
+diff --git a/src/panfrost/lib/kmod/kbase_kmod.c b/src/panfrost/lib/kmod/kbase_kmod.c
+index 1b7035b..bb7eaee 100644
+--- a/src/panfrost/lib/kmod/kbase_kmod.c
++++ b/src/panfrost/lib/kmod/kbase_kmod.c
+@@ -36,6 +36,7 @@
+ 
+ #include <errno.h>
+ #include <fcntl.h>
++#include <linux/dma-buf.h>
+ #include <linux/dma-heap.h>
+ #include <stdlib.h>
+ #include <string.h>
+@@ -50,6 +51,8 @@
+ #include "util/u_atomic.h"
+ #include "util/u_math.h"
+ #include "util/log.h"
++#include "util/list.h"
++#include "util/u_debug.h"
+ 
+ #include "drm-uapi/mali_kbase_ioctl.h"
+ /* Only used as the interchange format for CSF interface information; no
+@@ -187,6 +190,11 @@ struct kbase_kmod_dev {
+    bool atom_failed[KBASE_MAX_ATOMS];
+    uint64_t last_done_atom_ctx[KBASE_MAX_ATOMS];
+    uint32_t last_done_code_ctx[KBASE_MAX_ATOMS];
++
++   /* v9 JM: CPU-mapped dma-buf imports the kernel did not make coherent
++    * (kbase_kmod_jm_clean_imports()). */
++   simple_mtx_t nc_lock;
++   struct list_head nc_bos;
+ };
+ 
+ struct kbase_kmod_vm {
+@@ -232,6 +240,10 @@ struct kbase_kmod_bo {
+     * for dma-heap imports with EINVAL); the kernel keeps CPU/GPU coherent.
+     */
+    bool cpu_gpu_coherent;
++
++   /* On kbase_kmod_dev::nc_bos (nc_link valid). */
++   bool nc_listed;
++   struct list_head nc_link;
+ };
+ 
+ bool
+@@ -1567,6 +1579,8 @@ kbase_kmod_dev_create(int fd, uint32_t flags,
+    kbase_dev->kcpu.fence_fd = -1;
+    simple_mtx_init(&kbase_dev->kcpu.lock, mtx_plain);
+    simple_mtx_init(&kbase_dev->kcpu_export.lock, mtx_plain);
++   simple_mtx_init(&kbase_dev->nc_lock, mtx_plain);
++   list_inithead(&kbase_dev->nc_bos);
+    if (!is_csf) {
+       kbase_dev->atom_stride = atom_stride;
+       simple_mtx_init(&kbase_dev->atoms_lock, mtx_plain);
+@@ -1686,6 +1700,7 @@ kbase_kmod_dev_destroy(struct pan_kmod_dev *dev)
+       ioctl(dev->fd, KBASE_IOCTL_KCPU_QUEUE_DELETE, &delete);
+    }
+    simple_mtx_destroy(&kbase_dev->kcpu_export.lock);
++   simple_mtx_destroy(&kbase_dev->nc_lock);
+ 
+    if (!kbase_dev->is_csf) {
+       simple_mtx_destroy(&kbase_dev->atoms_read_lock);
+@@ -1942,6 +1957,24 @@ kbase_kmod_import_dmabuf(struct pan_kmod_dev *dev,
+ 
+    pan_kmod_bo_init(&kbase_bo->base, dev, exclusive_vm, bo_size, flags,
+                     handle);
++
++   /* Host-visible memory on JM is a dma-heap buffer the CPU writes through
++    * its own (cached) dma-buf mapping. When the kernel did not grant
++    * COHERENT_SYSTEM, HOST_COHERENT writes can sit in the CPU cache while
++    * the GPU reads memory (faux123: black dashes in 32-bit DXVK games).
++    * WB_MMAP BOs are flushed by vkFlushMappedMemoryRanges instead. */
++   if (!kbase_dev->is_csf && pan_arch(dev->props.gpu_id) == 9 &&
++       !kbase_bo->cpu_gpu_coherent && kbase_bo->cpu_ptr &&
++       !(kmod_flags & PAN_KMOD_BO_FLAG_WB_MMAP) &&
++       debug_get_bool_option("PANVK_KBASE_IMPORT_SYNC", true)) {
++      mesa_logw_once("kbase: dma-buf imports are not CPU-coherent; cleaning "
++                     "them before each submit (PANVK_KBASE_IMPORT_SYNC=0 "
++                     "disables)");
++      simple_mtx_lock(&kbase_dev->nc_lock);
++      list_addtail(&kbase_bo->nc_link, &kbase_dev->nc_bos);
++      kbase_bo->nc_listed = true;
++      simple_mtx_unlock(&kbase_dev->nc_lock);
++   }
+    mesa_logi("kbase_kmod_bo_alloc_dmabuf: succeeded for %d, bo_size=%lu, handle=%u", kbase_bo->dmabuf_fd, bo_size, handle);
+    mesa_logi("kbase: import flags=0x%llx -> va=0x%llx pages=%llu outflags=0x%llx",
+              (unsigned long long)import_flags,
+@@ -2174,6 +2207,14 @@ kbase_kmod_bo_free(struct pan_kmod_bo *bo)
+ {
+    struct kbase_kmod_bo *kbase_bo =
+       container_of(bo, struct kbase_kmod_bo, base);
++   struct kbase_kmod_dev *kbase_dev =
++      container_of(bo->dev, struct kbase_kmod_dev, base);
++
++   if (kbase_bo->nc_listed) {
++      simple_mtx_lock(&kbase_dev->nc_lock);
++      list_del(&kbase_bo->nc_link);
++      simple_mtx_unlock(&kbase_dev->nc_lock);
++   }
+ 
+    pan_kmod_bo_cleanup(bo);
+ 
+@@ -2851,6 +2892,32 @@ kbase_kmod_job_submit_retry(struct pan_kmod_dev *dev, uint64_t jc,
+    return false;
+ }
+ 
++/* Clean the CPU caches of every non-coherent CPU-mapped dma-buf import
++ * (see kbase_kmod_import_dmabuf()) so GPU work submitted next sees the CPU's
++ * writes. DMA_BUF_IOCTL_SYNC END makes the exporter sync its device
++ * attachments, kbase's included. ponytail: whole buffers on every submit;
++ * track dirty mappings if this shows up in profiles. */
++void
++kbase_kmod_jm_clean_imports(struct pan_kmod_dev *dev)
++{
++   struct kbase_kmod_dev *kd = container_of(dev, struct kbase_kmod_dev, base);
++
++   simple_mtx_lock(&kd->nc_lock);
++   list_for_each_entry(struct kbase_kmod_bo, bo, &kd->nc_bos, nc_link) {
++      struct dma_buf_sync sync = {
++         .flags = DMA_BUF_SYNC_END | DMA_BUF_SYNC_WRITE,
++      };
++      int ret;
++      do {
++         ret = ioctl(bo->dmabuf_fd, DMA_BUF_IOCTL_SYNC, &sync);
++      } while (ret && (errno == EINTR || errno == EAGAIN));
++      if (ret)
++         mesa_logw_once("kbase: DMA_BUF_IOCTL_SYNC failed: %s",
++                        strerror(errno));
++   }
++   simple_mtx_unlock(&kd->nc_lock);
++}
++
+ bool
+ kbase_kmod_wait_atom(struct pan_kmod_dev *dev, uint64_t atom_number,
+                      int64_t timeout_ns)
+diff --git a/src/panfrost/lib/kmod/kbase_kmod.h b/src/panfrost/lib/kmod/kbase_kmod.h
+index adac7e9..42da782 100644
+--- a/src/panfrost/lib/kmod/kbase_kmod.h
++++ b/src/panfrost/lib/kmod/kbase_kmod.h
+@@ -50,6 +50,7 @@ bool kbase_kmod_job_submit_retry(struct pan_kmod_dev *dev, uint64_t jc,
+ bool kbase_kmod_wait_atom(struct pan_kmod_dev *dev, uint64_t atom_number,
+                          int64_t timeout_ns);
+ void kbase_kmod_atom_release(struct pan_kmod_dev *dev, uint64_t atom_num);
++void kbase_kmod_jm_clean_imports(struct pan_kmod_dev *dev);
+ struct pan_kmod_bo *kbase_kmod_bo_import_host(struct pan_kmod_dev *dev,
+                                             void *host_ptr, uint64_t size);
+ 
+diff --git a/src/panfrost/vulkan/jm/panvk_vX_gpu_queue.c b/src/panfrost/vulkan/jm/panvk_vX_gpu_queue.c
+index 7a2023f..0900a0c 100644
+--- a/src/panfrost/vulkan/jm/panvk_vX_gpu_queue.c
++++ b/src/panfrost/vulkan/jm/panvk_vX_gpu_queue.c
+@@ -378,6 +378,8 @@ panvk_per_arch(gpu_queue_submit)(struct vk_queue *vk_queue, struct vk_queue_subm
+ 
+ #if PAN_ARCH == 9
+    BITSET_ZERO(queue->submit_atoms);
++   if (submit->command_buffer_count)
++      kbase_kmod_jm_clean_imports(dev->kmod.dev);
+ #endif
+ 
+    if (submit->wait_count) {

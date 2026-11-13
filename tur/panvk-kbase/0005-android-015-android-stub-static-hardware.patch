@@ -1,0 +1,49 @@
+diff --git a/src/android_stub/hardware_stub.cpp b/src/android_stub/hardware_stub.cpp
+index 4cb973fd2ac..b20f8de9ccc 100644
+--- a/src/android_stub/hardware_stub.cpp
++++ b/src/android_stub/hardware_stub.cpp
+@@ -1,10 +1,13 @@
+ #include <hardware/hardware.h>
++#include <errno.h>
+ 
+ extern "C" {
+ 
+ int hw_get_module(const char *id, const struct hw_module_t **module)
+ {
+-   return 0;
++   if (module)
++      *module = nullptr;
++   return -ENOENT;
+ }
+ 
+ }
+diff --git a/src/android_stub/meson.build b/src/android_stub/meson.build
+index 0e3f27bc4a5..3d659491e5b 100644
+--- a/src/android_stub/meson.build
++++ b/src/android_stub/meson.build
+@@ -1,6 +1,6 @@
+ if with_android_stub
+   stub_libs = []
+-  lib_names = ['hardware', 'log', 'nativewindow', 'sync']
++  lib_names = ['log', 'nativewindow', 'sync']
+ 
+   if with_libbacktrace
+     lib_names += ['backtrace']
+@@ -15,7 +15,16 @@ if with_android_stub
+     )
+   endforeach
+ 
++  stub_static_libs = [
++    static_library(
++      'hardware',
++      files('hardware_stub.cpp'),
++      include_directories : inc_include,
++      install : false,
++    )
++  ]
++
+   dep_android = declare_dependency(
+-    link_with : stub_libs,
++    link_with : stub_libs + stub_static_libs,
+   )
+ endif

@@ -1,0 +1,279 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: Tue, 6 Oct 2026 22:00:00 +0530
+Subject: [PATCH] panvk: build a strip table for gpu_prerast GS restart draws
+ biblioklept
+
+With primitive restart, each lowered-GS invocation found its strip by
+walking the generated indices back to the previous restart, and its
+primitive ID by counting the primitives of every strip in front of it
+(the gs_prims_before loop). Both are O(position), so one GS job over a
+65536-vertex chunk was quadratic: about 2.5 s per chunk loop on the
+large_draw gs_restart strips (a 70001-vertex strip). While that compute
+job runs, the vertex/tiler CSG sits in its cross-CSG SYNC_WAIT inside the
+render pass, and kbase/firmware kill it (CS_FATAL 0x41 or group fatal
+0x72, DEVICE_LOST), the same mechanism as the 094 restart planner (096).
+
+Add panlib_gs_strip_table: one 256-invocation workgroup scans the
+generated indices once and writes, per index, the strip start, the
+primitives before that strip and the next restart. gpu_prerast_gs_run
+launches it before the GS kernel when restart is enabled; the GS kernel
+loads the three words instead of looping. The table lives in the
+polygon-mode index region of the arena (unused by GS draws).
+
+Purpose: fix GPU fault on GS draws over long primitive-restart strips
+Tested GPU: Mali-G615 MC6 (Poco X6 Pro), large_draw gs_restart_* and CTS
+Tested Kbase UAPI: CSF 1.21 / MediaTek
+Dependencies: csf-v11/094, csf-v11/096, csf-v11/112
+Generated-by: LLM
+---
+diff --git a/src/panfrost/libpan/draw_helper.cl b/src/panfrost/libpan/draw_helper.cl
+index 9c7bb5a..72907b5 100644
+--- a/src/panfrost/libpan/draw_helper.cl
++++ b/src/panfrost/libpan/draw_helper.cl
+@@ -551,6 +551,87 @@ panlib_chunk_step(global struct panlib_chunk_draw *c)
+    }
+ }
+ 
++/* Strip table of a GS draw with primitive restart, for the first
++ * min(*count, cap) generated indices: out[j] is the first vertex of the
++ * strip of j, out[cap + j] the primitives of the strips before it and
++ * out[2 * cap + j] the first restart at or after j (or the count). Each
++ * GS invocation then loads its strip instead of walking the indices, which
++ * made the GS job quadratic in the strip length.
++ */
++KERNEL(CHUNK_WG)
++panlib_gs_strip_table(constant uint32_t *gen, constant uint32_t *count,
++                      uint32_t cap, uint32_t prim, global uint32_t *out)
++{
++   local uint32_t tmp[5 * CHUNK_WG];
++   const enum mesa_prim p = (enum mesa_prim)prim;
++   const uint32_t n = min(count[0], cap);
++   const uint32_t tid = cl_local_id.x;
++   const uint32_t seg = (n + CHUNK_WG - 1) / CHUNK_WG;
++   const uint32_t b = min(tid * seg, n), e = min(b + seg, n);
++   uint32_t first = UINT32_MAX, last = UINT32_MAX, lead = 0, inner = 0;
++   uint32_t run = 0;
++
++   for (uint32_t j = b; j < e; j++) {
++      if (gen[j] == 0xffffffff) {
++         if (last == UINT32_MAX) {
++            first = j;
++            lead = run;
++         } else {
++            inner += u_decomposed_prims_for_vertices(p, run);
++         }
++         last = j;
++         run = 0;
++      } else {
++         run++;
++      }
++   }
++
++   tmp[tid] = last;
++   tmp[CHUNK_WG + tid] = lead;
++   tmp[2 * CHUNK_WG + tid] = inner;
++   tmp[3 * CHUNK_WG + tid] = run;
++   tmp[4 * CHUNK_WG + tid] = first;
++   barrier(CLK_LOCAL_MEM_FENCE);
++
++   /* State at b: strip start, its run so far, primitives before it. */
++   uint32_t start = 0, before = 0;
++   run = 0;
++   for (uint32_t t = 0; t < tid; t++) {
++      if (tmp[t] == UINT32_MAX) {
++         run += tmp[3 * CHUNK_WG + t];
++      } else {
++         before += u_decomposed_prims_for_vertices(p, run + tmp[CHUNK_WG + t]) +
++                   tmp[2 * CHUNK_WG + t];
++         run = tmp[3 * CHUNK_WG + t];
++         start = tmp[t] + 1;
++      }
++   }
++   uint32_t next = n;
++   for (uint32_t t = tid + 1; t < CHUNK_WG; t++) {
++      if (tmp[4 * CHUNK_WG + t] != UINT32_MAX) {
++         next = tmp[4 * CHUNK_WG + t];
++         break;
++      }
++   }
++
++   for (uint32_t j = b; j < e; j++) {
++      out[j] = start;
++      out[cap + j] = before;
++      if (gen[j] == 0xffffffff) {
++         before += u_decomposed_prims_for_vertices(p, run);
++         run = 0;
++         start = j + 1;
++      } else {
++         run++;
++      }
++   }
++   for (uint32_t j = e; j-- > b;) {
++      if (gen[j] == 0xffffffff)
++         next = j;
++      out[2 * cap + j] = next;
++   }
++}
++
+ /* One chunk of a triangle fan as 32-bit indices: the hub element, then the
+  * count - 1 elements from first. Without an index buffer (index_size 0) the
+  * element numbers are the indices. Elements past the buffer read as 0.
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+index a921271..77d3465 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+@@ -3921,6 +3921,7 @@ gpu_prerast_gs_run(struct panvk_cmd_buffer *cmdbuf,
+    STORE_GS64(stats[3], panvk_pstats_counter_addr(
+       pstats, VK_QUERY_PIPELINE_STATISTIC_CLIPPING_PRIMITIVES_BIT, true));
+    STORE_GS64(prims_generated, cmdbuf->state.gfx.prims_generated_query.ptr);
++   STORE_GS64(strips, arena + PANVK_GPU_PRERAST_GS_STRIP_OFFSET);
+ #undef STORE_GS32
+ #undef STORE_GS64
+ 
+@@ -3938,6 +3939,19 @@ gpu_prerast_gs_run(struct panvk_cmd_buffer *cmdbuf,
+    }
+    cs_flush_stores(compute);
+ 
++   /* Strip starts and primitive ID bases for the GS invocations, see
++    * panlib_gs_strip_table(). */
++   if (source->index.restart_enable) {
++      struct panvk_precomp_ctx ctx = panvk_per_arch(precomp_cs)(cmdbuf);
++
++      cs_wait_slots(compute, dev->csf.sb.all_iters_mask);
++      panlib_gs_strip_table(
++         &ctx, panlib_1d(1), PANLIB_BARRIER_NONE, vs_indices,
++         gs_params + offsetof(struct panvk_gpu_prerast_gs_params, vertex_count),
++         PANVK_GPU_PRERAST_GS_STRIP_CAP, source->prim,
++         arena + PANVK_GPU_PRERAST_GS_STRIP_OFFSET);
++   }
++
+    struct panvk_dispatch_info dispatch = {
+       .direct.wg_count = {source->vertex.count, source->instance.count,
+                           gsi->invocations},
+diff --git a/src/panfrost/vulkan/panvk_gpu_prerast.h b/src/panfrost/vulkan/panvk_gpu_prerast.h
+index 67fe0ca..d7ac2f2 100644
+--- a/src/panfrost/vulkan/panvk_gpu_prerast.h
++++ b/src/panfrost/vulkan/panvk_gpu_prerast.h
+@@ -219,8 +219,20 @@ struct panvk_gpu_prerast_gs_params {
+    uint64_t stats[4];
+    /* 32-bit primitives generated query counter, 0 when no query is active. */
+    uint64_t prims_generated;
++   /* panlib_gs_strip_table() output when primitive restart is on. */
++   uint64_t strips;
+ };
+ 
++/* The GS strip table lives in the polygon-mode index region: a GS draw has
++ * no polygon mode pass. Three words per generated index.
++ */
++#define PANVK_GPU_PRERAST_GS_STRIP_OFFSET PANVK_GPU_PRERAST_POLY_INDEX_OFFSET
++#define PANVK_GPU_PRERAST_GS_STRIP_CAP PANVK_GPU_PRERAST_MAX_INVOCATIONS
++static_assert(PANVK_GPU_PRERAST_GS_STRIP_OFFSET +
++                    3ull * PANVK_GPU_PRERAST_GS_STRIP_CAP * sizeof(uint32_t) <=
++                 PANVK_GPU_PRERAST_RECORD_OFFSET,
++              "gpu_prerast GS strip table overlaps the VS records");
++
+ static_assert(PANVK_GPU_PRERAST_GS_PARAMS_OFFSET +
+                     sizeof(struct panvk_gpu_prerast_gs_params) <=
+                  PANVK_GPU_PRERAST_INDEX_OFFSET,
+diff --git a/src/panfrost/vulkan/panvk_vX_shader.c b/src/panfrost/vulkan/panvk_vX_shader.c
+index 36bf2f5..a752847 100644
+--- a/src/panfrost/vulkan/panvk_vX_shader.c
++++ b/src/panfrost/vulkan/panvk_vX_shader.c
+@@ -2000,31 +2000,32 @@ panvk_gpu_prerast_lower_gs(nir_shader *nir,
+       nir_local_variable_create(impl, glsl_uint_type(), "gs_seg");
+    nir_variable *end_var =
+       nir_local_variable_create(impl, glsl_uint_type(), "gs_end");
++   nir_variable *before_var =
++      nir_local_variable_create(impl, glsl_uint_type(), "gs_prims_before");
+    nir_store_var(b, seg_var, nir_imm_int(b, 0), 1);
+    nir_store_var(b, end_var, s.n, 1);
++   nir_store_var(b, before_var, nir_imm_int(b, 0), 1);
+    nir_push_if(b, restart_en);
+    {
+-      nir_store_var(b, seg_var, j, 1);
+-      nir_push_loop(b);
+-      {
+-         nir_def *sg = nir_load_var(b, seg_var);
+-         nir_break_if(b, nir_ieq_imm(b, sg, 0));
+-         nir_def *sm1 = nir_iadd_imm(b, sg, -1);
+-         nir_break_if(b, panvk_gs_is_restart(b, restart_en, gen, sm1));
+-         nir_store_var(b, seg_var, sm1, 1);
+-      }
+-      nir_pop_loop(b, NULL);
+-
++      /* panlib_gs_strip_table() filled the strip of each generated index.
++       * Invocations past its capacity are not valid, any entry will do. */
++      nir_def *strips = GS_PARAM(b, p, 64, strips);
++      nir_def *jj = nir_umin(b, j, nir_imm_int(b, PANVK_GPU_PRERAST_GS_STRIP_CAP - 1));
++      nir_def *at = nir_iadd(b, strips, nir_u2u64(b, nir_imul_imm(b, jj, 4)));
++      const unsigned cap_B = PANVK_GPU_PRERAST_GS_STRIP_CAP * 4;
++
++      nir_store_var(b, seg_var, nir_load_global(b, 1, 32, at, .align_mul = 4),
++                    1);
++      nir_store_var(b, before_var,
++                    nir_load_global(b, 1, 32, nir_iadd_imm(b, at, cap_B),
++                                    .align_mul = 4),
++                    1);
+       if (in_prim == MESA_PRIM_TRIANGLES_ADJACENCY) {
+-         nir_store_var(b, end_var, j, 1);
+-         nir_push_loop(b);
+-         {
+-            nir_def *e = nir_load_var(b, end_var);
+-            nir_break_if(b, nir_uge(b, e, s.n));
+-            nir_break_if(b, panvk_gs_is_restart(b, restart_en, gen, e));
+-            nir_store_var(b, end_var, nir_iadd_imm(b, e, 1), 1);
+-         }
+-         nir_pop_loop(b, NULL);
++         nir_store_var(b, end_var,
++                       nir_load_global(b, 1, 32,
++                                       nir_iadd_imm(b, at, 2 * cap_B),
++                                       .align_mul = 4),
++                       1);
+       }
+    }
+    nir_pop_if(b, NULL);
+@@ -2155,40 +2156,8 @@ panvk_gpu_prerast_lower_gs(nir_shader *nir,
+       }
+       nir_push_else(b, NULL);
+       {
+-         nir_variable *before =
+-            nir_local_variable_create(impl, glsl_uint_type(), "gs_prims_before");
+-         nir_store_var(b, before, zero, 1);
+-         nir_push_if(b, restart_en);
+-         {
+-            nir_variable *q =
+-               nir_local_variable_create(impl, glsl_uint_type(), "gs_q");
+-            nir_variable *len =
+-               nir_local_variable_create(impl, glsl_uint_type(), "gs_len");
+-            nir_store_var(b, q, zero, 1);
+-            nir_store_var(b, len, zero, 1);
+-            nir_push_loop(b);
+-            {
+-               nir_def *qq = nir_load_var(b, q);
+-               nir_break_if(b, nir_uge(b, qq, seg));
+-               nir_def *l = nir_load_var(b, len);
+-               nir_push_if(b, panvk_gs_is_restart(b, restart_en, gen, qq));
+-               {
+-                  nir_store_var(b, before,
+-                                nir_iadd(b, nir_load_var(b, before),
+-                                         panvk_gs_prims_in_run(b, prim, l)),
+-                                1);
+-                  nir_store_var(b, len, zero, 1);
+-               }
+-               nir_push_else(b, NULL);
+-               nir_store_var(b, len, nir_iadd_imm(b, l, 1), 1);
+-               nir_pop_if(b, NULL);
+-               nir_store_var(b, q, nir_iadd_imm(b, qq, 1), 1);
+-            }
+-            nir_pop_loop(b, NULL);
+-         }
+-         nir_pop_if(b, NULL);
+          nir_def *ord = nir_iadd(
+-            b, nir_iadd(b, nir_load_var(b, before), lp),
++            b, nir_iadd(b, nir_load_var(b, before_var), lp),
+             GS_PARAM(b, p, 32, prim_id_base));
+          nir_store_var(b, prim_var, ord, 1);
+       }
+-- 
+2.51.0

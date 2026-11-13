@@ -1,0 +1,84 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: Sat, 3 Oct 2026 22:00:00 +0530
+Subject: [PATCH] panvk: emit only VERTEX_TILER_STARTED heap ops on kbase
+
+kbase validates the firmware heap statistics on every tiler OOM event and
+terminates the queue group when frag_end > vt_end (dmesg: "Invalid Heap
+statistics provided by firmware: vt_start 1, vt_end 0, frag_end 16",
+"Terminate ctx ..., kbase_queue_oom_event"). DXVK then reports
+VK_ERROR_DEVICE_LOST, seen in Need for Speed Most Wanted on the first
+tiler heap growth. The kbase bring-up tree only emitted VERTEX_TILER_STARTED
+on kbase and recycled the heap wholesale through queue heap renewal
+(csf/007 still documents that); restore it.
+
+Purpose: fix DEVICE_LOST on tiler heap growth on kbase
+Tested GPU: Mali-G615 MC6 (Poco X6 Pro)
+Tested Kbase UAPI: CSF 1.21 (MediaTek)
+Mesa base range: 5a07217f034b (26.3.0-devel)
+Validation test: Need for Speed Most Wanted (i686 DXVK D3D9) 10 min gameplay
+
+Generated-by: LLM
+---
+
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+index da41abcabf9..8c905bdf464 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+@@ -54,6 +54,22 @@
+ #include "vk_render_pass.h"
+ #include "poly/geometry.h"
+ 
++/* kbase validates the firmware heap statistics on every tiler OOM event and
++ * terminates the queue group when frag_end > vt_end ("Invalid Heap
++ * statistics provided by firmware"), which surfaces as DEVICE_LOST.  On
++ * kbase, emit only VERTEX_TILER_STARTED: vt_end and frag_end then stay 0,
++ * nr_in_flight = vt_start keeps the grow path valid, and the heap is
++ * recycled wholesale by the queue's heap renewal instead of
++ * FINISH_FRAGMENT/FRAGMENT_COMPLETED. */
++static bool
++cmdbuf_skips_gpu_heap_ops(const struct panvk_cmd_buffer *cmdbuf)
++{
++   const struct panvk_physical_device *phys_dev =
++      to_panvk_physical_device(cmdbuf->vk.base.device->physical);
++
++   return phys_dev->kbase_node_path[0] != '\0';
++}
++
+ static bool
+ render_needs_zs_crc_ext(struct panvk_cmd_buffer *cmdbuf)
+ {
+@@ -6579,7 +6595,8 @@ flush_tiling(struct panvk_cmd_buffer *cmdbuf)
+                 offsetof(struct panvk_cs_subqueue_context, syncobjs));
+ 
+    cs_move64_to(b, add_val, 1);
+-   cs_vt_end(b, cs_defer_indirect());
++   if (!cmdbuf_skips_gpu_heap_ops(cmdbuf))
++      cs_vt_end(b, cs_defer_indirect());
+    panvk_instr_sync64_add(cmdbuf, PANVK_SUBQUEUE_VERTEX_TILER, true,
+                           MALI_CS_SYNC_SCOPE_CSG, add_val, sync_addr,
+                           cs_defer_indirect());
+@@ -6596,7 +6613,8 @@ flush_tiling(struct panvk_cmd_buffer *cmdbuf)
+    cs_move64_to(b, add_val, 1);
+ 
+    cs_match_iter_sb(b, x, iter_sb, cmp_scratch) {
+-      cs_vt_end(b, cs_defer(SB_WAIT_ITER(x), SB_ID(DEFERRED_SYNC)));
++      if (!cmdbuf_skips_gpu_heap_ops(cmdbuf))
++         cs_vt_end(b, cs_defer(SB_WAIT_ITER(x), SB_ID(DEFERRED_SYNC)));
+       panvk_instr_sync64_add(cmdbuf, PANVK_SUBQUEUE_VERTEX_TILER, true,
+                              MALI_CS_SYNC_SCOPE_CSG, add_val, sync_addr,
+                              cs_defer(SB_WAIT_ITER(x), SB_ID(DEFERRED_SYNC)));
+@@ -7008,7 +7026,9 @@ issue_fragment_jobs(struct panvk_cmd_buffer *cmdbuf)
+          cs_defer(SB_WAIT_ITER(sb_upd_ctx.cur_sb), SB_ITER(sb_upd_ctx.next_sb));
+ #endif
+ 
+-      if (td_count == 1) {
++      if (cmdbuf_skips_gpu_heap_ops(cmdbuf)) {
++         /* Heap chunks are reclaimed by the queue's heap renewal. */
++      } else if (td_count == 1) {
+          cs_load_to(b, completed, cur_tiler, BITFIELD_MASK(4), 40);
+          cs_finish_fragment(b, true, completed_top, completed_bottom, async);
+       } else if (td_count > 1) {
+--
+2.51.0
+

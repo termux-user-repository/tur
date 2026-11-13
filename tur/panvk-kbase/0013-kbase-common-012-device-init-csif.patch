@@ -1,0 +1,29 @@
+From: panvk-kbase-android worker <panvk-worker@localhost>
+Subject: [PATCH kbase-common 012] panvk: kbase-aware csif in device init
+
+Purpose: Route the device-init scoreboard setup through
+ panvk_get_csif_props() (kbase GLB interface on /dev/mali*). The direct
+ panthor call reads garbage on a kbase device (zero register counts),
+ corrupting scoreboard masks used by every later submit. Missed by the
+ hunk filters (no 'kbase' string at the call site).
+Source/Reference: https://github.com/wonderkast02/panvk-g720-kbase-csf
+ branch android-candidate-beta-1.9.4
+ (src/panfrost/vulkan/panvk_vX_device.c).
+Tested GPU: Poco X6 Pro / G615.
+Tested Kbase UAPI: CSF 1.21.
+Mesa base range: 26.3.0-devel (pinned 5a07217f).
+Dependencies: 006 (helper).
+Validation test: Gate E compute with buffer access.
+
+diff --git a/src/panfrost/vulkan/panvk_vX_device.c b/src/panfrost/vulkan/panvk_vX_device.c
+--- a/src/panfrost/vulkan/panvk_vX_device.c
++++ b/src/panfrost/vulkan/panvk_vX_device.c
+@@ -528,7 +528,7 @@
+
+ #if PAN_ARCH >= 10
+    const struct drm_panthor_csif_info *csif_info =
+-      panthor_kmod_get_csif_props(device->kmod.dev);
++      panvk_get_csif_props(device);
+
+    assert(csif_info->scoreboard_slot_count <= 16);
+    device->csf.sb.count = csif_info->scoreboard_slot_count;

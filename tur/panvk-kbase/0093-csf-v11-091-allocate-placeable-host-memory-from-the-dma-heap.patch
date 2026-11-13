@@ -1,0 +1,57 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: Sat, 3 Oct 2026 19:40:00 +0530
+Subject: [PATCH] panvk: allocate placeable host memory from the dma-heap
+ biblioklept
+
+VK_EXT_map_memory_placed maps memory at a caller-chosen address (Wine
+WoW64 needs it below 4 GiB). kbase SAME_VA regions cannot be moved or
+mapped twice, so the kbase backend used an anonymous shadow copy that
+was merged word by word on every kick and wait. That was slow (i686
+D3D9 at ~1 fps, Need for Speed Most Wanted at 0.5 fps) and racy (stale
+DXVK HUD and game text).
+
+When the app enables memoryMapPlaced, allocate host-visible memory as
+shareable BOs. On kbase those come from /dev/dma_heap/system and are
+imported into the GPU context; a placed map then maps the same dma-buf
+again at the requested address, so CPU and GPU share pages with no
+copy and no sync. The shadow copy is removed from kbase_kmod.c.
+
+Purpose: zero-copy placed maps for 32-bit WoW64 (DXVK) on kbase
+Source/Reference: VK_EXT_map_memory_placed; kbase_kmod.c dma-heap import path
+Tested GPU: Mali-G615 MC6 (Poco X6 Pro)
+Tested Kbase UAPI: CSF 1.21 (MediaTek)
+Mesa base range: 5a07217f034b (26.3.0-devel)
+Dependencies: kbase-common kbase_kmod.c (dma-heap BOs, placed bo_mmap)
+Validation test: i686 dxcube D3D8/9/10/11, Need for Speed Most Wanted (DXVK D3D9), dEQP-VK.memory.map_placed.*
+
+Generated-by: LLM
+---
+ src/panfrost/vulkan/panvk_device_memory.c | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/src/panfrost/vulkan/panvk_device_memory.c b/src/panfrost/vulkan/panvk_device_memory.c
+index 5e2b64e25e9..cf9f4c0aff8 100644
+--- a/src/panfrost/vulkan/panvk_device_memory.c
++++ b/src/panfrost/vulkan/panvk_device_memory.c
+@@ -125,9 +125,16 @@ panvk_AllocateMemory(VkDevice _device,
+           (type->propertyFlags & VK_MEMORY_PROPERTY_HOST_CACHED_BIT))
+          bo_flags |= PAN_KMOD_BO_FLAG_WB_MMAP;
+
++      /* A placed map aliases the BO at a caller-chosen address; on kbase
++       * only shareable (dma-buf backed) BOs can be mapped twice. */
++      bool shareable =
++         can_be_exported ||
++         (device->vk.enabled_features.memoryMapPlaced &&
++          (type->propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT));
++
+       bo_flags = panvk_device_adjust_bo_flags(device, bo_flags);
+       mem->bo = pan_kmod_bo_alloc(device->kmod.dev,
+-                                  can_be_exported ? NULL : device->kmod.vm,
++                                  shareable ? NULL : device->kmod.vm,
+                                   pAllocateInfo->allocationSize, bo_flags);
+       if (!mem->bo) {
+          result = panvk_error(device, VK_ERROR_OUT_OF_DEVICE_MEMORY);
+--
+2.51.0
+

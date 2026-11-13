@@ -1,0 +1,37 @@
+--- a/src/android_stub/meson.build
++++ b/src/android_stub/meson.build
+@@ -1,12 +1,15 @@
+ if with_android_stub
++  # Only liblog is a public NDK API and resolvable at runtime. The rest
++  # must not produce DT_NEEDED entries, so they are static stubs.
+   stub_libs = []
+-  lib_names = ['log', 'nativewindow', 'sync']
++  shared_stub_libs = ['log']
++  static_stub_libs = ['nativewindow', 'sync']
+ 
+   if with_libbacktrace
+-    lib_names += ['backtrace']
++    static_stub_libs += ['backtrace']
+   endif
+ 
+-  foreach lib : lib_names
++  foreach lib : shared_stub_libs
+     stub_libs += shared_library(
+       lib,
+       files(lib + '_stub.cpp'),
+@@ -24,6 +27,15 @@
+     )
+   ]
+ 
++  foreach lib : static_stub_libs
++    stub_static_libs += static_library(
++      lib,
++      files(lib + '_stub.cpp'),
++      include_directories : inc_include,
++      install : false,
++    )
++  endforeach
++
+   dep_android = declare_dependency(
+     link_with : stub_libs + stub_static_libs,
+   )

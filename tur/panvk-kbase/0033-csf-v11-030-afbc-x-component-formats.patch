@@ -1,0 +1,62 @@
+From: Valentine Burley <valentine.burley@collabora.com>
+Subject: [PATCH csf-v11 030] pan/afbc: Support X-component format variants in AFBC and blend tables
+
+Purpose: AFBC/blend tables accept X-component format variants (dep of 6409a5b16af)
+Source/Reference: upstream Mesa commit 6c89f9d2b7e (author preserved)
+Backport-of: 6c89f9d2b7e
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/029
+Validation test: device matrix; icc.c
+
+diff --git a/src/panfrost/lib/pan_afbc.h b/src/panfrost/lib/pan_afbc.h
+index 393b59009c0373d0d89f440cccc4bcea676a7605..524ca19b5705087b1f43601560742d9afdcc2b52 100644
+--- a/src/panfrost/lib/pan_afbc.h
++++ b/src/panfrost/lib/pan_afbc.h
+@@ -472,6 +472,8 @@ pan_afbc_unswizzled_format(unsigned arch, enum pipe_format format)
+       return PIPE_FORMAT_R5G6B5_UNORM;
+ 
+    case PIPE_FORMAT_B5G5R5A1_UNORM:
++   case PIPE_FORMAT_B5G5R5X1_UNORM:
++   case PIPE_FORMAT_R5G5B5X1_UNORM:
+       return PIPE_FORMAT_R5G5B5A1_UNORM;
+ 
+    case PIPE_FORMAT_R10G10B10X2_UNORM:
+@@ -480,11 +482,16 @@ pan_afbc_unswizzled_format(unsigned arch, enum pipe_format format)
+       return PIPE_FORMAT_R10G10B10A2_UNORM;
+ 
+    case PIPE_FORMAT_B4G4R4A4_UNORM:
++   case PIPE_FORMAT_B4G4R4X4_UNORM:
++   case PIPE_FORMAT_R4G4B4X4_UNORM:
+       return PIPE_FORMAT_R4G4B4A4_UNORM;
+    case PIPE_FORMAT_A4B4G4R4_UNORM:
+       /* v7 can only support AFBC for RGB and BGR */
+       return arch == 7 ? format : PIPE_FORMAT_R4G4B4A4_UNORM;
+ 
++   case PIPE_FORMAT_R16G16B16X16_UNORM:
++      return PIPE_FORMAT_R16G16B16A16_UNORM;
++
+    default:
+       return format;
+    }
+@@ -558,6 +565,7 @@ pan_afbc_format(unsigned arch, enum pipe_format format, unsigned plane_idx)
+    case PIPE_FORMAT_R16G16_UNORM:
+    case PIPE_FORMAT_R16G16B16_UNORM:
+    case PIPE_FORMAT_R16G16B16A16_UNORM:
++   case PIPE_FORMAT_R16G16B16X16_UNORM:
+       if (arch < 10)
+          return PAN_AFBC_MODE_INVALID;
+       else
+diff --git a/src/panfrost/lib/pan_format.c b/src/panfrost/lib/pan_format.c
+index 6368be85fe0aa7dd5a3e7029b34822752a580f9f..039f09620dc11fc34c34c7796eb2bf705d53e30c 100644
+--- a/src/panfrost/lib/pan_format.c
++++ b/src/panfrost/lib/pan_format.c
+@@ -118,6 +118,7 @@ const struct pan_blendable_format
+       BFMT_FLOAT(R16_FLOAT, R16F),
+       BFMT_FLOAT(R16G16_FLOAT, RG16F),
+       BFMT_FLOAT(R16G16B16A16_FLOAT, RGBA16F),
++      BFMT_FLOAT(R16G16B16X16_FLOAT, RGBA16F),
+       BFMT_FLOAT(R11G11B10_FLOAT, RG11F_B10F),
+ #endif
+ };

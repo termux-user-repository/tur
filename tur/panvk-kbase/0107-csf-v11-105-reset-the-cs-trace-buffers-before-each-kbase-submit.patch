@@ -1,0 +1,97 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: Mon, 5 Oct 2026 14:00:00 +0530
+Subject: [PATCH] panvk: reset the CS trace buffers before each kbase submit
+
+With PANVK_DEBUG=trace the panthor path resets each subqueue's CS tracebuf
+and descriptor ringbuf pointers before submitting, but the kbase path never
+did. Each submit then re-decoded every earlier trace: PanProbe
+gpu_prerast_slice wrote a 700 MB log and the app ran out of memory.
+
+Move the reset into a helper and call it from both paths; on kbase, clean
+the CPU cache lines of the subqueue context after the write.
+
+Purpose: make PANVK_DEBUG=trace usable on kbase
+
+Tested GPU: Mali-G615 MC6 (Poco X6 Pro)
+Tested Kbase UAPI: CSF 1.21 (MediaTek)
+Mesa base range: 5a07217f034b (26.3.0-devel)
+Validation test: PanProbe 17/17 with MESA_DEBUG=1 PANVK_DEBUG=trace and without
+
+Generated-by: LLM
+---
+
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c b/src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c
+index 4e5265a..3711c0f 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c
+@@ -2794,6 +2794,35 @@ panvk_queue_submit_init_signals(struct panvk_queue_submit *submit,
+    }
+ }
+ 
++/* If we're tracing, reset the desc ringbufs and the CS tracebufs before each
++ * submission (tracing forces synchronous submits, so nothing is in flight).
++ * Without the reset on kbase, every submit re-decoded all earlier traces:
++ * one PanProbe test wrote a 700 MB log with PANVK_DEBUG=trace. */
++static void
++reset_trace_bufs(struct panvk_gpu_queue *queue)
++{
++   if (!PANVK_DEBUG(TRACE))
++      return;
++
++   for (uint32_t i = 0; i < ARRAY_SIZE(queue->subqueues); i++) {
++      panvk_priv_mem_rmw(queue->subqueues[i].context, 0,
++                         struct panvk_cs_subqueue_context, ctx) {
++         if (ctx->render.desc_ringbuf.ptr) {
++            ctx->render.desc_ringbuf.ptr = queue->render_desc_ringbuf.addr.dev;
++            ctx->render.desc_ringbuf.pos = 0;
++         }
++
++         if (ctx->debug.tracebuf.cs)
++            ctx->debug.tracebuf.cs = queue->subqueues[i].tracebuf.addr.dev;
++      }
++#ifdef HAVE_PAN_KMOD_KBASE
++      if (gpu_queue_uses_kbase(to_panvk_device(queue->vk.base.device)))
++         kbase_clean_priv_mem(queue->subqueues[i].context, 0,
++                              sizeof(struct panvk_cs_subqueue_context));
++#endif
++   }
++}
++
+ #ifdef HAVE_PAN_KMOD_KBASE
+ /* Binary semaphores pending on this queue are waited for on the GPU: each
+  * new ring entry SYNC_WAITs for the other subqueues' seqnos, and its own
+@@ -2893,6 +2922,8 @@ panvk_queue_submit_ioctl_kbase(struct panvk_queue_submit *submit,
+          return result;
+    }
+ 
++   reset_trace_bufs(queue);
++
+    /* Flush pending synchronization requests before submitting the job, to
+     * make sure things are GPU-visible. */
+    pan_kmod_flush_bo_map_syncs(dev->kmod.dev);
+@@ -3015,23 +3046,7 @@ panvk_queue_submit_ioctl(struct panvk_queue_submit *submit)
+    struct panvk_gpu_queue *queue = submit->queue;
+    int ret;
+ 
+-   if (PANVK_DEBUG(TRACE)) {
+-      /* If we're tracing, we need to reset the desc ringbufs and the CS
+-       * tracebuf. */
+-      for (uint32_t i = 0; i < ARRAY_SIZE(queue->subqueues); i++) {
+-         panvk_priv_mem_rmw(queue->subqueues[i].context, 0,
+-                            struct panvk_cs_subqueue_context, ctx) {
+-            if (ctx->render.desc_ringbuf.ptr) {
+-               ctx->render.desc_ringbuf.ptr =
+-                  queue->render_desc_ringbuf.addr.dev;
+-               ctx->render.desc_ringbuf.pos = 0;
+-            }
+-
+-            if (ctx->debug.tracebuf.cs)
+-               ctx->debug.tracebuf.cs = queue->subqueues[i].tracebuf.addr.dev;
+-         }
+-      }
+-   }
++   reset_trace_bufs(queue);
+ 
+    /* Flush pending synchronization requests before submitting the job, to
+     * make sure things are GPU-visible. */

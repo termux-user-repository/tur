@@ -1,0 +1,260 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: Mon, 5 Oct 2026 14:00:00 +0530
+Subject: [PATCH] panvk: renew the kbase tiler heap without a graphics drain
+
+Tiler heap renewal waited on the CPU for the vertex/tiler and fragment
+subqueues to go idle. With the 64k work threshold, NFS Most Wanted renewed
+on almost every graphics submission, so the submit thread stalled ~13 ms per
+frame and the CPU and GPU never overlapped.
+
+Keep two TILER_HEAP descriptor slots. A renewal writes the new heap into the
+other slot, and each graphics ring entry points its subqueue context at the
+current slot (one store, only when the slot changed), so entries emitted
+before the renewal keep the old heap and descriptor. The retired heap context
+is destroyed once both graphics subqueues have completed an entry emitted
+after the retirement; until then a renewal is skipped and retried. If it
+stays busy for 4x the renewal budget, drain the graphics subqueues once, so
+the current heap stays bounded.
+
+Purpose: remove the per-frame CPU/GPU serialization from heap renewal
+
+Tested GPU: Mali-G615 MC6 (Poco X6 Pro)
+Tested Kbase UAPI: CSF 1.21 (MediaTek)
+Mesa base range: 5a07217f034b (26.3.0-devel)
+Validation test: NFS Most Wanted A/B in PanPlay, CTS synchronization + memory subsets
+
+Generated-by: LLM
+---
+
+diff --git a/src/panfrost/vulkan/csf/panvk_queue.h b/src/panfrost/vulkan/csf/panvk_queue.h
+index 37e87c2..1cab196 100644
+--- a/src/panfrost/vulkan/csf/panvk_queue.h
++++ b/src/panfrost/vulkan/csf/panvk_queue.h
+@@ -97,6 +97,10 @@ struct panvk_subqueue {
+       uint32_t last_flush_id;
+       uint64_t last_stream_addr;
+ 
++      /* TILER_HEAP descriptor last stored into this subqueue's context by a
++       * ring entry (see kbase_renew_tiler_heap()). */
++      uint64_t heap_desc;
++
+       struct panvk_priv_mem init_cs;
+       uint64_t init_stream_addr;
+       uint32_t init_stream_size;
+@@ -138,12 +142,13 @@ struct panvk_gpu_queue {
+    uint32_t kbase_tiler_submit_count;
+    uint64_t kbase_tiler_work_count;
+    uint64_t kbase_gpu_waits[PANVK_SUBQUEUE_COUNT][PANVK_SUBQUEUE_COUNT];
+-   /* Tiler heap context retired by the last heap renewal.  The firmware CS
+-    * HEAP_SET registers keep pointing at the old context until each graphics
+-    * subqueue executes its next ring entry, so the context is only
+-    * destroyed once both graphics subqueues have provably re-armed HEAP_SET
+-    * (their emitted-job counts passed the values recorded at retirement and
+-    * the pre-renewal drain completed).  ctx == 0 means the slot is empty. */
++   /* Which of the two TILER_HEAP descriptor slots the current heap uses. */
++   uint32_t kbase_heap_slot;
++   /* Tiler heap context retired by the last heap renewal.  Ring entries
++    * emitted before the renewal keep using it (their HEAP_SET and TILER_HEAP
++    * descriptor slot), so it is only destroyed once both graphics subqueues
++    * have completed a ring entry emitted after the retirement.  ctx == 0
++    * means the slot is empty. */
+    struct {
+       uint64_t ctx;
+       uint64_t vt_jobs;
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c b/src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c
+index 86dbf2f..262b218 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c
+@@ -461,6 +461,17 @@ kbase_subqueue_reserve_ring(struct panvk_gpu_queue *queue,
+    return VK_SUCCESS;
+ }
+ 
++/* Two TILER_HEAP descriptors live at the start of tiler_heap.desc (the
++ * geometry buffer starts at +4096). */
++#define KBASE_HEAP_DESC_SLOT_STRIDE 64
++
++static uint64_t
++kbase_heap_desc_addr(const struct panvk_gpu_queue *queue)
++{
++   return panvk_priv_mem_dev_addr(queue->tiler_heap.desc) +
++          queue->kbase_heap_slot * KBASE_HEAP_DESC_SLOT_STRIDE;
++}
++
+ static VkResult
+ kbase_subqueue_emit_job(struct panvk_gpu_queue *queue, uint32_t subqueue,
+                         uint64_t stream_addr, uint32_t stream_size,
+@@ -576,6 +587,21 @@ kbase_subqueue_emit_job(struct panvk_gpu_queue *queue, uint32_t subqueue,
+    if (subqueue != PANVK_SUBQUEUE_COMPUTE) {
+       cs_move64_to(&b, addr64, queue->tiler_heap.context.dev_addr);
+       cs_heap_set(&b, addr64);
++
++      /* A renewal moves the heap to the other TILER_HEAP descriptor slot.
++       * Point the context at it from the ring, so entries emitted before
++       * the renewal keep the old descriptor and no drain is needed. */
++      uint64_t heap_desc = kbase_heap_desc_addr(queue);
++      if (subq->kbase.heap_desc != heap_desc) {
++         cs_move64_to(&b, addr64,
++                      panvk_priv_mem_dev_addr(subq->context) +
++                         offsetof(struct panvk_cs_subqueue_context,
++                                  render.tiler_heap));
++         cs_move64_to(&b, val64, heap_desc);
++         cs_store64(&b, val64, addr64, 0);
++         cs_wait_slot(&b, SB_ID(LS));
++         subq->kbase.heap_desc = heap_desc;
++      }
+    }
+ 
+    /* Diagnostic breadcrumbs are useful when investigating a hang, but each
+@@ -1665,6 +1691,9 @@ init_subqueue(struct panvk_gpu_queue *queue, enum panvk_subqueue_id subqueue)
+           * to the tiler descriptors. */
+          cs_ctx->render.geom_buf =
+             (cs_ctx->render.tiler_heap + 4096) | ((64 * 1024) >> 12);
++#ifdef HAVE_PAN_KMOD_KBASE
++         subq->kbase.heap_desc = cs_ctx->render.tiler_heap;
++#endif
+ 
+          /* Initialize the ringbuf */
+          cs_ctx->render.desc_ringbuf = (struct panvk_cs_desc_ringbuf){
+@@ -2184,10 +2213,10 @@ cleanup_tiler(struct panvk_gpu_queue *queue)
+ 
+ #ifdef HAVE_PAN_KMOD_KBASE
+ /* Destroy the heap context retired by the previous renewal, provided every
+- * graphics subqueue has executed a ring entry emitted after the retirement.
+- * Each ring entry re-issues HEAP_SET before its CALL, and the caller's
+- * pre-renewal drain guarantees those entries completed, so the firmware
+- * provably no longer holds a reference to the retired context.  Destroying
++ * graphics subqueue has completed a ring entry emitted after the retirement.
++ * Each ring entry re-issues HEAP_SET (and its TILER_HEAP descriptor slot)
++ * before its CALL and entries retire in order, so the firmware provably no
++ * longer holds a reference to the retired context.  Destroying
+  * it any earlier lets kbase free (and the custom-VA allocator reuse) its
+  * chunks while a CS HEAP_SET register can still point at them: the firmware
+  * then walks whatever now lives at the old chunk VAs as a chunk list and
+@@ -2202,9 +2231,9 @@ kbase_try_destroy_retired_heap(struct panvk_gpu_queue *queue)
+    if (!queue->kbase_retired_heap.ctx)
+       return true;
+ 
+-   if (queue->subqueues[PANVK_SUBQUEUE_VERTEX_TILER].kbase.emitted_jobs <=
++   if (kbase_subqueue_seqno_cell(queue, PANVK_SUBQUEUE_VERTEX_TILER)->seqno <=
+           queue->kbase_retired_heap.vt_jobs ||
+-       queue->subqueues[PANVK_SUBQUEUE_FRAGMENT].kbase.emitted_jobs <=
++       kbase_subqueue_seqno_cell(queue, PANVK_SUBQUEUE_FRAGMENT)->seqno <=
+           queue->kbase_retired_heap.frag_jobs)
+       return false;
+ 
+@@ -2225,10 +2254,11 @@ kbase_renew_tiler_heap(struct panvk_gpu_queue *queue)
+    uint64_t new_ctx, first_chunk;
+ 
+    /* Hold at most one retired context: if the previous one is still
+-    * firmware-visible (no graphics ring entry ran since), skip this
+-    * renewal and retry on a later graphics submission. */
++    * firmware-visible, skip this renewal (VK_INCOMPLETE) and retry on a
++    * later graphics submission.  This also keeps the other descriptor slot
++    * free: only entries of the retired heap used it. */
+    if (!kbase_try_destroy_retired_heap(queue))
+-      return VK_SUCCESS;
++      return VK_INCOMPLETE;
+ 
+    if (kbase_kmod_csf_tiler_heap_create(
+           dev->kmod.dev, tiler_heap->chunk_size,
+@@ -2241,13 +2271,16 @@ kbase_renew_tiler_heap(struct panvk_gpu_queue *queue)
+    uint64_t old_ctx = tiler_heap->context.dev_addr;
+    tiler_heap->context.dev_addr = new_ctx;
+ 
+-   panvk_priv_mem_write_desc(tiler_heap->desc, 0, TILER_HEAP, cfg) {
++   const uint32_t slot = queue->kbase_heap_slot ^ 1;
++   const uint32_t slot_offset = slot * KBASE_HEAP_DESC_SLOT_STRIDE;
++   panvk_priv_mem_write_desc(tiler_heap->desc, slot_offset, TILER_HEAP, cfg) {
+       cfg.size = tiler_heap->chunk_size;
+       cfg.base = first_chunk;
+       cfg.bottom = cfg.base + 64;
+       cfg.top = cfg.base + cfg.size;
+    }
+-   kbase_clean_priv_mem(tiler_heap->desc, 0, pan_size(TILER_HEAP));
++   kbase_clean_priv_mem(tiler_heap->desc, slot_offset, pan_size(TILER_HEAP));
++   queue->kbase_heap_slot = slot;
+ 
+    queue->kbase_retired_heap.ctx = old_ctx;
+    queue->kbase_retired_heap.vt_jobs =
+@@ -2722,29 +2755,6 @@ kbase_wait_sync_targets(
+    return VK_SUCCESS;
+ }
+ 
+-static VkResult
+-kbase_wait_graphics_targets(
+-   struct panvk_gpu_queue *queue,
+-   const uint64_t targets[PANVK_KBASE_SYNC_TARGET_COUNT],
+-   uint64_t abs_timeout_ns)
+-{
+-   const uint32_t graphics_mask =
+-      BITFIELD_BIT(PANVK_SUBQUEUE_VERTEX_TILER) |
+-      BITFIELD_BIT(PANVK_SUBQUEUE_FRAGMENT);
+-
+-   u_foreach_bit(i, graphics_mask) {
+-      if (!targets[i])
+-         continue;
+-
+-      VkResult result = kbase_subqueue_wait_seqno(
+-         queue, i, targets[i], graphics_mask, false, abs_timeout_ns);
+-      if (result != VK_SUCCESS)
+-         return result;
+-   }
+-
+-   return VK_SUCCESS;
+-}
+-
+ /* Incoming CPU syncs are resolved before emission.  The new work itself is
+  * only published here; completion is represented by the seqno snapshot and
+  * consumed later by fence/semaphore waits. */
+@@ -2860,21 +2870,37 @@ panvk_queue_submit_ioctl_kbase(struct panvk_queue_submit *submit,
+        (queue->kbase_tiler_submit_count >=
+            kbase_tiler_heap_renew_interval() ||
+         (renew_work && queue->kbase_tiler_work_count >= renew_work))) {
+-      /* Heap generations are referenced only by graphics streams.  Preserve
+-       * overlap with unrelated compute work instead of draining every
+-       * subqueue before replacing the tiler heap. */
+-      result = kbase_wait_graphics_targets(
+-         queue, submit->kbase_target_seqnos, UINT64_MAX);
+-      if (result != VK_SUCCESS)
+-         return result;
+-
++      /* No graphics drain: in-flight entries keep the retired heap and its
++       * descriptor slot (see kbase_subqueue_emit_job()).  Draining here
++       * serialized the CPU and GPU on nearly every NFS Most Wanted frame. */
+       result = kbase_renew_tiler_heap(queue);
+-      if (result != VK_SUCCESS)
++
++      /* Backpressure: the heap does not recycle chunks between renewals, so
++       * if the retired heap stays busy for 4x the renewal budget, drain the
++       * graphics subqueues once and renew, to bound the current heap. */
++      const uint32_t interval = kbase_tiler_heap_renew_interval();
++      if (result == VK_INCOMPLETE &&
++          ((interval && queue->kbase_tiler_submit_count >= 4ull * interval) ||
++           (renew_work && queue->kbase_tiler_work_count / 4 >= renew_work))) {
++         uint64_t targets[PANVK_KBASE_SYNC_TARGET_COUNT] = {0};
++         targets[PANVK_SUBQUEUE_VERTEX_TILER] =
++            queue->subqueues[PANVK_SUBQUEUE_VERTEX_TILER].kbase.emitted_jobs;
++         targets[PANVK_SUBQUEUE_FRAGMENT] =
++            queue->subqueues[PANVK_SUBQUEUE_FRAGMENT].kbase.emitted_jobs;
++         result = kbase_wait_sync_targets(queue, targets, UINT64_MAX);
++         if (result != VK_SUCCESS)
++            return result;
++         result = kbase_renew_tiler_heap(queue);
++      }
++
++      if (result < 0)
+          return vk_queue_set_lost(&queue->vk,
+                                   "kbase: tiler heap renewal failed");
+ 
+-      queue->kbase_tiler_submit_count = 0;
+-      queue->kbase_tiler_work_count = 0;
++      if (result == VK_SUCCESS) {
++         queue->kbase_tiler_submit_count = 0;
++         queue->kbase_tiler_work_count = 0;
++      }
+    }
+ 
+    return VK_SUCCESS;
+--
+2.51.0

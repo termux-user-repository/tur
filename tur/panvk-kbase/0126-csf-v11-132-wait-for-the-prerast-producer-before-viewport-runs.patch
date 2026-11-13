@@ -1,0 +1,60 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: Wed, 7 Oct 2026 10:40:00 +0530
+Subject: [PATCH] panvk: wait for the prerast producer before viewport runs biblioklept
+
+A gpu_prerast draw that selects a viewport per primitive runs three
+compute kernels on the compute queue: the lowered VS, the GS kernel
+(when there is a GS), then the viewport run builder. The run builder
+reads the producer's records and its index count, and writes the run
+list header that the vertex/tiler queue walks.
+
+The producer kernels end with a CSF sync barrier. That barrier only
+signals the compute syncobj for the vertex/tiler queue. It does not stop
+the next RUN_COMPUTE on the compute queue, which goes to another
+iterator scoreboard. So the run builder could start while the GS kernel
+was still writing, read a zero count, and write run_count = 0. The
+draw then emitted nothing.
+
+On an Immortalis-G925 (v13), gs_viewport_depth failed in 5 to 7 of 10
+runs with nothing drawn in any case:
+
+  FAIL case A_clamp depthL=[1.000000..1.000000] expL=0.250000
+       badDepth=1024 badColor=1024
+
+The chunk loop and the tessellation path already wait on all iterator
+scoreboards before panlib_vp_runs_launch_struct(). Do the same in
+gpu_prerast_draw_generated().
+
+The race is in shared CSF code, so v10-v12 get the same wait. There,
+gs_viewport_depth passed because the smaller GPU finished the producer
+first. The cost is one compute-queue wait per viewport-run draw.
+
+G925: gs_viewport_depth 10/10, PanProbe Run all 36/36.
+
+---
+ src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+@@ -4559,8 +4559,16 @@
+           * A launch here is recorded after that loop, past TESS_FREE.
+           */
+          if (!vp_launch) {
++            struct panvk_device *dev = to_panvk_device(cmdbuf->vk.base.device);
+             struct panvk_precomp_ctx ctx = panvk_per_arch(precomp_cs)(cmdbuf);
+
++            /* The run builder reads the VS/GS kernel's records and counts.
++             * Its sync barrier only orders the VT queue, not this compute
++             * queue: without the wait it can run beside the producer and
++             * see a zero count, so the draw emits nothing.
++             */
++            cs_wait_slots(panvk_get_cs_builder(cmdbuf, PANVK_SUBQUEUE_COMPUTE),
++                          dev->csf.sb.all_iters_mask);
+             panlib_vp_runs_launch_struct(&ctx, panlib_1d(1),
+                                          PANLIB_BARRIER_CSF_SYNC, *use);
+             gpu_prerast_wait_compute(cmdbuf);
+--
+2.47.0
