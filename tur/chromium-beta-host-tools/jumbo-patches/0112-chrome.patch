@@ -806,7 +806,7 @@ diff --git a/chrome/browser/extensions/browser_extension_window_controller.cc b/
 index 1f1c8f2bc0..3d8b953513 100644
 --- a/chrome/browser/extensions/browser_extension_window_controller.cc
 +++ b/chrome/browser/extensions/browser_extension_window_controller.cc
-@@ -155,7 +155,7 @@ Browser* BrowserExtensionWindowController::GetBrowser() const {
+@@ -167,7 +167,7 @@
  
  content::WebContents* BrowserExtensionWindowController::GetActiveTab() const {
    // In some situations, especially tests, there may not be an active tab.
@@ -815,6 +815,24 @@ index 1f1c8f2bc0..3d8b953513 100644
    return active_tab ? active_tab->GetContents() : nullptr;
  }
  
+@@ -179,7 +179,7 @@
+     int i) const {
+   // On Android a tab slot can be null when the native tab was destroyed while
+   // still referenced by the Java tab model (crbug.com/578128713).
+-  tabs::TabInterface* tab = tab_list_->GetTab(i);
++  ::tabs::TabInterface* tab = tab_list_->GetTab(i);
+   return tab ? tab->GetContents() : nullptr;
+ }
+ 
+@@ -255,7 +255,7 @@
+   const int tab_count = tab_list_->GetTabCount();
+ 
+   for (int i = 0; i < tab_count; ++i) {
+-    tabs::TabInterface* tab = tab_list_->GetTab(i);
++    ::tabs::TabInterface* tab = tab_list_->GetTab(i);
+     // See GetWebContentsAt() for why the tab can be null.
+     if (!tab) {
+       continue;
 diff --git a/chrome/browser/extensions/browser_window_util.cc b/chrome/browser/extensions/browser_window_util.cc
 index 5af8b82010..13c46f4168 100644
 --- a/chrome/browser/extensions/browser_window_util.cc
@@ -4229,7 +4247,7 @@ diff --git a/chrome/browser/glic/suggestions/glic_cue_tab_state.cc b/chrome/brow
 index d000528f1d..ba34f883ef 100644
 --- a/chrome/browser/glic/suggestions/glic_cue_tab_state.cc
 +++ b/chrome/browser/glic/suggestions/glic_cue_tab_state.cc
-@@ -46,7 +46,7 @@
+@@ -49,7 +49,7 @@
    optimization_guide_keyed_service_ =
        OptimizationGuideKeyedServiceFactory::GetForProfile(profile);
    if (base::FeatureList::IsEnabled(
@@ -4237,8 +4255,17 @@ index d000528f1d..ba34f883ef 100644
 +          ::contextual_cueing::kContextualCueingV2MultiSource)) {
      annotation_service_ =
          PageContentAnnotationsServiceFactory::GetForProfile(profile);
-     if (annotation_service_) {
-@@ -103,8 +103,8 @@
+     sync_service_ = SyncServiceFactory::GetForProfile(profile);
+@@ -133,7 +133,7 @@
+   }
+   const bool should_observe =
+       base::FeatureList::IsEnabled(
+-          contextual_cueing::kContextualCueingV2MultiSource) &&
++          ::contextual_cueing::kContextualCueingV2MultiSource) &&
+       IsHistorySyncEnabled();
+   if (should_observe == is_observing_category_classifier_) {
+     return;
+@@ -157,8 +157,8 @@
  }
  
  void GlicCueTabState::CheckEligibility(
@@ -4247,9 +4274,9 @@ index d000528f1d..ba34f883ef 100644
 +    ::contextual_cueing::CueIntrusiveness intrusiveness,
 +    ::contextual_cueing::CueTarget::EligibilityCallback callback,
      GlicCueTarget* target) {
-   if (!annotation_service_) {
+   if (!annotation_service_ || !is_observing_category_classifier_) {
      CUEING_LOG(
-@@ -112,7 +112,7 @@
+@@ -167,7 +167,7 @@
      base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
          FROM_HERE,
          base::BindOnce(std::move(callback), false,
@@ -4258,7 +4285,7 @@ index d000528f1d..ba34f883ef 100644
      return;
    }
  
-@@ -124,7 +124,7 @@
+@@ -179,7 +179,7 @@
      base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
          FROM_HERE,
          base::BindOnce(std::move(callback), eligible,
@@ -4267,7 +4294,7 @@ index d000528f1d..ba34f883ef 100644
      return;
    }
  
-@@ -137,7 +137,7 @@
+@@ -192,7 +192,7 @@
        .target = target->GetWeakPtr(),
    };
    annotation_timeout_timer_.Start(FROM_HERE,
@@ -4276,7 +4303,7 @@ index d000528f1d..ba34f883ef 100644
                                    this, &GlicCueTabState::OnAnnotationTimeout);
  }
  
-@@ -149,7 +149,7 @@
+@@ -204,7 +204,7 @@
      base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
          FROM_HERE,
          base::BindOnce(std::move(pending_check_->callback), false,
@@ -4285,7 +4312,7 @@ index d000528f1d..ba34f883ef 100644
      pending_check_.reset();
    }
  }
-@@ -163,7 +163,7 @@
+@@ -218,7 +218,7 @@
    }
  
    annotation_timeout_timer_.Stop();
@@ -4294,7 +4321,7 @@ index d000528f1d..ba34f883ef 100644
        std::move(pending_check_->callback);
    base::WeakPtr<GlicCueTarget> target = pending_check_->target;
    pending_check_.reset();
-@@ -178,7 +178,7 @@
+@@ -233,7 +233,7 @@
    base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
        FROM_HERE,
        base::BindOnce(std::move(callback), eligible,
@@ -4513,25 +4540,6 @@ index a61e8fdd86..b21138e32f 100644
  }
 +
 +#undef GetLoggerIfAvailable
-diff --git a/chrome/browser/password_manager/remote_actor/remote_actor_credential_permission_client.cc b/chrome/browser/password_manager/remote_actor/remote_actor_credential_permission_client.cc
-index 294e5783fd..489c6c716f 100644
---- a/chrome/browser/password_manager/remote_actor/remote_actor_credential_permission_client.cc
-+++ b/chrome/browser/password_manager/remote_actor/remote_actor_credential_permission_client.cc
-@@ -22,6 +22,8 @@
- #include "url/gurl.h"
- #include "url/origin.h"
- 
-+#define GetEndpointUrlBase GetEndpointUrlBase_remote_actor_credential_permission_client
-+
- namespace password_manager {
- 
- namespace {
-@@ -180,3 +182,5 @@ void RemoteActorCredentialPermissionClient::DeleteRequest(
- }
- 
- }  // namespace password_manager
-+
-+#undef GetEndpointUrlBase
 diff --git a/chrome/browser/ui/tabs/recent_tabs_builder.cc b/chrome/browser/ui/tabs/recent_tabs_builder.cc
 index c4eb8624ab..899963491a 100644
 --- a/chrome/browser/ui/tabs/recent_tabs_builder.cc
@@ -4856,12 +4864,14 @@ index 9fc77e09a7..b41fa76422 100644
  }
 --- a/chrome/browser/ui/passwords/remote_actor_selection_dialog_controller.cc
 +++ b/chrome/browser/ui/passwords/remote_actor_selection_dialog_controller.cc
-@@ -90,7 +90,7 @@
+@@ -156,8 +156,8 @@
    }
    content::OpenURLParams params(
-       GURL(kRemoteActorDataHandlingHelpUrl), content::Referrer(),
--      WindowOpenDisposition::kNewForegroundTab, ui::PAGE_TRANSITION_LINK,
-+      WindowOpenDisposition::kNewForegroundTab, ::ui::PAGE_TRANSITION_LINK,
+       GetLearnMoreUrl(), content::Referrer(),
+-      ui::mojom::WindowOpenDisposition::kNewForegroundTab,
+-      ui::PAGE_TRANSITION_LINK,
++      ::ui::mojom::WindowOpenDisposition::kNewForegroundTab,
++      ::ui::PAGE_TRANSITION_LINK,
        /*is_renderer_initiated=*/false);
    web_contents_->OpenURL(params, /*navigation_handle_callback=*/{});
  }
@@ -4908,34 +4918,6 @@ index 9fc77e09a7..b41fa76422 100644
  }
 +
 +#undef kResizeBorder
---- a/chrome/browser/ui/webui/omnibox_everywhere/omnibox_everywhere_handler.cc
-+++ b/chrome/browser/ui/webui/omnibox_everywhere/omnibox_everywhere_handler.cc
-@@ -58,7 +58,7 @@
- constexpr char kVoiceSearchQueryParameterKey[] = "gs_ivs";
- constexpr char kVoiceSearchQueryParameterValue[] = "1";
- 
--bool IsFuseboxEligible(Profile* profile) {
-+bool IsFuseboxEligible_omnibox_everywhere_handler(Profile* profile) {
-   if (!profile) {
-     return false;
-   }
-@@ -68,6 +68,9 @@
-          aim_eligibility_service->IsFuseboxEligible();
- }
- 
-+#define IsFuseboxEligible IsFuseboxEligible_omnibox_everywhere_handler
-+#define IsFuseboxEnabled IsFuseboxEnabled_omnibox_everywhere_handler
-+
- bool IsFuseboxEnabled(Profile* profile) {
-   if (!IsFuseboxEligible(profile)) {
-     return false;
-@@ -566,3 +569,6 @@
-         context_token, context_upload_status, error_type);
-   }
- }
-+
-+#undef IsFuseboxEligible
-+#undef IsFuseboxEnabled
 --- a/chrome/browser/enterprise/connectors/device_trust/device_trust_service_factory.cc
 +++ b/chrome/browser/enterprise/connectors/device_trust/device_trust_service_factory.cc
 @@ -48,6 +48,8 @@
@@ -5404,3 +5386,188 @@ index 9fc77e09a7..b41fa76422 100644
  }
 +
 +#undef GetLastActiveElapsedText
+--- a/chrome/browser/extensions/api/developer_private/developer_private_functions.cc
++++ b/chrome/browser/extensions/api/developer_private/developer_private_functions.cc
+@@ -2398,10 +2398,10 @@
+ 
+   // Directory url is non empty only for syncfilesystem.
+   if (!directory_url_str.empty()) {
+-    storage::FileSystemURL directory_url =
++    ::storage::FileSystemURL directory_url =
+         context_->CrackURLInFirstPartyContext(GURL(directory_url_str));
+     if (!directory_url.is_valid() ||
+-        directory_url.type() != storage::kFileSystemTypeSyncable) {
++        directory_url.type() != ::storage::kFileSystemTypeSyncable) {
+       return RespondNow(Error("DirectoryEntry of unsupported filesystem."));
+     }
+     return LoadByFileSystemAPI(directory_url);
+@@ -2419,19 +2419,19 @@
+   // points to a non-native local directory.
+   std::string filesystem_id;
+   bool cracked =
+-      storage::CrackIsolatedFileSystemName(filesystem_name, &filesystem_id);
++      ::storage::CrackIsolatedFileSystemName(filesystem_name, &filesystem_id);
+   CHECK(cracked);
+   base::FilePath virtual_path =
+-      storage::IsolatedContext::GetInstance()
++      ::storage::IsolatedContext::GetInstance()
+           ->CreateVirtualRootPath(filesystem_id)
+           .Append(base::FilePath::FromUTF8Unsafe(filesystem_path));
+-  storage::FileSystemURL directory_url = context_->CreateCrackedFileSystemURL(
++  ::storage::FileSystemURL directory_url = context_->CreateCrackedFileSystemURL(
+       blink::StorageKey::CreateFirstParty(extension()->origin()),
+-      storage::kFileSystemTypeIsolated, virtual_path);
++      ::storage::kFileSystemTypeIsolated, virtual_path);
+ 
+   if (directory_url.is_valid() &&
+-      directory_url.type() != storage::kFileSystemTypeLocal &&
+-      directory_url.type() != storage::kFileSystemTypeDragged) {
++      directory_url.type() != ::storage::kFileSystemTypeLocal &&
++      directory_url.type() != ::storage::kFileSystemTypeDragged) {
+     return LoadByFileSystemAPI(directory_url);
+   }
+ 
+@@ -2441,7 +2441,7 @@
+ 
+ ExtensionFunction::ResponseAction
+ DeveloperPrivateLoadDirectoryFunction::LoadByFileSystemAPI(
+-    const storage::FileSystemURL& directory_url) {
++    const ::storage::FileSystemURL& directory_url) {
+   std::string directory_url_str = directory_url.ToGURL().spec();
+ 
+   size_t pos = 0;
+@@ -2497,7 +2497,7 @@
+     const base::FilePath& project_path,
+     const base::FilePath& destination_path) {
+   GURL project_url = GURL(project_base_url_ + destination_path.AsUTF8Unsafe());
+-  storage::FileSystemURL url =
++  ::storage::FileSystemURL url =
+       context_->CrackURLInFirstPartyContext(project_url);
+ 
+   context_->operation_runner()->ReadDirectory(
+@@ -2510,7 +2510,7 @@
+     const base::FilePath& project_path,
+     const base::FilePath& destination_path,
+     base::File::Error status,
+-    storage::FileSystemOperation::FileEntryList file_list,
++    ::storage::FileSystemOperation::FileEntryList file_list,
+     bool has_more) {
+   if (status != base::File::FILE_OK) {
+     DLOG(ERROR) << "Error in copying files from sync filesystem.";
+@@ -2535,7 +2535,7 @@
+ 
+     GURL project_url = GURL(project_base_url_ +
+                             destination_path.Append(file.name).AsUTF8Unsafe());
+-    storage::FileSystemURL url =
++    ::storage::FileSystemURL url =
+         context_->CrackURLInFirstPartyContext(project_url);
+ 
+     base::FilePath target_path = project_path;
+@@ -2567,7 +2567,7 @@
+     base::File::Error result,
+     const base::File::Info& file_info,
+     const base::FilePath& src_path,
+-    storage::ScopedFile temp_file) {
++    ::storage::ScopedFile temp_file) {
+   if (result != base::File::FILE_OK) {
+     error_ = "Error in copying files from sync filesystem.";
+     success_ = false;
+@@ -2584,7 +2584,7 @@
+ void DeveloperPrivateLoadDirectoryFunction::CopyFile(
+     const base::FilePath& src_path,
+     const base::FilePath& target_path,
+-    storage::ScopedFile temp_file) {
++    ::storage::ScopedFile temp_file) {
+   if (!base::CreateDirectory(target_path.DirName())) {
+     error_ = "Error in copying files from sync filesystem.";
+     success_ = false;
+--- a/chrome/browser/actor/tools/navigate_tool_request.cc
++++ b/chrome/browser/actor/tools/navigate_tool_request.cc
+@@ -23,6 +23,8 @@
+ #include "components/sessions/core/session_id.h"
+ #include "content/public/browser/web_contents.h"
+ 
++#define GetActiveWindowId GetActiveWindowId_navigate_tool_request
++
+ namespace actor {
+ 
+ namespace {
+@@ -124,3 +126,5 @@
+ }
+ 
+ }  // namespace actor
++
++#undef GetActiveWindowId
+--- a/chrome/browser/actor/tools/site_based_search_tool_request.cc
++++ b/chrome/browser/actor/tools/site_based_search_tool_request.cc
+@@ -34,6 +34,8 @@
+ #include "content/public/browser/web_contents.h"
+ #include "url/gurl.h"
+ 
++#define kQueryParamDescription kQueryParamDescription_site_based_search_tool_request
++
+ namespace actor {
+ 
+ namespace {
+@@ -176,3 +178,5 @@
+ }
+ 
+ }  // namespace actor
++
++#undef kQueryParamDescription
+--- a/chrome/browser/actor/tools/load_and_extract_content_tool.cc
++++ b/chrome/browser/actor/tools/load_and_extract_content_tool.cc
+@@ -49,6 +49,8 @@
+ 
+ using TabObservation = ::optimization_guide::proto::TabObservation;
+ 
++#define OnValidatedAllUrls OnValidatedAllUrls_load_and_extract_content_tool
++
+ namespace actor {
+ 
+ namespace {
+@@ -696,3 +698,5 @@
+ }
+ 
+ }  // namespace actor
++
++#undef OnValidatedAllUrls
+--- a/chrome/browser/ui/views/context_hub/save_to_memory_bank_bubble_view.cc
++++ b/chrome/browser/ui/views/context_hub/save_to_memory_bank_bubble_view.cc
+@@ -23,6 +23,9 @@
+ #include "ui/views/widget/widget.h"
+ #include "url/gurl.h"
+ 
++#define kPopupWidth kPopupWidth_save_to_memory_bank_bubble_view
++#define kPopupHeight kPopupHeight_save_to_memory_bank_bubble_view
++
+ namespace {
+ constexpr int kPopupWidth = 320;
+ constexpr int kPopupHeight = 510;
+@@ -70,3 +73,6 @@
+   web_view_tracker_.SetView(web_view.get());
+   SetContentsView(std::move(web_view));
+ }
++
++#undef kPopupWidth
++#undef kPopupHeight
+--- a/chrome/browser/ui/views/toolbar/ai_overlay_toolbar_button.cc
++++ b/chrome/browser/ui/views/toolbar/ai_overlay_toolbar_button.cc
+@@ -16,6 +16,7 @@
+ #include "components/vector_icons/vector_icons.h"
+ #include "ui/actions/actions.h"
+ #include "ui/base/l10n/l10n_util.h"
++#include "ui/base/class_properties.h"
+ #include "ui/base/metadata/metadata_header_macros.h"
+ #include "ui/base/metadata/metadata_impl_macros.h"
+ #include "ui/base/models/image_model.h"
+--- a/chrome/browser/ui/views/toolbar/overflow_menu.cc
++++ b/chrome/browser/ui/views/toolbar/overflow_menu.cc
+@@ -25,6 +25,7 @@
+ #include "components/vector_icons/vector_icons.h"
+ #include "third_party/abseil-cpp/absl/functional/overload.h"
+ #include "ui/actions/actions.h"
++#include "ui/base/class_properties.h"
+ #include "ui/base/l10n/l10n_util.h"
+ #include "ui/base/mojom/menu_source_type.mojom.h"
+ #include "ui/base/ui_base_features.h"
