@@ -1,0 +1,1344 @@
+diff --git a/configure-al.m4 b/configure-al.m4
+index e37c20b..5250f0d 100644
+--- a/configure-al.m4
++++ b/configure-al.m4
+@@ -1,118 +1,8 @@
+ dnl Checking for OpenAL
+-AC_ARG_WITH([openal-static],
+-            AC_HELP_STRING([--with-openal-static],
+-                           [enable static linking for openal (default no)]),
+-            [use_static_openal=${withval}],,)
+-AC_ARG_ENABLE(openaltest, 
+-	[  --disable-openaltest    Do not try to compile and run a test OpenAL program],
+-		    , enable_openaltest=yes)
+-AC_MSG_CHECKING(for OpenAL support)
+-AC_PATH_PROG(OPENAL_CONFIG, openal-config, no)
+-if test x$OPENAL_CONFIG = xno; then
+-	echo "The openal-config script installed by OpenAL could not be found"
+-	echo "Make sure openal-config is in your path, or set the OPENAL_CONFIG"
+-	echo "environment variable to the full path to openal-config."
+-	echo "Trying pkg-config instead."
+-
+-	AC_PATH_PROG(PKG_CONFIG, pkg-config, no)
+-	if test x$PKG_CONFIG = xno; then
+-		echo "The pkg-config script could not be found"
+-		echo "Make sure pkg-config is in your path, or set the PKG_CONFIG"
+-		echo "environment variable to the full path to pkg-config."
+-
+-		AC_MSG_ERROR([*** Can't find the openal library. Try: http://www.openal.org/])
+-	else
+-		OPENAL_CONFIG="$PKG_CONFIG openal";
+-	fi
+-fi
+-	
+-if test x"$use_static_openal" = x"yes"; then
+-	AL_LIBS="/usr/local/lib/libopenal.a"
+-else
+-	AL_LIBS="`$OPENAL_CONFIG --libs`"
+-fi
+-
+-AL_CFLAGS="`$OPENAL_CONFIG --cflags`"
+-
+-AC_MSG_RESULT(yes)
+-
+-AC_MSG_CHECKING(for Freealut support)
+-AC_PATH_PROG(FREEALUT_CONFIG, freealut-config, no)
+-if test x$FREEALUT_CONFIG = xno; then
+-	echo "*** Warning: The freealut-config script installed by OpenAL could not be found."
+-	echo "*** The alut library is required, however some older OpenAL distribitions may include it."
+-	echo "*** If Scorched3D fails to link check alut is in the link line."
+-	echo "*** Alternatively, make sure freealut-config is in your path, or set the FREEALUT_CONFIG"
+-	echo "*** environment variable to the full path to openal-config."
+-else
+-
+-	AL_LIBS="$AL_LIBS `$FREEALUT_CONFIG --libs`"
+-	AL_CFLAGS="$AL_CFLAGS `$FREEALUT_CONFIG --cflags`"
+-
+-	AC_MSG_RESULT(yes)
+-fi
+-
+-AC_MSG_CHECKING(for OpenAL compilation)
+-if test "x$enable_openaltest" = "xyes" ; then
+-
+-	ac_save_CFLAGS="$CFLAGS"
+-	ac_save_LIBS="$LIBS"
+-	CFLAGS="$CFLAGS $AL_CFLAGS"
+-	LIBS="$AL_LIBS $LIBS"
+-
+-	AC_TRY_COMPILE([
+-#ifdef __APPLE__
+-		#include <OpenAL/al.h>
+-		#include <OpenAL/alc.h>
+-#else
+-		#include <AL/al.h>
+-		#include <AL/alut.h>
+-		#include <AL/alc.h>
+-#endif
+-
+-		],[
+-		],[
+-		have_openal=yes	
+-		],[
+-		echo "*** Failed to compile using the OpenAL library."
+-		echo "*** CFLAGS = $AL_CFLAGS";
+-    		AC_MSG_ERROR([*** Check the OpenAL library is correctly installed.])
+-	])
+-
+-	AC_TRY_LINK([
+-#ifdef __APPLE__
+-		#include <OpenAL/al.h>
+-		#include <OpenAL/alc.h>
+-#else
+-		#include <AL/al.h>
+-		#include <AL/alut.h>
+-		#include <AL/alc.h>
+-#endif
+-
+-		int main(int argc, char *argv[])
+-		{
+-			alutInit(argc, argv);
+-			return 0;
+-		}
+-#undef  main
+-#define main K_and_R_C_main
+-
+-		],[
+-		],[
+-		have_openal=yes	
+-		],[
+-		echo "*** Compiled but failed to link using the OpenAL library."
+-		echo "*** LIBS = $AL_LIBS";
+-		echo "*** Check the OpenAL library is on the LD_LIBRARY_PATH";
+-    		AC_MSG_ERROR([*** Check the OpenAL library is correctly installed.])
+-	])
+-
+-	CFLAGS="$ac_save_CFLAGS"
+-	LIBS="$ac_save_LIBS"
+-
+-	AC_MSG_RESULT(yes)
+-fi
+-
++PKG_CHECK_MODULES([OPENAL], [openal])
++PKG_CHECK_MODULES([FREEALUT], [freealut])
++AL_CFLAGS="$OPENAL_CFLAGS $FREEALUT_CFLAGS"
++AL_LIBS="$OPENAL_LIBS $FREEALUT_LIBS"
+ AC_SUBST(AL_CFLAGS)
+ AC_SUBST(AL_LIBS)
+ 
+diff --git a/configure-fftw.m4 b/configure-fftw.m4
+index 248239c..df7700c 100644
+--- a/configure-fftw.m4
++++ b/configure-fftw.m4
+@@ -1,131 +1,4 @@
+ dnl Check for FFTW3
+-
+-FFTW_CFLAGS=
+-FFTW_LIBS=
+-
+-AC_ARG_WITH(fftw,[  --with-fftw=PFX   Prefix where fftw is installed (optional)], fftw_prefix="$withval", fftw_prefix="")
+-AC_ARG_WITH(fftw-libraries,[  --with-fftw-libraries=DIR   Directory where fftw library is installed (optional)], fftw_libraries="$withval", fftw_libraries="")
+-AC_ARG_WITH(fftw-includes,[  --with-fftw-includes=DIR   Directory where fftw header files are installed (optional)], fftw_includes="$withval", fftw_includes="")
+-AC_ARG_ENABLE(fftwtest, [  --disable-fftwtest       Do not try to compile and run a test fftw program],, enable_fftwtest=yes)
+-
+-  if test "x$fftw_libraries" != "x" ; then
+-    FFTW_LIBS="-L$fftw_libraries"
+-  elif test "x$fftw_prefix" != "x" ; then
+-    FFTW_LIBS="-L$fftw_prefix/lib"
+-  elif test "x$prefix" != "xNONE"; then
+-    FFTW_LIBS="-L$prefix/lib"
+-  fi
+-
+-if test `uname` == Darwin; then
+-  FFTW_LIBS="$FFTW_LIBS -lfftw3"
+-else        
+-  FFTW_LIBS="$FFTW_LIBS -lfftw3f"
+-fi
+-
+-  if test "x$fftw_includes" != "x" ; then
+-    FFTW_CFLAGS="-I$fftw_includes"
+-  elif test "x$fftw_prefix" != "x" ; then
+-    FFTW_CFLAGS="-I$fftw_prefix/include"
+-  elif test "x$prefix" != "xNONE"; then
+-    FFTW_CFLAGS="-I$prefix/include -I/usr/include"
+-  fi
+-
+-  AC_MSG_CHECKING(for FFTW)
+-  no_fftw=""
+-
+-  if test "x$enable_fftwtest" = "xyes" ; then
+-    ac_save_CFLAGS="$CFLAGS"
+-    ac_save_LIBS="$LIBS"
+-    CFLAGS="$CFLAGS $FFTW_CFLAGS"
+-    LIBS="$LIBS $FFTW_LIBS"
+-dnl
+-dnl Now check if the installed fftw is sufficiently new.
+-dnl
+-      rm -f conf.fftwtest
+-      AC_TRY_RUN([
+-#include <stdio.h>
+-#include <stdlib.h>
+-#include <string.h>
+-#include <fftw3.h>
+-
+-#ifdef FFTW_USE_DOUBLE
+-#define FFT_COMPLEX_TYPE fftw_complex
+-#define FFT_REAL_TYPE double
+-#define FFT_PLAN_TYPE fftw_plan
+-#define FFT_CREATE_PLAN fftw_plan_dft_c2r_2d
+-#define FFT_DELETE_PLAN fftw_destroy_plan
+-#define FFT_EXECUTE_PLAN fftw_execute
+-#else
+-#define FFT_COMPLEX_TYPE fftwf_complex
+-#define FFT_REAL_TYPE float
+-#define FFT_PLAN_TYPE fftwf_plan
+-#define FFT_CREATE_PLAN fftwf_plan_dft_c2r_2d
+-#define FFT_DELETE_PLAN fftwf_destroy_plan
+-#define FFT_EXECUTE_PLAN fftwf_execute
+-#endif
+-
+-#define N 10
+-
+-int main ()
+-{
+-        FFT_COMPLEX_TYPE fft_in[N*(N/2+1)];
+-        FFT_REAL_TYPE fft_out[N*N];
+-        FFT_PLAN_TYPE plan;
+-
+-        plan = FFT_CREATE_PLAN(N, N, fft_in, fft_out, 0);
+-
+-
+-    system("touch conf.fftwtest");
+-    return 0;
+-}
+-
+-],, no_fftw=yes,[echo $ac_n "cross compiling; assumed OK... $ac_c"])
+-       CFLAGS="$ac_save_CFLAGS"
+-       LIBS="$ac_save_LIBS"
+-  fi
+-
+-  if test "x$no_fftw" = "x" ; then
+-     AC_MSG_RESULT(yes)  
+-  else
+-     AC_MSG_RESULT(no)
+-     if test -f conf.fftwtest ; then
+-       :
+-     else
+-       echo "*** Could not run FFTW test program, checking why..."
+-       CFLAGS="$CFLAGS $FFTW_CFLAGS"
+-       LIBS="$LIBS $FFTW_LIBS"
+-       AC_TRY_LINK([
+-#include <stdio.h>
+-#include <fftw3.h>
+-],     [ return 0; ],
+-       [ echo "*** The test program compiled, but did not run. This usually means"
+-       echo "*** that the run-time linker is not finding FFTW or finding the wrong"
+-       echo "*** version of FFTW. If it is not finding FFTW, you'll need to set your"
+-       echo "*** LD_LIBRARY_PATH environment variable, or edit /etc/ld.so.conf to point"
+-       echo "*** to the installed location  Also, make sure you have run ldconfig if that"
+-       echo "*** is required on your system"
+-       echo "***"
+-       echo "*** If you have an old version installed, it is best to remove it, although"
+-       echo "*** you may also be able to get things to work by modifying LD_LIBRARY_PATH"],
+-       [ echo "*** The test program failed to compile or link. See the file config.log for the"
+-       echo "*** exact error that occured. This usually means FFTW was incorrectly installed"
+-       echo "*** or that you have moved FFTW since it was installed." ])
+-       CFLAGS="$ac_save_CFLAGS"
+-       LIBS="$ac_save_LIBS"
+-     fi
+-     FFTW_CFLAGS=""
+-     FFTW_LIBS=""
+-     
+-            AC_MSG_ERROR([
+-                FFTW must be installed on your system but couldn't be found.
+-                Please check that FFTW is installed.
+-                FFTW version 3 is required.
+-        ])
+-
+-
+-  fi
+-  rm -f conf.fftwtest
+-
+-
++PKG_CHECK_MODULES([FFTW], [fftw3f])
+ AC_SUBST(FFTW_CFLAGS)
+ AC_SUBST(FFTW_LIBS)
+diff --git a/configure-gl.m4 b/configure-gl.m4
+index 85e38ea..320e0a6 100644
+--- a/configure-gl.m4
++++ b/configure-gl.m4
+@@ -43,15 +43,7 @@ if test x$have_glew != xyes; then
+     AC_MSG_ERROR([*** Can't find the GLEW library])
+ fi
+ 
+-if test `uname -s` == FreeBSD; then 
+-    GL_LIBS="-lGL -lGLU -lGLEW"
+-else 
+-    if test `uname -s` == Darwin; then 
+-        GL_LIBS="-framework OpenGL"
+-    else
+-        GL_LIBS="-lGL -lGLU -lpthread -lGLEW" 
+-    fi
+-fi 
++GL_LIBS="-lGL -lGLU -lGLEW" 
+ 
+ AC_SUBST(GL_LIBS)
+ 
+diff --git a/configure-sdl.m4 b/configure-sdl.m4
+index 03316ff..ffb6480 100644
+--- a/configure-sdl.m4
++++ b/configure-sdl.m4
+@@ -1,54 +1,7 @@
+ dnl Checking for SDL
+-AC_MSG_CHECKING(for SDL)
+-SDL_VERSION=1.2.5
+-AM_PATH_SDL($SDL_VERSION,
+-            :,
+-            AC_MSG_ERROR([*** SDL version $SDL_VERSION not found. Try http://www.libsdl.org/])
+-)
+-
+-dnl checking for SDL_net
+-AC_MSG_CHECKING(for SDL_net lib)
+-have_SDLnet=yes
+-if test "x$enable_sdltest" = "xyes" ; then
+-
+-	ac_save_CFLAGS="$CFLAGS"
+-	ac_save_CXXFLAGS="$CXXFLAGS"
+-	ac_save_LIBS="$LIBS"
+-	CFLAGS="$CFLAGS $SDL_CFLAGS"
+-	CXXFLAGS="$CXXFLAGS $SDL_CFLAGS"
+-	LIBS="$SDL_LIBS $LIBS"
+-
+-	AC_TRY_COMPILE([
+-		#include <SDL/SDL.h>
+-#ifdef __DARWIN__
+-		#include <SDL_net/SDL_net.h>
+-#else
+-		#include <SDL/SDL_net.h>
+-#endif
+-
+-		int main(int argc, char *argv[])
+-		{ return 0; }
+-#undef  main
+-#define main K_and_R_C_main
+-		],[
+-		],[
+-		have_SDLnet=yes
+-		],[
+-		have_SDLnet=no
+-		])
+-
+-	CFLAGS="$ac_save_CFLAGS"
+-	CXXFLAGS="$ac_save_CXXFLAGS"
+-	LIBS="$ac_save_LIBS"
+-fi
+-
+-AC_MSG_RESULT($have_SDLnet)
+-if test x$have_SDLnet != xyes; then
+-    AC_MSG_ERROR([*** Can't find the SDL_net library Try: http://www.libsdl.org/projects/SDL_net])
+-fi
+-
+-if test `uname` == Darwin; then
+-SDL_LIBS="$SDL_LIBS -framework SDL_net"
+-else
+-SDL_LIBS="$SDL_LIBS -lSDL_net"
+-fi
++PKG_CHECK_MODULES([SDL], [sdl])
++PKG_CHECK_MODULES([SDL_NET], [SDL_net])
++SDL_CFLAGS="$SDL_CFLAGS $SDL_NET_CFLAGS"
++SDL_LIBS="$SDL_LIBS $SDL_NET_LIBS"
++AC_SUBST(SDL_CFLAGS)
++AC_SUBST(SDL_LIBS)
+diff --git a/configure.ac b/configure.ac
+index 3be883e..681ae7a 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -1,10 +1,10 @@
+ dnl Process this file with autoconf to produce a configure script.
+ 
+-AC_INIT(README)
++AC_INIT([scorched3d], [44])
+ AC_CANONICAL_TARGET([]) 
+ 
+ dnl Setup for automake
+-AM_INIT_AUTOMAKE(scorched3d, 43)
++AM_INIT_AUTOMAKE([foreign subdir-objects])
+ 
+ dnl Check for tools
+ AC_PROG_MAKE_SET
+@@ -13,17 +13,6 @@ AC_PROG_CXX
+ AC_PROG_INSTALL
+ AC_PROG_RANLIB
+ 
+-LDFLAGS="$LDFLAGS -L/usr/X11R6/lib -L/usr/X11R6"
+-CPPFLAGS="$CPPFLAGS -I/usr/X11R6/include -I/usr/X11R6"
+-
+-if test `uname` == Darwin; then
+-LDFLAGS="$LDFLAGS -lmx"
+-CPPFLAGS="$CPPFLAGS -DFFTW_USE_DOUBLE -D__DARWIN__ -D__MACOSX__"
+-else
+-LDFLAGS="$LDFLAGS -L/usr/local/lib"
+-CPPFLAGS="$CPPFLAGS -I/usr/local/include"
+-fi
+-
+ AC_CHECK_LIB(fridge, beer, echo "Hmm?!",[
+ 	echo "Warning: No beer found in fridge!";
+ 	echo "We highly suggest that you rectify this situation immediately."
+@@ -40,7 +29,8 @@ m4_include([configure-gl.m4])
+ m4_include([configure-al.m4])
+ m4_include([configure-wx.m4])
+ m4_include([configure-ogg.m4])
+-m4_include([configure-ft.m4])
++PKG_CHECK_MODULES(FT2, freetype2)
++PKG_CHECK_MODULES(LUA, lua54)
+ m4_include([configure-fftw.m4])
+ S3D_SUBDIRS="launcher client server"
+ else
+@@ -74,11 +64,7 @@ AC_CHECK_HEADERS(unistd.h iconv.h)
+ 
+ # FIXEME
+ dnl Checking for Zlib Png Jpeg
+-if test `uname` == Darwin; then
+-LIBS="$LIBS /usr/local/lib/libexpat.a -lz -framework UnixImageIO"
+-else
+ LIBS="$LIBS -lexpat -lz -lpng -ljpeg"
+-fi
+ 
+ # Directory setup stuff
+ dnl --with-docdir
+@@ -94,9 +80,6 @@ fi
+ AC_SUBST(docdir)
+ 
+ AC_PREFIX_DEFAULT(/usr/local/games/scorched3d)
+-if test `uname` == Darwin; then
+-prefix=./
+-fi
+ 
+ CFLAGS="$CFLAGS -DS3D_DOCDIR=\\\"${docdir}\\\" -DS3D_DATADIR=\\\"${datadir}\\\" -DS3D_BINDIR=\\\"${bindir}\\\""
+ CXXFLAGS="$CXXFLAGS -DS3D_DOCDIR=\\\"${docdir}\\\" -DS3D_DATADIR=\\\"${datadir}\\\" -DS3D_BINDIR=\\\"${bindir}\\\""
+diff --git a/data/ultradisplay.xml b/data/ultradisplay.xml
+index ee58f89..6d29aff 100644
+--- a/data/ultradisplay.xml
++++ b/data/ultradisplay.xml
+@@ -109,7 +109,7 @@
+   <!-- LowTreeDetail: Only use low detail trees.  Faster..  Default value : "off" . -->
+   <!-- SoftwareMouse: Use a software mouse pointer.  Useful if mouse clicks are not aligned..  Default value : "off" . -->
+   <!-- SideScroll: Allows the user to scroll the viewport moving the mouse to the sides of the screen.  Default value : "on" . -->
+-  <!-- StorePlayerCamera: Stores the camera position for each player and resets to that position on thier turn.  Default value : "off" . -->
++  <!-- StorePlayerCamera: Stores the camera position for each player and resets to that position on their turn.  Default value : "off" . -->
+   <!-- RestricedCameraMovement: Keeps the player camera within the bounds of the landscape.  Default value : "on" . -->
+   <!-- SwapYAxis: Remaps mouse pointer from top of window to the bottom and vice-versa (MAC/OSX).  Default value : "off" . -->
+   <!-- ClientLogToFile: Client logs to file.  Default value : "off" . -->
+diff --git a/scripts/createAMMakefile.pl b/scripts/createAMMakefile.pl
+index cb98d73..03d9be8 100644
+--- a/scripts/createAMMakefile.pl
++++ b/scripts/createAMMakefile.pl
+@@ -68,8 +68,8 @@ print CLIENT "bin_PROGRAMS = $binary\n\n";
+ print CLIENT $binary."_SOURCES = \\\n";
+ print CLIENT @clientfiles;
+ print CLIENT "\n";
+-print CLIENT "AM_CPPFLAGS = -I../../common/porting -I../../common ${flags}\n";
+-print CLIENT "LDADD = ${libs}\n";
++print CLIENT $binary."_CPPFLAGS = -I../../common/porting -I../../common ${flags}\n";
++print CLIENT $binary."_LDADD = ${libs}\n";
+ print CLIENT "\n";
+ 
+ close(CLIENT);
+@@ -98,13 +98,13 @@ createBinaryMakefile(
+ 	"../src/client/scorchedc/scorchedc.vcxproj", 
+ 	"../src/client/scorchedc/Makefile.am", 
+ 	"scorched3dc",
+-	'-I../../client -I../../server  @FFTW_CFLAGS@ @AL_CFLAGS@ @FT2_CFLAGS@ @OGG_CFLAGS@ @SDL_CFLAGS@',
+-	'@FFTW_LIBS@ @AL_LIBS@ @FT2_LIBS@ @GL_LIBS@ @OGG_LIBS@ @SDL_LIBS@'
++	'-I../../client -I../../server  @FFTW_CFLAGS@ @AL_CFLAGS@ @FT2_CFLAGS@ @OGG_CFLAGS@ @SDL_CFLAGS@ @LUA_CFLAGS@',
++	'@FFTW_LIBS@ @AL_LIBS@ @FT2_LIBS@ @GL_LIBS@ @OGG_LIBS@ @SDL_LIBS@ @LUA_LIBS@'
+ 	);
+ createBinaryMakefile(
+ 	"../src/server/scorcheds/scorcheds.vcxproj", 
+ 	"../src/server/scorcheds/Makefile.am", 
+ 	"scorched3ds",
+-	'-I../../server -DS3D_SERVER=1 @SDL_CFLAGS@ @MYSQL_CFLAGS@',
+-	'@SDL_LIBS@ @MYSQL_LIBS@'
++	'-I../../server -DS3D_SERVER=1 @SDL_CFLAGS@ @MYSQL_CFLAGS@ @LUA_CFLAGS@',
++	'@SDL_LIBS@ @MYSQL_LIBS@ @LUA_LIBS@'
+ 	);
+diff --git a/src/client/GLEXT/GLFont2dFreeType.h b/src/client/GLEXT/GLFont2dFreeType.h
+index 2cde9a8..8e3d96d 100644
+--- a/src/client/GLEXT/GLFont2dFreeType.h
++++ b/src/client/GLEXT/GLFont2dFreeType.h
+@@ -23,10 +23,10 @@
+ 
+ #include <GLEXT/GLFont2dStorage.h>
+ #include <ft2build.h>
+-#include <freetype/freetype.h>
+-#include <freetype/ftglyph.h>
+-#include <freetype/ftoutln.h>
+-#include <freetype/fttrigon.h>
++#include FT_FREETYPE_H
++#include FT_GLYPH_H
++#include FT_OUTLINE_H
++#include FT_TRIGONOMETRY_H
+ #include <string>
+ 
+ class GLFont2dFreeType
+diff --git a/src/client/GLW/GLWChannelText.cpp b/src/client/GLW/GLWChannelText.cpp
+index 6d7fe65..74cf319 100644
+--- a/src/client/GLW/GLWChannelText.cpp
++++ b/src/client/GLW/GLWChannelText.cpp
+@@ -620,7 +620,7 @@ void GLWChannelText::buttonDown(unsigned int id)
+ 	static ToolTip leaveTooltip(ToolTip::ToolTipHelp | ToolTip::ToolTipAlignBottom, 
+ 		LANG_RESOURCE("LEAVE_CHANNEL", "Leave Channel"), 
+ 		LANG_RESOURCE("LEAVE_CHANNEL_TOOLTIP", "Leave a current chat channel.\n"
+-		"You will stop recieving messages sent on this channel"));
++		"You will stop receiving messages sent on this channel"));
+ 	static ToolTip selectTooltip(ToolTip::ToolTipHelp | ToolTip::ToolTipAlignBottom, 
+ 		LANG_RESOURCE("SELECT_CHANNEL", "Select Channel"), 
+ 		LANG_RESOURCE("SELECT_CHANNEL_TOOLTIP", "Select the current channel.\n"
+diff --git a/src/client/GLW/GLWTankViewer.cpp b/src/client/GLW/GLWTankViewer.cpp
+index 988ea54..7c69a3f 100644
+--- a/src/client/GLW/GLWTankViewer.cpp
++++ b/src/client/GLW/GLWTankViewer.cpp
+@@ -55,11 +55,11 @@ GLWTankViewer::GLWTankViewer(float x, float y, int numH, int numV) :
+ 	catagoryChoice_.setHandler(this);
+ 
+ 	catagoryChoice_.setToolTip(new ToolTip(ToolTip::ToolTipHelp, 
+-		LANG_RESOURCE("MODEL_CATAGORY", "Model Catagory"),
++		LANG_RESOURCE("MODEL_CATAGORY", "Model Category"),
+ 		LANG_RESOURCE("MODEL_CATAGORY_TOOLTIP", 
+-		"Displays the currently selected model catagory.\n"
++		"Displays the currently selected model category.\n"
+ 		"To make models easier to locate\n"
+-		"tank models are grouped by catagory.")));
++		"tank models are grouped by category.")));
+ 	infoWindow_.setToolTip(new ToolTip(ToolTip::ToolTipHelp, 
+ 		LANG_RESOURCE("CURRENT_MODEL", "Current Model"),
+ 		LANG_RESOURCE("CURRENT_MODEL_TOOLTIP", 
+diff --git a/src/client/client/ClientMain.cpp b/src/client/client/ClientMain.cpp
+index 60a50f1..a134421 100644
+--- a/src/client/client/ClientMain.cpp
++++ b/src/client/client/ClientMain.cpp
+@@ -84,7 +84,7 @@ static bool initHardware(ProgressCounter *progressCounter)
+ 	if (!Keyboard::instance()->init())
+ 	{
+ 		S3D::dialogMessage("Scorched3D Keyboard", 
+-			"SDL failed to aquire keyboard.\n"
++			"SDL failed to acquire keyboard.\n"
+ #ifdef WIN32
+ 			"Is DirectX 5.0 installed?"
+ #endif
+@@ -106,7 +106,7 @@ static bool initHardware(ProgressCounter *progressCounter)
+ 			OptionsDisplay::instance()->getSoundChannels()))
+ 		{
+ 			S3D::dialogMessage("Scorched3D Sound", 
+-				"Failed to aquire sound.\n"
++				"Failed to acquire sound.\n"
+ 				"Is anything else currently using the sound card?");
+ 		}
+ 		else
+diff --git a/src/client/client/SecureID.cpp b/src/client/client/SecureID.cpp
+index a87f5da..e42a474 100644
+--- a/src/client/client/SecureID.cpp
++++ b/src/client/client/SecureID.cpp
+@@ -1,6 +1,7 @@
+ #include <client/SecureID.h>
+ #include <net/NetInterface.h>
+ #include <common/Defines.h>
++#include <unistd.h>
+ 
+ #ifdef _WIN32
+ 
+diff --git a/src/client/dialogs/NetworkSelectDialog.cpp b/src/client/dialogs/NetworkSelectDialog.cpp
+index a4b8198..b8e41bb 100644
+--- a/src/client/dialogs/NetworkSelectDialog.cpp
++++ b/src/client/dialogs/NetworkSelectDialog.cpp
+@@ -315,7 +315,7 @@ void NetworkSelectDialog::drawColumnGames(unsigned int id, int row, int col,
+ 		if (officialStr == "official")
+ 		{
+ 			LANG_RESOURCE_CONST_VAR(
+-				OFFICAL_SERVER, "OFFICAL_SERVER", "An offical server.");
++				OFFICAL_SERVER, "OFFICAL_SERVER", "An official server.");
+ 			drawIcon(tankTex_.getTexture(), x, y, OFFICAL_SERVER);
+ 		}
+ 		else if (officialStr == "mod")
+diff --git a/src/client/dialogs/PlayerDialog.cpp b/src/client/dialogs/PlayerDialog.cpp
+index 743f957..83eb4a3 100644
+--- a/src/client/dialogs/PlayerDialog.cpp
++++ b/src/client/dialogs/PlayerDialog.cpp
+@@ -109,7 +109,7 @@ PlayerDialog::PlayerDialog(const std::string &name,
+ 			LANG_RESOURCE("PLAYER_NAME_TOOLTIP",
+ 			"The name of this player.\n"
+ 			"Use the backspace or delete key to remove this name.\n"
+-			"Type in a new player name via the keyboad to change."));
++			"Type in a new player name via the keyboard to change."));
+ 		GLWLabel *nameLabel = (GLWLabel *) 
+ 			infoPanel->addWidget(new GLWLabel(145, 40, LANG_RESOURCE("NAME_LABEL", "Name:")));
+ 		nameLabel->setToolTip(nameTip);
+diff --git a/src/client/graph/OptionsDisplay.cpp b/src/client/graph/OptionsDisplay.cpp
+index 1b36325..0e8834a 100644
+--- a/src/client/graph/OptionsDisplay.cpp
++++ b/src/client/graph/OptionsDisplay.cpp
+@@ -115,7 +115,7 @@ OptionsDisplay::OptionsDisplay() :
+ 	sideScroll_(options_, "SideScroll",
+ 		"Allows the user to scroll the viewport moving the mouse to the sides of the screen", RWAccess | NoRestore, true),
+ 	storePlayerCamera_(options_, "StorePlayerCamera",
+-		"Stores the camera position for each player and resets to that position on thier turn", RWAccess | NoRestore, false),
++		"Stores the camera position for each player and resets to that position on their turn", RWAccess | NoRestore, false),
+ 	restricedCameraMovement_(options_, "RestricedCameraMovement",
+ 		"Keeps the player camera within the bounds of the landscape", RWAccess | NoRestore, true),
+ 	drawPlayerNames_(options_, "DrawPlayerNames",
+diff --git a/src/client/graph/TargetCamera.cpp b/src/client/graph/TargetCamera.cpp
+index 5635693..77a54b1 100644
+--- a/src/client/graph/TargetCamera.cpp
++++ b/src/client/graph/TargetCamera.cpp
+@@ -89,7 +89,7 @@ static const char *cameraDescriptions[] =
+ 	"Tracks the current tanks rotation.",
+ 	"Shows the finishing position of the last\n"
+ 	"shot this tank made.",
+-	"Automaticaly tracks any action around the\n"
++	"Automatically tracks any action around the\n"
+ 	"island by moving to view any explosions\n"
+ 	"and deaths.",
+ 	"Look at the left of the current tank.\n"
+diff --git a/src/common/common/DefinesScorched.cpp b/src/common/common/DefinesScorched.cpp
+index c6a8f88..54a94ef 100644
+--- a/src/common/common/DefinesScorched.cpp
++++ b/src/common/common/DefinesScorched.cpp
+@@ -62,7 +62,7 @@ void S3D::showURL(const std::string &url)
+ 	std::string buffer = S3D::formatStringBuffer("open %s", url.c_str());
+ 	system(buffer.c_str());
+ #else
+-	std::string buffer = S3D::formatStringBuffer("firefox %s", url.c_str());
++	std::string buffer = S3D::formatStringBuffer("sensible-browser %s", url.c_str());
+ 	system(buffer.c_str());
+ #endif // __DARWIN__
+ #endif // _WIN32
+diff --git a/src/common/common/OptionsGame.cpp b/src/common/common/OptionsGame.cpp
+index ed4bb51..a09a0af 100644
+--- a/src/common/common/OptionsGame.cpp
++++ b/src/common/common/OptionsGame.cpp
+@@ -326,7 +326,7 @@ OptionsGame::OptionsGame() :
+ 	economy_(options_, "Economy", 
+ 		"Speicifies the name of the economy to use", 0, "EconomyFreeMarket", economyEnum),
+ 	landscapes_(options_, "Landscapes", 
+-		"Colon seperated list of landscape names", 0, ""),
++		"Colon separated list of landscape names", 0, ""),
+ 	serverPassword_(options_, "ServerPassword", 
+ 		"The password for this server (empty password is no password)", OptionEntry::DataProtected, ""),
+ 	allowSameIP_(options_, "AllowSameIP",
+@@ -336,7 +336,7 @@ OptionsGame::OptionsGame() :
+ 	publishServer_(options_, "PublishServer",
+ 		"Allow other scorched net clients to see this server.  Do not use for LAN games.", 0, false),
+ 	useUPnP_(options_, "UseUPnP",
+-		"Try to automaticaly add external port forwarding rules using UPnP", 0, false),
++		"Try to automatically add external port forwarding rules using UPnP", 0, false),
+ 	useUPnPLogging_(options_, "UseUPnPLogging",
+ 		"Turn on packet logging for UPnP", 0, false),
+ 	publishAddress_(options_, "PublishAddress",
+@@ -382,7 +382,7 @@ OptionsGame::OptionsGame() :
+ 	depricatedAutoBallanceTeams_(options_, "AutoBallanceTeams",
+ 		"", OptionEntry::DataDepricated, true),
+ 	depricatedScoreType_(options_, "ScoreType",
+-		"How the winnder is choosen", OptionEntry::DataDepricated, 0, scoreEnum)
++		"How the winner is chosen", OptionEntry::DataDepricated, 0, scoreEnum)
+ {
+ 	char buffer[128];
+ 	for (int i=0; i<24; i++)
+diff --git a/src/common/common/StdVectorPtr.h b/src/common/common/StdVectorPtr.h
+index 6e10089..7c2b2f6 100644
+--- a/src/common/common/StdVectorPtr.h
++++ b/src/common/common/StdVectorPtr.h
+@@ -23,6 +23,7 @@
+ 
+ #include <vector>
+ #include <stdexcept>
++#include <memory>
+ 
+ // same as std::vector regarding the interface, but handles pointers.
+ template <class T>
+@@ -61,11 +62,19 @@ class StdVectorPtr
+ 	}
+ 
+ 	// exception safe, so first create space, then store
++#if __cplusplus >= 201103L
++	void push_back(std::unique_ptr<T> ptr) 
++	{
++		data.push_back(0);
++		data.back() = ptr.release();
++	}
++#else
+ 	void push_back(std::auto_ptr<T> ptr) 
+ 	{
+ 		data.push_back(0);
+ 		data.back() = ptr.release();
+ 	}
++#endif
+ 
+ 	T* const& operator[](size_t n) const { return data[n]; }
+ 	T* const& at(size_t n) const { return data.at(n); }
+diff --git a/src/common/coms/ComsLoadLevelMessage.cpp b/src/common/coms/ComsLoadLevelMessage.cpp
+index 0a66881..9bf60ba 100644
+--- a/src/common/coms/ComsLoadLevelMessage.cpp
++++ b/src/common/coms/ComsLoadLevelMessage.cpp
+@@ -108,6 +108,49 @@ bool ComsLoadLevelMessage::loadState(ScorchedContext &context, bool fullState)
+ 
+ bool ComsLoadLevelMessage::loadTanks(ScorchedContext &context)
+ {
++	/*
++	 * There is a timing bug which shows on really fast machines
++	 * where the client starts talking to the server before the
++	 * server initial setup is done.
++	 * In sofar as I have managed to debug this, the following
++	 * happens on slower machines, aka the GOOD case:
++	 *
++	 * Server TankAddSimAction::invokeAction() new Tank "(Bot) Fred"
++	 * Server TankAddSimAction::invokeAction() new Tank "(Bot) Ted"
++	 * Server TankAddSimAction::invokeAction() new Tank "Player 1"
++	 * Server TankAddSimAction::invokeAction() new Tank "Spectator"
++	 * Client TankAddSimAction::invokeAction() new Tank "(Bot) Fred"
++	 * Client TankAddSimAction::invokeAction() new Tank "(Bot) Ted"
++	 * Client TankAddSimAction::invokeAction() new Tank "Player 1"
++	 * Client TankAddSimAction::invokeAction() new Tank "Spectator"
++	 * 
++	 * Note the server internally creates all tanks before the
++	 * client does and thus before the client starts sending
++	 * messages related to these tanks to the server.
++	 *
++	 * On a fast enough system (i7-10610U) the following order
++	 * has been observed instead:
++	 *
++	 * Server TankAddSimAction::invokeAction() new Tank "(Bot) Fred"
++	 * Server TankAddSimAction::invokeAction() new Tank "(Bot) Ted"
++	 * Client TankAddSimAction::invokeAction() new Tank "(Bot) Fred"
++	 * Client TankAddSimAction::invokeAction() new Tank "(Bot) Ted"
++	 * Client TankAddSimAction::invokeAction() new Tank "Player 1"
++	 * Client TankAddSimAction::invokeAction() new Tank "Spectator"
++	 * Server TankAddSimAction::invokeAction() new Tank "Player 1"
++	 * Server TankAddSimAction::invokeAction() new Tank "Spectator"
++	 *
++	 * Note the server creates the "Player 1" and "Spectator"
++	 * tanks after the client, this causes the server to ignore
++	 * some initial messages from the client related to these
++	 * tanks, after which things get stuck, breaking non-networked
++	 * games on fast machines.
++	 *
++	 * The sleep below is an ugly but effective workaround for this
++	 * issue.
++	 */
++	SDL_Delay(100);
++
+ 	NetBufferReader reader(tanksBuffer_);
+ 
+ 	// Add any new tanks
+diff --git a/src/common/engine/ModDirs.cpp b/src/common/engine/ModDirs.cpp
+index 01790a1..51e2803 100644
+--- a/src/common/engine/ModDirs.cpp
++++ b/src/common/engine/ModDirs.cpp
+@@ -73,7 +73,7 @@ bool ModDirs::loadModFile(const std::string &inputFileName, bool global)
+ 	{
+ 		S3D::dialogMessage("ModDirs", S3D::formatStringBuffer(
+ 			"ERROR: All mod directories must have lower case filenames.\n"
+-			"Directory \"%s\" has upper case charaters in it",
++			"Directory \"%s\" has upper case characters in it",
+ 			newFileName.c_str()));
+ 		return false;
+ 	}
+diff --git a/src/common/engine/ModFiles.cpp b/src/common/engine/ModFiles.cpp
+index c56d33b..6dea8be 100644
+--- a/src/common/engine/ModFiles.cpp
++++ b/src/common/engine/ModFiles.cpp
+@@ -217,7 +217,7 @@ bool ModFiles::loadModFile(NetBuffer &tmpFileContents,
+ 	{
+ 		S3D::dialogMessage("Mod", S3D::formatStringBuffer(
+ 			"ERROR: All mod files must have lower case filenames.\n"
+-			"File \"%s,%s\" has upper case charaters in it",
++			"File \"%s,%s\" has upper case characters in it",
+ 			oldFileName.c_str(),
+ 			shortFileName));
+ 		return false;
+diff --git a/src/common/landscapedef/LandscapeDefnTankStart.cpp b/src/common/landscapedef/LandscapeDefnTankStart.cpp
+index dd7f3dd..c61fa59 100644
+--- a/src/common/landscapedef/LandscapeDefnTankStart.cpp
++++ b/src/common/landscapedef/LandscapeDefnTankStart.cpp
+@@ -313,7 +313,7 @@ bool LandscapeDefnTankStartPositional::readXML(XMLNode *node)
+ 	if (positions.empty())
+ 	{
+ 		S3D::dialogMessage("LandscapeDefnTankStartPositional", S3D::formatStringBuffer(
+-			"Error: At least one tank starting positon must be specfied"));
++			"Error: At least one tank starting position must be specified"));
+ 		return false;
+ 	}
+ 	
+diff --git a/src/common/landscapemap/HeightMapLoader.cpp b/src/common/landscapemap/HeightMapLoader.cpp
+index 38d6b28..0de2a2c 100644
+--- a/src/common/landscapemap/HeightMapLoader.cpp
++++ b/src/common/landscapemap/HeightMapLoader.cpp
+@@ -140,7 +140,7 @@ bool HeightMapLoader::generateTerrain(
+ 	else 
+ 	{
+ 		S3D::dialogMessage("HeightMapLoader", S3D::formatStringBuffer(
+-			"Error: Unkown generate type %i",
++			"Error: Unknown generate type %i",
+ 			defn->getType()));
+ 		return false;
+ 	}
+diff --git a/src/common/lang/LangString.h b/src/common/lang/LangString.h
+index 3503329..3e8e21f 100644
+--- a/src/common/lang/LangString.h
++++ b/src/common/lang/LangString.h
+@@ -22,6 +22,76 @@
+ #define __INCLUDE_LangString_INCLUDE__
+ 
+ #include <string>
++#include <cstring>
++
++namespace std {
++template <>
++struct char_traits<unsigned int> {
++	typedef unsigned int char_type;
++	typedef int int_type;
++	typedef streampos pos_type;
++	typedef streamoff off_type;
++	typedef mbstate_t state_type;
++
++	static void assign(char_type& c1, const char_type& c2) noexcept { c1 = c2; }
++	static constexpr bool eq(char_type c1, char_type c2) noexcept { return c1 == c2; }
++	static constexpr bool lt(char_type c1, char_type c2) noexcept { return c1 < c2; }
++
++	static int compare(const char_type* s1, const char_type* s2, size_t n) {
++		for (size_t i = 0; i < n; ++i) {
++			if (lt(s1[i], s2[i])) return -1;
++			if (lt(s2[i], s1[i])) return 1;
++		}
++		return 0;
++	}
++
++	static size_t length(const char_type* s) {
++		size_t len = 0;
++		while (*s++) ++len;
++		return len;
++	}
++
++	static const char_type* find(const char_type* s, size_t n, const char_type& a) {
++		for (size_t i = 0; i < n; ++i) {
++			if (eq(s[i], a)) return s + i;
++		}
++		return nullptr;
++	}
++
++	static char_type* move(char_type* s1, const char_type* s2, size_t n) {
++		return (char_type*)memmove(s1, s2, n * sizeof(char_type));
++	}
++
++	static char_type* copy(char_type* s1, const char_type* s2, size_t n) {
++		return (char_type*)memcpy(s1, s2, n * sizeof(char_type));
++	}
++
++	static char_type* assign(char_type* s, size_t n, char_type a) {
++		for (size_t i = 0; i < n; ++i) s[i] = a;
++		return s;
++	}
++
++	static constexpr int_type not_eof(int_type c) noexcept {
++		return eq_int_type(c, eof()) ? ~eof() : c;
++	}
++
++	static constexpr char_type to_char_type(int_type c) noexcept {
++		return static_cast<char_type>(c);
++	}
++
++	static constexpr int_type to_int_type(char_type c) noexcept {
++		return static_cast<int_type>(c);
++	}
++
++	static constexpr bool eq_int_type(int_type c1, int_type c2) noexcept {
++		return c1 == c2;
++	}
++
++	static constexpr int_type eof() noexcept {
++		return static_cast<int_type>(-1);
++	}
++};
++}
+ 
+ #define LANG_STRING(x) LangStringUtil::convertToLang(x)
+ 
+diff --git a/src/common/lua/LUAS3DLib.cpp b/src/common/lua/LUAS3DLib.cpp
+index 04121f1..40f65c9 100644
+--- a/src/common/lua/LUAS3DLib.cpp
++++ b/src/common/lua/LUAS3DLib.cpp
+@@ -34,12 +34,14 @@
+ #include <target/TargetLife.h>
+ #include <landscapemap/LandscapeMaps.h>
+ 
++extern "C" {
++
+ #define LUA_LIB
+ 
+-#include "lua.h"
++#include <lua.h>
+ 
+-#include "lauxlib.h"
+-#include "lualib.h"
++#include <lauxlib.h>
++#include <lualib.h>
+ 
+ static LUAScript *getScript(lua_State *L)
+ {
+@@ -347,6 +349,15 @@ static const luaL_Reg s3dlib[] = {
+ };
+ 
+ LUALIB_API int luaopen_s3d (lua_State *L) {
++#if LUA_VERSION_NUM > 501
++	lua_newtable(L);
++	luaL_setfuncs(L, s3dlib, 0);
++	lua_pushvalue(L, -1);
++	lua_setglobal(L, LUA_S3DLIBNAME);
++#else
+ 	luaL_register(L, LUA_S3DLIBNAME, s3dlib);
++#endif
+ 	return 1;
+ }
++
++} /* end of extern "C" */
+diff --git a/src/common/lua/LUAS3DLib.h b/src/common/lua/LUAS3DLib.h
+index 42b3ac0..cde855e 100644
+--- a/src/common/lua/LUAS3DLib.h
++++ b/src/common/lua/LUAS3DLib.h
+@@ -21,9 +21,13 @@
+ #if !defined(__INCLUDE_LUAS3DLib_INCLUDE__)
+ #define __INCLUDE_LUAS3DLib_INCLUDE__
+ 
+-#include "lua.h"
++extern "C" {
++
++#include <lua.h>
+ 
+ #define LUA_S3DLIBNAME	"s3d"
+ LUALIB_API int (luaopen_s3d) (lua_State *L);
+ 
++}
++
+ #endif // __INCLUDE_LUAS3DLib_INCLUDE__
+diff --git a/src/common/lua/LUAS3DWeaponLib.cpp b/src/common/lua/LUAS3DWeaponLib.cpp
+index 2da5b5e..5eff5c9 100644
+--- a/src/common/lua/LUAS3DWeaponLib.cpp
++++ b/src/common/lua/LUAS3DWeaponLib.cpp
+@@ -30,12 +30,14 @@
+ #include <engine/Simulator.h>
+ #include <common/Logger.h>
+ 
++extern "C" {
++
+ #define LUA_LIB
+ 
+-#include "lua.h"
++#include <lua.h>
+ 
+-#include "lauxlib.h"
+-#include "lualib.h"
++#include <lauxlib.h>
++#include <lualib.h>
+ 
+ static LUAScript *getScript(lua_State *L)
+ {
+@@ -154,6 +156,15 @@ static const luaL_Reg s3dweaponlib[] = {
+ };
+ 
+ LUALIB_API int luaopen_s3dweapon (lua_State *L) {
++#if LUA_VERSION_NUM > 501
++	lua_newtable(L);
++	luaL_setfuncs(L, s3dweaponlib, 0);
++	lua_pushvalue(L, -1);
++	lua_setglobal(L, LUA_S3DWEAPONLIBNAME);
++#else
+ 	luaL_register(L, LUA_S3DWEAPONLIBNAME, s3dweaponlib);
++#endif
+ 	return 1;
+ }
++
++} /* end of extern "C" */
+diff --git a/src/common/lua/LUAS3DWeaponLib.h b/src/common/lua/LUAS3DWeaponLib.h
+index aab9cce..8b9a49c 100644
+--- a/src/common/lua/LUAS3DWeaponLib.h
++++ b/src/common/lua/LUAS3DWeaponLib.h
+@@ -21,9 +21,13 @@
+ #if !defined(__INCLUDE_LUAWeaponFns_INCLUDE__)
+ #define __INCLUDE_LUAWeaponFns_INCLUDE__
+ 
+-#include "lua.h"
++extern "C" {
++
++#include <lua.h>
+ 
+ #define LUA_S3DWEAPONLIBNAME "s3dweapon"
+ LUALIB_API int (luaopen_s3dweapon) (lua_State *L);
+ 
++}
++
+ #endif // __INCLUDE_LUAWeaponFns_INCLUDE__
+diff --git a/src/common/lua/LUAScript.cpp b/src/common/lua/LUAScript.cpp
+index f7c9318..d170a9a 100644
+--- a/src/common/lua/LUAScript.cpp
++++ b/src/common/lua/LUAScript.cpp
+@@ -24,15 +24,14 @@
+ #include <lua/LUAS3DWeaponLib.h>
+ #include <common/Logger.h>
+ 
+-#include "lauxlib.h"
+-#include "lualib.h"
++#include <lua.hpp>
+ 
+ LUAScript::LUAScript(ScorchedContext *context) :
+ 	context_(context),
+ 	L_(0),
+ 	weapon_(0)
+ {
+-	L_ = lua_open();
++	L_ = luaL_newstate();
+ 	
+ 	// Load the available libraries
+ 	luaopen_base(L_); 
+diff --git a/src/common/lua/LUAScript.h b/src/common/lua/LUAScript.h
+index be5eb07..8f932a8 100644
+--- a/src/common/lua/LUAScript.h
++++ b/src/common/lua/LUAScript.h
+@@ -24,7 +24,7 @@
+ #include <string>
+ #include <common/FixedVector.h>
+ 
+-#include "lua.h"
++#include <lua.hpp>
+ 
+ class Weapon;
+ class ScorchedContext;
+diff --git a/src/common/lua/LUAUtil.h b/src/common/lua/LUAUtil.h
+index 3f4c50a..95b9585 100644
+--- a/src/common/lua/LUAUtil.h
++++ b/src/common/lua/LUAUtil.h
+@@ -24,9 +24,7 @@
+ #include <string>
+ #include <common/FixedVector.h>
+ 
+-#include "lua.h"
+-#include "lauxlib.h"
+-#include "lualib.h"
++#include <lua.hpp>
+ 
+ class LUAUtil
+ {
+diff --git a/src/common/net/NetServerTCP3Destination.cpp b/src/common/net/NetServerTCP3Destination.cpp
+index 3020de9..9d04fbe 100644
+--- a/src/common/net/NetServerTCP3Destination.cpp
++++ b/src/common/net/NetServerTCP3Destination.cpp
+@@ -56,7 +56,7 @@ void NetServerTCP3Destination::printStats()
+ 		destinationId_));
+ 	Logger::log(S3D::formatStringBuffer("  %u messages sent, %u bytes out",
+ 		send_.getMessagesSent(), send_.getBytesOut()));
+-	Logger::log(S3D::formatStringBuffer("  %u messages recieved, %u bytes in",
++	Logger::log(S3D::formatStringBuffer("  %u messages received, %u bytes in",
+ 		recv_.getMessagesRecieved(), recv_.getBytesIn()));
+ }
+ 
+diff --git a/src/common/net/NetServerTCP3Recv.cpp b/src/common/net/NetServerTCP3Recv.cpp
+index b84b4a3..4f84d4a 100644
+--- a/src/common/net/NetServerTCP3Recv.cpp
++++ b/src/common/net/NetServerTCP3Recv.cpp
+@@ -81,7 +81,7 @@ bool NetServerTCP3Recv::actualRecvFunc()
+ 	if (len > 15000000 || len == 0)
+ 	{
+ 		Logger::log(S3D::formatStringBuffer(
+-			"NetServerTCP3Recv: Buffer was too large to recieve.  Size %i.",
++			"NetServerTCP3Recv: Buffer was too large to receive.  Size %i.",
+ 			len));
+ 		return false;
+ 	}
+diff --git a/src/common/net/NetServerTCPProtocol.cpp b/src/common/net/NetServerTCPProtocol.cpp
+index 24a9ab1..0dfc533 100644
+--- a/src/common/net/NetServerTCPProtocol.cpp
++++ b/src/common/net/NetServerTCPProtocol.cpp
+@@ -109,14 +109,14 @@ NetMessage *NetServerTCPScorchedProtocol::readBuffer(TCPsocket socket, unsigned
+ 	// check if anything is strange, like a zero length buffer
+ 	if(len == 0)
+ 	{
+-		Logger::log( "Zero length buffer recieved.");
++		Logger::log( "Zero length buffer received.");
+ 		return 0;
+ 	}
+ 
+ 	// Cannot recieve a message large than .5 MB
+ 	if (len > 5000000)
+ 	{
+-		Logger::log(S3D::formatStringBuffer("Buffer was too large to recieve.  Size %i.",
++		Logger::log(S3D::formatStringBuffer("Buffer was too large to receive.  Size %i.",
+ 			len));
+ 		return 0;
+ 	}
+diff --git a/src/common/weapons/AccessoryStore.cpp b/src/common/weapons/AccessoryStore.cpp
+index 07ec065..5424101 100644
+--- a/src/common/weapons/AccessoryStore.cpp
++++ b/src/common/weapons/AccessoryStore.cpp
+@@ -156,7 +156,7 @@ AccessoryPart *AccessoryStore::createAccessoryPart(
+ 	Accessory *parent, XMLNode *currentNode)
+ {
+ 	XMLNode *typeNode = 0;
+-	if (!currentNode->getNamedParameter("type", typeNode)) return false;
++	if (!currentNode->getNamedParameter("type", typeNode)) return 0;
+ 
+ 	AccessoryPart *accessoryPart = 
+ 		AccessoryMetaRegistration::getNewAccessory(typeNode->getContent(), this);
+diff --git a/src/launcher/scorched/main.cpp b/src/launcher/scorched/main.cpp
+index d3a1a5b..f83f692 100644
+--- a/src/launcher/scorched/main.cpp
++++ b/src/launcher/scorched/main.cpp
+@@ -26,6 +26,7 @@
+ #include <graph/OptionsDisplay.h>
+ #include <wx/wx.h>
+ #include <wx/utils.h>
++#include <wx/sizer.h>
+ #include <locale.h>
+ #include <math.h>
+ #include <signal.h>
+@@ -86,6 +87,8 @@ int main(int argc, char *argv[])
+ 		ScorchedParams::instance()->getSDLInitVideo() = true;
+ 	}
+ 
++	wxSizerFlags::DisableConsistencyChecks();
++
+ #ifdef _WIN32
+ 		wxEntry((WXHINSTANCE) (HINSTANCE) GetModuleHandle(NULL),
+ 			(WXHINSTANCE) NULL, "", SW_SHOWNORMAL);
+diff --git a/src/launcher/wxdialogs/Display.cpp b/src/launcher/wxdialogs/Display.cpp
+index e0a423a..ee6d277 100644
+--- a/src/launcher/wxdialogs/Display.cpp
++++ b/src/launcher/wxdialogs/Display.cpp
+@@ -26,7 +26,7 @@ static void createMainControls(wxWindow *parent, wxSizer *sizer)
+ 	// Display settings
+ 	wxStaticBox *displayBox = new wxStaticBox(parent, -1, wxT("&Display"));
+ 	wxStaticBoxSizer *displaySizer = new wxStaticBoxSizer(displayBox, wxVERTICAL);
+-	wxFlexGridSizer *displaySizer2 = new wxFlexGridSizer(2, 3, 5, 5);
++	wxFlexGridSizer *displaySizer2 = new wxFlexGridSizer(0, 3, 5, 5);
+ 	wxStaticText *resText = new wxStaticText(parent, -1, wxT("&Resolution :"));
+ 	IDC_DISPLAY_CTRL = 
+ 		new wxComboBox(parent, -1,
+@@ -88,7 +88,7 @@ static void createMainControls(wxWindow *parent, wxSizer *sizer)
+ 	// Sound settings
+ 	wxStaticBox *soundBox = new wxStaticBox(parent, -1, wxT("&Sound"));
+ 	wxStaticBoxSizer *soundSizerMain = new wxStaticBoxSizer(soundBox, wxVERTICAL);
+-	wxFlexGridSizer *soundSizer1 = new wxFlexGridSizer(4, 2);
++	wxFlexGridSizer *soundSizer1 = new wxFlexGridSizer(0, 4, 2, 0);
+ 	wxStaticText *volumeText = new wxStaticText(parent, -1, wxT("Sound Volume :"));
+ 	wxStaticText *musicVolumeText = new wxStaticText(parent, -1, wxT("Music Volume :"));
+ 	wxStaticText *ambientVolumeText = new wxStaticText(parent, -1, wxT("Ambient Volume :"));
+@@ -137,7 +137,7 @@ static void createMainControls(wxWindow *parent, wxSizer *sizer)
+ 		wxT("Game Detail Options"));
+ 	wxStaticBoxSizer *speedSizer = new wxStaticBoxSizer(speedBox, wxHORIZONTAL);
+ 
+-	wxGridSizer *loadSizer = new wxFlexGridSizer(2, 2);
++	wxGridSizer *loadSizer = new wxFlexGridSizer(0, 2, 2, 0);
+ 	IDC_LOADULTRA_CTRL = new wxButton(parent,  ID_LOADULTRA, wxT("&Ultra Detail"), wxDefaultPosition, wxSize(120,-1));
+ 	IDC_LOADDEFAULTS_CTRL = new wxButton(parent, ID_LOADDEFAULTS, wxT("&Normal Detail"), wxDefaultPosition, wxSize(120,-1));
+ 	IDC_LOADMEDIUM_CTRL = new wxButton(parent, ID_LOADMEDIUM, wxT("Faster Detail"), wxDefaultPosition, wxSize(120,-1));
+@@ -256,7 +256,7 @@ static void createSpeedControls(wxWindow *parent, wxSizer *sizer)
+ 		wxStaticBox *waterDetailBox = new wxStaticBox(parent, -1, 
+ 													  wxT("Graphics Detail"));
+ 		wxStaticBoxSizer *waterDetailSizer = new wxStaticBoxSizer(waterDetailBox, wxHORIZONTAL);
+-		wxGridSizer *waterDetailSizer2 = new wxGridSizer(3, 1, 10, 10);
++		wxGridSizer *waterDetailSizer2 = new wxGridSizer(0, 1, 10, 10);
+ 		
+ 		IDC_NOWATERREF_CTRL = 
+ 		new wxCheckBox(parent, -1, wxT("Don't draw water reflections - Large Framerate Improvement"));
+@@ -471,12 +471,12 @@ static void createKeysControls(wxWindow *parent, wxSizer *topsizer)
+ {
+ 	wxScrolledWindow *scrolledWindow = new wxScrolledWindow(parent, -1, 
+ 		wxDefaultPosition, wxSize(480, 250));
+-	wxSizer *sizer = new wxFlexGridSizer(5, 1);
++	wxSizer *sizer = new wxFlexGridSizer(0, 5, 1, 0);
+ 	
+ 	keyboardKeyList.clear();
+ 	if (!Keyboard::instance()->loadKeyFile())
+ 	{
+-		S3D::dialogExit("Keyboard", "Failed to process keyboad file keys.xml");
++		S3D::dialogExit("Keyboard", "Failed to process keyboard file keys.xml");
+ 	}
+ 
+ 	int lastGroup = 0;
+diff --git a/src/launcher/wxdialogs/DisplayDialog.cpp b/src/launcher/wxdialogs/DisplayDialog.cpp
+index c34c9dc..0cdc620 100644
+--- a/src/launcher/wxdialogs/DisplayDialog.cpp
++++ b/src/launcher/wxdialogs/DisplayDialog.cpp
+@@ -449,15 +449,15 @@ void DisplayFrame::refreshScreen()
+ 	IDC_SLIDER1_CTRL->SetValue(OptionsDisplay::instance()->getBrightness());
+ 	IDC_SLIDER1_CTRL->SetToolTip(wxString(OptionsDisplay::instance()->getBrightnessEntry().getDescription(), wxConvUTF8));
+ 	IDC_VOLUME_CTRL->SetRange(0, 128);
+-	IDC_VOLUME_CTRL->SetTickFreq(4, 0);
++	IDC_VOLUME_CTRL->SetTickFreq(4);
+ 	IDC_VOLUME_CTRL->SetValue(OptionsDisplay::instance()->getSoundVolume());
+ 	IDC_VOLUME_CTRL->SetToolTip(wxString(OptionsDisplay::instance()->getSoundVolumeEntry().getDescription(), wxConvUTF8));
+ 	IDC_MUSICVOLUME_CTRL->SetRange(0, 128);
+-	IDC_MUSICVOLUME_CTRL->SetTickFreq(4, 0);
++	IDC_MUSICVOLUME_CTRL->SetTickFreq(4);
+ 	IDC_MUSICVOLUME_CTRL->SetValue(OptionsDisplay::instance()->getMusicVolume());
+ 	IDC_MUSICVOLUME_CTRL->SetToolTip(wxString(OptionsDisplay::instance()->getMusicVolumeEntry().getDescription(), wxConvUTF8));
+ 	IDC_AMBIENTVOLUME_CTRL->SetRange(0, 128);
+-	IDC_AMBIENTVOLUME_CTRL->SetTickFreq(4, 0);
++	IDC_AMBIENTVOLUME_CTRL->SetTickFreq(4);
+ 	IDC_AMBIENTVOLUME_CTRL->SetValue(OptionsDisplay::instance()->getAmbientSoundVolume());
+ 	IDC_AMBIENTVOLUME_CTRL->SetToolTip(wxString(OptionsDisplay::instance()->getAmbientSoundVolumeEntry().getDescription(), wxConvUTF8));
+ 	IDC_USERNAME_CTRL->SetValue(wxString(OptionsDisplay::instance()->getOnlineUserName(), wxConvUTF8));
+@@ -736,7 +736,7 @@ void DisplayFrame::onExportMod(wxCommandEvent &event)
+ #if wxCHECK_VERSION(2, 8, 0)
+ 		wxFD_SAVE);
+ #else
+-		wxSAVE);
++		wxFD_SAVE);
+ #endif
+ 	if (file.empty()) return;
+ 	ModFiles files;
+@@ -764,7 +764,7 @@ void DisplayFrame::onImportMod(wxCommandEvent &event)
+ #if wxCHECK_VERSION(2, 8, 0)
+ 		wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+ #else
+-		wxOPEN | wxFILE_MUST_EXIST);
++		wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+ #endif
+ 	if (file.empty()) return;
+ 	ModFiles files;
+diff --git a/src/launcher/wxdialogs/ServerS.cpp b/src/launcher/wxdialogs/ServerS.cpp
+index 298edd7..61fb9b6 100644
+--- a/src/launcher/wxdialogs/ServerS.cpp
++++ b/src/launcher/wxdialogs/ServerS.cpp
+@@ -72,7 +72,7 @@ static void createControls(wxWindow *parent,
+ 
+ 	IDC_USEUPNP_CTRL = 
+ 		new wxCheckBox(parent, IDC_USEPNP,
+-		wxT("Try to automaticaly add external port forwarding rules using UPnP"));	
++		wxT("Try to automatically add external port forwarding rules using UPnP"));	
+ 	servernameSizer->Add(IDC_USEUPNP_CTRL, 0, wxTOP, 5);
+ 
+ 	IDC_ALLOWSAME_CTRL = 
+diff --git a/src/launcher/wxdialogs/SettingsDialog.cpp b/src/launcher/wxdialogs/SettingsDialog.cpp
+index b312085..03ba629 100644
+--- a/src/launcher/wxdialogs/SettingsDialog.cpp
++++ b/src/launcher/wxdialogs/SettingsDialog.cpp
+@@ -105,7 +105,7 @@ void SettingsFrame::createMainPanel(bool server)
+ 	mainPanel_ = new wxPanel(book_, -1);
+ 	book_->AddPage(mainPanel_, wxT("Main"));
+ 	wxSizer *mainPanelSizer = new wxBoxSizer(wxVERTICAL);
+-	wxSizer *sizer = new wxFlexGridSizer(2, 2);
++	wxSizer *sizer = new wxFlexGridSizer(0, 2, 2, 0);
+ 	mainPanelSizer->Add(sizer, 0, wxALL | wxALIGN_CENTER, 10);
+ 
+ 	setters_.push_back(
+@@ -166,7 +166,7 @@ void SettingsFrame::createMoneyPanel()
+ {
+ 	moneyPanel_ = new wxPanel(book_, -1);
+ 	wxSizer *ecoPanelSizer = new wxBoxSizer(wxVERTICAL);
+-	wxSizer *sizer = new wxFlexGridSizer(2, 2);
++	wxSizer *sizer = new wxFlexGridSizer(0, 2, 2, 0);
+ 	ecoPanelSizer->Add(sizer, 0, wxALL | wxALIGN_CENTER, 10);
+ 
+ 	setters_.push_back(
+@@ -215,7 +215,7 @@ void SettingsFrame::createScorePanel()
+ {
+ 	scorePanel_ = new wxPanel(book_, -1);
+ 	wxSizer *ecoPanelSizer = new wxBoxSizer(wxVERTICAL);
+-	wxSizer *sizer = new wxFlexGridSizer(2, 2);
++	wxSizer *sizer = new wxFlexGridSizer(0, 2, 2, 0);
+ 	ecoPanelSizer->Add(sizer, 0, wxALL | wxALIGN_CENTER, 10);
+ 
+ 	setters_.push_back(
+@@ -249,7 +249,7 @@ void SettingsFrame::createWeaponsPanel()
+ {
+ 	weaponsPanel_ = new wxPanel(book_, -1);
+ 	wxSizer *ecoPanelSizer = new wxBoxSizer(wxVERTICAL);
+-	wxSizer *sizer = new wxFlexGridSizer(2, 2);
++	wxSizer *sizer = new wxFlexGridSizer(0, 2, 2, 0);
+ 	ecoPanelSizer->Add(sizer, 0, wxALL | wxALIGN_CENTER, 10);
+ 
+ 	setters_.push_back(
+@@ -286,7 +286,7 @@ void SettingsFrame::createEnvPanel()
+ {
+ 	envPanel_ = new wxPanel(book_, -1);
+ 	wxSizer *envPanelSizer = new wxBoxSizer(wxVERTICAL);
+-	wxSizer *sizer = new wxFlexGridSizer(2, 2);
++	wxSizer *sizer = new wxFlexGridSizer(0, 2, 2, 0);
+ 	envPanelSizer->Add(sizer, 0, wxALL | wxALIGN_CENTER, 10);
+ 
+ 	setters_.push_back(
+@@ -337,7 +337,7 @@ void SettingsFrame::createLandPanel()
+ 	wxScrolledWindow *scrolledWindow = new wxScrolledWindow(landPanel_, -1, 
+ 		wxDefaultPosition, wxSize(225, 200));
+ 
+-	wxSizer *sizer = new wxFlexGridSizer(3, 3);
++	wxSizer *sizer = new wxFlexGridSizer(0, 3, 3, 0);
+ 	int i = 0;
+ 	std::list<LandscapeDefinitionsEntry> &defns =
+ 		landscapeDefinitions.getAllLandscapes();
+@@ -438,7 +438,7 @@ void SettingsFrame::createPlayersPanel()
+ 		wxT("Players are persistent for game"));
+ 	playersPanelSizer->Add(IDC_SERVER_RESIDUAL_CTRL, 0, wxALIGN_CENTER | wxTOP, 10);
+ 		
+-	wxSizer *sizer = new wxGridSizer(3, 3);
++	wxSizer *sizer = new wxGridSizer(0, 3, 3, 0);
+ 	playersPanelSizer->Add(sizer, 0, wxALL | wxALIGN_CENTER, 10);
+ 
+ 	for (int i=0; i<24; i++)
+diff --git a/src/launcher/wxdialogs/TrueTypeFont.h b/src/launcher/wxdialogs/TrueTypeFont.h
+index ca88464..ad79e1c 100644
+--- a/src/launcher/wxdialogs/TrueTypeFont.h
++++ b/src/launcher/wxdialogs/TrueTypeFont.h
+@@ -25,10 +25,10 @@
+ #include <wx/image.h>
+ #include <ft2build.h>
+ #include <string>
+-#include <freetype/freetype.h>
+-#include <freetype/ftglyph.h>
+-#include <freetype/ftoutln.h>
+-#include <freetype/fttrigon.h>
++#include FT_FREETYPE_H
++#include FT_GLYPH_H
++#include FT_OUTLINE_H
++#include FT_TRIGONOMETRY_H
+ 
+ class TrueTypeFont
+ {
+diff --git a/src/server/server/ServerAuthHandlerPrefered.cpp b/src/server/server/ServerAuthHandlerPrefered.cpp
+index 1f766a3..c95c03c 100644
+--- a/src/server/server/ServerAuthHandlerPrefered.cpp
++++ b/src/server/server/ServerAuthHandlerPrefered.cpp
+@@ -43,8 +43,8 @@ bool ServerAuthHandlerPrefered::authenticateUser(ComsConnectAuthMessage &authMes
+ 	if (!getUserById(authMessage.getUniqueId()))
+ 	{
+ 		message = 
+-			"This server is running a prefered player only game.\n"
+-			"Your supplied unique id is not in the prefered player list.\n";
++			"This server is running a preferred player only game.\n"
++			"Your supplied unique id is not in the preferred player list.\n";
+ 		return false;
+ 	}
+ 
+diff --git a/src/server/server/ServerRegistration.cpp b/src/server/server/ServerRegistration.cpp
+index 55f569c..6eddf8a 100644
+--- a/src/server/server/ServerRegistration.cpp
++++ b/src/server/server/ServerRegistration.cpp
+@@ -139,7 +139,7 @@ void ServerRegistrationEntry::actualThreadFunc()
+ 
+ 			Logger::log(S3D::formatStringBuffer("Registration to %s %s.", 
+ 				masterListServer_,
+-				(success_?"was successfull":"failed")));
++				(success_?"was successful":"failed")));
+ 		}
+ 		else
+ 		{
+diff --git a/src/server/webserver/ServerWebSettingsHandler.cpp b/src/server/webserver/ServerWebSettingsHandler.cpp
+index 5492eed..16c1480 100644
+--- a/src/server/webserver/ServerWebSettingsHandler.cpp
++++ b/src/server/webserver/ServerWebSettingsHandler.cpp
+@@ -424,7 +424,7 @@ bool ServerWebSettingsHandler::SettingsModHandler::processRequest(
+ 				return ServerWebServerUtil::getHtmlMessage(
+ 					request.getSession(), 
+ 					"Mod Upload", 
+-					S3D::formatStringBuffer("Successfuly uploaded and imported mod %s",
++					S3D::formatStringBuffer("Successfully uploaded and imported mod %s",
+ 					(mod[0]?mod.c_str():"Unknown")), 
+ 					request.getFields(), text);
+ 			}
