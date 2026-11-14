@@ -803,13 +803,14 @@ diff --git a/v8/src/utils/sha-256.cc b/v8/src/utils/sha-256.cc
 index 4b1d2bd42b..f55c0b4aec 100644
 --- a/v8/src/utils/sha-256.cc
 +++ b/v8/src/utils/sha-256.cc
-@@ -174,3 +174,6 @@ const uint8_t* SHA256_hash(const void* data, size_t len, uint8_t* digest) {
- 
+@@ -192,4 +192,7 @@ const uint8_t* SHA256_hash(const void* data, size_t len, uint8_t* digest) {
  }  // namespace internal
  }  // namespace v8
-+
+ 
 +#undef ror
 +#undef shr
++
+ #endif  // V8_BORINGSSL_SHA256
 diff --git a/v8/src/compiler/turboshaft/wasm-revec-reducer.cc b/v8/src/compiler/turboshaft/wasm-revec-reducer.cc
 index ddf3b81c7a..f6548579c7 100644
 --- a/v8/src/compiler/turboshaft/wasm-revec-reducer.cc
