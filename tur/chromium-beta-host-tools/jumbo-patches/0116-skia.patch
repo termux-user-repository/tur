@@ -1272,3 +1272,26 @@ index c7cf9f56f1..f91bae3051 100644
 +#undef Vertex
 +#undef write_index_buffer
 +#undef write_vertex_buffer
+--- a/third_party/skia/src/core/SkAnalyticEdge.cpp
++++ b/third_party/skia/src/core/SkAnalyticEdge.cpp
+@@ -18,6 +18,11 @@
+ #include <cstddef>
+ #include <iterator>
+ 
++#define SkFDot6ToFixedDiv2 SkFDot6ToFixedDiv2_SkAnalyticEdge
++#define cheap_distance cheap_distance_SkAnalyticEdge
++#define SkFDot6UpShift SkFDot6UpShift_SkAnalyticEdge
++#define cubic_delta_from_line cubic_delta_from_line_SkAnalyticEdge
++
+ static constexpr int kInverseTableSize = 1024; // SK_FDot6One * 16
+ 
+ static inline SkFixed quick_inverse(SkFDot6 x) {
+@@ -715,3 +720,8 @@
+     fCurveCount = SkToS8(count);
+     return success;
+ }
++
++#undef SkFDot6ToFixedDiv2
++#undef cheap_distance
++#undef SkFDot6UpShift
++#undef cubic_delta_from_line

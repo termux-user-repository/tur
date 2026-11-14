@@ -1,0 +1,11 @@
+--- a/third_party/blink/common/page_state/page_state_serialization.cc
++++ b/third_party/blink/common/page_state/page_state_serialization.cc
+@@ -929,7 +929,7 @@
+   // file paths, and this code has historically unwrapped each element with
+   // `.value()`.
+   CHECK(std::ranges::all_of(state.referenced_files,
+-                            &std::optional<std::u16string>::has_value));
++                            [](const auto& file) { return file.has_value(); }));
+   page->referenced_files = base::ToVector(state.referenced_files);
+   page->top = WriteMojoFrameState(state.top);
+ 
