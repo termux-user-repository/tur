@@ -1,0 +1,36 @@
+--- a/packages/core/src/zig/build.zig
++++ b/packages/core/src/zig/build.zig
+@@ -190,8 +190,10 @@
+     switch (target.result.os.tag) {
+         .macos => addMacOSSystemLibraries(b, artifact, macos_sdk_path.?),
+         .linux => {
+-            artifact.linkSystemLibrary("dl");
+-            artifact.linkSystemLibrary("pthread");
++            if (!target.result.abi.isAndroid()) {
++                artifact.linkSystemLibrary("dl");
++                artifact.linkSystemLibrary("pthread");
++            }
+         },
+         else => {},
+     }
+--- a/packages/core/src/zig/miniaudio_shim.c
++++ b/packages/core/src/zig/miniaudio_shim.c
+@@ -1,11 +1,17 @@
+ #define MINIAUDIO_IMPLEMENTATION
+ 
+-#if defined(__linux__)
++#if defined(__linux__) && !defined(__ANDROID__)
+ #define MA_ENABLE_ONLY_SPECIFIC_BACKENDS
+ #define MA_ENABLE_ALSA
+ #define MA_ENABLE_PULSEAUDIO
+ #endif
+ 
++#if defined(__ANDROID__)
++#define MA_ENABLE_ONLY_SPECIFIC_BACKENDS
++#define MA_ENABLE_AAUDIO
++#define MA_ENABLE_OPENSL
++#endif
++
+ #if defined(__APPLE__)
+ #define MA_ENABLE_ONLY_SPECIFIC_BACKENDS
+ #define MA_ENABLE_COREAUDIO
