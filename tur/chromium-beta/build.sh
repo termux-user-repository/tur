@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://www.chromium.org/Home
 TERMUX_PKG_DESCRIPTION="Chromium web browser"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="@licy183"
-TERMUX_PKG_VERSION="158.0.8127.18"
+TERMUX_PKG_VERSION="159.0.8154.6"
 TERMUX_PKG_SRCURL="https://github.com/chromium-linux-tarballs/chromium-tarballs/releases/download/$TERMUX_PKG_VERSION/chromium-$TERMUX_PKG_VERSION-linux.tar.xz"
-TERMUX_PKG_SHA256=cd7bdb9253e7afd06db1e604778b1f93d655a001fbd64a2aab2dd3ffb85ccf3f
+TERMUX_PKG_SHA256=dcfeede4554b3ba185941212ac39953d1d279acf4c7e6315a8989dbc92213b8f
 TERMUX_PKG_DEPENDS="atk, cups, dbus, fontconfig, gtk3, krb5, libc++, libevdev, libxkbcommon, libminizip, libnss, libx11, mesa, openssl, pango, pipewire, pulseaudio, zlib"
 TERMUX_PKG_BUILD_DEPENDS="chromium-beta-host-tools, libffi-static"
 # Chromium doesn't support i686 on Linux.
@@ -113,6 +113,8 @@ EOF
 	ln -sf $(command -v java) third_party/jdk/current/bin/
 	mkdir -p third_party/dawn/tools/golang/linux-amd64/bin/
 	ln -sf $(command -v go) third_party/dawn/tools/golang/linux-amd64/bin/
+	mkdir -p third_party/cpython3/host/bin
+	ln -sf $(command -v python3) third_party/cpython3/host/bin/
 
 	# Install nodejs
 	if [ ! -f "third_party/node/linux/node-linux-x64/bin/node" ]; then
@@ -244,6 +246,7 @@ use_custom_libcxx = false
 use_custom_libcxx_for_host = true
 use_clang_modules = false
 use_allocator_shim = false
+use_alloc_token = false
 use_partition_alloc_as_malloc = false
 enable_backup_ref_ptr_slow_checks = false
 enable_dangling_raw_ptr_checks = false
