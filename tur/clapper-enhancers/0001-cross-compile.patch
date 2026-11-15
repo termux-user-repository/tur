@@ -1,0 +1,26 @@
+diff --git a/src/meson.build b/src/meson.build
+index 00c735c..cb2f37b 100644
+--- a/src/meson.build
++++ b/src/meson.build
+@@ -98,21 +98,3 @@ foreach name : clapper_possible_enhancers
+   endif
+ endforeach
+ 
+-if clapper_configurable_enhancers.length() > 0
+-  clapper_functionalities = clapper_dep.get_variable('functionalities').split()
+-
+-  if not (clapper_functionalities.contains('enhancers-loader'))
+-    error('Cannot compile schemas without Clapper built with "enhancers-loader"')
+-  endif
+-
+-  # Used inside "gen-schemas" executable
+-  find_program('glib-compile-schemas', required: true)
+-
+-  gen_schemas_bin = executable(
+-    'gen-schemas',
+-    ['gen-schemas.c'],
+-    dependencies: [glib_dep, gio_dep, clapper_dep],
+-    install: false,
+-  )
+-  meson.add_install_script(gen_schemas_bin, clapper_enhancers_dir, ','.join(clapper_configurable_enhancers))
+-endif
