@@ -1,0 +1,9 @@
+--- a/vendor/github.com/enetx/http2/client_priority_go127.go
++++ b/vendor/github.com/enetx/http2/client_priority_go127.go
+@@ -9,5 +9,5 @@
+ import "github.com/enetx/http"
+ 
+ func clientPriorityDisabled(s *http.Server) bool {
+-	return s.DisableClientPriority
++	return false
+ }
