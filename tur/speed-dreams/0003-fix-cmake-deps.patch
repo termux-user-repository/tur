@@ -1,0 +1,30 @@
+Description: Fix third-party dependencies detection on Android
+ - Ensure ADD_OPENGL_LIBRARY directly links GL so compatibility symbols
+   like glClientActiveTextureARB are resolved from libGL.so under Bionic.
+ - Dynamically link libdl on Android instead of static stub libdl.a.
+Author: Fervi <lordfervi@protonmail.com>
+
+--- a/cmake/thirdpartydeps.cmake
++++ b/cmake/thirdpartydeps.cmake
+@@ -228,7 +228,7 @@
+   FIND_PACKAGE(OpenGL)
+ 
+   IF(OPENGL_FOUND)
+-    TARGET_LINK_LIBRARIES(${TARGET} ${OPENGL_LIBRARIES})
++    TARGET_LINK_LIBRARIES(${TARGET} ${OPENGL_LIBRARIES} GL)
+   ELSE(OPENGL_FOUND)
+     MESSAGE(FATAL_ERROR "Cannot find OpenGL libraries")
+   ENDIF(OPENGL_FOUND)
+@@ -520,7 +520,11 @@
+ MACRO(ADD_DL_LIBRARY TARGET)
+ 
+   IF(UNIX)
+-    FIND_LIBRARY(LIBDL_LIB dl "")
++    IF(ANDROID)
++      SET(LIBDL_LIB dl)
++    ELSE()
++      FIND_LIBRARY(LIBDL_LIB dl "")
++    ENDIF()
+ 
+     IF(LIBDL_LIB)
+       TARGET_LINK_LIBRARIES(${TARGET} ${LIBDL_LIB})

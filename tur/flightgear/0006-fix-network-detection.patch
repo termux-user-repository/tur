@@ -1,0 +1,88 @@
+Description: Disable QNetworkInformation on Android/Termux to prevent false offline status
+ On Android/Termux, NetworkManager and ConnMan daemons are not running, causing
+ QNetworkInformation in Qt6 to falsely report no connectivity and block online
+ features (aircraft browser, scenery download, multiplayer). Fall back to
+ assuming online connectivity as was done in Qt5.
+Author: Fervi (IntinteDAO) <lordfervi@protonmail.com>
+
+--- a/src/GUI/QtLauncher.cxx
++++ b/src/GUI/QtLauncher.cxx
+@@ -43,7 +43,7 @@
+ #include <QUrl>
+ #include <QtGlobal>
+ 
+-#if (QT_VERSION >= QT_VERSION_CHECK(6, 1, 0))
++#if (QT_VERSION >= QT_VERSION_CHECK(6, 1, 0)) && !defined(__ANDROID__)
+ #include <QNetworkInformation>
+ #endif
+ 
+@@ -489,9 +489,9 @@
+ #endif
+     }
+ 
+-#if (QT_VERSION >= QT_VERSION_CHECK(6, 3, 0))
++#if (QT_VERSION >= QT_VERSION_CHECK(6, 3, 0)) && !defined(__ANDROID__)
+     QNetworkInformation::loadDefaultBackend();
+-#elif (QT_VERSION >= QT_VERSION_CHECK(6,1,0))
++#elif (QT_VERSION >= QT_VERSION_CHECK(6,1,0)) && !defined(__ANDROID__)
+     bool ok = QNetworkInformation::load(QNetworkInformation::Feature::Reachability);
+     if (!ok) {
+         qInfo() << "network information plugins:" << QNetworkInformation::availableBackends();
+--- a/src/GUI/LauncherController.cxx
++++ b/src/GUI/LauncherController.cxx
+@@ -21,7 +21,7 @@
+ #include <QRegularExpressionValidator>
+ #include <QSettings>
+ 
+-#if (QT_VERSION >= QT_VERSION_CHECK(6, 1, 0))
++#if (QT_VERSION >= QT_VERSION_CHECK(6, 1, 0)) && !defined(__ANDROID__)
+ #include <QNetworkInformation>
+ #endif
+ 
+@@ -177,7 +177,7 @@
+         settings.setValue(versionedCountKey, m_versionLaunchCount + 1);
+     }
+ 
+-#if (QT_VERSION >= QT_VERSION_CHECK(6, 1, 0))
++#if (QT_VERSION >= QT_VERSION_CHECK(6, 1, 0)) && !defined(__ANDROID__)
+     if (QNetworkInformation::instance()) {
+         connect(QNetworkInformation::instance(), &QNetworkInformation::reachabilityChanged,
+                 this, &LauncherController::onReachabilityChanged);
+@@ -1039,7 +1039,7 @@
+ 
+ bool LauncherController::isNetworkAvailable() const
+ {
+-#if (QT_VERSION >= QT_VERSION_CHECK(6, 1, 0))
++#if (QT_VERSION >= QT_VERSION_CHECK(6, 1, 0)) && !defined(__ANDROID__)
+     return QNetworkInformation::instance()->reachability() == QNetworkInformation::Reachability::Online;
+ #else
+     return true;
+@@ -1048,7 +1048,7 @@
+ 
+ void LauncherController::onReachabilityChanged()
+ {
+-#if (QT_VERSION >= QT_VERSION_CHECK(6, 1, 0))
++#if (QT_VERSION >= QT_VERSION_CHECK(6, 1, 0)) && !defined(__ANDROID__)
+     const auto online = (QNetworkInformation::instance()->reachability() == QNetworkInformation::Reachability::Online);
+     auto pkgRoot = globals->packageRoot();
+     pkgRoot->setOnlineMode(online);
+--- a/src/GUI/UpdateChecker.cxx
++++ b/src/GUI/UpdateChecker.cxx
+@@ -24,7 +24,7 @@
+ #include <QDebug>
+ #include <QSettings>
+ 
+-#if (QT_VERSION >= QT_VERSION_CHECK(6, 1, 0))
++#if (QT_VERSION >= QT_VERSION_CHECK(6, 1, 0)) && !defined(__ANDROID__)
+ #include <QNetworkInformation>
+ #endif
+ 
+@@ -97,7 +97,7 @@
+     }
+ 
+ // if we're offline when the launcher starts, skip the check
+-#if (QT_VERSION >= QT_VERSION_CHECK(6, 1, 0))
++#if (QT_VERSION >= QT_VERSION_CHECK(6, 1, 0)) && !defined(__ANDROID__)
+     if (QNetworkInformation::instance()->reachability() != QNetworkInformation::Reachability::Online) {
+         qInfo() << "Launcher update check: not online, deferring";
+         return;

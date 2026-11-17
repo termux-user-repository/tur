@@ -1,0 +1,96 @@
+Description: Fallback to first usable track when configured track is missing
+ When a raceman configuration references a track that is not installed
+ (such as 'espie' when only base data with 'jarama' is present),
+ fallback to the first available track instead of returning NULL,
+ preventing SIGSEGV crashes across menus and race startup.
+Author: Fervi <lordfervi@protonmail.com>
+
+--- a/src/libs/tgfdata/race.cpp
++++ b/src/libs/tgfdata/race.cpp
+@@ -992,7 +992,10 @@
+     if (!_pPrivate->pRaceMan)
+         return 0;
+ 
+-    return _pPrivate->pRaceMan->getEventTrack(_pPrivate->nEventInd);
++    GfTrack* pTrack = _pPrivate->pRaceMan->getEventTrack(_pPrivate->nEventInd);
++    if (!pTrack)
++        pTrack = GfTracks::self()->getFirstUsableTrack();
++    return pTrack;
+ }
+ 
+ const std::string& GfRace::getSessionName() const
+--- a/src/libs/tgfdata/racemanagers.cpp
++++ b/src/libs/tgfdata/racemanagers.cpp
+@@ -374,9 +374,9 @@
+ 
+                 // Get the first usable track in the same category,
+                 // or else in the next categories.
+-                GfTrack* pTrack = GfTracks::self()->getFirstUsableTrack(pszCatId, pszTrackId, +1, true);
++                GfTrack* pTrack = GfTracks::self()->getFirstUsableTrack(pszCatId ? pszCatId : "", "", +1, false);
+                 if (!pTrack)
+-                    pTrack = GfTracks::self()->getFirstUsableTrack(pszCatId, +1, true);
++                    pTrack = GfTracks::self()->getFirstUsableTrack();
+ 
+                 // If found, select this one for the the event.
+                 if (pTrack)
+@@ -451,8 +451,9 @@
+         GfParmSetStr(_hparmHandle, ossSectionPath.str().c_str(), RM_ATTR_NAME,
+                         _vecEventTrackIds[nEventInd].c_str());
+         GfTrack* pTrack = GfTracks::self()->getTrack(_vecEventTrackIds[nEventInd]);
+-        GfParmSetStr(_hparmHandle, ossSectionPath.str().c_str(), RM_ATTR_CATEGORY,
+-                        pTrack->getCategoryId().c_str());
++        if (pTrack)
++            GfParmSetStr(_hparmHandle, ossSectionPath.str().c_str(), RM_ATTR_CATEGORY,
++                            pTrack->getCategoryId().c_str());
+     }
+ 
+     // Now we are consistent with the race managers params (in memory).
+@@ -557,6 +558,19 @@
+             GfTracks::self()->getTrack(_vecEventTrackIds[nEventIndex]);
+     }
+ 
++    if (!pTrack)
++    {
++        pTrack = GfTracks::self()->getFirstUsableTrack();
++        if (pTrack)
++        {
++            if (!_vecEventTrackIds.empty())
++                _vecEventTrackIds[nEventIndex] = pTrack->getId();
++            else
++                _vecEventTrackIds.push_back(pTrack->getId());
++            _bIsDirty = true;
++        }
++    }
++
+     return pTrack;
+ }
+ 
+--- a/src/modules/userinterface/legacymenu/racescreens/trackselect.cpp
++++ b/src/modules/userinterface/legacymenu/racescreens/trackselect.cpp
+@@ -275,6 +275,13 @@
+ 	// Get currently selected track for the current race type
+ 	// (or the first usable one in the selected category).
+ 	PCurTrack = MenuData->pRace->getTrack();
++	if (!PCurTrack)
++		PCurTrack = GfTracks::self()->getFirstUsableTrack();
++	if (!PCurTrack)
++	{
++		GfLogError("No available track for any category ; quitting Track Select menu\n");
++		return;
++	}
+ 	const std::string strReqTrackId = PCurTrack->getId();
+ 	const std::string strReqTrackCatId = PCurTrack->getCategoryId();
+ 	PCurTrack =
+--- a/src/modules/userinterface/legacymenu/racescreens/racemanmenu.cpp
++++ b/src/modules/userinterface/legacymenu/racescreens/racemanmenu.cpp
+@@ -205,6 +205,10 @@
+ 	// Get the currently selected track for the race (should never fail, unless no track at all).
+ 	const GfTrack* pTrack = pRace->getTrack();
+ 
++	if (!pTrack)
++		pTrack = GfTracks::self()->getFirstUsableTrack();
++	if (!pTrack)
++		return;
+ 	// Set title (race type + track name).
+ 	std::ostringstream ossText;
+ 	ossText << "at " << pTrack->getName();

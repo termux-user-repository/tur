@@ -1,0 +1,98 @@
+Description: Include GL/gl.h for OpenGL symbols
+Author: Fervi (IntinteDAO) <lordfervi@protonmail.com>
+
+--- a/simgear/canvas/ODGauge.cxx
++++ b/simgear/canvas/ODGauge.cxx
+@@ -49,6 +49,8 @@
+ 
+ #include <cassert>
+ 
++#include <GL/gl.h>
++
+ namespace simgear
+ {
+ namespace canvas
+--- a/simgear/scene/material/Effect.cxx
++++ b/simgear/scene/material/Effect.cxx
+@@ -81,6 +81,8 @@
+ #include <simgear/scene/util/OsgUtils.hxx>
+ #include <simgear/structure/SGExpression.hxx>
+ 
++#include <GL/gl.h>
++
+ namespace simgear
+ {
+ using namespace std;
+--- a/simgear/scene/model/SGClipGroup.cxx
++++ b/simgear/scene/model/SGClipGroup.cxx
+@@ -34,6 +34,8 @@
+ #include <osgUtil/RenderLeaf>
+ #include <osgUtil/CullVisitor>
+ 
++#include <GL/gl.h>
++
+ class SGClipGroup::ClipRenderBin : public osgUtil::RenderBin {
+ public:
+   virtual osg::Object* cloneType() const
+--- a/simgear/scene/sky/dome.cxx
++++ b/simgear/scene/sky/dome.cxx
+@@ -48,6 +48,7 @@
+ #include <simgear/scene/material/Effect.hxx>
+ #include <simgear/scene/material/EffectGeode.hxx>
+ 
++#include <GL/gl.h>
+ #include "dome.hxx"
+ 
+ using namespace osg;
+--- a/simgear/scene/sky/moon.cxx
++++ b/simgear/scene/sky/moon.cxx
+@@ -48,6 +48,7 @@
+ #include <simgear/scene/model/model.hxx>
+ #include <simgear/scene/util/SGReaderWriterOptions.hxx>
+ 
++#include <GL/gl.h>
+ #include "sphere.hxx"
+ #include "moon.hxx"
+ 
+--- a/simgear/scene/sky/stars.cxx
++++ b/simgear/scene/sky/stars.cxx
+@@ -54,6 +54,7 @@
+ #include <osg/ShadeModel>
+ #include <osg/Node>
+ 
++#include <GL/gl.h>
+ #include "stars.hxx"
+ 
+ using namespace simgear;
+--- a/simgear/scene/tgdb/SGVasiDrawable.cxx
++++ b/simgear/scene/tgdb/SGVasiDrawable.cxx
+@@ -23,6 +23,7 @@
+ #  include <simgear_config.h>
+ #endif
+ 
++#include <GL/gl.h>
+ #include <simgear/compiler.h>
+ 
+ #include "SGVasiDrawable.hxx"
+--- a/simgear/scene/tgdb/ShaderGeometry.cxx
++++ b/simgear/scene/tgdb/ShaderGeometry.cxx
+@@ -24,7 +24,7 @@
+ #include <osgDB/ParameterOutput>
+ 
+ #include "ShaderGeometry.hxx"
+-
++#include <GL/gl.h>
+ #include <algorithm>
+ 
+ using namespace osg;
+--- a/simgear/screen/tr.cxx
++++ b/simgear/screen/tr.cxx
+@@ -147,7 +147,7 @@
+ #include <simgear/scene/util/project.hxx>
+ 
+ #include "tr.h"
+-
++#include <GL/gl.h>
+ 
+ #define DEFAULT_TILE_WIDTH  256
+ #define DEFAULT_TILE_HEIGHT 256
