@@ -1,12 +1,11 @@
---- blender/source/blender/blenlib/intern/uuid.cc	2023-08-03 07:40:39.587087828 +0530
-+++ blender.mod/source/blender/blenlib/intern/uuid.cc	2023-08-03 18:57:00.762913459 +0530
-@@ -31,7 +31,7 @@
+--- a/source/blender/blenlib/intern/uuid.cc
++++ b/source/blender/blenlib/intern/uuid.cc
+@@ -33,7 +33,7 @@ bUUID BLI_uuid_generate_random()
      static_assert(std::mt19937_64::max() == 0xffffffffffffffffLL);
  
      timespec ts;
--#ifdef __APPLE__
-+#ifdef __ANDROID__
-     /* `timespec_get()` is only available on macOS 10.15+, so until that's the minimum version
-      * supported by Blender, use another function to get the timespec.
-      *
-
+-    timespec_get(&ts, TIME_UTC);
++    clock_gettime(CLOCK_REALTIME, &ts);
+     /* XOR the nanosecond and second fields, just in case the clock only has seconds resolution. */
+     uint64_t seed = ts.tv_nsec;
+     seed ^= ts.tv_sec;
