@@ -6,8 +6,9 @@ TERMUX_PKG_MAINTAINER="Gouranga Das Samrat <gouranga.das.khulna@gmail.com>"
 TERMUX_PKG_VERSION="6.2.2"
 TERMUX_PKG_SRCURL="https://github.com/beekeeper-studio/beekeeper-studio/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz"
 TERMUX_PKG_SHA256=93b95c7aeaab64ab8fbdee7d31a69700ee648fb4e2a1f286dc3637408ea5a215
-TERMUX_PKG_DEPENDS="electron42, libx11"
-TERMUX_PKG_BUILD_DEPENDS="electron42-headers, pkg-config, yarn"
+TERMUX_PKG_REVISION=1
+TERMUX_PKG_DEPENDS="electron43, libx11"
+TERMUX_PKG_BUILD_DEPENDS="electron43-headers, pkg-config, yarn"
 TERMUX_PKG_BUILD_IN_SRC=true
 # Chromium/Electron don't support i686 on Linux.
 TERMUX_PKG_EXCLUDED_ARCHES="i686"
