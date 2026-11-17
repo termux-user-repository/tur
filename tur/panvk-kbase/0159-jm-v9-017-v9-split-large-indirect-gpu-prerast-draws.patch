@@ -1,0 +1,264 @@
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: 2026-10-11
+Subject: [PATCH jm-v9 017] panvk: v9 split indirect gpu_prerast draws over the arena biblioklept
+
+Purpose: Stop dropping indirect XFB/GS/multi-viewport draws that do not
+fit the gpu_prerast arena on v9 JM.
+Port of CSF gpu_prerast_chunk_loop without the loop: the draw is planned on
+the GPU by panlib_chunk_setup and unrolled into 8 iterations, each a
+panlib_chunk_step (next chunk: whole instance ranges, a vertex window, or a
+primitive-restart strip window) and the lowering of that chunk as an
+indirect draw. The chunk start goes to the lowered VS through the new chunk
+field of panlib_v9_prerast_indirect (014). A draw the arena holds is one
+chunk; iterations past the end become NULL jobs. panlib_chunk_draw gets a
+max_insts field, 0 keeping the v10+ 2048-instance cap; v9 keeps whole
+instance ranges as before. Indirect strips with primitive restart are now
+lowered too.
+Limit: a draw needing more than 8 chunks loses the rest (it was dropped
+whole before). Fans and other topologies keep the old path.
+Source/Reference: csf-v11 gpu_prerast_chunk_loop and panlib_chunk_* (MIT)
+Tested GPU: build-checked (universal Android build v6-v14); device run on Mali-G57 MC2 (gpu_id 0x90930010) pending, see worklogs/v9-jm/PROGRESS.md
+Tested Kbase UAPI: JM 11.38
+Mesa base range: 5a07217f + g615-v11-csf series + jm-v9 001-016
+Dependencies: jm-v9 011, 012, 014
+Validation test: PanProbe large_draw, xfb, geometry (pending device)
+
+---
+diff --git a/src/panfrost/libpan/draw_helper.cl b/src/panfrost/libpan/draw_helper.cl
+index ee5a41a..c5699a8 100644
+--- a/src/panfrost/libpan/draw_helper.cl
++++ b/src/panfrost/libpan/draw_helper.cl
+@@ -476,7 +476,8 @@ panlib_chunk_step(global struct panlib_chunk_draw *c)
+    if (verts <= c->max_verts) {
+       n_verts = verts;
+       n_insts = min(max(c->max_verts / verts, 1u), insts - inst);
+-      n_insts = min(n_insts, PANLIB_CHUNK_MAX_INSTANCES);
++      n_insts = min(n_insts, c->max_insts ? c->max_insts
++                                          : PANLIB_CHUNK_MAX_INSTANCES);
+       if (strips) {
+          prims = sc.closed + u_decomposed_prims_for_vertices(prim, sc.run);
+       } else {
+@@ -1661,8 +1662,8 @@ v9_patch_compute_job(global uint8_t *job, bool null_job, uint32_t x,
+  * instance sysvals and writes the generated draw. A draw past the indirect
+  * count, empty, or over the record capacity becomes NULL jobs and an empty
+  * generated draw.
+- * ponytail: CSF splits oversized indirect draws in its GPU chunk loop, JM
+- * drops them; a JM chunk loop needs a job chain per chunk. */
++ * Chunkable topologies come here one panlib_chunk_step() chunk at a time,
++ * see v9_prerast_chunked(); the others over the capacity are dropped. */
+ KERNEL(1)
+ panlib_v9_prerast_indirect(constant struct panlib_v9_prerast_patch *a)
+ {
+diff --git a/src/panfrost/libpan/tess_draw.h b/src/panfrost/libpan/tess_draw.h
+index 72a15e5..f45a48f 100644
+--- a/src/panfrost/libpan/tess_draw.h
++++ b/src/panfrost/libpan/tess_draw.h
+@@ -139,4 +139,7 @@ struct panlib_chunk_draw {
+    uint32_t chunk_instance;
+    /* Copy of "more" stored by the compute CS for the vertex/tiler CS. */
+    uint32_t more_vt;
++   /* Instances per chunk, 0 for PANLIB_CHUNK_MAX_INSTANCES. v9 JM, which
++    * lowered whole draws before, keeps whole instance ranges. */
++   uint32_t max_insts;
+ } PACKED;
+diff --git a/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c
+index 3abd4bf..2519522 100644
+--- a/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c
+@@ -3261,7 +3261,7 @@ v9_prerast_draw_viewports(struct panvk_cmd_buffer *cmdbuf,
+  * not (indirect, see panlib_v9_prerast_indirect()). */
+ static void
+ v9_prerast_draw_one(struct panvk_cmd_buffer *cmdbuf,
+-                    const struct panvk_draw_info *src)
++                    const struct panvk_draw_info *src, uint64_t chunk)
+ {
+    struct panvk_device *dev = to_panvk_device(cmdbuf->vk.base.device);
+    const struct panvk_shader *shader = cmdbuf->state.gfx.vs.shader;
+@@ -3294,7 +3294,7 @@ v9_prerast_draw_one(struct panvk_cmd_buffer *cmdbuf,
+        (has_gs && !v9_prerast_gs(cmdbuf, src, arena, &gs)) ||
+        (src->indirect.buffer_dev_addr &&
+         !(gen_draw = v9_prerast_indirect(cmdbuf, src, &vs,
+-                                         has_gs ? &gs : NULL, 0)))) {
++                                         has_gs ? &gs : NULL, chunk)))) {
+       vk_command_buffer_set_error(&cmdbuf->vk, VK_ERROR_OUT_OF_DEVICE_MEMORY);
+       return;
+    }
+@@ -3366,27 +3366,119 @@ v9_prerast_split_fan(struct panvk_cmd_buffer *cmdbuf,
+          chunk.index.buffer_size = (n + 1) * sizeof(uint32_t);
+          chunk.vertex.count = n + 1;
+          chunk.gpu_prerast_prim_base = s - 1;
+-         v9_prerast_draw_one(cmdbuf, &chunk);
++         v9_prerast_draw_one(cmdbuf, &chunk, 0);
+       }
+    }
+ }
+ 
+-/* Direct draws the arena does not hold are split on the CPU, the CPU half of
+- * CSF gpu_prerast_split(). The GPU chunk loop has no JM equivalent: strips
+- * with primitive restart over the arena are not lowered, indirect draws over
+- * it are dropped (panlib_v9_prerast_indirect()).
++static bool v9_prerast_reserve_jobs(struct panvk_cmd_buffer *cmdbuf,
++                                    uint32_t jobs);
++
++/* Topologies panlib_chunk_step() cuts by vertex range, as on CSF. */
++static bool
++v9_prerast_chunkable(enum mesa_prim prim)
++{
++   switch (prim) {
++   case MESA_PRIM_POINTS:
++   case MESA_PRIM_LINES:
++   case MESA_PRIM_TRIANGLES:
++   case MESA_PRIM_LINES_ADJACENCY:
++   case MESA_PRIM_TRIANGLES_ADJACENCY:
++   case MESA_PRIM_LINE_STRIP:
++   case MESA_PRIM_LINE_STRIP_ADJACENCY:
++   case MESA_PRIM_TRIANGLE_STRIP:
++   case MESA_PRIM_TRIANGLE_STRIP_ADJACENCY:
++      return true;
++   default:
++      return false;
++   }
++}
++
++/* Indirect draws, the JM form of CSF gpu_prerast_chunk_loop(). JM has no
++ * loop: V9_PRERAST_INDIRECT_CHUNKS iterations are unrolled into the job
++ * chain, each a panlib_chunk_step() planning the next chunk of the draw (at
++ * most max_verts vertices x instances) and the lowering of
++ * that chunk as an indirect draw. A draw the arena holds is one chunk. The
++ * iterations past the end of the draw get an empty chunk, whose jobs
++ * panlib_v9_prerast_indirect() makes NULL jobs. No CPU reads anything back.
++ * ponytail: a draw needing more chunks loses the rest, as when it was
++ * dropped whole before; a GPU job chain jump back to the step would lift the
++ * bound. Without a GS, gl_PrimitiveID restarts at 0 in each chunk (the GPU
++ * prim_base only reaches the GS, as on CSF).
+  */
++#define V9_PRERAST_INDIRECT_CHUNKS 8
++
+ static void
+-v9_prerast_draw(struct panvk_cmd_buffer *cmdbuf,
+-                const struct panvk_draw_info *draw)
++v9_prerast_chunked(struct panvk_cmd_buffer *cmdbuf,
++                   const struct panvk_draw_info *draw, uint32_t max_verts)
+ {
+-   /* v9_draw_indirect_unrolled() hands over one draw at a time. */
+-   if (draw->indirect.buffer_dev_addr) {
+-      v9_prerast_draw_one(cmdbuf, draw);
++   const bool indexed = draw->index.index_size != 0;
++   struct pan_ptr cd =
++      panvk_cmd_alloc_dev_mem(cmdbuf, desc, sizeof(struct panlib_chunk_draw), 16);
++   if (!cd.gpu) {
++      vk_command_buffer_set_error(&cmdbuf->vk, VK_ERROR_OUT_OF_DEVICE_MEMORY);
+       return;
+    }
+ 
++#define CD(f) (cd.gpu + offsetof(struct panlib_chunk_draw, f))
++   struct panlib_chunk_draw *c = cd.cpu;
++   memset(c, 0, sizeof(*c));
++   c->index_buffer = draw->index.buffer_dev_addr;
++   /* v9_count_draw_queries() counted the primitives generated. */
++   c->prims_generated = 0;
++   c->indexed = indexed;
++   c->max_verts = max_verts;
++   c->prim = draw->prim;
++   c->restart = indexed && draw->index.restart_enable;
++   c->index_size = draw->index.index_size;
++   c->index_count_el =
++      indexed ? draw->index.buffer_size / draw->index.index_size : 0;
++   c->view_count = 1;
++   c->max_insts = UINT32_MAX;
++
++   /* What the lowering sees: an indirect draw that is one chunk of the API
++    * draw. The chunk start is added to the VS invocation IDs, so the base
++    * vertex and base instance stay the API ones. */
++   struct panvk_draw_info chunk = *draw;
++   chunk.indirect.buffer_dev_addr = CD(draw);
++   chunk.indirect.count_buffer_dev_addr = 0;
++   chunk.indirect.draw_count = 1;
++   chunk.indirect.stride = 5 * sizeof(uint32_t);
++   chunk.pstats_counted = true;
++   chunk.prims_generated_counted = true;
++   chunk.gpu_prerast_prim_base = 0;
++   if (cmdbuf->state.gfx.gs.shader)
++      chunk.gpu_prerast_prim_base_addr = CD(prim_base);
++
++   if (!v9_prerast_reserve_jobs(cmdbuf, 2))
++      return;
++
++   struct panvk_precomp_ctx ctx = panvk_per_arch(precomp_cs)(cmdbuf);
++   panlib_chunk_setup(&ctx, panlib_1d(1), PANLIB_BARRIER_JM_BARRIER, cd.gpu,
++                      draw->indirect.buffer_dev_addr,
++                      draw->indirect.count_buffer_dev_addr,
++                      draw->indirect.draw_index);
+ 
++   for (uint32_t i = 0; i < V9_PRERAST_INDIRECT_CHUNKS; i++) {
++      if (!v9_prerast_reserve_jobs(cmdbuf, 2))
++         return;
++
++      ctx = panvk_per_arch(precomp_cs)(cmdbuf);
++      panlib_chunk_step(&ctx, panlib_1d(1), PANLIB_BARRIER_JM_BARRIER, cd.gpu);
++      v9_prerast_draw_one(cmdbuf, &chunk, CD(chunk_vertex));
++   }
++#undef CD
++}
++
++/* Direct draws the arena does not hold are split on the CPU, the CPU half of
++ * CSF gpu_prerast_split(); indirect ones on the GPU, see
++ * v9_prerast_chunked(). Direct strips with primitive restart over the arena
++ * are not lowered.
++ */
++static void
++v9_prerast_draw(struct panvk_cmd_buffer *cmdbuf,
++                const struct panvk_draw_info *draw)
++{
+    const struct panvk_shader *vs = cmdbuf->state.gfx.vs.shader;
+    const struct panvk_shader *gs = cmdbuf->state.gfx.gs.shader;
+    uint32_t max_verts =
+@@ -3396,8 +3488,20 @@ v9_prerast_draw(struct panvk_cmd_buffer *cmdbuf,
+                        panvk_gpu_prerast_gs_cap_slots(&gs->gpu_prerast.gs) /
+                           gs->gpu_prerast.gs.invocations);
+ 
++   uint32_t align, overlap, prim_div;
++   panlib_chunk_topology(draw->prim, &align, &overlap, &prim_div);
++
++   /* v9_draw_indirect_unrolled() hands over one draw at a time. */
++   if (draw->indirect.buffer_dev_addr) {
++      if (v9_prerast_chunkable(draw->prim) && max_verts >= overlap + align)
++         v9_prerast_chunked(cmdbuf, draw, max_verts);
++      else
++         v9_prerast_draw_one(cmdbuf, draw, 0);
++      return;
++   }
++
+    if ((uint64_t)draw->vertex.count * draw->instance.count <= max_verts) {
+-      v9_prerast_draw_one(cmdbuf, draw);
++      v9_prerast_draw_one(cmdbuf, draw, 0);
+       return;
+    }
+ 
+@@ -3407,7 +3511,7 @@ v9_prerast_draw(struct panvk_cmd_buffer *cmdbuf,
+       for (uint32_t i = 0; i < draw->instance.count; i += step) {
+          chunk.instance.base = draw->instance.base + i;
+          chunk.instance.count = MIN2(step, draw->instance.count - i);
+-         v9_prerast_draw_one(cmdbuf, &chunk);
++         v9_prerast_draw_one(cmdbuf, &chunk, 0);
+       }
+       return;
+    }
+@@ -3419,8 +3523,6 @@ v9_prerast_draw(struct panvk_cmd_buffer *cmdbuf,
+       return;
+    }
+ 
+-   uint32_t align, overlap, prim_div;
+-   panlib_chunk_topology(draw->prim, &align, &overlap, &prim_div);
+    const uint32_t step =
+       max_verts > overlap ? (max_verts - overlap) / align * align : 0;
+    if (!step || draw->prim == MESA_PRIM_TRIANGLE_FAN ||
+@@ -3440,7 +3542,7 @@ v9_prerast_draw(struct panvk_cmd_buffer *cmdbuf,
+          else
+             chunk.vertex.base = draw->vertex.base + i;
+          chunk.gpu_prerast_prim_base = i / prim_div;
+-         v9_prerast_draw_one(cmdbuf, &chunk);
++         v9_prerast_draw_one(cmdbuf, &chunk, 0);
+       }
+    }
+ }

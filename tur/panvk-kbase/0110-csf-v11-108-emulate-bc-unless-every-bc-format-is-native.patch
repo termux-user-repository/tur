@@ -1,0 +1,76 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: Mon, 5 Oct 2026 22:30:00 +0530
+Subject: [PATCH] panvk: emulate BC unless every BC format is native
+
+panvk_bc_emul_enabled() turned BC emulation off as soon as kbase
+TEXTURE_FEATURES reported BC1. Mali-G57 (v9) and Mali-G610 (v10) report
+BC1 without the other BC formats, so emulation went off while
+has_texture_compression_bc() still wanted all of them natively:
+textureCompressionBC stayed false, every BC format had no features, and
+DXVK skipped the adapter ("Device does not support required feature
+'textureCompressionBC'").
+
+Keep emulation on unless all ten BC formats (mask 0x1ff80) are native.
+When emulation is off, BC formats now take the native per-format path in
+get_image_plane_format_features() instead of returning 0. Image creation
+(panvk_image_init), image views, meta copies and the feature bit all use
+panvk_bc_emul_enabled(), so they stay consistent. GPUs without native BC1
+(G615, G720, G925) are unchanged.
+
+Purpose: expose textureCompressionBC on v9 G57 and v10 G610 (DXVK adapter selection)
+
+Tested GPU: Mali-G57 MC2 (Lenovo TB336FU, 0x90930010, PAN_ARCH 9 JM)
+Tested Kbase UAPI: JM 11.0
+Mesa base range: 5a07217f034b (26.3.0-devel)
+Validation test: deqp-vk via shim on G57: info.device_features textureCompressionBC 0 -> 1; api.info.format_properties.bc* 16/16 pass; texture.compressed BC fails match native ETC2-RGBA/ASTC fails on v9 (pre-existing v9 sampling issue)
+
+Generated-by: LLM
+
+diff --git a/src/panfrost/vulkan/panvk_physical_device.c b/src/panfrost/vulkan/panvk_physical_device.c
+index 7aa9d6abea21198cfe9557895e52fc2bcb36356a..a56fe757f247cdda93223102e77f54c4be92f5d0 100644
+--- a/src/panfrost/vulkan/panvk_physical_device.c
++++ b/src/panfrost/vulkan/panvk_physical_device.c
+@@ -1817,12 +1817,26 @@ panvk_bc_emul_enabled(const struct panvk_physical_device *physical_device)
+    if (PANVK_DEBUG(NO_BC_EMUL))
+       return false;
+
+-   const struct pan_format fmt =
+-      physical_device->formats.all[PIPE_FORMAT_DXT1_RGBA];
++   /* Emulate unless every BC format is native. Some v9/v10 kbase GPUs
++    * (G57, G610) report BC1 alone; keying off BC1 disabled emulation there
++    * and left textureCompressionBC false with no usable BC format. */
++   static const enum pipe_format bc_fmts[] = {
++      PIPE_FORMAT_DXT1_RGBA,       PIPE_FORMAT_DXT3_RGBA,
++      PIPE_FORMAT_DXT5_RGBA,       PIPE_FORMAT_RGTC1_UNORM,
++      PIPE_FORMAT_RGTC1_SNORM,     PIPE_FORMAT_RGTC2_UNORM,
++      PIPE_FORMAT_RGTC2_SNORM,     PIPE_FORMAT_BPTC_RGB_FLOAT,
++      PIPE_FORMAT_BPTC_RGB_UFLOAT, PIPE_FORMAT_BPTC_RGBA_UNORM,
++   };
+    uint32_t supported_compr_fmts =
+       pan_query_compressed_formats(&physical_device->kmod.dev->props);
+
+-   return !(BITFIELD_BIT(fmt.texfeat_bit) & supported_compr_fmts);
++   for (unsigned i = 0; i < ARRAY_SIZE(bc_fmts); i++) {
++      const struct pan_format fmt = physical_device->formats.all[bc_fmts[i]];
++      if (!fmt.hw || !(BITFIELD_BIT(fmt.texfeat_bit) & supported_compr_fmts))
++         return true;
++   }
++
++   return false;
+ }
+
+ static VkFormatFeatureFlags2
+@@ -1834,10 +1848,8 @@ get_image_plane_format_features(struct panvk_physical_device *physical_device,
+    const struct pan_format fmt = physical_device->formats.all[pfmt];
+    unsigned arch = pan_arch(physical_device->kmod.dev->props.gpu_id);
+
+-   if (panvk_format_is_bc(format)) {
+-      if (!panvk_bc_emul_enabled(physical_device))
+-         return 0;
+-
++   /* Without emulation, BC formats take the native per-format path below. */
++   if (panvk_format_is_bc(format) && panvk_bc_emul_enabled(physical_device)) {
+       features = VK_FORMAT_FEATURE_2_TRANSFER_SRC_BIT |
+                  VK_FORMAT_FEATURE_2_TRANSFER_DST_BIT |
+                  VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_BIT |

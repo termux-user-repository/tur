@@ -1,0 +1,33 @@
+From: panvk-kbase-android worker <panvk-worker@localhost>
+Subject: [PATCH csf-v11 019] panvk: invalidate CRC on CLEAR/DONT_CARE
+Generated-by: LLM
+
+Purpose: Mali-G615 IDVS matrix CASE 2+ read back RGBA 0 0 0 0 after a
+ passing first draw. PANVK_DEBUG=no_crc makes all 13 CASE PASS. CRC was
+ left valid across UNDEFINED+CLEAR, so later stores CRC-skipped.
+ Invalidate CRC on CLEAR/DONT_CARE as well as PREINITIALIZED.
+ Source/Reference: csf/panvk_vX_cmd_draw.c invalidate_initial_attachment_crcs
+  at Mesa 5a07217f034b3e50d8c7c7794f97a2df1742613b
+ Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+ Tested Kbase UAPI: 1.21
+ Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+ Dependencies: patches/csf-v11/018-gpu-prerast-contracts.patch
+ Validation test: tests/dxvk/vulkan/test_crc_invalidate_undefined_clear.py
+
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+@@ -4051,8 +4051,12 @@ invalidate_initial_attachment_crcs(struct panvk_cmd_buffer *cmdbuf,
+          vk_find_struct_const(att->pNext,
+                               RENDERING_ATTACHMENT_INITIAL_LAYOUT_INFO_MESA);
+ 
+-      if (!initial || initial->initialLayout != VK_IMAGE_LAYOUT_PREINITIALIZED)
++      bool host_preinit =
++         initial && initial->initialLayout == VK_IMAGE_LAYOUT_PREINITIALIZED;
++      bool discard = att->loadOp == VK_ATTACHMENT_LOAD_OP_CLEAR ||
++                     att->loadOp == VK_ATTACHMENT_LOAD_OP_DONT_CARE;
++      if (!host_preinit && !discard)
+          continue;
+ 
+       VK_FROM_HANDLE(panvk_image_view, iview, att->imageView);
+       if (!iview || iview->pview.first_level != 0)

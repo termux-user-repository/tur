@@ -1,0 +1,186 @@
+From: abhay-byte <zenithblue.dev@gmail.com>
+Subject: [PATCH csf-v11 059] panvk/csf: add opt-in GPU waits for same-queue kbase semaphores
+Generated-by: LLM
+
+Purpose: TBD; biblioklept
+Source/Reference: TBD, work/mesa 07688e5ff72
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/058
+Validation test: TBD
+
+diff --git a/src/panfrost/vulkan/csf/panvk_queue.h b/src/panfrost/vulkan/csf/panvk_queue.h
+index 17528de0694..0f2a8e843e2 100644
+--- a/src/panfrost/vulkan/csf/panvk_queue.h
++++ b/src/panfrost/vulkan/csf/panvk_queue.h
+@@ -138,6 +138,7 @@ struct panvk_gpu_queue {
+    } kbase_seqnos;
+    uint32_t kbase_tiler_submit_count;
+    uint64_t kbase_tiler_work_count;
++   uint64_t kbase_gpu_waits[PANVK_SUBQUEUE_COUNT][PANVK_SUBQUEUE_COUNT];
+    /* Tiler heap context retired by the last heap renewal.  The firmware CS
+     * HEAP_SET registers keep pointing at the old context until each graphics
+     * subqueue executes its next ring entry, so the context is only
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c b/src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c
+index e66bc930224..5a893249ea3 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c
+@@ -464,7 +464,8 @@ kbase_subqueue_reserve_ring(struct panvk_gpu_queue *queue,
+ static VkResult
+ kbase_subqueue_emit_job(struct panvk_gpu_queue *queue, uint32_t subqueue,
+                         uint64_t stream_addr, uint32_t stream_size,
+-                        uint32_t flush_id, uint64_t gpu_id)
++                        uint32_t flush_id, uint64_t gpu_id,
++                        const uint64_t *wait_seqnos)
+ {
+    struct panvk_device *dev = to_panvk_device(queue->vk.base.device);
+    const struct drm_panthor_csif_info *csif_info = panvk_get_csif_props(dev);
+@@ -557,6 +558,17 @@ kbase_subqueue_emit_job(struct panvk_gpu_queue *queue, uint32_t subqueue,
+    uint64_t seqno_addr = kbase_subqueue_seqno_dev_addr(queue, subqueue);
+    uint64_t target_seqno = subq->kbase.emitted_jobs + 1;
+ 
++   for (uint32_t i = 0; wait_seqnos && i < PANVK_SUBQUEUE_COUNT; i++) {
++      if (!wait_seqnos[i])
++         continue;
++      flush_id = 0;
++      if (i == subqueue)
++         continue;
++      cs_move64_to(&b, addr64, kbase_subqueue_seqno_dev_addr(queue, i));
++      cs_move64_to(&b, val64, wait_seqnos[i] - 1);
++      cs_sync64_wait(&b, false, MALI_CS_CONDITION_GREATER, val64, addr64);
++   }
++
+    /* The heap context can be renewed between synchronous submissions to
+     * release chunks that proprietary kbase accounts per CSG.  Refresh the
+     * firmware heap state at every graphics CALL so it observes the current
+@@ -1391,7 +1403,7 @@ kbase_submit_init_subqueues(struct panvk_gpu_queue *queue)
+          kbase_subqueue_emit_job(queue, subqueue, subq->kbase.init_stream_addr,
+                                  subq->kbase.init_stream_size,
+                                  subq->kbase.init_flush_id,
+-                                 phys_dev->kmod.dev->props.gpu_id);
++                                 phys_dev->kmod.dev->props.gpu_id, NULL);
+       if (res != VK_SUCCESS)
+          return panvk_errorf(dev->vk.physical, VK_ERROR_INITIALIZATION_FAILED,
+                              "Failed to initialize subqueue");
+@@ -2658,6 +2670,17 @@ panvk_queue_submit_init_signals(struct panvk_queue_submit *submit,
+ }
+ 
+ #ifdef HAVE_PAN_KMOD_KBASE
++/* Off by default: G615 query_pool.statistics_query CTS loses the device on
++ * subqueue 0 with GPU waits (1-3 of 17769), never with CPU waits. */
++DEBUG_GET_ONCE_BOOL_OPTION(kbase_gpu_semaphore_waits,
++                           "PANVK_KBASE_GPU_SEMAPHORE_WAITS", false)
++
++static bool
++kbase_gpu_waits_disabled(void)
++{
++   return !debug_get_option_kbase_gpu_semaphore_waits();
++}
++
+ static VkResult
+ kbase_wait_sync_targets(
+    void *data, const uint64_t targets[PANVK_KBASE_SYNC_TARGET_COUNT],
+@@ -2738,10 +2761,26 @@ panvk_queue_submit_ioctl_kbase(struct panvk_queue_submit *submit,
+    //              __func__);
+    // }
+ 
+-   if (vk_submit->wait_count) {
+-      result = vk_sync_wait_many(&dev->vk, vk_submit->wait_count,
+-                                 vk_submit->waits, VK_SYNC_WAIT_COMPLETE,
+-                                 UINT64_MAX);
++   for (uint32_t w = 0; w < vk_submit->wait_count; w++) {
++      const struct vk_sync_wait *wait = &vk_submit->waits[w];
++      uint64_t targets[PANVK_KBASE_SYNC_TARGET_COUNT];
++      void *owner;
++
++      if (!kbase_gpu_waits_disabled() && wait->wait_value == 0 &&
++          panvk_kbase_sync_peek(wait->sync, &owner, targets) &&
++          (owner == NULL || owner == queue)) {
++         for (uint32_t i = 0; owner && i < PANVK_SUBQUEUE_COUNT; i++) {
++            if (targets[i] <= kbase_subqueue_seqno_cell(queue, i)->seqno)
++               continue;
++            for (uint32_t j = 0; j < PANVK_SUBQUEUE_COUNT; j++)
++               queue->kbase_gpu_waits[j][i] =
++                  MAX2(queue->kbase_gpu_waits[j][i], targets[i]);
++         }
++         continue;
++      }
++
++      result = vk_sync_wait(&dev->vk, wait->sync, wait->wait_value,
++                            VK_SYNC_WAIT_COMPLETE, UINT64_MAX);
+       if (result != VK_SUCCESS)
+          return result;
+    }
+@@ -2761,10 +2800,14 @@ panvk_queue_submit_ioctl_kbase(struct panvk_queue_submit *submit,
+                                        qsubmit->stream_addr,
+                                        qsubmit->stream_size,
+                                        qsubmit->latest_flush,
+-                                       submit->phys_dev->kmod.dev->props.gpu_id);
++                                       submit->phys_dev->kmod.dev->props.gpu_id,
++                                       queue->kbase_gpu_waits[qsubmit->queue_index]);
+       if (result != VK_SUCCESS)
+          return vk_queue_set_lost(&queue->vk, "kbase: ring emission failed");
+ 
++      memset(queue->kbase_gpu_waits[qsubmit->queue_index], 0,
++             sizeof(queue->kbase_gpu_waits[0]));
++
+       touched |= BITFIELD_BIT(qsubmit->queue_index);
+    }
+ 
+diff --git a/src/panfrost/vulkan/panvk_physical_device.c b/src/panfrost/vulkan/panvk_physical_device.c
+index 3a85310cca9..e28f5868990 100644
+--- a/src/panfrost/vulkan/panvk_physical_device.c
++++ b/src/panfrost/vulkan/panvk_physical_device.c
+@@ -745,6 +745,37 @@ panvk_kbase_sync_set_pending(
+    mtx_unlock(&ks->mutex);
+ }
+ 
++bool
++panvk_kbase_sync_peek(struct vk_sync *sync, void **data,
++                      uint64_t targets[PANVK_KBASE_SYNC_TARGET_COUNT])
++{
++   if (sync->type->wait_many != kbase_cpu_sync_wait_many)
++      return false;
++
++   struct kbase_cpu_sync *ks = container_of(sync, struct kbase_cpu_sync, sync);
++   bool known = true;
++
++   mtx_lock(&ks->mutex);
++   switch (ks->state) {
++   case KBASE_CPU_SYNC_SIGNALED:
++      *data = NULL;
++      memset(targets, 0, sizeof(uint64_t) * PANVK_KBASE_SYNC_TARGET_COUNT);
++      break;
++   case KBASE_CPU_SYNC_PENDING:
++   case KBASE_CPU_SYNC_WAITING:
++      *data = ks->pending_data;
++      memcpy(targets, ks->targets,
++             sizeof(uint64_t) * PANVK_KBASE_SYNC_TARGET_COUNT);
++      known = ks->pending_data != NULL;
++      break;
++   default:
++      known = false;
++      break;
++   }
++   mtx_unlock(&ks->mutex);
++   return known;
++}
++
+ static VkResult
+ kbase_cpu_sync_wait_one(struct vk_device *device, struct kbase_cpu_sync *ks,
+                         enum vk_sync_wait_flags wait_flags,
+diff --git a/src/panfrost/vulkan/panvk_physical_device.h b/src/panfrost/vulkan/panvk_physical_device.h
+index bf7e00e0c56..e01d87eef20 100644
+--- a/src/panfrost/vulkan/panvk_physical_device.h
++++ b/src/panfrost/vulkan/panvk_physical_device.h
+@@ -117,6 +117,9 @@ typedef VkResult (*panvk_kbase_sync_wait_func)(
+ void panvk_kbase_sync_set_pending(
+    struct vk_sync *sync, void *data, panvk_kbase_sync_wait_func wait,
+    const uint64_t targets[PANVK_KBASE_SYNC_TARGET_COUNT]);
++
++bool panvk_kbase_sync_peek(struct vk_sync *sync, void **data,
++                           uint64_t targets[PANVK_KBASE_SYNC_TARGET_COUNT]);
+ #endif
+ 
+ void panvk_physical_device_finish(struct panvk_physical_device *device);

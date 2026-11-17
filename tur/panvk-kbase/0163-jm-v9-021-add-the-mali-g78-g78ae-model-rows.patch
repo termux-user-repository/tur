@@ -1,0 +1,68 @@
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: 2026-10-11
+Subject: [PATCH jm-v9 021] panfrost: add the Mali-G78 and G78AE model rows, match v9 ids by product biblioklept
+
+Purpose: Let G78 and G78AE devices pass pan_get_model() and keep v9 parts
+with an unexpected arch minor from being dropped as INCOMPATIBLE_DRIVER.
+kbase names v9 products by arch major and product major only (mask
+0xf00f): 0x9000 G77, 0x9001/0x9003 G57, 0x9002 G78, 0x9004 G68 and
+0x9005 G78AE. Mesa keys on arch minor too, and parts differ there
+(gs101's G78 reports 0x9202, upstream's G68 row is (9, 2, 4)). Add the
+G78 row at (9, 2, 2) and G78AE at (9, 0, 5), and when no exact row
+exists for an arch 9 id, match on arch major and product major.
+G77 (9, 0, 0) from 006 is unchanged and agrees with malisx2 (0x9000) and
+gs101 (PAN_PROD_ID(9, 0, 0)). G68 is upstream !43414, already in our base.
+All v9 rows use the G57 16 KiB colour / 8 KiB depth tile buffer, as
+malisx2 does for every arch 9 part. Transaction elimination produces
+stale tiles on G78 (gs101 finding); panvk enables CRC only on v10+
+(panvk_image.c), so no quirk is needed on v9.
+Source/Reference: bmdhacks/malisx2 src/vk/mali_physical_device.c (MIT, id
+table); Mesa bifrost cmdline.c GPU list; m8l8th814n-eng/mesa-gs101 0001/0003
+(no licence: facts only, no code)
+Tested GPU: build-checked (universal Android build v6-v14); not run on a G77/G78/G68/G78AE
+Tested Kbase UAPI: none (table lookup only)
+Mesa base range: 5a07217f + g615-v11-csf series + jm-v9 001-020
+Dependencies: jm-v9 006
+Validation test: vkEnumeratePhysicalDevices on a G78/G78AE (pending)
+
+---
+ src/panfrost/model/pan_model.c | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+
+diff --git a/src/panfrost/model/pan_model.c b/src/panfrost/model/pan_model.c
+index 82c4dc7..d386f74 100644
+--- a/src/panfrost/model/pan_model.c
++++ b/src/panfrost/model/pan_model.c
+@@ -93,6 +93,14 @@ const struct pan_model pan_model_list[] = {
+                                               MODEL_RATES_X(2, 4, 8,  32,  32, 8)),
+    VALHALL_MODEL(PAN_PROD_ID(9, 2, 4), 0, "G68",    "G78", MODEL_ANISO(ALL),  MODEL_TB_SIZES(16384,  8192),
+                                               MODEL_RATES_X(2, 4, 8,  32,  32, 8)),
++   /* G78 (kbase TBEX, product major 2; Tensor gs101 reports 0x9202) and
++    * G78AE (product major 5): same v9 core and 16 KiB colour tile buffer as
++    * the G57/G68. Transaction elimination produces stale tiles on G78
++    * (gs101); panvk only enables CRC on v10+, so it stays off here. */
++   VALHALL_MODEL(PAN_PROD_ID(9, 2, 2), 0, "G78",    "G78", MODEL_ANISO(ALL),  MODEL_TB_SIZES(16384,  8192),
++                                              MODEL_RATES_X(2, 4, 8,  32,  32, 8)),
++   VALHALL_MODEL(PAN_PROD_ID(9, 0, 5), 0, "G78AE",  "G78", MODEL_ANISO(ALL),  MODEL_TB_SIZES(16384,  8192),
++                                              MODEL_RATES_X(2, 4, 8,  32,  32, 8)),
+    /* G710 (kbase TODX, 0xa862): same Valhall v10 core as G610, 7-16 cores. */
+    VALHALL_MODEL(PAN_PROD_ID(10, 8, 2), 0, "G710",   "G710", MODEL_ANISO(ALL),  MODEL_TB_SIZES(32768, 16384),
+                                               MODEL_RATES_X(4, 8, 16,  64,  64, 16)),
+@@ -160,5 +168,17 @@ pan_get_model(uint64_t gpu_id, uint32_t gpu_variant)
+          return &pan_model_list[i];
+    }
+ 
++   /* kbase names v9 products by arch major and product major only
++    * (GPU_ID2_PRODUCT_MODEL, mask 0xf00f): arch minor is not part of the
++    * product, and parts report different values (gs101's G78: 0x9202). */
++   if ((gpu_prod_id >> 16) == 9) {
++      for (unsigned i = 0; i < ARRAY_SIZE(pan_model_list); ++i) {
++         if ((pan_model_list[i].gpu_prod_id & ~0xff00) ==
++                (gpu_prod_id & ~0xff00) &&
++             pan_model_list[i].gpu_variant == gpu_variant)
++            return &pan_model_list[i];
++      }
++   }
++
+    return NULL;
+ }

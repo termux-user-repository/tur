@@ -1,0 +1,54 @@
+From: abhay-byte <zenithblue.dev@gmail.com>
+Subject: [PATCH csf-v11 068] panvk: expose VK_EXT_transform_feedback on v10+
+Generated-by: LLM
+
+Purpose: Expose VK_EXT_transform_feedback, geometryStreams and the transform feedback limits on v10+; biblioklept
+Source/Reference: local, dx9-xfb 6c3c88b174a, work/mesa-dxint 846989a5081
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/067
+Validation test: CTS dEQP-VK.transform_feedback.* 133695 cases 15793 Pass 0 Fail; conditional_rendering 922 Pass 0 Fail
+
+diff --git a/src/panfrost/vulkan/panvk_vX_physical_device.c b/src/panfrost/vulkan/panvk_vX_physical_device.c
+index 99d432549b1..993c02b6e85 100644
+--- a/src/panfrost/vulkan/panvk_vX_physical_device.c
++++ b/src/panfrost/vulkan/panvk_vX_physical_device.c
+@@ -208,6 +208,7 @@ panvk_per_arch(get_physical_device_extensions)(
+       .EXT_scalar_block_layout = true,
+       .EXT_separate_stencil_usage = true,
+       .EXT_shader_atomic_float = true,
++      .EXT_transform_feedback = PAN_ARCH >= 10,
+       .EXT_shader_demote_to_helper_invocation = true,
+       .EXT_shader_image_atomic_int64 = PAN_ARCH >= 9,
+       .EXT_shader_module_identifier = true,
+@@ -613,6 +614,10 @@ panvk_per_arch(get_physical_device_features)(
+       .provokingVertexLast = true,
+       .transformFeedbackPreservesProvokingVertex = false,
+ 
++      /* VK_EXT_transform_feedback */
++      .transformFeedback = PAN_ARCH >= 10,
++      .geometryStreams = PAN_ARCH >= 10 && !PANVK_DEBUG(NO_GS),
++
+       /* v7 doesn't support AFBC(BGR). We need to tweak the texture swizzle to
+        * make it work, which forces us to apply the same swizzle on the border
+        * color, meaning we need to know the format when preparing the border
+@@ -1290,6 +1295,18 @@ panvk_per_arch(get_physical_device_properties)(
+       .provokingVertexModePerPipeline = false,
+       .transformFeedbackPreservesTriangleFanProvokingVertex = false,
+ 
++      /* VK_EXT_transform_feedback */
++      .maxTransformFeedbackStreams = PAN_ARCH >= 10 ? 4 : 0,
++      .maxTransformFeedbackBuffers = PAN_ARCH >= 10 ? 4 : 0,
++      .maxTransformFeedbackBufferSize = UINT32_MAX,
++      .maxTransformFeedbackStreamDataSize = 512,
++      .maxTransformFeedbackBufferDataSize = 512,
++      .maxTransformFeedbackBufferDataStride = 2048,
++      .transformFeedbackQueries = true,
++      .transformFeedbackStreamsLinesTriangles = true,
++      .transformFeedbackRasterizationStreamSelect = true,
++      .transformFeedbackDraw = true,
++
+       /* VK_EXT_shader_tile_image */
+       .shaderTileImageCoherentReadAccelerated = PAN_ARCH >= 9,
+       .shaderTileImageReadSampleFromPixelRateInvocation = PAN_ARCH >= 9,

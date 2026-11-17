@@ -1,0 +1,33 @@
+From: abhay-byte <zenithblue.dev@gmail.com>
+Subject: [PATCH csf-v11 058] panvk/csf: skip texture cache invalidation for non-texel buffer barriers
+Generated-by: LLM
+
+Purpose: TBD; biblioklept
+Source/Reference: TBD, work/mesa ccdb936d91e
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/057
+Validation test: TBD
+
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_buffer.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_buffer.c
+index ebfc59edda3..3a6534b4b76 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_buffer.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_buffer.c
+@@ -595,11 +595,16 @@ panvk_per_arch(add_cs_deps)(struct panvk_cmd_buffer *cmdbuf,
+ 
+    for (uint32_t i = 0; i < in->bufferMemoryBarrierCount; i++) {
+       const VkBufferMemoryBarrier2 *barrier = &in->pBufferMemoryBarriers[i];
++      VK_FROM_HANDLE(panvk_buffer, buffer, barrier->buffer);
+       struct panvk_sync_scope src = {barrier->srcStageMask, barrier->srcAccessMask};
+       struct panvk_sync_scope dst = {barrier->dstStageMask, barrier->dstAccessMask};
+       normalize_dependency(&src, &dst, barrier->srcQueueFamilyIndex,
+                            barrier->dstQueueFamilyIndex);
+ 
++      if (!(buffer->vk.usage & VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT))
++         dst.access &= ~(VK_ACCESS_2_SHADER_READ_BIT |
++                         VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
++
+       collect_cs_deps(cmdbuf, in, src, dst, out);
+    }
+ 

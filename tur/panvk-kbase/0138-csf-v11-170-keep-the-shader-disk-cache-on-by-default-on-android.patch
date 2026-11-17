@@ -1,0 +1,49 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: Wed, 7 Oct 2026 20:00:00 +0530
+Subject: [PATCH] util/disk_cache: keep the shader disk cache on by default on Android biblioklept
+
+Upstream turns the Mesa disk cache off by default on Android because
+the EGL layer brings its own blob cache. This build is a Vulkan-only
+driver that mostly runs under Wine + DXVK, where nothing else caches
+compiled shaders, so every session recompiled every pipeline.
+
+It also hurts within a session: 32-bit DXVK compiles each shader
+pipeline library on a worker, destroys it right away to save address
+space ("we should hit the driver's disk cache"), and recreates it on
+dxvk-cs at first draw. panvk's in-memory pipeline cache only holds weak
+references, so without the disk cache that second create is a full
+compile on the render thread (NFS Most Wanted: 0.65 s per pipeline,
+1-1.6 s freezes).
+
+Use the normal default. The path still comes from
+$MESA_SHADER_CACHE_DIR, $XDG_CACHE_HOME or $HOME/.cache; when none of
+them is writable (a plain Android app) path init fails and the cache
+stays inert, as before. MESA_SHADER_CACHE_DISABLE=true still turns it
+off. The cache key already includes the driver BuildID and the GPU id.
+---
+diff --git a/src/util/disk_cache_os.c b/src/util/disk_cache_os.c
+index 66a3f5b..08165bb 100644
+--- a/src/util/disk_cache_os.c
++++ b/src/util/disk_cache_os.c
+@@ -1007,14 +1007,13 @@ disk_cache_enabled()
+       return false;
+ 
+    /* At user request, disable shader cache entirely.
+-    * Disk cache is not enabled by default for android, for most
+-    * applications the EGL layer uses EGL_ANDROID_blob_cache to manage
+-    * the cache itself, however those that wish to use the cache directly
+-    * can set `mesa.shader.cache.disable=false` property.
+-    * Don't forget to also set the shader cache path to something readable
+-    * and writable by the application via `mesa.shader.cache.dir`.
++    * Upstream disables the disk cache by default on Android because the EGL
++    * layer manages its own blob cache. This build is a Vulkan-only driver
++    * that mostly runs under Wine/DXVK, where nothing else caches shaders:
++    * keep it on. Without a writable $MESA_SHADER_CACHE_DIR, $XDG_CACHE_HOME
++    * or $HOME/.cache the path init fails and the cache stays inert.
+     */
+-#if defined(SHADER_CACHE_DISABLE_BY_DEFAULT) || DETECT_OS_ANDROID
++#if defined(SHADER_CACHE_DISABLE_BY_DEFAULT)
+    bool disable_by_default = true;
+ #else
+    bool disable_by_default = false;

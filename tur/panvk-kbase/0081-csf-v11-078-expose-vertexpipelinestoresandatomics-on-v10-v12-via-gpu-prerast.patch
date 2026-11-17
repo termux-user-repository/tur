@@ -1,0 +1,201 @@
+From: abhay-byte <zenithblue.dev@gmail.com>
+Subject: [PATCH csf-v11 078] panvk: expose vertexPipelineStoresAndAtomics on v10-v12 via gpu_prerast
+
+Generated-by: LLM
+
+Purpose: Expose vertexPipelineStoresAndAtomics on v10-v12 by running vertex shaders that write memory once per vertex through gpu_prerast compute instead of IDVS; biblioklept
+Source/Reference: local, work/mesa-vpsa2-final dx-vpsa2-final 61d58783ae1
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/077
+Validation test: CTS dEQP-VK.glsl.atomic_operations.*_vertex* 66 Pass 0 Fail (was NotSupported); memory_model.message_passing.*vert* 320 Pass 0 Fail; binding_model.shader_access.*vertex* 2086 Pass 0 Fail; tests/dxvk/vulkan/vertex-stores 10/10 PASS
+
+diff --git a/src/panfrost/vulkan/csf/panvk_gpu_prerast.c b/src/panfrost/vulkan/csf/panvk_gpu_prerast.c
+index 60992fd87e9..090587b7c4d 100644
+--- a/src/panfrost/vulkan/csf/panvk_gpu_prerast.c
++++ b/src/panfrost/vulkan/csf/panvk_gpu_prerast.c
+@@ -79,8 +79,9 @@ panvk_per_arch(gpu_prerast_can_lower)(
+     const bool xfb = cmdbuf->state.gfx.xfb.active &&
+                      panvk_gpu_prerast_has_xfb(gs ? &gs->gpu_prerast.xfb
+                                                   : &shader->xfb);
+-    if (!(PANVK_DEBUG(GPU_PRERAST) || poly || gs || xfb) ||
+-        (!gs && !poly && !xfb && shader->has_side_effects) ||
++    const bool side_effects = PAN_ARCH < 13 && shader->has_side_effects;
++    if (!(PANVK_DEBUG(GPU_PRERAST) || poly || gs || xfb || side_effects) ||
++        (PAN_ARCH >= 13 && !gs && !poly && !xfb && shader->has_side_effects) ||
+         !shader->lowered_vs_compiled || !shader->passthrough_vs_compiled ||
+         (poly && !shader->polygon_compiled) ||
+         (gs && (!gs->gpu_prerast.gs.kernel_compiled ||
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+index 56f40199713..04fe0b7241f 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+@@ -4792,6 +4792,18 @@ gpu_prerast_needed(const struct panvk_cmd_buffer *cmdbuf,
+               PANVK_GPU_PRERAST_POLY_NONE);
+ }
+ 
++/* VS stores and atomics run once per vertex through gpu_prerast. Draws it
++ * cannot lower fall back to IDVS.
++ */
++static bool
++gpu_prerast_wanted(const struct panvk_cmd_buffer *cmdbuf,
++                   const struct panvk_draw_info *draw)
++{
++   return gpu_prerast_needed(cmdbuf, draw) ||
++          (PAN_ARCH < 13 && !draw->gpu_prerast_generated &&
++           cmdbuf->state.gfx.vs.shader->gpu_prerast.has_side_effects);
++}
++
+ /* Returns true if the draw was split into draws that fit the arena. */
+ static bool
+ gpu_prerast_split(struct panvk_cmd_buffer *cmdbuf,
+@@ -4872,6 +4884,8 @@ gpu_prerast_split(struct panvk_cmd_buffer *cmdbuf,
+        * vertex range, the kernels need a first-vertex/strip-end input for
+        * that.
+        */
++      if (!gpu_prerast_needed(cmdbuf, draw))
++         return false;
+       gpu_prerast_unhandled("vertex count over the arena capacity");
+       return true;
+    }
+@@ -4883,6 +4897,8 @@ gpu_prerast_split(struct panvk_cmd_buffer *cmdbuf,
+     */
+    if (!step || (overlap && draw->index.index_size &&
+                  draw->index.restart_enable)) {
++      if (!gpu_prerast_needed(cmdbuf, draw))
++         return false;
+       gpu_prerast_unhandled("vertex count over the arena capacity");
+       return true;
+    }
+@@ -4927,7 +4943,7 @@ panvk_cmd_draw(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info draw)
+       draw.pstats_counted = true;
+    }
+ 
+-   if (gpu_prerast_needed(cmdbuf, &draw) && gpu_prerast_split(cmdbuf, &draw))
++   if (gpu_prerast_wanted(cmdbuf, &draw) && gpu_prerast_split(cmdbuf, &draw))
+       return;
+ 
+    if (draw.indirect.buffer_dev_addr)
+diff --git a/src/panfrost/vulkan/panvk_vX_physical_device.c b/src/panfrost/vulkan/panvk_vX_physical_device.c
+index 5e6d037d1d3..66a11693d7e 100644
+--- a/src/panfrost/vulkan/panvk_vX_physical_device.c
++++ b/src/panfrost/vulkan/panvk_vX_physical_device.c
+@@ -336,8 +336,10 @@ panvk_per_arch(get_physical_device_features)(
+       .occlusionQueryPrecise = true,
+       .pipelineStatisticsQuery = PAN_ARCH >= 10,
+       /* On v13+, the hardware isn't speculatively referencing to invalid
+-         indices anymore. */
++         indices anymore. On v10-v12, pre-rasterization stages that write
++         memory run through gpu_prerast compute instead of IDVS. */
+       .vertexPipelineStoresAndAtomics =
++         (PAN_ARCH >= 10 && PAN_ARCH < 13) ||
+          (PAN_ARCH >= 13 && instance->drirc.misc.enable_vertex_pipeline_stores_atomics) ||
+          instance->drirc.misc.force_enable_shader_atomics,
+       .fragmentStoresAndAtomics = true,
+diff --git a/src/panfrost/vulkan/panvk_vX_shader.c b/src/panfrost/vulkan/panvk_vX_shader.c
+index 074168afc5c..2dc8cd2bab2 100644
+--- a/src/panfrost/vulkan/panvk_vX_shader.c
++++ b/src/panfrost/vulkan/panvk_vX_shader.c
+@@ -1189,6 +1189,45 @@ panvk_gpu_prerast_passthrough_nir(const nir_shader *source, uint64_t outputs,
+    return b.shader;
+ }
+ 
++static nir_def *
++panvk_gpu_prerast_vs_is_restart(nir_builder *b)
++{
++   nir_def *vertex = nir_channel(b, nir_load_global_invocation_id(b, 32), 0);
++   nir_def *params = load_sysval(b, graphics, 64, gpu_prerast_params);
++   nir_def *index_offset = nir_load_global(
++      b, 1, 32,
++      nir_iadd_imm(b, params,
++                   offsetof(struct panvk_gpu_prerast_params, index_offset)),
++      .align_mul = 4);
++   nir_def *raw = panvk_poly_load_raw_vertex_id(b, nir_iadd(b, vertex, index_offset));
++   nir_def *restart_enable = nir_load_global(
++      b, 1, 32,
++      nir_iadd_imm(b, params,
++                   offsetof(struct panvk_gpu_prerast_params, primitive_restart)),
++      .align_mul = 4);
++   nir_def *restart_index = nir_load_global(
++      b, 1, 32,
++      nir_iadd_imm(b, params,
++                   offsetof(struct panvk_gpu_prerast_params, restart_index)),
++      .align_mul = 4);
++   return nir_iand(b, nir_ine_imm(b, restart_enable, 0),
++                   nir_ieq(b, raw, restart_index));
++}
++
++/* A restart index is not a vertex, don't run the VS stores for it. */
++static void
++panvk_gpu_prerast_skip_restart(nir_shader *nir)
++{
++   nir_function_impl *impl = nir_shader_get_entrypoint(nir);
++   nir_cf_list body;
++   nir_cf_extract(&body, nir_before_impl(impl), nir_after_impl(impl));
++   nir_builder b = nir_builder_at(nir_before_impl(impl));
++   nir_push_if(&b, nir_inot(&b, panvk_gpu_prerast_vs_is_restart(&b)));
++   nir_cf_reinsert(&body, b.cursor);
++   nir_pop_if(&b, NULL);
++   nir_progress(true, impl, nir_metadata_none);
++}
++
+ static void
+ panvk_gpu_prerast_emit_generated_records(nir_shader *nir)
+ {
+@@ -1198,27 +1237,7 @@ panvk_gpu_prerast_emit_generated_records(nir_shader *nir)
+    nir_def *vertex = nir_channel(&b, gid, 0);
+    nir_def *instance = nir_channel(&b, gid, 1);
+    nir_def *params = load_sysval(&b, graphics, 64, gpu_prerast_params);
+-
+-    nir_def *index = vertex;
+-    nir_def *index_offset = nir_load_global(
+-       &b, 1, 32,
+-       nir_iadd_imm(&b, params,
+-                    offsetof(struct panvk_gpu_prerast_params, index_offset)),
+-       .align_mul = 4);
+-    index = nir_iadd(&b, vertex, index_offset);
+-    nir_def *raw = panvk_poly_load_raw_vertex_id(&b, index);
+-   nir_def *restart_enable = nir_load_global(
+-      &b, 1, 32,
+-      nir_iadd_imm(&b, params,
+-                   offsetof(struct panvk_gpu_prerast_params, primitive_restart)),
+-      .align_mul = 4);
+-   nir_def *restart_index = nir_load_global(
+-      &b, 1, 32,
+-      nir_iadd_imm(&b, params,
+-                   offsetof(struct panvk_gpu_prerast_params, restart_index)),
+-      .align_mul = 4);
+-   nir_def *is_restart = nir_iand(
+-      &b, nir_ine_imm(&b, restart_enable, 0), nir_ieq(&b, raw, restart_index));
++   nir_def *is_restart = panvk_gpu_prerast_vs_is_restart(&b);
+    nir_def *verts = nir_load_global(
+       &b, 1, 32,
+       nir_iadd_imm(&b, params,
+@@ -3141,6 +3160,8 @@ panvk_compile_shader(struct panvk_device *dev,
+          info->nir->info.clip_distance_array_size;
+       shader->gpu_prerast.io.cull_distance_array_size =
+          info->nir->info.cull_distance_array_size;
++      nir_shader_gather_info(info->nir,
++                             nir_shader_get_entrypoint(info->nir));
+       shader->gpu_prerast.has_side_effects = info->nir->info.writes_memory;
+    }
+ #endif
+@@ -3171,6 +3192,7 @@ panvk_compile_shader(struct panvk_device *dev,
+          BITSET_TEST(state->dynamic, MESA_VK_DYNAMIC_RS_POLYGON_MODE);
+       const bool want_prerast =
+          PANVK_DEBUG(GPU_PRERAST) || info->nir->xfb_info ||
++         (PAN_ARCH < 13 && info->nir->info.writes_memory) ||
+          (info->next_stage_mask & (VK_SHADER_STAGE_GEOMETRY_BIT |
+                                    VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT)) ||
+          (dev->vk.enabled_features.fillModeNonSolid &&
+@@ -3280,6 +3302,9 @@ panvk_compile_shader(struct panvk_device *dev,
+                                           nir_metadata_all, &out_types);
+                NIR_PASS(_, nir, pan_nir_lower_vs_inputs_poly, inputs.gpu_id);
+                NIR_PASS(_, nir, panvk_gpu_prerast_lower_vs_outputs);
++               if (info->stage == MESA_SHADER_VERTEX &&
++                   nir->info.writes_memory)
++                  panvk_gpu_prerast_skip_restart(nir);
+                panvk_gpu_prerast_emit_generated_records(nir);
+                NIR_PASS(_, nir, panvk_poly_lower_sw_vs);
+                NIR_PASS(_, nir, panvk_poly_lower_sysvals);

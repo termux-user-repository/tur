@@ -1,0 +1,241 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: Sat, 3 Oct 2026 22:00:00 +0530
+Subject: [PATCH] panvk: share TLS across command buffers and fault-back gpu_prerast arenas
+
+Every command buffer allocated its own thread local storage from its pool,
+and the command pool cached the big BOs. A shader with 4 KiB of stack per
+thread needs ~84 MiB of TLS on Mali-G615 MC6, so DXVK's command lists kept
+20+ such BOs alive in Need for Speed Most Wanted: RSS grew from 2 GiB to
+4 GiB+ during gameplay and Android killed apps. Mali indexes TLS by core
+and thread slot, so all command buffers can share one device-wide region
+sized for the largest stack (the subqueues of one command buffer already
+share it).
+
+The gpu_prerast arenas (64 + 96 MiB per VkDevice) were committed and
+zeroed at device creation although only GS, tessellation, XFB,
+polygon-mode and VS-store draws use them. On kbase they are now growable
+regions backed on GPU fault, with the first 2 MiB committed for the CPU
+header.
+
+Purpose: bound Vulkan driver memory for DXVK games on kbase
+Tested GPU: Mali-G615 MC6 (Poco X6 Pro)
+Tested Kbase UAPI: CSF 1.21 (MediaTek)
+Mesa base range: 5a07217f034b (26.3.0-devel)
+Validation test: Need for Speed Most Wanted (i686 DXVK D3D9) 10 min gameplay, i686 dxcube, MiSide
+
+Generated-by: LLM
+---
+
+diff --git a/src/panfrost/lib/kmod/kbase_kmod.c b/src/panfrost/lib/kmod/kbase_kmod.c
+index 66edcdb8f9f..76c64fbd02a 100644
+--- a/src/panfrost/lib/kmod/kbase_kmod.c
++++ b/src/panfrost/lib/kmod/kbase_kmod.c
+@@ -1700,10 +1700,14 @@ kbase_kmod_bo_alloc(struct pan_kmod_dev *dev,
+    uint64_t alloc_gpu_va;
+ 
+    if (kmod_flags & PAN_KMOD_BO_FLAG_ALLOC_ON_FAULT) {
+-      /* Growable region: nothing committed up-front, grown in 2 MB
+-       * increments on GPU page fault (matches panfork's heap setup). */
+-      commit_pages = 0;
++      /* Growable region: grown in 2 MB increments on GPU page fault
++       * (matches panfork's heap setup).  A CPU-mapped BO gets the first
++       * increment committed so the CPU can write a header; CPU access past
++       * the committed pages faults, so only the GPU may touch the rest. */
+       extension = (2 * 1024 * 1024) / page_size;
++      commit_pages = (kmod_flags & PAN_KMOD_BO_FLAG_NO_MMAP)
++                        ? 0
++                        : MIN2(extension, va_pages);
+    }
+ 
+    if (kbase_dev->is_csf &&
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_buffer.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_buffer.c
+index 3c55d0280c1..85174dd9e53 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_buffer.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_buffer.c
+@@ -80,6 +80,48 @@ panvk_per_arch(kbase_mark_progress)(
+    cs_flush_stores(b);
+ }
+ 
++/* Mali indexes TLS by (core, thread slot), so concurrent jobs from any
++ * command buffer can share one region sized for the largest per-thread
++ * stack, exactly like the subqueues of one command buffer already do.
++ * Per-command-buffer TLS kept ~84 MiB per DXVK command list alive in Need
++ * for Speed Most Wanted (1.7 GiB, then Android killed apps).
++ * ponytail: outgrown BOs live until device destroy (<= 2x the peak size);
++ * refcount them per command buffer if that ever matters. */
++static uint64_t
++get_device_tls(struct panvk_cmd_buffer *cmdbuf, uint64_t size)
++{
++   struct panvk_device *dev = to_panvk_device(cmdbuf->vk.base.device);
++   uint64_t addr = 0;
++
++   simple_mtx_lock(&dev->tls.lock);
++   struct panvk_priv_bo *cur =
++      util_dynarray_num_elements(&dev->tls.bos, struct panvk_priv_bo *)
++         ? util_dynarray_top(&dev->tls.bos, struct panvk_priv_bo *)
++         : NULL;
++
++   if (!cur || pan_kmod_bo_size(cur->bo) < size) {
++      struct panvk_priv_bo *bo;
++      if (panvk_priv_bo_create(
++             dev, size,
++             panvk_device_adjust_bo_flags(dev, PAN_KMOD_BO_FLAG_NO_MMAP),
++             VK_SYSTEM_ALLOCATION_SCOPE_DEVICE, &bo) == VK_SUCCESS) {
++         util_dynarray_append(&dev->tls.bos, bo);
++         cur = bo;
++      } else {
++         cur = NULL;
++      }
++   }
++
++   if (cur)
++      addr = cur->addr.dev;
++   simple_mtx_unlock(&dev->tls.lock);
++
++   if (!addr)
++      vk_command_buffer_set_error(&cmdbuf->vk, VK_ERROR_OUT_OF_DEVICE_MEMORY);
++
++   return addr;
++}
++
+ static void
+ emit_tls(struct panvk_cmd_buffer *cmdbuf)
+ {
+@@ -94,8 +136,7 @@ emit_tls(struct panvk_cmd_buffer *cmdbuf)
+       unsigned size = pan_get_total_stack_size(cmdbuf->state.tls.info.tls.size,
+                                                thread_tls_alloc, core_id_range);
+ 
+-      cmdbuf->state.tls.info.tls.ptr =
+-         panvk_cmd_alloc_dev_mem(cmdbuf, tls, size, 4096).gpu;
++      cmdbuf->state.tls.info.tls.ptr = get_device_tls(cmdbuf, size);
+    }
+ 
+    assert(!cmdbuf->state.tls.info.wls.size);
+diff --git a/src/panfrost/vulkan/panvk_device.h b/src/panfrost/vulkan/panvk_device.h
+index 67aab839d81..e90787bead0 100644
+--- a/src/panfrost/vulkan/panvk_device.h
++++ b/src/panfrost/vulkan/panvk_device.h
+@@ -27,6 +27,7 @@
+ #include "util/perf/u_trace.h"
+ 
+ #include "util/simple_mtx.h"
++#include "util/u_dynarray.h"
+ #include "util/u_call_once.h"
+ #include "util/u_printf.h"
+ #include "util/vma.h"
+@@ -120,6 +121,14 @@ struct panvk_device {
+    /* struct panvk_gpu_prerast_syncs */
+    struct panvk_priv_bo *gpu_prerast_syncs;
+ 
++   /* Device-wide thread local storage shared by all command buffers. The
++    * last BO is the current one; outgrown ones stay alive for command
++    * buffers that still point at them. */
++   struct {
++      simple_mtx_t lock;
++      struct util_dynarray bos;
++   } tls;
++
+    struct {
+       struct pandecode_context *decode_ctx;
+    } debug;
+diff --git a/src/panfrost/vulkan/panvk_vX_device.c b/src/panfrost/vulkan/panvk_vX_device.c
+index 2a4c78d5d4f..6fd68e513f4 100644
+--- a/src/panfrost/vulkan/panvk_vX_device.c
++++ b/src/panfrost/vulkan/panvk_vX_device.c
+@@ -121,6 +121,37 @@ panvk_device_cleanup_mempools(struct panvk_device *dev)
+    panvk_pool_cleanup(&dev->mempools.exec);
+ }
+ 
++static void
++panvk_device_cleanup_tls(struct panvk_device *dev)
++{
++   util_dynarray_foreach(&dev->tls.bos, struct panvk_priv_bo *, bo)
++      panvk_priv_bo_unref(*bo);
++   util_dynarray_fini(&dev->tls.bos);
++   simple_mtx_destroy(&dev->tls.lock);
++}
++
++#if PAN_ARCH >= 10
++/* Only GS, tessellation, XFB, polygon-mode and VS-store draws touch the
++ * gpu_prerast arenas, and many apps (DXVK D3D9 games) never issue one.  Let
++ * the kernel back them on GPU fault where it can, instead of committing and
++ * zeroing 160 MiB per VkDevice up front.  The CPU only writes the header. */
++static struct panvk_priv_mem
++alloc_gpu_prerast_arena(struct panvk_device *dev, uint64_t size)
++{
++   uint32_t flags =
++      panvk_device_adjust_bo_flags(dev, PAN_KMOD_BO_FLAG_WB_MMAP) |
++      (dev->kmod.dev->props.supported_bo_flags &
++       PAN_KMOD_BO_FLAG_ALLOC_ON_FAULT);
++   struct panvk_priv_bo *bo;
++
++   if (panvk_priv_bo_create(dev, size, flags, VK_SYSTEM_ALLOCATION_SCOPE_DEVICE,
++                            &bo) != VK_SUCCESS)
++      return (struct panvk_priv_mem){0};
++
++   return (struct panvk_priv_mem){.bo = (uintptr_t)bo};
++}
++#endif
++
+ static VkResult
+ panvk_meta_cmd_bind_map_buffer(struct vk_command_buffer *cmd,
+                                struct vk_meta_device *meta, VkBuffer buf,
+@@ -583,6 +614,8 @@ panvk_per_arch(create_device)(struct panvk_physical_device *physical_device,
+    }
+ 
+    panvk_device_init_mempools(device);
++   simple_mtx_init(&device->tls.lock, mtx_plain);
++   util_dynarray_init(&device->tls.bos, NULL);
+ 
+ #if PAN_ARCH >= 10
+    if (PANVK_DEBUG(GPU_PRERAST) || device->vk.enabled_features.fillModeNonSolid ||
+@@ -590,12 +623,8 @@ panvk_per_arch(create_device)(struct panvk_physical_device *physical_device,
+        device->vk.enabled_features.transformFeedback ||
+        device->vk.enabled_features.shaderOutputViewportIndex ||
+        device->vk.enabled_features.vertexPipelineStoresAndAtomics) {
+-      device->gpu_prerast_arena = panvk_pool_alloc_mem(
+-         &device->mempools.rw,
+-         (struct panvk_pool_alloc_info){
+-            .size = PANVK_GPU_PRERAST_ARENA_SIZE,
+-            .alignment = 4096,
+-         });
++      device->gpu_prerast_arena =
++         alloc_gpu_prerast_arena(device, PANVK_GPU_PRERAST_ARENA_SIZE);
+       if (!panvk_priv_mem_check_alloc(device->gpu_prerast_arena)) {
+          result = panvk_error(device, VK_ERROR_OUT_OF_DEVICE_MEMORY);
+          goto err_free_priv_bos;
+@@ -606,12 +635,8 @@ panvk_per_arch(create_device)(struct panvk_physical_device *physical_device,
+       }
+    }
+    if (device->vk.enabled_features.tessellationShader) {
+-      device->gpu_prerast_tess_arena = panvk_pool_alloc_mem(
+-         &device->mempools.rw,
+-         (struct panvk_pool_alloc_info){
+-            .size = PANVK_GPU_PRERAST_TESS_ARENA_SIZE,
+-            .alignment = 4096,
+-         });
++      device->gpu_prerast_tess_arena =
++         alloc_gpu_prerast_arena(device, PANVK_GPU_PRERAST_TESS_ARENA_SIZE);
+       if (!panvk_priv_mem_check_alloc(device->gpu_prerast_tess_arena)) {
+          result = panvk_error(device, VK_ERROR_OUT_OF_DEVICE_MEMORY);
+          goto err_free_priv_bos;
+@@ -772,6 +797,7 @@ err_free_mem_cache:
+ err_free_precomp:
+    panvk_precomp_cleanup(device);
+ err_free_priv_bos:
++   panvk_device_cleanup_tls(device);
+    panvk_priv_bo_unref(device->gpu_prerast_syncs);
+    panvk_pool_free_mem(&device->gpu_prerast_tess_arena);
+    panvk_pool_free_mem(&device->gpu_prerast_arena);
+@@ -837,6 +863,7 @@ panvk_per_arch(destroy_device)(struct panvk_device *device,
+     panvk_priv_bo_unref(device->indirect_varying_buffer);
+     panvk_priv_bo_unref(device->tiler_heap);
+     panvk_priv_bo_unref(device->sample_positions);
++    panvk_device_cleanup_tls(device);
+     panvk_priv_bo_unref(device->gpu_prerast_syncs);
+     panvk_pool_free_mem(&device->gpu_prerast_tess_arena);
+     panvk_pool_free_mem(&device->gpu_prerast_arena);
+--
+2.51.0
+

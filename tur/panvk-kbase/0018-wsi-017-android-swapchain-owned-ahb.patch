@@ -1,0 +1,53 @@
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: Mon, 5 Oct 2026 23:59:00 +0530
+Subject: [PATCH wsi 017] panvk: mark Android WSI swapchain AHBs as driver-owned
+
+The no-mapper layout fallback in android/014 (vk_android_get_ahb_layout
+cpu-linear-probe) writes cookies into the buffer to prove a linear
+layout, so it only runs on an AHB the driver itself just allocated. The
+Android swapchain sets that AHB with vk_android_set_owned_ahb() around
+its import and clears it after the loop and on destroy.
+
+Purpose: swapchain on vendor API < 34 apps (no mapper in clns-N)
+Tested GPU: Lenovo TB336FU Mali-G57 in panvk-test, swapchain_lifecycle PASS
+Dependencies: android/014, wsi/016
+
+Generated-by: LLM
+
+diff --git a/src/panfrost/vulkan/panvk_wsi.c b/src/panfrost/vulkan/panvk_wsi.c
+index c048093..e485002 100644
+--- a/src/panfrost/vulkan/panvk_wsi.c
++++ b/src/panfrost/vulkan/panvk_wsi.c
+@@ -56,6 +56,7 @@ panvk_can_present_on_device(VkPhysicalDevice pdevice, int fd)
+ #include "panvk_entrypoints.h"
+ #include "panvk_image.h"
+ #include "vk_object.h"
++#include "vk_android.h"
+ 
+ struct panvk_android_swapchain_image {
+    struct wsi_image base;
+@@ -305,6 +306,7 @@ panvk_android_swapchain_destroy(
+    struct panvk_android_swapchain *chain = (struct panvk_android_swapchain *)swapchain;
+    VK_FROM_HANDLE(vk_device, dev, swapchain->device);
+ 
++   vk_android_set_owned_ahb(NULL);
+    for (uint32_t i = 0; i < chain->base.image_count; i++) {
+       if (chain->images[i].base.image != VK_NULL_HANDLE)
+          dev->dispatch_table.DestroyImage(swapchain->device, chain->images[i].base.image, pAllocator);
+@@ -376,6 +378,8 @@ panvk_wsi_android_create_swapchain(
+          panvk_android_swapchain_destroy(&chain->base, pAllocator);
+          return VK_ERROR_INITIALIZATION_FAILED;
+       }
++      /* Ours and still undefined: the no-mapper linear probe may write it. */
++      vk_android_set_owned_ahb(chain->images[i].ahb);
+ 
+       VkExternalMemoryImageCreateInfo emici = {
+          .sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO,
+@@ -451,6 +455,7 @@ panvk_wsi_android_create_swapchain(
+          return result;
+       }
+    }
++   vk_android_set_owned_ahb(NULL);
+ 
+    *swapchain_out = &chain->base;
+    return VK_SUCCESS;

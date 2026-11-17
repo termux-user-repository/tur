@@ -1,0 +1,212 @@
+From: panvk-kbase-android worker <panvk-worker@localhost>
+Subject: [PATCH android 008] panvk: robust dma-buf fd discovery and allocationSize query for AHB
+
+Purpose: Do not assume native_handle_t->data[0] is the dma-buf (MediaTek
+ gralloc handles carry fence fds alongside). Centralize fd discovery in
+ panvk_android_find_dma_buf_fd: probe each handle fd, reject non-seekable
+ fds, verify GetMemoryFdPropertiesKHR succeeds for DMA_BUF, and derive
+ true allocationSize. Fix vk_common_GetAndroidHardwareBufferPropertiesANDROID
+ and provide panvk_GetAndroidHardwareBufferPropertiesANDROID to ensure
+ allocationSize reflects the real buffer size without returning UINT64_MAX.
+Source/Reference: G615 bring-up forensics (MediaTek gralloc handle: data[0] is
+ gralloc_extra, data[1] is dma-buf).
+Tested GPU: Poco X6 Pro / G615 (Gate G).
+Tested Kbase UAPI: CSF 1.21.
+Mesa base range: 26.3.0-devel (pinned 5a07217f).
+Dependencies: none (Android WSI code path).
+Validation test: Gate G allocate/query/import/bind/GPU-write/CPU-verify.
+
+diff --git a/src/panfrost/vulkan/panvk_android.c b/src/panfrost/vulkan/panvk_android.c
+--- a/src/panfrost/vulkan/panvk_android.c
++++ b/src/panfrost/vulkan/panvk_android.c
+@@ -3,6 +3,9 @@
+  * SPDX-License-Identifier: MIT
+  */
+ 
++#include <sys/stat.h>
++#include <unistd.h>
++
+ #include "panvk_android.h"
+ 
+ #include "panvk_device.h"
+@@ -248,6 +251,44 @@
+    return VK_SUCCESS;
+ }
+ 
++int
++panvk_android_find_dma_buf_fd(VkDevice device,
++                              const native_handle_t *handle,
++                              uint64_t *size_out)
++{
++   if (!handle || handle->numFds <= 0)
++      return -1;
++
++   VK_FROM_HANDLE(vk_device, dev, device);
++
++   for (int i = 0; i < handle->numFds; i++) {
++      int fd = handle->data[i];
++      if (fd < 0)
++         continue;
++
++      struct stat st;
++      if (fstat(fd, &st) < 0)
++         continue;
++
++      off_t size = lseek(fd, 0, SEEK_END);
++      if (size <= 0)
++         continue;
++
++      VkMemoryFdPropertiesKHR fd_props = {
++         .sType = VK_STRUCTURE_TYPE_MEMORY_FD_PROPERTIES_KHR,
++      };
++      if (dev->dispatch_table.GetMemoryFdPropertiesKHR(
++             device, VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT, fd,
++             &fd_props) == VK_SUCCESS) {
++         if (size_out)
++            *size_out = (uint64_t)size;
++         return fd;
++      }
++   }
++
++   return -1;
++}
++
+ static VkResult
+ panvk_android_import_ahb_memory(VkDevice device,
+                                 const VkMemoryAllocateInfo *pAllocateInfo,
+@@ -258,7 +299,10 @@
+    VK_FROM_HANDLE(vk_device, dev, device);
+    const native_handle_t *handle = AHardwareBuffer_getNativeHandle(ahb);
+    assert(handle && handle->numFds > 0);
+-   int dma_buf_fd = handle->data[0];
++   uint64_t dma_buf_size = 0;
++   int dma_buf_fd = panvk_android_find_dma_buf_fd(device, handle, &dma_buf_size);
++   if (dma_buf_fd < 0)
++      return VK_ERROR_INVALID_EXTERNAL_HANDLE;
+    VkResult result;
+ 
+    VkImage img_handle = VK_NULL_HANDLE;
+@@ -391,3 +435,23 @@
+ 
+    return VK_SUCCESS;
+ }
++
++VkResult
++panvk_GetAndroidHardwareBufferPropertiesANDROID(
++   VkDevice device_h, const struct AHardwareBuffer *buffer,
++   VkAndroidHardwareBufferPropertiesANDROID *pProperties)
++{
++   VkResult result =
++      vk_common_GetAndroidHardwareBufferPropertiesANDROID(device_h, buffer, pProperties);
++   if (result != VK_SUCCESS)
++      return result;
++
++   const native_handle_t *handle = AHardwareBuffer_getNativeHandle(buffer);
++   uint64_t real_size = 0;
++   int fd = panvk_android_find_dma_buf_fd(device_h, handle, &real_size);
++   if (fd < 0 || real_size == 0)
++      return VK_ERROR_INVALID_EXTERNAL_HANDLE;
++
++   pProperties->allocationSize = real_size;
++   return VK_SUCCESS;
++}
+diff --git a/src/panfrost/vulkan/panvk_android.h b/src/panfrost/vulkan/panvk_android.h
+--- a/src/panfrost/vulkan/panvk_android.h
++++ b/src/panfrost/vulkan/panvk_android.h
+@@ -27,10 +27,20 @@
+ 
+ bool panvk_android_is_ahb_memory(const VkMemoryAllocateInfo *pAllocateInfo);
+ 
++struct native_handle;
++struct AHardwareBuffer;
++
++int panvk_android_find_dma_buf_fd(
++   VkDevice device, const struct native_handle *handle, uint64_t *size_out);
++
+ VkResult panvk_android_allocate_ahb_memory(
+    VkDevice device, const VkMemoryAllocateInfo *pAllocateInfo,
+    const VkAllocationCallbacks *pAllocator, VkDeviceMemory *pMemory);
+ 
++VkResult panvk_GetAndroidHardwareBufferPropertiesANDROID(
++   VkDevice device_h, const struct AHardwareBuffer *buffer,
++   VkAndroidHardwareBufferPropertiesANDROID *pProperties);
++
+ #else /* VK_USE_PLATFORM_ANDROID_KHR */
+ 
+ static inline bool
+diff --git a/src/vulkan/runtime/vk_android.c b/src/vulkan/runtime/vk_android.c
+--- a/src/vulkan/runtime/vk_android.c
++++ b/src/vulkan/runtime/vk_android.c
+@@ -52,6 +52,7 @@
+ #endif
+ 
+ #include <unistd.h>
++#include <sys/stat.h>
+ 
+ static struct u_gralloc *_gralloc;
+ 
+@@ -1223,18 +1224,41 @@
+    }
+ 
+    const native_handle_t *handle = AHardwareBuffer_getNativeHandle(buffer);
+-   assert(handle && handle->numFds > 0);
+-   pProperties->allocationSize = lseek(handle->data[0], 0, SEEK_END);
++   if (!handle || handle->numFds <= 0)
++      return VK_ERROR_INVALID_EXTERNAL_HANDLE;
+ 
++   int dma_buf = -1;
++   off_t dma_buf_size = -1;
+    VkMemoryFdPropertiesKHR fd_props = {
+       .sType = VK_STRUCTURE_TYPE_MEMORY_FD_PROPERTIES_KHR,
+    };
+-   result = device->dispatch_table.GetMemoryFdPropertiesKHR(
+-      device_h, VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT, handle->data[0],
+-      &fd_props);
+-   if (result != VK_SUCCESS)
+-      return result;
+ 
++   for (int i = 0; i < handle->numFds; i++) {
++      int fd = handle->data[i];
++      if (fd < 0)
++         continue;
++
++      struct stat st;
++      if (fstat(fd, &st) < 0)
++         continue;
++
++      off_t size = lseek(fd, 0, SEEK_END);
++      if (size <= 0)
++         continue;
++
++      if (device->dispatch_table.GetMemoryFdPropertiesKHR(
++             device_h, VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT, fd,
++             &fd_props) == VK_SUCCESS) {
++         dma_buf = fd;
++         dma_buf_size = size;
++         break;
++      }
++   }
++
++   if (dma_buf < 0 || dma_buf_size <= 0)
++      return VK_ERROR_INVALID_EXTERNAL_HANDLE;
++
++   pProperties->allocationSize = (VkDeviceSize)dma_buf_size;
+    pProperties->memoryTypeBits = fd_props.memoryTypeBits;
+ 
+    return VK_SUCCESS;
+diff --git a/src/vulkan/runtime/vk_android.h b/src/vulkan/runtime/vk_android.h
+--- a/src/vulkan/runtime/vk_android.h
++++ b/src/vulkan/runtime/vk_android.h
+@@ -133,6 +133,10 @@
+ bool vk_android_rp_attachment_has_external_format(
+    const VkAttachmentDescription2 *desc);
+ 
++VkResult vk_common_GetAndroidHardwareBufferPropertiesANDROID(
++   VkDevice device_h, const struct AHardwareBuffer *buffer,
++   VkAndroidHardwareBufferPropertiesANDROID *pProperties);
++
+ #else /* defined(VK_USE_PLATFORM_ANDROID_KHR) && ANDROID_API_LEVEL >= 26 */
+ 
+ static inline uint64_t
+ 
+ #ifdef __cplusplus

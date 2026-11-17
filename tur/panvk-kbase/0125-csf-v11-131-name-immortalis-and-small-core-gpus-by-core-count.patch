@@ -1,0 +1,76 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: Wed, 7 Oct 2026 10:20:00 +0530
+Subject: [PATCH] panvk: name Immortalis and small GPUs by core count biblioklept
+
+Arm ships one product id under several names. The shader core count
+picks the name: Immortalis-G925 (10+ cores), Mali-G725 (6-9) and
+Mali-G625 (1-5) share prod id (13, 8, 0). G720/G620 share (12, 8, 0),
+and Immortalis-G715 shares (11, 8, 2) with G715. pan_model has one row
+per product id, so a G925 MC12 tablet showed up as "Mali-G725 MC12".
+
+Pick the deviceName from the core count, with the same split as
+panthor. Keep the "Mali-" prefix like Arm's own driver string
+("Mali-G925-Immortalis MC12"), because apps and PanProbe tests match on
+"Mali". model->name is unchanged, so perf counter lookup and logs are
+unaffected. G615 has its own product id (11, 8, 3) and keeps its name.
+
+Measured on a G925 (gpu_id 0xd8300015, MC12):
+  before: Mali-G725 MC12
+  after:  Mali-G925-Immortalis MC12
+
+---
+ src/panfrost/vulkan/panvk_physical_device.c | 28 +++++++++++++++++++--
+ 1 file changed, 26 insertions(+), 2 deletions(-)
+
+--- a/src/panfrost/vulkan/panvk_physical_device.c
++++ b/src/panfrost/vulkan/panvk_physical_device.c
+@@ -1192,6 +1192,28 @@
+    vk_physical_device_finish(&device->vk);
+ }
+
++/* Arm ships some GPUs of one product id under several names, picked by the
++ * shader core count (same split as panthor). Keep the "Mali-" prefix, as Arm
++ * does: apps and tests match on it. */
++static const char *
++panvk_marketing_name(const struct pan_model *model, unsigned core_count)
++{
++   switch (model->gpu_prod_id) {
++   case PAN_PROD_ID(11, 8, 2):
++      return core_count >= 10 ? "Mali-G715-Immortalis" : model->name;
++   case PAN_PROD_ID(12, 8, 0):
++      return core_count >= 10 ? "Mali-G720-Immortalis"
++             : core_count >= 6 ? model->name
++                               : "Mali-G620";
++   case PAN_PROD_ID(13, 8, 0):
++      return core_count >= 10 ? "Mali-G925-Immortalis"
++             : core_count >= 6 ? model->name
++                               : "Mali-G625";
++   default:
++      return model->name;
++   }
++}
++
+ VkResult
+ panvk_physical_device_init(struct panvk_physical_device *device,
+                            struct panvk_instance *instance,
+@@ -1252,7 +1274,8 @@
+       pan_query_core_count(&device->kmod.dev->props);
+
+    memset(device->name, 0, sizeof(device->name));
+-   sprintf(device->name, "%s MC%u", device->model->name, core_count);
++   sprintf(device->name, "%s MC%u",
++           panvk_marketing_name(device->model, core_count), core_count);
+
+    result = get_core_masks(device, instance);
+    if (result != VK_SUCCESS)
+@@ -1403,7 +1426,8 @@
+       pan_query_core_count(&device->kmod.dev->props);
+
+    memset(device->name, 0, sizeof(device->name));
+-   sprintf(device->name, "%s MC%u", device->model->name, core_count);
++   sprintf(device->name, "%s MC%u",
++           panvk_marketing_name(device->model, core_count), core_count);
+
+    result = get_core_masks(device, instance);
+    if (result != VK_SUCCESS)

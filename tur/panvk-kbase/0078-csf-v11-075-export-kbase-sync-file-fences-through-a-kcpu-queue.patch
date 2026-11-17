@@ -1,0 +1,425 @@
+From: abhay-byte <zenithblue.dev@gmail.com>
+Subject: [PATCH csf-v11 075] panvk: export kbase sync_file fences through a KCPU queue
+
+Generated-by: LLM
+
+Purpose: Export SYNC_FD semaphores/fences on kbase through a KCPU CQS-wait + fence-signal queue instead of /dev/sw_sync (absent on GKI); biblioklept
+Source/Reference: local, work/mesa-p5 dx-p5 9eb0f02b4d0
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/074
+Validation test: CTS dEQP-VK.api.external.{semaphore,fence}.sync_fd.* + synchronization{,2}.cross_instance.* 62640 cases 1996 Pass 0 Fail 0 ResourceError (was 113 ResourceError)
+
+diff --git a/src/panfrost/lib/kmod/kbase_kmod.c b/src/panfrost/lib/kmod/kbase_kmod.c
+--- a/src/panfrost/lib/kmod/kbase_kmod.c
++++ b/src/panfrost/lib/kmod/kbase_kmod.c
+@@ -110,5 +110,11 @@
+       int fence_fd;
+    } kcpu;
++
++   struct {
++      simple_mtx_t lock;
++      base_kcpu_queue_id id;
++      bool valid;
++   } kcpu_export;
+ };
+
+ struct kbase_kmod_vm {
+@@ -1070,6 +1076,89 @@
+    return ret;
+ }
+ 
++int
++kbase_kmod_csf_export_cqs64_fence(struct pan_kmod_dev *dev,
++                                  const uint64_t *addrs,
++                                  const uint64_t *targets_minus_one,
++                                  unsigned count)
++{
++   struct kbase_kmod_dev *kbase_dev =
++      container_of(dev, struct kbase_kmod_dev, base);
++   struct base_cqs_wait_operation_info waits[3] = {0};
++   struct base_fence fence = {
++      .basep = {
++         .fd = -1,
++         .stream_fd = -1,
++      },
++   };
++   struct base_kcpu_command commands[2] = {
++      {
++         .type = BASE_KCPU_COMMAND_TYPE_CQS_WAIT_OPERATION,
++         .info.cqs_wait_operation = {
++            .objs = (uintptr_t)waits,
++            .nr_objs = count,
++         },
++      },
++      {
++         .type = BASE_KCPU_COMMAND_TYPE_FENCE_SIGNAL,
++         .info.fence = {
++            .fence = (uintptr_t)&fence,
++         },
++      },
++   };
++
++   if (!kbase_dev->is_csf) {
++      errno = ENOTSUP;
++      return -1;
++   }
++
++   if (count > ARRAY_SIZE(waits)) {
++      errno = EINVAL;
++      return -1;
++   }
++
++   for (unsigned i = 0; i < count; i++) {
++      if (addrs[i] & 15) {
++         errno = EINVAL;
++         return -1;
++      }
++      waits[i] = (struct base_cqs_wait_operation_info){
++         .addr = addrs[i],
++         .val = targets_minus_one[i],
++         .operation = BASEP_CQS_WAIT_OPERATION_GT,
++         .data_type = BASEP_CQS_DATA_TYPE_U64,
++      };
++   }
++
++   simple_mtx_lock(&kbase_dev->kcpu_export.lock);
++   if (!kbase_dev->kcpu_export.valid) {
++      struct kbase_ioctl_kcpu_queue_new create = {0};
++      if (ioctl(dev->fd, KBASE_IOCTL_KCPU_QUEUE_CREATE, &create)) {
++         simple_mtx_unlock(&kbase_dev->kcpu_export.lock);
++         return -1;
++      }
++      kbase_dev->kcpu_export.id = create.id;
++      kbase_dev->kcpu_export.valid = true;
++   }
++
++   for (unsigned i = count ? 0 : 1; i < 2; i++) {
++      struct kbase_ioctl_kcpu_queue_enqueue enqueue = {
++         .addr = (uintptr_t)&commands[i],
++         .nr_commands = 1,
++         .id = kbase_dev->kcpu_export.id,
++      };
++      if (ioctl(dev->fd, KBASE_IOCTL_KCPU_QUEUE_ENQUEUE, &enqueue)) {
++         simple_mtx_unlock(&kbase_dev->kcpu_export.lock);
++         return -1;
++      }
++   }
++   simple_mtx_unlock(&kbase_dev->kcpu_export.lock);
++
++   if (fence.basep.fd < 0)
++      errno = ENOENT;
++   return fence.basep.fd;
++}
++
+ bool
+ kbase_kmod_csf_has_error(const struct pan_kmod_dev *dev)
+ {
+@@ -1330,6 +1419,7 @@
+    kbase_dev->dma_heap_fd = -1;
+    kbase_dev->kcpu.fence_fd = -1;
+    simple_mtx_init(&kbase_dev->kcpu.lock, mtx_plain);
++   simple_mtx_init(&kbase_dev->kcpu_export.lock, mtx_plain);
+
+    if (is_csf && kbase_query_csif_info(fd, &kbase_dev->csif_info)) {
+       mesa_loge("kbase: failed to query the CSF global interface");
+@@ -1426,6 +1516,14 @@
+    simple_mtx_unlock(&kbase_dev->kcpu.lock);
+    simple_mtx_destroy(&kbase_dev->kcpu.lock);
+ 
++   if (kbase_dev->kcpu_export.valid) {
++      struct kbase_ioctl_kcpu_queue_delete delete = {
++         .id = kbase_dev->kcpu_export.id,
++      };
++      ioctl(dev->fd, KBASE_IOCTL_KCPU_QUEUE_DELETE, &delete);
++   }
++   simple_mtx_destroy(&kbase_dev->kcpu_export.lock);
++
+    if (kbase_dev->user_reg_page)
+       munmap(kbase_dev->user_reg_page, 4096);
+ 
+diff --git a/src/panfrost/lib/kmod/kbase_kmod.h b/src/panfrost/lib/kmod/kbase_kmod.h
+index 7b54aba9386..ed96ac4a76e 100644
+--- a/src/panfrost/lib/kmod/kbase_kmod.h
++++ b/src/panfrost/lib/kmod/kbase_kmod.h
+@@ -68,6 +68,11 @@ int kbase_kmod_csf_wait_cqs64(struct pan_kmod_dev *dev, uint64_t addr,
+                               uint64_t target_minus_one,
+                               int64_t timeout_ns);
+ 
++int kbase_kmod_csf_export_cqs64_fence(struct pan_kmod_dev *dev,
++                                      const uint64_t *addrs,
++                                      const uint64_t *targets_minus_one,
++                                      unsigned count);
++
+ /* Report whether this kbase context has seen a queue-group error.  The error
+  * state is latched while completion waits consume the notification stream. */
+ bool kbase_kmod_csf_has_error(const struct pan_kmod_dev *dev);
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c b/src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c
+index 289e0f26d76..255818d2dd6 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c
+@@ -2869,12 +2869,17 @@ static void
+ panvk_queue_submit_process_signals_kbase(struct panvk_queue_submit *submit,
+                                          const struct vk_queue_submit *vk_submit)
+ {
++   uint64_t addrs[PANVK_KBASE_SYNC_TARGET_COUNT] = {0};
++
++   for (uint32_t i = 0; i < PANVK_SUBQUEUE_COUNT; i++)
++      addrs[i] = kbase_subqueue_seqno_dev_addr(submit->queue, i);
++
+    for (uint32_t i = 0; i < vk_submit->signal_count; i++) {
+       const struct vk_sync_signal *signal = &vk_submit->signals[i];
+       assert(signal->signal_value == 0);
+       panvk_kbase_sync_set_pending(signal->sync, submit->queue,
+                                    kbase_wait_sync_targets,
+-                                   submit->kbase_target_seqnos);
++                                   submit->kbase_target_seqnos, addrs);
+    }
+ }
+ #endif /* HAVE_PAN_KMOD_KBASE */
+diff --git a/src/panfrost/vulkan/panvk_physical_device.c b/src/panfrost/vulkan/panvk_physical_device.c
+index e28f5868990..a7850747caa 100644
+--- a/src/panfrost/vulkan/panvk_physical_device.c
++++ b/src/panfrost/vulkan/panvk_physical_device.c
+@@ -649,6 +649,7 @@ struct kbase_cpu_sync {
+    void *pending_data;
+    panvk_kbase_sync_wait_func pending_wait;
+    uint64_t targets[PANVK_KBASE_SYNC_TARGET_COUNT];
++   uint64_t target_addrs[PANVK_KBASE_SYNC_TARGET_COUNT];
+ };
+ 
+ static VkResult
+@@ -671,6 +672,7 @@ kbase_cpu_sync_init(struct vk_device *device, struct vk_sync *sync,
+    ks->pending_data = NULL;
+    ks->pending_wait = NULL;
+    memset(ks->targets, 0, sizeof(ks->targets));
++   memset(ks->target_addrs, 0, sizeof(ks->target_addrs));
+    return VK_SUCCESS;
+ }
+ 
+@@ -712,6 +714,7 @@ kbase_cpu_sync_reset(UNUSED struct vk_device *device, struct vk_sync *sync)
+    ks->pending_data = NULL;
+    ks->pending_wait = NULL;
+    memset(ks->targets, 0, sizeof(ks->targets));
++   memset(ks->target_addrs, 0, sizeof(ks->target_addrs));
+    mtx_unlock(&ks->mutex);
+    return VK_SUCCESS;
+ }
+@@ -725,7 +728,8 @@ kbase_cpu_sync_wait_many(struct vk_device *device, uint32_t wait_count,
+ void
+ panvk_kbase_sync_set_pending(
+    struct vk_sync *sync, void *data, panvk_kbase_sync_wait_func wait,
+-   const uint64_t targets[PANVK_KBASE_SYNC_TARGET_COUNT])
++   const uint64_t targets[PANVK_KBASE_SYNC_TARGET_COUNT],
++   const uint64_t target_addrs[PANVK_KBASE_SYNC_TARGET_COUNT])
+ {
+    struct kbase_cpu_sync *ks = container_of(sync, struct kbase_cpu_sync, sync);
+ 
+@@ -739,6 +743,10 @@ panvk_kbase_sync_set_pending(
+    ks->pending_data = data;
+    ks->pending_wait = wait;
+    memcpy(ks->targets, targets, sizeof(ks->targets));
++   if (target_addrs)
++      memcpy(ks->target_addrs, target_addrs, sizeof(ks->target_addrs));
++   else
++      memset(ks->target_addrs, 0, sizeof(ks->target_addrs));
+    ks->result = VK_SUCCESS;
+    ks->state = KBASE_CPU_SYNC_PENDING;
+    u_cnd_monotonic_broadcast(&ks->cond);
+@@ -910,12 +918,15 @@ kbase_cpu_sync_move(UNUSED struct vk_device *device, struct vk_sync *dst,
+    ks_dst->pending_data = ks_src->pending_data;
+    ks_dst->pending_wait = ks_src->pending_wait;
+    memcpy(ks_dst->targets, ks_src->targets, sizeof(ks_dst->targets));
++   memcpy(ks_dst->target_addrs, ks_src->target_addrs,
++          sizeof(ks_dst->target_addrs));
+ 
+    ks_src->state = KBASE_CPU_SYNC_RESET;
+    ks_src->result = VK_SUCCESS;
+    ks_src->pending_data = NULL;
+    ks_src->pending_wait = NULL;
+    memset(ks_src->targets, 0, sizeof(ks_src->targets));
++   memset(ks_src->target_addrs, 0, sizeof(ks_src->target_addrs));
+    u_cnd_monotonic_broadcast(&ks_dst->cond);
+    u_cnd_monotonic_broadcast(&ks_src->cond);
+    mtx_unlock(&second->mutex);
+@@ -1007,110 +1018,72 @@ kbase_cpu_sync_import_sync_file(struct vk_device *device,
+    kbase_sync_file_waiter_free(ks);
+    mtx_unlock(&ks->mutex);
+ 
+-   panvk_kbase_sync_set_pending(sync, waiter, kbase_sync_file_wait_func, targets);
++   panvk_kbase_sync_set_pending(sync, waiter, kbase_sync_file_wait_func, targets,
++                                NULL);
+ 
+    return VK_SUCCESS;
+ }
+ 
+-#ifndef SW_SYNC_IOC_CREATE_FENCE
+-struct sw_sync_create_fence_data {
+-   __u32 value;
+-   char name[32];
+-   __s32 fence;
+-};
+-#define SW_SYNC_IOC_MAGIC 'W'
+-#define SW_SYNC_IOC_CREATE_FENCE _IOWR(SW_SYNC_IOC_MAGIC, 0, struct sw_sync_create_fence_data)
+-#define SW_SYNC_IOC_INC          _IOW(SW_SYNC_IOC_MAGIC, 1, __u32)
+-#endif
+-
+-static void *
+-kbase_export_signaler_thread(void *arg)
+-{
+-   struct {
+-      struct vk_device *device;
+-      struct kbase_cpu_sync *ks;
+-      int timeline_fd;
+-   } *ctx = arg;
+-
+-   struct vk_sync_wait wait = {
+-      .sync = &ctx->ks->sync,
+-      .wait_value = 0,
+-   };
+-
+-   VkResult res = kbase_cpu_sync_wait_many(ctx->device, 1, &wait,
+-                                           VK_SYNC_WAIT_COMPLETE,
+-                                           0xFFFFFFFFFFFFFFFFULL);
+-   if (res == VK_SUCCESS) {
+-      uint32_t inc = 1;
+-      ioctl(ctx->timeline_fd, SW_SYNC_IOC_INC, &inc);
+-   }
+-
+-   close(ctx->timeline_fd);
+-   free(ctx);
+-   return NULL;
+-}
+-
+ static VkResult
+ kbase_cpu_sync_export_sync_file(struct vk_device *device,
+                                 struct vk_sync *sync,
+                                 int *sync_file)
+ {
+    struct kbase_cpu_sync *ks = container_of(sync, struct kbase_cpu_sync, sync);
++   struct panvk_device *dev = to_panvk_device(device);
++   uint64_t addrs[PANVK_KBASE_SYNC_TARGET_COUNT];
++   uint64_t vals[PANVK_KBASE_SYNC_TARGET_COUNT];
++   unsigned count = 0;
++   int fd;
+ 
+-   /* If already signaled, return an already-signaled sync_file FD using sw_sync */
+-   int timeline_fd = open("/dev/sw_sync", O_RDWR | O_CLOEXEC);
+-   if (timeline_fd < 0) {
+-      return vk_errorf(device, VK_ERROR_OUT_OF_HOST_MEMORY,
+-                       "Failed to open /dev/sw_sync: %m");
+-   }
+-
+-   struct sw_sync_create_fence_data create_fence = {
+-      .value = 1,
+-      .name = "panvk_signal_fence",
+-      .fence = -1,
+-   };
+-
+-   if (ioctl(timeline_fd, SW_SYNC_IOC_CREATE_FENCE, &create_fence) < 0) {
+-      close(timeline_fd);
+-      return vk_errorf(device, VK_ERROR_OUT_OF_HOST_MEMORY,
+-                       "SW_SYNC_IOC_CREATE_FENCE failed: %m");
+-   }
++   VkResult result =
++      kbase_cpu_sync_wait_one(device, ks, VK_SYNC_WAIT_PENDING, UINT64_MAX);
++   if (result != VK_SUCCESS)
++      return result;
+ 
+    mtx_lock(&ks->mutex);
+-   bool already_signaled = (ks->state == KBASE_CPU_SYNC_SIGNALED);
++   if (ks->state == KBASE_CPU_SYNC_PENDING ||
++       ks->state == KBASE_CPU_SYNC_WAITING) {
++      if (ks->pending_wait == kbase_sync_file_wait_func) {
++         struct kbase_sync_file_waiter *waiter = ks->pending_data;
++         fd = dup(waiter->fd);
++         mtx_unlock(&ks->mutex);
++         goto out;
++      }
++      for (unsigned i = 0; i < PANVK_KBASE_SYNC_TARGET_COUNT; i++) {
++         if (!ks->targets[i])
++            continue;
++         if (!ks->target_addrs[i]) {
++            count = UINT32_MAX;
++            break;
++         }
++         addrs[count] = ks->target_addrs[i];
++         vals[count++] = ks->targets[i] - 1;
++      }
++   }
+    mtx_unlock(&ks->mutex);
+ 
+-   if (already_signaled) {
+-      uint32_t inc = 1;
+-      ioctl(timeline_fd, SW_SYNC_IOC_INC, &inc);
+-      close(timeline_fd);
+-      *sync_file = create_fence.fence;
+-      return VK_SUCCESS;
++   if (count == UINT32_MAX) {
++      result = kbase_cpu_sync_wait_one(device, ks, VK_SYNC_WAIT_COMPLETE,
++                                       UINT64_MAX);
++      if (result != VK_SUCCESS)
++         return result;
++      count = 0;
+    }
+ 
+-   /* Spawn worker thread to signal fence when CPU sync completes */
+-   pthread_t thread;
+-   typedef void *(*pthread_func)(void *);
++   fd = kbase_kmod_csf_export_cqs64_fence(dev->kmod.dev, addrs, vals,
++                                          count);
+ 
+-   struct {
+-      struct vk_device *device;
+-      struct kbase_cpu_sync *ks;
+-      int timeline_fd;
+-   } *ctx = malloc(sizeof(*ctx));
+-
+-   ctx->device = device;
+-   ctx->ks = ks;
+-   ctx->timeline_fd = timeline_fd;
+-
+-   if (pthread_create(&thread, NULL, (pthread_func)kbase_export_signaler_thread, ctx) != 0) {
+-      free(ctx);
+-      close(create_fence.fence);
+-      close(timeline_fd);
+-      return vk_errorf(device, VK_ERROR_OUT_OF_HOST_MEMORY, "pthread_create failed");
++out:
++   if (fd < 0) {
++      if (errno == EMFILE || errno == ENFILE)
++         return vk_errorf(device, VK_ERROR_TOO_MANY_OBJECTS,
++                          "sync_file export failed: %m");
++      return vk_errorf(device, VK_ERROR_OUT_OF_HOST_MEMORY,
++                       "sync_file export failed: %m");
+    }
+-   pthread_detach(thread);
+ 
+-   *sync_file = create_fence.fence;
++   *sync_file = fd;
+    return VK_SUCCESS;
+ }
+ 
+@@ -1146,6 +1119,8 @@ get_device_sync_types_kbase(struct panvk_physical_device *device,
+    uint32_t sync_type_count = 0;
+ 
+    device->drm_syncobj_type = kbase_cpu_sync_type;
++   if (pan_arch(device->kmod.dev->props.gpu_id) < 10)
++      device->drm_syncobj_type.export_sync_file = NULL;
+ 
+    /* Binary CPU sync first (fences need a binary type with CPU_RESET),
+     * software timeline emulation second (timeline semaphores).  Submitted
+diff --git a/src/panfrost/vulkan/panvk_physical_device.h b/src/panfrost/vulkan/panvk_physical_device.h
+index e01d87eef20..5458eb0d05d 100644
+--- a/src/panfrost/vulkan/panvk_physical_device.h
++++ b/src/panfrost/vulkan/panvk_physical_device.h
+@@ -116,7 +116,8 @@ typedef VkResult (*panvk_kbase_sync_wait_func)(
+ 
+ void panvk_kbase_sync_set_pending(
+    struct vk_sync *sync, void *data, panvk_kbase_sync_wait_func wait,
+-   const uint64_t targets[PANVK_KBASE_SYNC_TARGET_COUNT]);
++   const uint64_t targets[PANVK_KBASE_SYNC_TARGET_COUNT],
++   const uint64_t target_addrs[PANVK_KBASE_SYNC_TARGET_COUNT]);
+ 
+ bool panvk_kbase_sync_peek(struct vk_sync *sync, void **data,
+                            uint64_t targets[PANVK_KBASE_SYNC_TARGET_COUNT]);

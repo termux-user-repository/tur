@@ -1,0 +1,395 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: Tue, 6 Oct 2026 00:30:00 +0530
+Subject: [PATCH] panvk: cut attachment-less secondaries per sample count, end
+ contexts on suspend
+ biblioklept
+
+095 gave an attachment-less secondary the sample count of its first draw;
+later draws with another rasterizationSamples ran with it. A secondary
+cannot split the render context it inherits, so it now cuts its CS
+streams where the count changes (cmd_cut_vmr_segment: flush sync
+points, wait slots, end and keep the root chunks, restart the builders,
+dirty all draw state). CmdExecuteCommands calls the segments in order and
+splits the primary's context between them with the segment's count, so
+the primary does all context work with full render-pass knowledge (the
+086 failure modes: no context emission in the secondary, tile size from
+cmd_select_tile_size, no overwrite of an inherited context). The cut is
+taken once per API draw, outside any CS block. The primary's sync points
+are flushed after the context work, before each call.
+
+Attachment-less render passes no longer carry a render context across
+suspend/resume: suspending ends it (split_render_ctx) and resuming
+starts a fresh one, so the resumed pass knows its sample count.
+split_render_ctx clears RESUMING so the next context is owned.
+
+Generated-by: LLM
+---
+diff --git a/src/panfrost/vulkan/csf/panvk_cmd_buffer.h b/src/panfrost/vulkan/csf/panvk_cmd_buffer.h
+--- a/src/panfrost/vulkan/csf/panvk_cmd_buffer.h
++++ b/src/panfrost/vulkan/csf/panvk_cmd_buffer.h
+@@ -611,6 +611,19 @@
+ 
+       struct panvk_cond_render_state cond_render;
+    } state;
++
++   /* Attachment-less secondary: its CS is cut where rasterizationSamples
++    * changes (cmd_cut_vmr_segment). struct panvk_vmr_segment, the finished
++    * segments; the builders hold the last one, with gfx.render.vmr_samples.
++    */
++   struct util_dynarray vmr_segs;
++};
++
++struct panvk_vmr_segment {
++   uint64_t addr[PANVK_SUBQUEUE_COUNT];
++   uint32_t size[PANVK_SUBQUEUE_COUNT];
++   uint32_t req_resource_mask[PANVK_SUBQUEUE_COUNT];
++   uint8_t samples;
+ };
+ 
+ VK_DEFINE_HANDLE_CASTS(panvk_cmd_buffer, vk.base, VkCommandBuffer,
+@@ -901,7 +914,10 @@
+    bool is_set_event);
+ 
+ VkResult panvk_per_arch(cmd_prepare_exec_cmd_for_draws)(
+-   struct panvk_cmd_buffer *primary, struct panvk_cmd_buffer *secondary);
++   struct panvk_cmd_buffer *primary, struct panvk_cmd_buffer *secondary,
++   uint32_t samples);
++
++void panvk_per_arch(cmd_cut_vmr_segment)(struct panvk_cmd_buffer *cmdbuf);
+ 
+ void panvk_per_arch(cmd_inherit_render_state)(
+    struct panvk_cmd_buffer *cmdbuf, const VkCommandBufferBeginInfo *pBeginInfo);
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_buffer.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_buffer.c
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_buffer.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_buffer.c
+@@ -888,7 +888,7 @@
+ }
+ 
+ static void
+-init_cs_builders(struct panvk_cmd_buffer *cmdbuf)
++init_cs_builder(struct panvk_cmd_buffer *cmdbuf, uint32_t i)
+ {
+    struct panvk_physical_device *phys_dev =
+       to_panvk_physical_device(cmdbuf->vk.base.device->physical);
+@@ -902,7 +902,7 @@
+    const struct drm_panthor_csif_info *csif_info =
+       panvk_get_csif_props(dev);
+ 
+-   for (uint32_t i = 0; i < ARRAY_SIZE(cmdbuf->state.cs); i++) {
++   {
+       struct cs_builder *b = &cmdbuf->state.cs[i].builder;
+       /* Lazy allocation of the root CS. */
+       struct cs_buffer root_cs = {0};
+@@ -937,6 +937,70 @@
+ }
+ 
+ static void
++init_cs_builders(struct panvk_cmd_buffer *cmdbuf)
++{
++   for (uint32_t i = 0; i < ARRAY_SIZE(cmdbuf->state.cs); i++)
++      init_cs_builder(cmdbuf, i);
++}
++
++/* A secondary cannot split the render context it inherits. An
++ * attachment-less one whose rasterizationSamples changes ends its CS segment
++ * here and the primary splits the context between the segments
++ * (CmdExecuteCommands). Must not be called inside a CS block.
++ */
++void
++panvk_per_arch(cmd_cut_vmr_segment)(struct panvk_cmd_buffer *cmdbuf)
++{
++   struct panvk_device *dev = to_panvk_device(cmdbuf->vk.base.device);
++
++   /* The primary's context split between segments moves its sync points:
++    * the next segment must not carry relative ones across it.
++    */
++   flush_sync_points(cmdbuf);
++
++   struct panvk_vmr_segment *seg =
++      util_dynarray_grow(&cmdbuf->vmr_segs, struct panvk_vmr_segment, 1);
++   if (!seg) {
++      vk_command_buffer_set_error(&cmdbuf->vk, VK_ERROR_OUT_OF_HOST_MEMORY);
++      return;
++   }
++   memset(seg, 0, sizeof(*seg));
++   seg->samples = cmdbuf->state.gfx.render.vmr_samples;
++
++   for (uint32_t i = 0; i < ARRAY_SIZE(cmdbuf->state.cs); i++) {
++      struct cs_builder *b = panvk_get_cs_builder(cmdbuf, i);
++
++      assert(!b->blocks.stack);
++      /* An empty stream just carries over to the next segment. */
++      if (cs_is_empty(b))
++         continue;
++
++      /* Like finish_cs(): the primary's code after the call does not know
++       * this stream's pending loads.
++       */
++      cs_wait_slots(b, dev->csf.sb.all_mask);
++      cs_end(b);
++      if (!cs_is_valid(b)) {
++         vk_command_buffer_set_error(&cmdbuf->vk,
++                                     VK_ERROR_OUT_OF_DEVICE_MEMORY);
++         return;
++      }
++
++      seg->addr[i] = cs_root_chunk_gpu_addr(b);
++      seg->size[i] = cs_root_chunk_size(b);
++      seg->req_resource_mask[i] = b->req_resource_mask;
++      cs_builder_fini(b);
++      init_cs_builder(cmdbuf, i);
++   }
++
++   /* The primary's context emission runs between the segments: re-emit
++    * all the draw state in the next one.
++    */
++   vk_dynamic_graphics_state_dirty_all(&cmdbuf->vk.dynamic_graphics_state);
++   gfx_state_set_all_dirty(cmdbuf);
++}
++
++static void
+ panvk_reset_cmdbuf(struct vk_command_buffer *vk_cmdbuf,
+                    VkCommandBufferResetFlags flags)
+ {
+@@ -964,6 +1028,7 @@
+       cs_builder_fini(&cmdbuf->state.cs[i].builder);
+ 
+    memset(&cmdbuf->state, 0, sizeof(cmdbuf->state));
++   util_dynarray_clear(&cmdbuf->vmr_segs);
+    init_cs_builders(cmdbuf);
+ }
+ 
+@@ -982,6 +1047,7 @@
+    for (uint32_t i = 0; i < ARRAY_SIZE(cmdbuf->state.cs); i++)
+       cs_builder_fini(&cmdbuf->state.cs[i].builder);
+ 
++   util_dynarray_fini(&cmdbuf->vmr_segs);
+    panvk_pool_cleanup(&cmdbuf->cs_pool);
+    panvk_pool_cleanup(&cmdbuf->desc_pool);
+    panvk_pool_cleanup(&cmdbuf->tls_pool);
+@@ -1149,7 +1215,12 @@
+       primary->state.tls.info.tls.size =
+          MAX2(primary->state.tls.info.tls.size,
+               secondary->state.tls.info.tls.size);
+-      panvk_per_arch(cmd_prepare_exec_cmd_for_draws)(primary, secondary);
++      const struct panvk_vmr_segment *segs = secondary->vmr_segs.data;
++      const uint32_t seg_count = util_dynarray_num_elements(
++         &secondary->vmr_segs, struct panvk_vmr_segment);
++      panvk_per_arch(cmd_prepare_exec_cmd_for_draws)(
++         primary, secondary,
++         seg_count ? segs[0].samples : secondary->state.gfx.render.vmr_samples);
+ 
+       /* Write the conditional rendering flag into the subqueue context
+        * for inherited secondaries. The secondary's draws load from this
+@@ -1158,7 +1229,7 @@
+       if (secondary->state.cond_render.inherited) {
+          for (uint32_t j = 0; j < ARRAY_SIZE(primary->state.cs); j++) {
+             struct cs_builder *sec_b = panvk_get_cs_builder(secondary, j);
+-            if (cs_is_empty(sec_b))
++            if (cs_is_empty(sec_b) && !seg_count)
+                continue;
+ 
+             struct cs_builder *prim_b = panvk_get_cs_builder(primary, j);
+@@ -1199,6 +1270,35 @@
+             cs_flush_stores(prim_b);
+          }
+       }
++
++      /* Segments of an attachment-less secondary, each run in a context
++       * with its sample count (cmd_cut_vmr_segment). The context work
++       * moves the primary's sync points: flush them before each call.
++       */
++      for (uint32_t s = 0; s < seg_count; s++) {
++         const struct panvk_vmr_segment *seg = segs + s;
++
++         if (s > 0)
++            panvk_per_arch(cmd_prepare_exec_cmd_for_draws)(primary, secondary,
++                                                           seg->samples);
++         flush_sync_points(primary);
++         for (uint32_t j = 0; j < ARRAY_SIZE(primary->state.cs); j++) {
++            if (!seg->size[j])
++               continue;
++
++            struct cs_builder *prim_b = panvk_get_cs_builder(primary, j);
++            struct cs_index addr = cs_scratch_reg64(prim_b, 0);
++            struct cs_index size = cs_scratch_reg32(prim_b, 2);
++            cs_move64_to(prim_b, addr, seg->addr[j]);
++            cs_move32_to(prim_b, size, seg->size[j]);
++            cs_call(prim_b, addr, size);
++            prim_b->req_resource_mask |= seg->req_resource_mask[j];
++         }
++      }
++      if (seg_count)
++         panvk_per_arch(cmd_prepare_exec_cmd_for_draws)(
++            primary, secondary, secondary->state.gfx.render.vmr_samples);
++      flush_sync_points(primary);
+ 
+       for (uint32_t j = 0; j < ARRAY_SIZE(primary->state.cs); j++) {
+          struct cs_builder *sec_b = panvk_get_cs_builder(secondary, j);
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+@@ -3065,17 +3065,14 @@
+        */
+       if (!cmdbuf->state.gfx.render.bound_attachments) {
+          assert(rasterization_samples > 0);
+-         /* Secondaries cannot change the context they run in, see
+-          * vmr_samples. A primary can when it knows the count of its context:
+-          * its own, or one it suspended and resumed. A context from another
+-          * command buffer has fb->sample_count 0 and keeps its count.
++         /* A secondary cannot change the context it runs in, see
++          * vmr_track_secondary(). A primary splits its own context.
++          * Attachment-less contexts are not resumed across command buffers
++          * (CmdBeginRendering), so their count is known.
+           */
+-         if (cmdbuf->vk.level == VK_COMMAND_BUFFER_LEVEL_SECONDARY) {
+-            if (!cmdbuf->state.gfx.render.vmr_samples)
+-               cmdbuf->state.gfx.render.vmr_samples = rasterization_samples;
+-            else if (cmdbuf->state.gfx.render.vmr_samples !=
+-                     rasterization_samples)
+-               cmdbuf->state.gfx.render.vmr_mixed = true;
++         if (inherits_render_ctx(cmdbuf) &&
++             cmdbuf->vk.level == VK_COMMAND_BUFFER_LEVEL_SECONDARY) {
++            /* Context count set by the primary per segment. */
+          } else if (fb->sample_count != 0 &&
+                     fb->sample_count != rasterization_samples) {
+             result = split_render_ctx(cmdbuf);
+@@ -5677,6 +5674,29 @@
+    return true;
+ }
+ 
++/* A secondary cannot change the render context it inherits. An
++ * attachment-less one cuts its CS where rasterizationSamples changes and the
++ * primary runs each segment in a context with its count (CmdExecuteCommands).
++ * Called once per API draw, before anything of it is recorded.
++ */
++static void
++vmr_track_secondary(struct panvk_cmd_buffer *cmdbuf)
++{
++   const struct vk_dynamic_graphics_state *dyns =
++      &cmdbuf->vk.dynamic_graphics_state;
++   uint8_t *vmr = &cmdbuf->state.gfx.render.vmr_samples;
++
++   if (cmdbuf->vk.level != VK_COMMAND_BUFFER_LEVEL_SECONDARY ||
++       !inherits_render_ctx(cmdbuf) ||
++       cmdbuf->state.gfx.render.bound_attachments ||
++       dyns->rs.rasterizer_discard_enable)
++      return;
++
++   if (*vmr && *vmr != dyns->ms.rasterization_samples)
++      panvk_per_arch(cmd_cut_vmr_segment)(cmdbuf);
++   *vmr = dyns->ms.rasterization_samples;
++}
++
+ static void
+ panvk_cmd_draw(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info draw)
+ {
+@@ -5697,6 +5717,7 @@
+ 
+    /* Count once per API draw, before gpu_prerast splits or lowers it. */
+    if (!draw.gpu_prerast_generated && !draw.pstats_counted) {
++      vmr_track_secondary(cmdbuf);
+       panvk_per_arch(cmd_pstats_draw)(cmdbuf, &draw);
+       draw.pstats_counted = true;
+    }
+@@ -5766,25 +5787,21 @@
+ VkResult
+ panvk_per_arch(cmd_prepare_exec_cmd_for_draws)(
+    struct panvk_cmd_buffer *primary,
+-   struct panvk_cmd_buffer *secondary)
++   struct panvk_cmd_buffer *secondary, uint32_t sec_samples)
+ {
+    if (!(secondary->flags & VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT))
+       return VK_SUCCESS;
+ 
+-   /* An attachment-less secondary runs in a context with its sample count.
+-    * The primary gives it one, splitting the current context when it is known
+-    * to have another count (see prepare_draw). Without that the secondary's
+-    * draws would run with the count of whatever the primary had.
++   /* An attachment-less secondary (segment) runs in a context with its
++    * sample count. The primary gives it one, splitting the current context
++    * when it is known to have another count (see prepare_draw). Without that
++    * the secondary's draws would run with the count of whatever the primary
++    * had.
+     */
+    bool new_ctx = false;
+-   const uint32_t sec_samples = secondary->state.gfx.render.vmr_samples;
+    if (sec_samples && !primary->state.gfx.render.bound_attachments) {
+       const struct pan_fb_layout *fb = &primary->state.gfx.render.fb.layout;
+ 
+-      if (secondary->state.gfx.render.vmr_mixed)
+-         mesa_logw("panvk: secondary command buffer with several "
+-                   "rasterizationSamples values, all run with %u samples",
+-                   sec_samples);
+       if (fb->sample_count != 0 && fb->sample_count != sec_samples) {
+          VkResult result = split_render_ctx(primary);
+          if (result != VK_SUCCESS)
+@@ -6053,7 +6070,7 @@
+ 
+    assert(pBeginInfo->pInheritanceInfo);
+    cmdbuf->state.gfx.render.vmr_samples = 0;
+-   cmdbuf->state.gfx.render.vmr_mixed = false;
++   util_dynarray_clear(&cmdbuf->vmr_segs);
+    char gcbiar_data[VK_GCBIARR_DATA_SIZE(MAX_RTS)];
+    const VkRenderingInfo *resume_info =
+       vk_get_command_buffer_inheritance_as_rendering_resume(cmdbuf->vk.level,
+@@ -6216,6 +6233,13 @@
+       resuming ? state->render.fb.layout.tile_rt_alloc_B : 0;
+ 
+    panvk_per_arch(cmd_init_render_state)(cmdbuf, pRenderingInfo);
++
++   /* An attachment-less pass ends its context when it suspends
++    * (CmdEndRendering): the sample count of a context from another command
++    * buffer is unknown here, and rasterizationSamples may differ.
++    */
++   if (!state->render.bound_attachments)
++      state->render.flags &= ~VK_RENDERING_RESUMING_BIT;
+ 
+    if (suspended_sample_count != 0) {
+       state->render.fb.layout.sample_count = suspended_sample_count;
+@@ -7186,6 +7210,8 @@
+ 
+    panvk_per_arch(cmd_pstats_flush_pending)(cmdbuf);
+ 
++   /* The next context is this command buffer's own. */
++   cmdbuf->state.gfx.render.flags &= ~VK_RENDERING_RESUMING_BIT;
+    cmdbuf->state.gfx.render.oq.chain = 0;
+    memset(&cmdbuf->state.gfx.render.fbds, 0,
+           sizeof(cmdbuf->state.gfx.render.fbds));
+@@ -7242,6 +7268,13 @@
+ 
+          handle_deferred_queries(cmdbuf);
+       }
++   } else if (!cmdbuf->state.gfx.render.bound_attachments) {
++      /* Attachment-less: end the context, the resumed pass starts its own
++       * with its own sample count (CmdBeginRendering). Nothing to preserve.
++       */
++      result = split_render_ctx(cmdbuf);
++      if (result != VK_SUCCESS)
++         return;
+    } else if (!inherits_render_ctx(cmdbuf)) {
+       /* If we're suspending the render pass and we didn't inherit the render
+        * context, we need to emit it now, so it's available when the render pass
+diff --git a/src/panfrost/vulkan/panvk_cmd_draw.h b/src/panfrost/vulkan/panvk_cmd_draw.h
+--- a/src/panfrost/vulkan/panvk_cmd_draw.h
++++ b/src/panfrost/vulkan/panvk_cmd_draw.h
+@@ -111,12 +111,11 @@
+     * inherited context, and the primary command buffer needs to know. */
+    bool invalidate_inherited_ctx;
+ 
+-   /* Attachment-less secondary: rasterizationSamples of its first draw, the
+-    * count the primary has to give the inherited context. A secondary is one
+-    * CS stream, it cannot change the context in the middle: later draws with
+-    * another count set vmr_mixed. */
++   /* Attachment-less secondary: rasterizationSamples of the CS segment being
++    * recorded, the count the primary has to give the inherited context. A
++    * secondary cannot change the context in the middle, it cuts its CS where
++    * the count changes (cmd_cut_vmr_segment). */
+    uint8_t vmr_samples;
+-   bool vmr_mixed;
+ 
+    /* True if the last render pass was suspended. */
+    bool suspended;
+-- 
+2.45.0

@@ -1,0 +1,306 @@
+From: abhay-byte <zenithblue.dev@gmail.com>
+Subject: [PATCH csf-v11 083] build: dlopen the X11/XCB libraries for the Android X11 WSI
+
+Generated-by: LLM
+
+Purpose: Build the X11 WSI into the Android ICD (VK_KHR_xlib_surface, VK_KHR_xcb_surface) and dlopen libxcb/libX11-xcb and the xcb extension libraries on first X11 use, so the ICD keeps its Android-only DT_NEEDED set; biblioklept
+Source/Reference: local, work/mesa-wsi dx-wsi 43887780af5
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/082
+Validation test: Termux:X11 on device, launcher UID, imagefs loader 1.4.315 + imagefs libxcb 1.17.0 / libX11 1.8.12: vkCreateInstance(VK_KHR_surface+VK_KHR_xlib_surface) and (+VK_KHR_xcb_surface) = VK_SUCCESS; Xlib and XCB surface, presentation support, formats, swapchain create/acquire/clear/present/resize/destroy PASS, window readback matches the cleared color; 5 back-to-back relaunches PASS
+
+diff --git a/meson.build b/meson.build
+index 9ef00cd8dbd..a96b7bd8150 100644
+--- a/meson.build
++++ b/meson.build
+@@ -2402,6 +2402,18 @@ if with_platform_x11
+   if with_xlib_lease
+     dep_xlib_xrandr = dependency('xrandr', version : dep_xlib_xrandr_version)
+   endif
++  if with_platform_android and with_any_vk
++    dep_xcb = dep_xcb.partial_dependency(compile_args : true, includes : true)
++    dep_xcb_xrandr = dep_xcb_xrandr.partial_dependency(compile_args : true, includes : true)
++    dep_x11_xcb = dep_x11_xcb.partial_dependency(compile_args : true, includes : true)
++    dep_xcb_dri3 = dep_xcb_dri3.partial_dependency(compile_args : true, includes : true)
++    dep_xcb_present = dep_xcb_present.partial_dependency(compile_args : true, includes : true)
++    dep_xcb_shm = dep_xcb_shm.partial_dependency(compile_args : true, includes : true)
++    dep_xcb_sync = dep_xcb_sync.partial_dependency(compile_args : true, includes : true)
++    dep_xcb_xfixes = dep_xcb_xfixes.partial_dependency(compile_args : true, includes : true)
++    dep_xshmfence = dep_xshmfence.partial_dependency(compile_args : true, includes : true)
++    pre_args += '-DWSI_X11_DLOPEN'
++  endif
+ endif
+ 
+ if with_dri
+diff --git a/src/vulkan/wsi/meson.build b/src/vulkan/wsi/meson.build
+index 80925d1419d..68fb82271c0 100644
+--- a/src/vulkan/wsi/meson.build
++++ b/src/vulkan/wsi/meson.build
+@@ -11,6 +11,9 @@ endif
+ 
+ if with_platform_x11
+   files_vulkan_wsi += files('wsi_common_x11.c')
++  if with_platform_android
++    files_vulkan_wsi += files('wsi_x11_dlopen.c')
++  endif
+   links_vulkan_wsi += libloader_x11
+   links_vulkan_wsi += libloader
+ endif
+diff --git a/src/vulkan/wsi/wsi_common_private.h b/src/vulkan/wsi/wsi_common_private.h
+index 3d2cd7d2e51..0b1f5f49e0b 100644
+--- a/src/vulkan/wsi/wsi_common_private.h
++++ b/src/vulkan/wsi/wsi_common_private.h
+@@ -545,6 +545,11 @@ VkResult wsi_x11_init_wsi(struct wsi_device *wsi_device,
+                           const struct driOptionCache *dri_options);
+ void wsi_x11_finish_wsi(struct wsi_device *wsi_device,
+                         const VkAllocationCallbacks *alloc);
++#ifdef WSI_X11_DLOPEN
++bool wsi_x11_dlopen(void);
++#else
++static inline bool wsi_x11_dlopen(void) { return true; }
++#endif
+ VkResult wsi_wl_init_wsi(struct wsi_device *wsi_device,
+                          const VkAllocationCallbacks *alloc,
+                          VkPhysicalDevice physical_device);
+diff --git a/src/vulkan/wsi/wsi_common_x11.c b/src/vulkan/wsi/wsi_common_x11.c
+index e2e6ef8abbe..0960ec2f63a 100644
+--- a/src/vulkan/wsi/wsi_common_x11.c
++++ b/src/vulkan/wsi/wsi_common_x11.c
+@@ -637,6 +637,9 @@ wsi_GetPhysicalDeviceXcbPresentationSupportKHR(VkPhysicalDevice physicalDevice,
+    if (!(effective_queues & BITFIELD64_BIT(queueFamilyIndex)))
+       return false;
+ 
++   if (!wsi_x11_dlopen())
++      return false;
++
+    struct wsi_x11_connection *wsi_conn =
+       wsi_x11_get_connection(wsi_device, connection);
+ 
+@@ -663,7 +666,7 @@ wsi_GetPhysicalDeviceXlibPresentationSupportKHR(VkPhysicalDevice physicalDevice,
+    /* Our WSI implementation for X11 relies on threads.  Check Xlib is running
+     * in thread safe mode before advertising support.
+     */
+-   if (!x11_xlib_display_is_thread_safe(dpy))
++   if (!wsi_x11_dlopen() || !x11_xlib_display_is_thread_safe(dpy))
+       return false;
+ 
+    return wsi_GetPhysicalDeviceXcbPresentationSupportKHR(physicalDevice,
+@@ -1161,6 +1164,9 @@ wsi_CreateXcbSurfaceKHR(VkInstance _instance,
+ 
+    assert(pCreateInfo->sType == VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR);
+ 
++   if (!wsi_x11_dlopen())
++      return VK_ERROR_OUT_OF_HOST_MEMORY;
++
+    unsigned visual_depth;
+    xcb_visualtype_t *visual =
+       get_visualtype_for_window(pCreateInfo->connection, pCreateInfo->window, &visual_depth, NULL);
+@@ -1193,6 +1199,9 @@ wsi_CreateXlibSurfaceKHR(VkInstance _instance,
+ 
+    assert(pCreateInfo->sType == VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR);
+ 
++   if (!wsi_x11_dlopen())
++      return VK_ERROR_OUT_OF_HOST_MEMORY;
++
+    unsigned visual_depth;
+    xcb_visualtype_t *visual =
+       get_visualtype_for_window(XGetXCBConnection(pCreateInfo->dpy), pCreateInfo->window, &visual_depth, NULL);
+diff --git a/src/vulkan/wsi/wsi_x11_dlopen.c b/src/vulkan/wsi/wsi_x11_dlopen.c
+new file mode 100644
+index 00000000000..1e0a840d549
+--- /dev/null
++++ b/src/vulkan/wsi/wsi_x11_dlopen.c
+@@ -0,0 +1,191 @@
++/*
++ * Copyright © 2026 Mesa contributors
++ * SPDX-License-Identifier: MIT
++ */
++
++#include <dlfcn.h>
++#include <stdbool.h>
++#include <stdlib.h>
++
++#include <xcb/xcb.h>
++#include <xcb/xcbext.h>
++
++#include "c11/threads.h"
++#include "util/log.h"
++#include "util/macros.h"
++#include "wsi_common_private.h"
++
++static const char *const wsi_x11_libs[] = {
++   "libxcb.so.1",
++   "libX11-xcb.so.1",
++   "libxcb-dri3.so.0",
++   "libxcb-present.so.0",
++   "libxcb-shm.so.0",
++   "libxcb-sync.so.1",
++   "libxcb-xfixes.so.0",
++   "libxcb-randr.so.0",
++   "libxshmfence.so.1",
++};
++
++#define WSI_X11_SYMS(S) \
++   S(xcb_change_property_checked) \
++   S(xcb_create_gc) \
++   S(xcb_delete_property_checked) \
++   S(xcb_depth_next) \
++   S(xcb_depth_visuals_iterator) \
++   S(xcb_discard_reply) \
++   S(xcb_flush) \
++   S(xcb_free_pixmap) \
++   S(xcb_generate_id) \
++   S(xcb_get_geometry) \
++   S(xcb_get_geometry_reply) \
++   S(xcb_get_geometry_unchecked) \
++   S(xcb_get_maximum_request_length) \
++   S(xcb_get_setup) \
++   S(xcb_get_window_attributes) \
++   S(xcb_get_window_attributes_reply) \
++   S(xcb_intern_atom) \
++   S(xcb_intern_atom_reply) \
++   S(xcb_put_image) \
++   S(xcb_query_extension) \
++   S(xcb_query_extension_reply) \
++   S(xcb_query_tree) \
++   S(xcb_query_tree_reply) \
++   S(xcb_register_for_special_xge) \
++   S(xcb_request_check) \
++   S(xcb_screen_allowed_depths_iterator) \
++   S(xcb_screen_next) \
++   S(xcb_setup_roots_iterator) \
++   S(xcb_translate_coordinates_reply) \
++   S(xcb_translate_coordinates_unchecked) \
++   S(xcb_unregister_for_special_event) \
++   S(xcb_visualtype_next) \
++   S(xcb_wait_for_special_event) \
++   S(XGetXCBConnection) \
++   S(xcb_dri3_fence_from_fd) \
++   S(xcb_dri3_free_syncobj) \
++   S(xcb_dri3_get_supported_modifiers) \
++   S(xcb_dri3_get_supported_modifiers_reply) \
++   S(xcb_dri3_get_supported_modifiers_screen_modifiers) \
++   S(xcb_dri3_get_supported_modifiers_window_modifiers) \
++   S(xcb_dri3_import_syncobj_checked) \
++   S(xcb_dri3_open) \
++   S(xcb_dri3_open_reply) \
++   S(xcb_dri3_open_reply_fds) \
++   S(xcb_dri3_pixmap_from_buffer_checked) \
++   S(xcb_dri3_pixmap_from_buffers_checked) \
++   S(xcb_dri3_query_version) \
++   S(xcb_dri3_query_version_reply) \
++   S(xcb_present_pixmap) \
++   S(xcb_present_pixmap_synced) \
++   S(xcb_present_query_capabilities) \
++   S(xcb_present_query_capabilities_reply) \
++   S(xcb_present_query_version) \
++   S(xcb_present_query_version_reply) \
++   S(xcb_present_select_input) \
++   S(xcb_present_select_input_checked) \
++   S(xcb_shm_attach) \
++   S(xcb_shm_attach_checked) \
++   S(xcb_shm_create_pixmap_checked) \
++   S(xcb_shm_detach) \
++   S(xcb_shm_detach_checked) \
++   S(xcb_sync_destroy_fence) \
++   S(xcb_xfixes_create_region) \
++   S(xcb_xfixes_destroy_region) \
++   S(xcb_xfixes_query_version) \
++   S(xcb_xfixes_query_version_reply) \
++   S(xcb_xfixes_set_region) \
++   S(xcb_randr_get_crtc_info_reply) \
++   S(xcb_randr_get_crtc_info_unchecked) \
++   S(xcb_randr_get_output_info) \
++   S(xcb_randr_get_output_info_name) \
++   S(xcb_randr_get_output_info_reply) \
++   S(xcb_randr_get_screen_resources_current_crtcs) \
++   S(xcb_randr_get_screen_resources_current_modes) \
++   S(xcb_randr_get_screen_resources_current_outputs) \
++   S(xcb_randr_get_screen_resources_current_reply) \
++   S(xcb_randr_get_screen_resources_current_unchecked) \
++   S(xcb_randr_query_version_reply) \
++   S(xcb_randr_query_version_unchecked) \
++   S(xshmfence_alloc_shm) \
++   S(xshmfence_await) \
++   S(xshmfence_map_shm) \
++   S(xshmfence_reset) \
++   S(xshmfence_trigger) \
++   S(xshmfence_unmap_shm)
++
++xcb_extension_t xcb_present_id = { "Present", 0 };
++
++static void
++wsi_x11_dl_unloaded(void)
++{
++   mesa_loge("wsi/x11: X11 function called before the X11 libraries were loaded");
++   abort();
++}
++
++#define S(sym) void *wsi_x11_dl_##sym = (void *)wsi_x11_dl_unloaded;
++WSI_X11_SYMS(S)
++#undef S
++
++#define S(sym)                                                   \
++   __asm__(".text\n"                                             \
++           ".globl " #sym "\n"                                   \
++           ".hidden " #sym "\n"                                  \
++           ".type " #sym ", %function\n"                         \
++           ".p2align 2\n"                                        \
++           #sym ":\n"                                            \
++           "  adrp x16, wsi_x11_dl_" #sym "\n"                   \
++           "  ldr x16, [x16, :lo12:wsi_x11_dl_" #sym "]\n"       \
++           "  br x16\n"                                          \
++           ".size " #sym ", . - " #sym "\n");
++WSI_X11_SYMS(S)
++#undef S
++
++static once_flag wsi_x11_dl_once = ONCE_FLAG_INIT;
++static bool wsi_x11_dl_ok;
++
++static void *
++wsi_x11_dl_lookup(void *const *handles, const char *name)
++{
++   for (unsigned i = 0; i < ARRAY_SIZE(wsi_x11_libs); i++) {
++      void *p = dlsym(handles[i], name);
++      if (p)
++         return p;
++   }
++   mesa_loge("wsi/x11: missing symbol %s", name);
++   return NULL;
++}
++
++static void
++wsi_x11_dl_load(void)
++{
++   void *handles[ARRAY_SIZE(wsi_x11_libs)];
++
++   for (unsigned i = 0; i < ARRAY_SIZE(wsi_x11_libs); i++) {
++      handles[i] = dlopen(wsi_x11_libs[i], RTLD_NOW | RTLD_LOCAL);
++      if (!handles[i]) {
++         mesa_loge("wsi/x11: dlopen(%s) failed: %s", wsi_x11_libs[i], dlerror());
++         return;
++      }
++   }
++
++#define S(sym)                                                   \
++   void *p_##sym = wsi_x11_dl_lookup(handles, #sym);             \
++   if (!p_##sym)                                                 \
++      return;
++   WSI_X11_SYMS(S)
++#undef S
++
++#define S(sym) wsi_x11_dl_##sym = p_##sym;
++   WSI_X11_SYMS(S)
++#undef S
++
++   wsi_x11_dl_ok = true;
++}
++
++bool
++wsi_x11_dlopen(void)
++{
++   call_once(&wsi_x11_dl_once, wsi_x11_dl_load);
++   return wsi_x11_dl_ok;
++}

@@ -1,0 +1,46 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: Sun, 4 Oct 2026 12:00:00 +0530
+Subject: [PATCH] panvk: report the PanVK-kbase release in driverInfo
+
+Expose the PanVK-kbase release in driverInfo so DXVK HUD and PanProbe
+show the release name (RC3) alongside the Mesa version. Allow build-time
+overrides with PANVK_KBASE_RELEASE; the resulting string fits the 256-byte
+driverInfo.
+
+Purpose: show the PanVK-kbase release in DXVK HUD / PanProbe
+Tested GPU: not run (target: Mali-G615 MC6 / Poco X6 Pro)
+Tested Kbase UAPI: not run (target: CSF 1.21 / MediaTek)
+Mesa base range: 5a07217f034b (26.3.0-devel), patched through csf-v11/098
+Validation test: patch -p1 --dry-run against the current patched Mesa source
+
+Generated-by: LLM
+---
+
+diff --git a/src/panfrost/vulkan/panvk_vX_physical_device.c b/src/panfrost/vulkan/panvk_vX_physical_device.c
+index 90ed3daa229..9eb316fa1b6 100644
+--- a/src/panfrost/vulkan/panvk_vX_physical_device.c
++++ b/src/panfrost/vulkan/panvk_vX_physical_device.c
+@@ -28,6 +28,10 @@
+ #include "pan_format.h"
+ #include "pan_props.h"
+ 
++#ifndef PANVK_KBASE_RELEASE
++#define PANVK_KBASE_RELEASE "RC3"
++#endif
++
+ /* We reserve one ubo for push constant, one for sysvals and one per-set for the
+  * descriptor metadata  */
+ #define RESERVED_UBO_COUNT                   6
+@@ -1374,7 +1378,8 @@
+ 
+    snprintf(properties->driverName, VK_MAX_DRIVER_NAME_SIZE, "panvk");
+    snprintf(properties->driverInfo, VK_MAX_DRIVER_INFO_SIZE,
+-            "Mesa " PACKAGE_VERSION MESA_GIT_SHA1);
++            "PanVK-kbase " PANVK_KBASE_RELEASE " (Mesa " PACKAGE_VERSION
++            MESA_GIT_SHA1 ")");
+ 
+    /* VK_EXT_physical_device_drm */
+    if (device->drm.primary_rdev) {
+--
+2.51.0

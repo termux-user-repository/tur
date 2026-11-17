@@ -1,0 +1,71 @@
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: 2026-10-05
+Subject: [PATCH jm-v9 004] kbase: init EXEC_VA before JIT, full 4G zone
+
+Purpose: Issue KBASE_IOCTL_MEM_EXEC_INIT before KBASE_IOCTL_MEM_JIT_INIT.
+JM kbase and CSF kbase before uAPI 1.9 carve EXEC_VA from the end of
+SAME_VA and return -EPERM once JIT's CUSTOM_VA exists
+(kbase_region_tracker_init_exec checks kctx->jit_va), so every v9 JM and
+old v10 CSF context logged "EXEC_INIT failed: Operation not permitted" and
+GPU_EX BOs fell back to CUSTOM_VA. CSF >= 1.9 returns 0 early from
+EXEC_INIT (zone set up at context creation), so the reorder is a no-op
+there. JM now asks for the 4G maximum (0x100000 pages) instead of 1024
+pages, which would have capped all shader BOs at 4 MiB. EPERM/EINVAL log at
+debug level; GPU_EX allocation still works without the zone.
+Tested GPU: Mali-G57 MC2 (Lenovo TB336FU, gpu_id 0x90930010)
+Tested Kbase UAPI: JM 11.38 (VERSION_CHECK reply to a zeroed request)
+Mesa base range: 5a07217f + g615-v11-csf series + jm-v9 001-003
+Dependencies: jm-v9/001 (edits its JM exec_init sizing)
+Validation test: worklogs/driver-remaining/110-exec-init-order.md
+
+---
+diff --git a/src/panfrost/lib/kmod/kbase_kmod.c b/src/panfrost/lib/kmod/kbase_kmod.c
+index 41d9db8..2af90a8 100644
+--- a/src/panfrost/lib/kmod/kbase_kmod.c
++++ b/src/panfrost/lib/kmod/kbase_kmod.c
+@@ -1378,6 +1378,25 @@ kbase_kmod_dev_create(int fd, uint32_t flags,
+       goto err_unmap_tracking;
+    }
+ 
++   /* Initialise the EXEC_VA zone so that GPU-executable allocations
++    * (shader BOs) get their own zone.  Must run before JIT_INIT: JM kbase
++    * and CSF kbase before uAPI 1.9 carve EXEC_VA from the end of SAME_VA
++    * and refuse with -EPERM once JIT's CUSTOM_VA zone exists
++    * (kbase_region_tracker_init_exec checks kctx->jit_va).  CSF >= 1.9
++    * sets the zone up at context creation and this is a no-op.  4G
++    * (0x100000 pages) is the kernel maximum and matches panfork; without
++    * the zone, GPU_EX allocations fall back to CUSTOM_VA, so failure is
++    * not fatal. */
++   struct kbase_ioctl_mem_exec_init exec_init = { .va_pages = 0x100000 };
++   if (ioctl(fd, KBASE_IOCTL_MEM_EXEC_INIT, &exec_init)) {
++      if (errno == EPERM || errno == EINVAL)
++         mesa_logd("kbase: KBASE_IOCTL_MEM_EXEC_INIT: %s (zone exists or "
++                   "unsupported; GPU_EX BOs use CUSTOM_VA)", strerror(errno));
++      else
++         mesa_logw("kbase: KBASE_IOCTL_MEM_EXEC_INIT failed: %s "
++                   "(executable BO allocation may not work)", strerror(errno));
++   }
++
+    /* Initialise the JIT allocator.  This must happen before any allocation
+     * is made: besides setting up JIT, on 64-bit clients this is what carves
+     * the CUSTOM_VA zone out of the top of the SAME_VA zone
+@@ -1396,19 +1415,6 @@ kbase_kmod_dev_create(int fd, uint32_t flags,
+                 "(tiler heap creation will not work)", strerror(errno));
+    }
+ 
+-   /* Initialise the EXEC_VA zone so that GPU-executable allocations
+-    * (shader BOs) are possible.  4G of executable VA (0x100000 pages)
+-    * matches what panfork uses.  On CSF uAPI >= 1.9 the zone is set up
+-    * automatically and this is a no-op.  Failure is not fatal for
+-    * enumeration, but executable allocations will fail later, so warn. */
+-   struct kbase_ioctl_mem_exec_init exec_init = { .va_pages = 0x100000 };
+-   if (!is_csf)
+-      exec_init.va_pages = 1024;
+-   if (ioctl(fd, KBASE_IOCTL_MEM_EXEC_INIT, &exec_init)) {
+-      mesa_logw("kbase: KBASE_IOCTL_MEM_EXEC_INIT failed: %s "
+-                "(executable BO allocation will not work)", strerror(errno));
+-   }
+-
+    struct kbase_kmod_dev *kbase_dev =
+       pan_kmod_alloc(allocator, sizeof(*kbase_dev));
+    if (!kbase_dev) {

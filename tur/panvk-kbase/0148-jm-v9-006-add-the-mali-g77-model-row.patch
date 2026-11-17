@@ -1,0 +1,32 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: Thu, 8 Oct 2026 11:00:00 +0530
+Subject: [PATCH] panfrost: add the Mali-G77 model row biblioklept
+
+A POCO 21061110AG (MT6891) reports gpu_id 0x90800011 and panvk drops it
+as INCOMPATIBLE_DRIVER: pan_prod_id() gives PAN_PROD_ID(9, 0, 0) (arch
+major 9, arch minor 0, product major 0) and the table has no such row.
+0x9080 is kbase TTRX (GPU_ID2_MODEL_MAKE(9, 0), "Mali-G77"). The G57
+(TNAX, product major 1) is the same Valhall v9 shader core in smaller
+configurations, so reuse the G57 tile buffer sizes and rates, which
+describe one core.
+
+---
+ src/panfrost/model/pan_model.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/src/panfrost/model/pan_model.c b/src/panfrost/model/pan_model.c
+--- a/src/panfrost/model/pan_model.c
++++ b/src/panfrost/model/pan_model.c
+@@ -84,6 +84,9 @@ const struct pan_model pan_model_list[] = {
+    BIFROST_MODEL(PAN_PROD_ID(7, 2, 2),    "G52",    "G52", MODEL_ANISO(ALL),  MODEL_TB_SIZES(16384,  8192), MODEL_RATES(2, 2, 24)),
+    BIFROST_MODEL(PAN_PROD_ID(7, 4, 2),    "G52 r1", "G52", MODEL_ANISO(ALL),  MODEL_TB_SIZES( 8192,  8192), MODEL_RATES(2, 2, 24)),
+
++   /* G77 (kbase TTRX, 0x9080): same Valhall v9 core as G57, 7-16 cores. */
++   VALHALL_MODEL(PAN_PROD_ID(9, 0, 0), 0, "G77",    "G77", MODEL_ANISO(ALL),  MODEL_TB_SIZES(16384,  8192),
++                                              MODEL_RATES_X(2, 4, 8,  32,  32, 8)),
+    VALHALL_MODEL(PAN_PROD_ID(9, 0, 1), 0, "G57",    "G77", MODEL_ANISO(ALL),  MODEL_TB_SIZES(16384,  8192),
+                                               MODEL_RATES_X(2, 4, 8,  32,  32, 8)),
+    VALHALL_MODEL(PAN_PROD_ID(9, 0, 3), 0, "G57",    "G77", MODEL_ANISO(ALL),  MODEL_TB_SIZES(16384,  8192),
+--
+2.43.0

@@ -1,0 +1,26 @@
+From: abhay-byte <zenithblue.dev@gmail.com>
+Subject: [PATCH csf-v11 071] panvk: raise maxGeometryShaderInvocations to 64 on v10+
+
+Generated-by: LLM
+
+Purpose: Raise maxGeometryShaderInvocations to 64 on v10+ (gpu_prerast GS); biblioklept
+Source/Reference: local, work/mesa-p3 dx-p3 33a113ff72e
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/070
+Validation test: CTS dEQP-VK.geometry.* 199 cases 193 Pass 0 Fail (geometry.instanced.* 20 Pass)
+
+diff --git a/src/panfrost/vulkan/panvk_vX_physical_device.c b/src/panfrost/vulkan/panvk_vX_physical_device.c
+index 548613ff618..011f0112d6d 100644
+--- a/src/panfrost/vulkan/panvk_vX_physical_device.c
++++ b/src/panfrost/vulkan/panvk_vX_physical_device.c
+@@ -933,7 +933,7 @@ panvk_per_arch(get_physical_device_properties)(
+       .maxTessellationControlTotalOutputComponents = PAN_ARCH >= 10 ? 4096 : 0,
+       .maxTessellationEvaluationInputComponents = PAN_ARCH >= 10 ? 128 : 0,
+       .maxTessellationEvaluationOutputComponents = PAN_ARCH >= 10 ? 128 : 0,
+-      .maxGeometryShaderInvocations = PAN_ARCH >= 10 ? 32 : 0,
++      .maxGeometryShaderInvocations = PAN_ARCH >= 10 ? 64 : 0,
+       .maxGeometryInputComponents = PAN_ARCH >= 10 ? 64 : 0,
+       .maxGeometryOutputComponents = PAN_ARCH >= 10 ? 128 : 0,
+       .maxGeometryOutputVertices = PAN_ARCH >= 10 ? 256 : 0,

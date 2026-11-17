@@ -1,0 +1,57 @@
+From: Mikhail Mlhcnn <mikhail@advnirr.org>
+Subject: [PATCH csf-v11 027] panfrost: add the missing v11 cases to the arch switches
+
+Purpose: add missing v11 cases to panfrost arch switches
+Source/Reference: upstream Mesa commit c9c207bfd3d (author preserved)
+Backport-of: c9c207bfd3d
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/026
+Validation test: device matrix as 026
+
+diff --git a/src/panfrost/genxml/decode_common.c b/src/panfrost/genxml/decode_common.c
+index d09ea21560527fc592257876babecb892c7c50d5..96ee55b0e8c77aa1c0517ed4b63efee7aca3f14b 100644
+--- a/src/panfrost/genxml/decode_common.c
++++ b/src/panfrost/genxml/decode_common.c
+@@ -446,6 +446,9 @@ pandecode_cs_binary(struct pandecode_context *ctx, uint64_t bin_gpu_va,
+    case 10:
+       pandecode_cs_binary_v10(ctx, bin_gpu_va, size);
+       break;
++   case 11:
++      pandecode_cs_binary_v11(ctx, bin_gpu_va, size);
++      break;
+    case 12:
+       pandecode_cs_binary_v12(ctx, bin_gpu_va, size);
+       break;
+@@ -472,6 +475,9 @@ pandecode_cs_trace(struct pandecode_context *ctx, uint64_t trace_gpu_va,
+    case 10:
+       pandecode_cs_trace_v10(ctx, trace_gpu_va, size, gpu_id);
+       break;
++   case 11:
++      pandecode_cs_trace_v11(ctx, trace_gpu_va, size, gpu_id);
++      break;
+    case 12:
+       pandecode_cs_trace_v12(ctx, trace_gpu_va, size, gpu_id);
+       break;
+diff --git a/src/panfrost/lib/pan_mod.h b/src/panfrost/lib/pan_mod.h
+index 3014eba377da3dcff211e8aaba7fc39b57939897..2f44bc5caa40da85c9c3d5586d535452e0608d94 100644
+--- a/src/panfrost/lib/pan_mod.h
++++ b/src/panfrost/lib/pan_mod.h
+@@ -86,6 +86,7 @@ const struct pan_mod_handler *pan_mod_get_handler_v6(uint64_t modifier);
+ const struct pan_mod_handler *pan_mod_get_handler_v7(uint64_t modifier);
+ const struct pan_mod_handler *pan_mod_get_handler_v9(uint64_t modifier);
+ const struct pan_mod_handler *pan_mod_get_handler_v10(uint64_t modifier);
++const struct pan_mod_handler *pan_mod_get_handler_v11(uint64_t modifier);
+ const struct pan_mod_handler *pan_mod_get_handler_v12(uint64_t modifier);
+ const struct pan_mod_handler *pan_mod_get_handler_v13(uint64_t modifier);
+ const struct pan_mod_handler *pan_mod_get_handler_v14(uint64_t modifier);
+@@ -106,6 +107,8 @@ pan_mod_get_handler(unsigned arch, uint64_t modifier)
+       return pan_mod_get_handler_v9(modifier);
+    case 10:
+       return pan_mod_get_handler_v10(modifier);
++   case 11:
++      return pan_mod_get_handler_v11(modifier);
+    case 12:
+       return pan_mod_get_handler_v12(modifier);
+    case 13:

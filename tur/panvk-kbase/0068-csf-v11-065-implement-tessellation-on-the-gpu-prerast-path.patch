@@ -1,0 +1,1984 @@
+From: abhay-byte <zenithblue.dev@gmail.com>
+Subject: [PATCH csf-v11 065] panvk: implement tessellation on the gpu_prerast path
+Generated-by: LLM
+
+Purpose: GPU tessellation on gpu_prerast (VS/TCS/libpoly tessellator on compute, TES as raster VS, CS-loop chunking) and expose tessellationShader on v10+; biblioklept
+Source/Reference: local, dx8-tess 378bad20f31..01a54283d9b, work/mesa-dxint 2013d31d27e
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/064
+Validation test: tests/dxvk/vulkan/tessellation 24/24 TESSELLATION_FAILS=0; CTS dEQP-VK.tessellation.* 526 Pass, 0 Fail, 0 DeviceLost; DXVK Native D3D11 feature_level=0xb000
+
+diff --git a/meson.build b/meson.build
+index 986f6daa2a0..9ef00cd8dbd 100644
+--- a/meson.build
++++ b/meson.build
+@@ -1080,7 +1080,7 @@ with_llvm = with_llvm \
+ 
+ with_poly = [
+   with_gallium_asahi, with_asahi_vk, with_tools.contains('asahi'),
+-  with_kosmickrisp_vk,
++  with_kosmickrisp_vk, with_panfrost_vk,
+ ].contains(true)
+ 
+ dep_clc = null_dep
+diff --git a/src/panfrost/clc/pan_compile.c b/src/panfrost/clc/pan_compile.c
+index 4d68af91fc1..bf508840697 100644
+--- a/src/panfrost/clc/pan_compile.c
++++ b/src/panfrost/clc/pan_compile.c
+@@ -61,7 +61,8 @@ optimize(nir_shader *nir)
+       progress = false;
+ 
+       NIR_PASS(progress, nir, nir_split_var_copies);
+-      NIR_PASS(progress, nir, nir_split_struct_vars, nir_var_function_temp);
++      if (nir->info.stage == MESA_SHADER_KERNEL)
++         NIR_PASS(progress, nir, nir_split_struct_vars, nir_var_function_temp);
+       NIR_PASS(progress, nir, nir_lower_var_copies);
+       NIR_PASS(progress, nir, nir_lower_vars_to_ssa);
+ 
+diff --git a/src/panfrost/libpan/draw_helper.cl b/src/panfrost/libpan/draw_helper.cl
+index 501081cf1de..87c5854293f 100644
+--- a/src/panfrost/libpan/draw_helper.cl
++++ b/src/panfrost/libpan/draw_helper.cl
+@@ -9,7 +9,9 @@
+ #include "genxml/gen_macros.h"
+ #include "lib/pan_encoder.h"
+ #include "poly/cl/restart.h"
++#include "poly/cl/tessellator.h"
+ #include "draw_helper.h"
++#include "tess_draw.h"
+ 
+ #if PAN_ARCH >= 10
+ 
+@@ -105,7 +107,8 @@ panlib_update_pstats_draw(global uint32_t *stats, uint32_t slots,
+                           global uint32_t *count_buffer, uint32_t draw_index,
+                           uint64_t index_buffer, uint32_t index_buffer_size_el,
+                           uint32_t index_size_B, uint32_t restart,
+-                          uint32_t prim, uint32_t view_count)
++                          uint32_t prim, uint32_t view_count,
++                          uint32_t patch_size)
+ {
+    assert(get_sub_group_size() == SUBGROUP_SIZE);
+ 
+@@ -124,6 +127,8 @@ panlib_update_pstats_draw(global uint32_t *stats, uint32_t slots,
+       prims = poly_count_restart_prims(cmd, index_buffer, index_buffer_size_el,
+                                        index_size_B, restart_index, prim,
+                                        scratch);
++   } else if (prim == MESA_PRIM_PATCHES) {
++      prims = cmd[0] / max(patch_size, 1u);
+    } else {
+       prims = u_decomposed_prims_for_vertices(prim, cmd[0]);
+    }
+@@ -147,6 +152,171 @@ panlib_update_pstats_dispatch(global uint32_t *counter,
+ {
+    pstats_add(counter, (uint64_t)cmd[0] * cmd[1] * cmd[2] * local_size);
+ }
++
++/* Tessellation for gpu_prerast, see struct panlib_tess_draw. src_draw is the
++ * Vk[Indexed]DrawIndirectCommand of the API draw.
++ */
++KERNEL(1)
++panlib_tess_setup(global struct panlib_tess_draw *t, constant uint32_t *src_draw,
++                  constant uint32_t *count_buffer, uint32_t draw_index)
++{
++   uint32_t ps = max(t->input_patch_size, 1u);
++   bool live = !count_buffer || draw_index < count_buffer[0];
++
++   /* VkDrawIndirectCommand is 4 words. */
++   for (uint32_t i = 0; i < 5; i++)
++      t->in_draw[i] = live && (i < 4 || t->indexed) ? src_draw[i] : 0;
++
++   t->patches_per_instance = t->in_draw[0] / ps;
++   t->instances = t->in_draw[1];
++   t->total_patches = (uint64_t)t->patches_per_instance * t->instances;
++   t->next_patch = 0;
++   t->idx_total = 0;
++   t->idx_cursor = 0;
++   t->prims_done = 0;
++   t->new_chunk = 0;
++   t->more = 0;
++}
++
++/* Starts the next chunk of patches once the current one is fully drawn. A
++ * chunk is whole instances when an instance fits, else a patch range of one
++ * instance.
++ */
++KERNEL(1)
++panlib_tess_step(global struct panlib_tess_draw *t, global uint32_t *tcs_stat)
++{
++   global struct poly_tess_params *p = &t->p;
++
++   t->new_chunk = t->idx_cursor >= t->idx_total && t->next_patch < t->total_patches;
++   if (!t->new_chunk) {
++      t->vs_draw[0] = 0;
++      t->vs_draw[1] = 0;
++      t->tcs_grid[0] = 0;
++      t->tcs_grid[1] = 0;
++      t->tcs_grid[2] = 0;
++      p->nr_patches = 0;
++      return;
++   }
++
++   uint32_t ps = max(t->input_patch_size, 1u);
++   uint32_t ppi = t->patches_per_instance;
++   uint32_t inst = t->next_patch / ppi;
++   uint32_t first = t->next_patch % ppi;
++   uint32_t per_inst, k;
++
++   if (first == 0 && ppi <= t->max_patches) {
++      per_inst = ppi;
++      k = min(t->max_patches / ppi, t->instances - inst);
++   } else {
++      per_inst = min(t->max_patches, ppi - first);
++      k = 1;
++   }
++
++   uint32_t n = per_inst * k;
++   p->patches_per_instance = per_inst;
++   p->nr_patches = n;
++   p->heap->bottom = 0;
++   t->chunk_patches = n;
++   t->prim_base = first;
++   t->next_patch += n;
++
++   /* Base vertex/instance stay the API ones, the chunk start is added to the
++    * VS invocation IDs.
++    */
++   t->vs_draw[0] = per_inst * ps;
++   t->vs_draw[1] = k;
++   for (uint32_t i = 2; i < 5; i++)
++      t->vs_draw[i] = t->in_draw[i];
++   t->chunk_vertex = first * ps;
++   t->chunk_instance = inst;
++
++   t->tcs_grid[0] = per_inst;
++   t->tcs_grid[1] = k;
++   t->tcs_grid[2] = 1;
++
++   if (tcs_stat)
++      pstats_add(tcs_stat, n);
++}
++
++/* domain: 0 triangles, 1 quads, 2 isolines. */
++KERNEL(64)
++panlib_tessellate(constant struct poly_tess_params *p, uint32_t domain__3,
++                  uint32_t mode__2)
++{
++   uint32_t patch = cl_global_id.x;
++   enum poly_tess_mode mode = mode__2;
++
++   if (patch >= p->nr_patches)
++      return;
++
++   if (domain__3 == 0)
++      poly_tess_tri_process(p, patch, mode);
++   else if (domain__3 == 1)
++      poly_tess_quad_process(p, patch, mode);
++   else
++      poly_tess_isoline_process(p, patch, mode);
++
++   /* The tessellator emits clockwise triangles, swap two vertices of each
++    * one for the other winding.
++    */
++   if (mode == POLY_TESS_MODE_WITH_COUNTS && p->ccw && domain__3 != 2 &&
++       !p->points_mode) {
++      global uint32_t *idx = p->index_buffer;
++      uint32_t end = p->counts[patch];
++
++      for (uint32_t i = patch ? p->counts[patch - 1] : 0; i + 2 < end;
++           i += 3) {
++         uint32_t t = idx[i + 1];
++         idx[i + 1] = idx[i + 2];
++         idx[i + 2] = t;
++      }
++   }
++}
++
++/* Prefix sums the per-patch index counts of a new chunk, then writes the
++ * indexed draw for the next range of the chunk's indices.
++ */
++KERNEL(1)
++panlib_tess_draw(global struct panlib_tess_draw *t, global uint32_t *c_invs,
++                 global uint32_t *c_prims, global uint32_t *prims_generated)
++{
++   global struct poly_tess_params *p = &t->p;
++   uint32_t vpp = max(t->verts_per_prim, 1u);
++
++   if (t->new_chunk) {
++      uint32_t sum = 0;
++
++      /* ponytail: serial prefix sum, a chunk holds a few hundred patches. */
++      for (uint32_t i = 0; i < t->chunk_patches; i++) {
++         sum += p->counts[i];
++         p->counts[i] = sum;
++      }
++
++      t->idx_total = sum;
++      t->idx_cursor = 0;
++      if (c_invs)
++         pstats_add(c_invs, sum / vpp);
++      if (c_prims)
++         pstats_add(c_prims, sum / vpp);
++   }
++
++   uint32_t left = t->idx_total - t->idx_cursor;
++   uint32_t count = t->range ? min(t->range, left) : left;
++
++   t->draw[0] = count;
++   t->draw[1] = 1;
++   t->draw[2] = t->idx_cursor;
++   t->draw[3] = 0;
++   t->draw[4] = 0;
++
++   t->idx_cursor += count;
++   t->gs_prim_base = t->prims_done;
++   t->prims_done += count / vpp;
++   t->more = t->idx_cursor < t->idx_total || t->next_patch < t->total_patches;
++
++   if (prims_generated)
++      atomic_fetch_add((global atomic_uint *)prims_generated, count / vpp);
++}
+ #endif
+ 
+ #if (PAN_ARCH == 6 || PAN_ARCH == 7)
+diff --git a/src/panfrost/libpan/tess_draw.h b/src/panfrost/libpan/tess_draw.h
+new file mode 100644
+index 00000000000..ef749b9542d
+--- /dev/null
++++ b/src/panfrost/libpan/tess_draw.h
+@@ -0,0 +1,63 @@
++/*
++ * Copyright 2026 Abhay Byte
++ * SPDX-License-Identifier: MIT
++ */
++
++#pragma once
++
++#include "compiler/libcl/libcl.h"
++#include "poly/geometry.h"
++#include "poly/tessellator.h"
++
++struct panlib_tess_sync {
++   uint32_t seqno;
++   uint32_t error;
++};
++
++/* Per-draw tessellation state shared by the CS loop and the panlib_tess_*
++ * kernels. Each loop iteration either starts a new chunk of patches (VS, TCS,
++ * tessellator) or draws the next index range of the current chunk.
++ */
++struct panlib_tess_draw {
++   struct poly_tess_params p;
++   struct poly_heap heap;
++
++   /* Vk[Indexed]DrawIndirectCommand of the API draw. */
++   uint32_t in_draw[5];
++   /* The part of the API draw the VS runs over for the current chunk. */
++   uint32_t vs_draw[5];
++   uint32_t tcs_grid[3];
++   /* Indexed draw of this iteration's range of tessellator indices. */
++   uint32_t draw[5];
++
++   uint32_t input_patch_size;
++   uint32_t max_patches;
++   uint32_t indexed;
++   /* Max indices drawn per iteration, 0 for a whole chunk. */
++   uint32_t range;
++   /* Vertices per output primitive. */
++   uint32_t verts_per_prim;
++
++   uint32_t patches_per_instance;
++   uint32_t instances;
++   uint32_t new_chunk;
++   uint32_t chunk_patches;
++   /* First patch of the chunk within its instance, the primitive ID base. */
++   uint32_t prim_base;
++   uint32_t idx_total;
++   uint32_t idx_cursor;
++   /* Output primitives drawn before this iteration, GS primitive ID base. */
++   uint32_t gs_prim_base;
++   uint32_t prims_done;
++   uint32_t more;
++   /* Chunk start within the API draw, see panvk_gpu_prerast_params. */
++   uint32_t chunk_vertex;
++   uint32_t chunk_instance;
++   uint32_t _pad;
++
++   uint64_t total_patches;
++   uint64_t next_patch;
++
++   struct panlib_tess_sync ready;
++   struct panlib_tess_sync free;
++} PACKED;
+diff --git a/src/panfrost/vulkan/csf/panvk_cmd_buffer.h b/src/panfrost/vulkan/csf/panvk_cmd_buffer.h
+index 1c615134de0..d49aef58f39 100644
+--- a/src/panfrost/vulkan/csf/panvk_cmd_buffer.h
++++ b/src/panfrost/vulkan/csf/panvk_cmd_buffer.h
+@@ -964,6 +964,7 @@ panvk_get_subqueue_stages(enum panvk_subqueue_id subqueue)
+              VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT |
+              VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT |
+              VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT |
++             VK_PIPELINE_STAGE_2_TESSELLATION_EVALUATION_SHADER_BIT |
+              VK_PIPELINE_STAGE_2_CONDITIONAL_RENDERING_BIT_EXT;
+    case PANVK_SUBQUEUE_FRAGMENT:
+       return VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT |
+@@ -975,6 +976,8 @@ panvk_get_subqueue_stages(enum panvk_subqueue_id subqueue)
+              VK_PIPELINE_STAGE_2_CONDITIONAL_RENDERING_BIT_EXT;
+    case PANVK_SUBQUEUE_COMPUTE:
+       return VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT |
++             VK_PIPELINE_STAGE_2_TESSELLATION_CONTROL_SHADER_BIT |
++             VK_PIPELINE_STAGE_2_TESSELLATION_EVALUATION_SHADER_BIT |
+              VK_PIPELINE_STAGE_2_COPY_BIT |
+              VK_PIPELINE_STAGE_2_COPY_INDIRECT_BIT_KHR |
+              VK_PIPELINE_STAGE_2_CONDITIONAL_RENDERING_BIT_EXT;
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_buffer.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_buffer.c
+index 3a6534b4b76..3c55d0280c1 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_buffer.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_buffer.c
+@@ -346,6 +346,8 @@ add_execution_dependency(uint32_t wait_masks[static PANVK_SUBQUEUE_COUNT],
+                       VK_PIPELINE_STAGE_2_PRE_RASTERIZATION_SHADERS_BIT |
+                       VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT |
+                       VK_PIPELINE_STAGE_2_GEOMETRY_SHADER_BIT |
++                      VK_PIPELINE_STAGE_2_TESSELLATION_CONTROL_SHADER_BIT |
++                      VK_PIPELINE_STAGE_2_TESSELLATION_EVALUATION_SHADER_BIT |
+                       VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT)))
+       dst_subqueues |= BITFIELD_BIT(PANVK_SUBQUEUE_COMPUTE);
+ 
+@@ -469,7 +471,8 @@ collect_cs_deps(struct panvk_cmd_buffer *cmdbuf, const VkDependencyInfo *info,
+    uint32_t wait_masks[PANVK_SUBQUEUE_COUNT] = {0};
+    add_execution_dependency(
+       wait_masks, src.stages, dst.stages,
+-      panvk_priv_mem_check_alloc(dev->gpu_prerast_arena));
++      panvk_priv_mem_check_alloc(dev->gpu_prerast_arena) ||
++         panvk_priv_mem_check_alloc(dev->gpu_prerast_tess_arena));
+ 
+    if (cmdbuf->state.gfx.render.tiler || inherits_render_ctx(cmdbuf)) {
+       if (info->dependencyFlags & VK_DEPENDENCY_BY_REGION_BIT) {
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+index 2df4a505331..b57fcd4a59c 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+@@ -3212,7 +3212,7 @@ launch_draw(struct panvk_cmd_buffer *cmdbuf,
+ 
+ static void
+ patch_vs_attribs(struct panvk_cmd_buffer *cmdbuf,
+-                 struct panvk_draw_info *draw)
++                 const struct panvk_draw_info *draw, enum panvk_subqueue_id q)
+ {
+    uint32_t patch_attribs =
+       cmdbuf->state.gfx.vi.attribs_changing_on_base_instance;
+@@ -3228,8 +3228,7 @@ patch_vs_attribs(struct panvk_cmd_buffer *cmdbuf,
+    const struct vk_dynamic_graphics_state *dyns =
+       &cmdbuf->vk.dynamic_graphics_state;
+    const struct vk_vertex_input_state *vi = dyns->vi;
+-   struct cs_builder *b =
+-      panvk_get_cs_builder(cmdbuf, PANVK_SUBQUEUE_VERTEX_TILER);
++   struct cs_builder *b = panvk_get_cs_builder(cmdbuf, q);
+ 
+    struct cs_index draw_params = cs_scratch_reg64(b, 0);
+    struct cs_index vs_drv_set = cs_scratch_reg64(b, 2);
+@@ -3482,6 +3481,9 @@ launch_indirect_draw(struct panvk_cmd_buffer *cmdbuf,
+ 
+ static void panvk_cmd_draw(struct panvk_cmd_buffer *cmdbuf,
+                            struct panvk_draw_info draw);
++static void gpu_prerast_draw_generated(
++   struct panvk_cmd_buffer *cmdbuf, const struct panvk_draw_info *source,
++   uint64_t arena, enum panvk_gpu_prerast_poly_mode poly_mode);
+ 
+ static void
+ gpu_prerast_wait_compute(struct panvk_cmd_buffer *cmdbuf)
+@@ -3561,10 +3563,11 @@ gpu_prerast_launch_cs(struct panvk_cmd_buffer *cmdbuf,
+ }
+ 
+ static VkResult
+-prepare_gs_desc(struct panvk_cmd_buffer *cmdbuf, const struct panvk_shader *gs)
++prepare_prerast_desc(struct panvk_cmd_buffer *cmdbuf,
++                     const struct panvk_shader *gs,
++                     struct panvk_shader_desc_state *gs_desc)
+ {
+    const struct panvk_shader_desc_info *info = &gs->desc_info;
+-   struct panvk_shader_desc_state *gs_desc = &cmdbuf->state.gfx.gs.desc;
+    struct panvk_descriptor_state *desc_state = &cmdbuf->state.gfx.desc_state;
+    const uint32_t desc_count = info->dyn_bufs.count + 1;
+    VkResult result = panvk_per_arch(cmd_prepare_push_descs)(
+@@ -3591,10 +3594,12 @@ prepare_gs_desc(struct panvk_cmd_buffer *cmdbuf, const struct panvk_shader *gs)
+                                                        gs_desc, 1);
+ }
+ 
++/* prim_id_base_addr, when set, holds the GS primitive ID base on the GPU. */
+ static bool
+ gpu_prerast_gs_run(struct panvk_cmd_buffer *cmdbuf,
+                    const struct panvk_draw_info *source, uint64_t arena,
+-                   uint64_t vs_records, uint64_t vs_indices)
++                   uint64_t vs_records, uint64_t vs_indices,
++                   uint64_t prim_id_base_addr, enum panvk_csf_barrier barrier)
+ {
+    struct panvk_device *dev = to_panvk_device(cmdbuf->vk.base.device);
+    const struct panvk_shader *vs = cmdbuf->state.gfx.vs.shader;
+@@ -3614,7 +3619,8 @@ gpu_prerast_gs_run(struct panvk_cmd_buffer *cmdbuf,
+    const uint64_t gs_draw = arena + PANVK_GPU_PRERAST_GS_DRAW_OFFSET;
+    const uint64_t gs_dispatch = arena + PANVK_GPU_PRERAST_GS_DISPATCH_OFFSET;
+ 
+-   if (prepare_gs_desc(cmdbuf, gs) != VK_SUCCESS)
++   if (prepare_prerast_desc(cmdbuf, gs, &cmdbuf->state.gfx.gs.desc) !=
++       VK_SUCCESS)
+       return false;
+ 
+    struct pan_compute_dim dim = {source->vertex.count, source->instance.count,
+@@ -3680,7 +3686,15 @@ gpu_prerast_gs_run(struct panvk_cmd_buffer *cmdbuf,
+    STORE_GS32(provoking_last,
+               cmdbuf->vk.dynamic_graphics_state.rs.provoking_vertex ==
+                  VK_PROVOKING_VERTEX_MODE_LAST_VERTEX_EXT);
+-   STORE_GS32(prim_id_base, source->gpu_prerast_prim_base);
++   if (prim_id_base_addr) {
++      cs_move64_to(compute, addr, prim_id_base_addr);
++      cs_load32_to(compute, value, addr, 0);
++      cs_wait_slot(compute, SB_ID(LS));
++      cs_store32(compute, value, base,
++                 offsetof(struct panvk_gpu_prerast_gs_params, prim_id_base));
++   } else {
++      STORE_GS32(prim_id_base, source->gpu_prerast_prim_base);
++   }
+ 
+    const struct panvk_pstats_query_state *pstats =
+       &cmdbuf->state.gfx.pstats_query;
+@@ -3714,7 +3728,7 @@ gpu_prerast_gs_run(struct panvk_cmd_buffer *cmdbuf,
+    struct panvk_dispatch_info dispatch = {
+       .direct.wg_count = {source->vertex.count, source->instance.count,
+                           gsi->invocations},
+-      .barrier = PANVK_CSF_BARRIER_SYNC,
++      .barrier = barrier,
+    };
+    if (indirect)
+       dispatch.indirect.buffer_dev_addr = gs_dispatch;
+@@ -3725,15 +3739,33 @@ gpu_prerast_gs_run(struct panvk_cmd_buffer *cmdbuf,
+    return true;
+ }
+ 
++static void
++gpu_prerast_acquire_arena(struct panvk_cmd_buffer *cmdbuf, uint64_t arena)
++{
++   struct cs_builder *b = panvk_get_cs_builder(cmdbuf, PANVK_SUBQUEUE_COMPUTE);
++   struct cs_index addr = cs_scratch_reg64(b, 0);
++   struct cs_index value = cs_scratch_reg32(b, 2);
++
++   cs_move64_to(b, addr,
++                arena + offsetof(struct panvk_gpu_prerast_arena, available));
++   cs_move32_to(b, value, 0);
++   cs_sync32_wait(b, false, MALI_CS_CONDITION_GREATER, value, addr);
++   cs_move32_to(b, value, -1);
++   cs_sync32_add(b, true, MALI_CS_SYNC_SCOPE_CSG, value, addr, cs_now());
++}
++
++/* Acquires the arena and runs the lowered VS, plus the polygon kernel when
++ * poly_mode asks for it. Returns false if nothing was queued. chunk_addr
++ * points to the {vertex, instance} start of a tessellation chunk, or is 0.
++ */
+ static bool
+-gpu_prerast_draw(struct panvk_cmd_buffer *cmdbuf,
+-                 const struct panvk_draw_info *source)
++gpu_prerast_vs(struct panvk_cmd_buffer *cmdbuf,
++               const struct panvk_draw_info *source,
++               const struct panvk_shader *shader, uint64_t arena,
++               enum panvk_gpu_prerast_poly_mode poly_mode, bool acquire,
++               enum panvk_csf_barrier barrier, uint64_t chunk_addr)
+ {
+    struct panvk_device *dev = to_panvk_device(cmdbuf->vk.base.device);
+-   const struct panvk_shader *shader = cmdbuf->state.gfx.vs.shader;
+-   if (!panvk_per_arch(gpu_prerast_can_lower)(cmdbuf, source,
+-                                               &shader->gpu_prerast))
+-      return false;
+ 
+    panvk_per_arch(cmd_prepare_draw_sysvals)(
+       cmdbuf, source, panvk_shader_only_variant(get_fs(cmdbuf)));
+@@ -3750,31 +3782,34 @@ gpu_prerast_draw(struct panvk_cmd_buffer *cmdbuf,
+       panvk_shader_gpu_prerast_variant(shader, PANVK_VS_VARIANT_GPU_LOWERED),
+       &tls_dim, source->indirect.buffer_dev_addr != 0);
+    if (!tsd)
+-      return true;
++      return false;
+ 
+-   uint64_t arena = panvk_priv_mem_dev_addr(dev->gpu_prerast_arena);
+    uint64_t params = arena + PANVK_GPU_PRERAST_PARAMS_OFFSET;
+    uint64_t records = arena + PANVK_GPU_PRERAST_RECORD_OFFSET;
+    uint64_t indices = arena + PANVK_GPU_PRERAST_INDEX_OFFSET;
+    uint64_t generated_draw = arena + PANVK_GPU_PRERAST_DRAW_OFFSET;
+    uint64_t poly_indices = arena + PANVK_GPU_PRERAST_POLY_INDEX_OFFSET;
+    uint64_t poly_draw = arena + PANVK_GPU_PRERAST_POLY_DRAW_OFFSET;
+-   const struct panvk_shader *gs = cmdbuf->state.gfx.gs.shader;
+-   const enum panvk_gpu_prerast_poly_mode poly_mode =
+-      gs ? PANVK_GPU_PRERAST_POLY_NONE
+-         : panvk_per_arch(gpu_prerast_poly_mode)(cmdbuf, source);
+    struct cs_builder *compute =
+       panvk_get_cs_builder(cmdbuf, PANVK_SUBQUEUE_COMPUTE);
+    struct cs_index addr = cs_scratch_reg64(compute, 0);
+    struct cs_index value = cs_scratch_reg32(compute, 2);
+    struct cs_index draw_params = cs_scratch_reg64(compute, 4);
+ 
+-   cs_move64_to(compute, addr,
+-                arena + offsetof(struct panvk_gpu_prerast_arena, available));
+-   cs_move32_to(compute, value, 0);
+-   cs_sync32_wait(compute, false, MALI_CS_CONDITION_GREATER, value, addr);
+-   cs_move32_to(compute, value, -1);
+-   cs_sync32_add(compute, true, MALI_CS_SYNC_SCOPE_CSG, value, addr, cs_now());
++   struct pan_ptr push, poly_push = {0};
++   const struct panvk_shader_variant *lowered = panvk_shader_gpu_prerast_variant(
++      shader, PANVK_VS_VARIANT_GPU_LOWERED);
++   const struct panvk_shader_variant *polygon =
++      panvk_shader_gpu_prerast_variant(shader, PANVK_VS_VARIANT_GPU_POLYGON);
++   if (panvk_per_arch(cmd_prepare_gfx_push_uniforms)(cmdbuf, lowered, &push,
++                                                     1) != VK_SUCCESS ||
++       (poly_mode != PANVK_GPU_PRERAST_POLY_NONE &&
++        panvk_per_arch(cmd_prepare_gfx_push_uniforms)(
++           cmdbuf, polygon, &poly_push, 1) != VK_SUCCESS))
++      return false;
++
++   if (acquire)
++      gpu_prerast_acquire_arena(cmdbuf, arena);
+ 
+    uint32_t vertex_count = source->vertex.count;
+    uint32_t instance_count = source->instance.count;
+@@ -3855,12 +3890,6 @@ gpu_prerast_draw(struct panvk_cmd_buffer *cmdbuf,
+          cs_store32(compute, value, draw_params, i * 4);
+    }
+ 
+-   struct pan_ptr push;
+-   const struct panvk_shader_variant *lowered = panvk_shader_gpu_prerast_variant(
+-      shader, PANVK_VS_VARIANT_GPU_LOWERED);
+-    if (panvk_per_arch(cmd_prepare_gfx_push_uniforms)(cmdbuf, lowered, &push, 1)
+-        != VK_SUCCESS)
+-       return true;
+     uint64_t *fau = push.cpu;
+     if (shader_uses_sysval(lowered, graphics, gpu_prerast_params)) {
+        uint32_t params_off = shader_remapped_sysval_offset(
+@@ -3921,6 +3950,20 @@ gpu_prerast_draw(struct panvk_cmd_buffer *cmdbuf,
+    STORE_PARAM32(record_capacity,
+                  panvk_gpu_prerast_record_capacity(
+                     shader->gpu_prerast.io.record_stride));
++   STORE_PARAM32(draw_id, source->indirect.draw_index);
++   if (chunk_addr) {
++      cs_move64_to(compute, addr, chunk_addr);
++      cs_load32_to(compute, value, addr, 0);
++      cs_load32_to(compute, first_index_reg, addr, 4);
++      cs_wait_slot(compute, SB_ID(LS));
++      cs_store32(compute, value, draw_params,
++                 offsetof(struct panvk_gpu_prerast_params, chunk_vertex));
++      cs_store32(compute, first_index_reg, draw_params,
++                 offsetof(struct panvk_gpu_prerast_params, chunk_instance));
++   } else {
++      STORE_PARAM32(chunk_vertex, 0);
++      STORE_PARAM32(chunk_instance, 0);
++   }
+    if (poly_mode != PANVK_GPU_PRERAST_POLY_NONE) {
+       const struct vk_dynamic_graphics_state *dyns =
+          &cmdbuf->vk.dynamic_graphics_state;
+@@ -3949,20 +3992,13 @@ gpu_prerast_draw(struct panvk_cmd_buffer *cmdbuf,
+ 
+    struct panvk_dispatch_info dispatch = {
+       .direct.wg_count = {vertex_count, instance_count, 1},
+-      .barrier = PANVK_CSF_BARRIER_SYNC,
++      .barrier = barrier,
+    };
+    if (source->indirect.buffer_dev_addr)
+       dispatch.indirect.buffer_dev_addr = dispatch_params;
+    gpu_prerast_launch_cs(cmdbuf, lowered, push.gpu, tsd, &dispatch);
+ 
+    if (poly_mode != PANVK_GPU_PRERAST_POLY_NONE) {
+-      const struct panvk_shader_variant *polygon =
+-         panvk_shader_gpu_prerast_variant(shader, PANVK_VS_VARIANT_GPU_POLYGON);
+-      struct pan_ptr poly_push;
+-      if (panvk_per_arch(cmd_prepare_gfx_push_uniforms)(cmdbuf, polygon,
+-                                                        &poly_push, 1) !=
+-          VK_SUCCESS)
+-         return true;
+       if (shader_uses_sysval(polygon, graphics, gpu_prerast_params)) {
+          uint32_t off = shader_remapped_sysval_offset(
+             polygon, sysval_offset(graphics, gpu_prerast_params));
+@@ -3972,13 +4008,59 @@ gpu_prerast_draw(struct panvk_cmd_buffer *cmdbuf,
+       gpu_prerast_launch_cs(cmdbuf, polygon, poly_push.gpu, tsd, &dispatch);
+    }
+ 
+-   if (gs && !gpu_prerast_gs_run(cmdbuf, source, arena, records, indices)) {
++   return true;
++}
++
++static bool
++gpu_prerast_draw(struct panvk_cmd_buffer *cmdbuf,
++                 const struct panvk_draw_info *source)
++{
++   struct panvk_device *dev = to_panvk_device(cmdbuf->vk.base.device);
++   const struct panvk_shader *shader = cmdbuf->state.gfx.vs.shader;
++   if (!panvk_per_arch(gpu_prerast_can_lower)(cmdbuf, source,
++                                               &shader->gpu_prerast))
++      return false;
++
++   uint64_t arena = panvk_priv_mem_dev_addr(dev->gpu_prerast_arena);
++   uint64_t records = arena + PANVK_GPU_PRERAST_RECORD_OFFSET;
++   uint64_t indices = arena + PANVK_GPU_PRERAST_INDEX_OFFSET;
++   const struct panvk_shader *gs = cmdbuf->state.gfx.gs.shader;
++   const enum panvk_gpu_prerast_poly_mode poly_mode =
++      gs ? PANVK_GPU_PRERAST_POLY_NONE
++         : panvk_per_arch(gpu_prerast_poly_mode)(cmdbuf, source);
++
++   /* The lowered VS fetches attributes on the compute queue. */
++   if (source->indirect.buffer_dev_addr)
++      patch_vs_attribs(cmdbuf, source, PANVK_SUBQUEUE_COMPUTE);
++
++   if (!gpu_prerast_vs(cmdbuf, source, shader, arena, poly_mode, true,
++                       PANVK_CSF_BARRIER_SYNC, 0))
++      return true;
++
++   if (gs && !gpu_prerast_gs_run(cmdbuf, source, arena, records, indices, 0,
++                                 PANVK_CSF_BARRIER_SYNC)) {
+       gpu_prerast_wait_compute(cmdbuf);
+       gpu_prerast_release_arena(cmdbuf, arena);
+       return true;
+    }
+ 
+    gpu_prerast_wait_compute(cmdbuf);
++   gpu_prerast_draw_generated(cmdbuf, source, arena, poly_mode);
++   gpu_prerast_release_arena(cmdbuf, arena);
++   return true;
++}
++
++/* Draws what gpu_prerast_vs() and gpu_prerast_gs_run() left in the arena. */
++static void
++gpu_prerast_draw_generated(struct panvk_cmd_buffer *cmdbuf,
++                           const struct panvk_draw_info *source, uint64_t arena,
++                           enum panvk_gpu_prerast_poly_mode poly_mode)
++{
++   const struct panvk_shader *gs = cmdbuf->state.gfx.gs.shader;
++   uint64_t indices = arena + PANVK_GPU_PRERAST_INDEX_OFFSET;
++   uint64_t generated_draw = arena + PANVK_GPU_PRERAST_DRAW_OFFSET;
++   uint64_t poly_indices = arena + PANVK_GPU_PRERAST_POLY_INDEX_OFFSET;
++   uint64_t poly_draw = arena + PANVK_GPU_PRERAST_POLY_DRAW_OFFSET;
+ 
+    struct panvk_draw_info generated = *source;
+    generated.index.buffer_dev_addr = indices;
+@@ -4036,10 +4118,8 @@ gpu_prerast_draw(struct panvk_cmd_buffer *cmdbuf,
+     gfx_state_set_dirty(cmdbuf, VS);
+     gfx_state_set_dirty(cmdbuf, VS_PUSH_UNIFORMS);
+     panvk_cmd_draw(cmdbuf, generated);
+-    gpu_prerast_release_arena(cmdbuf, arena);
+     gfx_state_set_dirty(cmdbuf, VS);
+     gfx_state_set_dirty(cmdbuf, VS_PUSH_UNIFORMS);
+-    return true;
+ }
+ 
+ #define gpu_prerast_unhandled(why)                                             \
+@@ -4049,12 +4129,451 @@ gpu_prerast_draw(struct panvk_cmd_buffer *cmdbuf,
+       assert(!"gpu_prerast draw not lowered");                                 \
+    } while (0)
+ 
++static uint32_t
++gpu_prerast_tess_max_patches(const struct panvk_cmd_buffer *cmdbuf)
++{
++   const struct panvk_shader *vs = cmdbuf->state.gfx.vs.shader;
++   const struct panvk_shader *tcs = cmdbuf->state.gfx.tcs.shader;
++   const uint32_t ps =
++      MAX2(cmdbuf->vk.dynamic_graphics_state.ts.patch_control_points, 1);
++
++   if (!tcs || !cmdbuf->state.gfx.tes.shader)
++      return 0;
++
++   return panvk_gpu_prerast_tess_max_patches(
++      tcs->gpu_prerast.tess.stride_el * 4, vs->gpu_prerast.io.record_stride,
++      ps);
++}
++
++static void
++gpu_prerast_sync32_take(struct panvk_cmd_buffer *cmdbuf,
++                        enum panvk_subqueue_id subqueue, uint64_t sync)
++{
++   struct cs_builder *b = panvk_get_cs_builder(cmdbuf, subqueue);
++   struct cs_index addr = cs_scratch_reg64(b, 0);
++   struct cs_index value = cs_scratch_reg32(b, 2);
++
++   cs_move64_to(b, addr, sync);
++   cs_move32_to(b, value, 0);
++   cs_sync32_wait(b, false, MALI_CS_CONDITION_GREATER, value, addr);
++   cs_move32_to(b, value, -1);
++   cs_sync32_add(b, true, MALI_CS_SYNC_SCOPE_CSG, value, addr, cs_now());
++}
++
++static void
++gpu_prerast_sync32_give(struct panvk_cmd_buffer *cmdbuf,
++                        enum panvk_subqueue_id subqueue, uint64_t sync)
++{
++   struct panvk_device *dev = to_panvk_device(cmdbuf->vk.base.device);
++   struct cs_builder *b = panvk_get_cs_builder(cmdbuf, subqueue);
++   struct cs_index addr = cs_scratch_reg64(b, 0);
++   struct cs_index value = cs_scratch_reg32(b, 2);
++
++   cs_wait_slots(b, dev->csf.sb.all_iters_mask);
++   cs_move64_to(b, addr, sync);
++   cs_move32_to(b, value, 1);
++   cs_sync32_add(b, true, MALI_CS_SYNC_SCOPE_CSG, value, addr, cs_now());
++}
++
++/* Loads a 32-bit flag into scratch register 0 for a loop exit test. */
++static struct cs_index
++gpu_prerast_load_flag(struct cs_builder *b, uint64_t addr)
++{
++   struct cs_index ptr = cs_scratch_reg64(b, 2);
++   struct cs_index flag = cs_scratch_reg32(b, 0);
++
++   cs_move64_to(b, ptr, addr);
++   cs_load32_to(b, flag, ptr, 0);
++   cs_wait_slot(b, SB_ID(LS));
++   return flag;
++}
++
++/* GPU tessellation, as one CS loop on each of the compute and vertex/tiler
++ * queues, handshaking through the ready/free syncs of struct
++ * panlib_tess_draw. Each compute iteration either runs VS -> TCS ->
++ * tessellator on the next chunk of patches that fits the tessellation arena,
++ * or moves to the next index range of the current chunk. When the TES output
++ * goes through gpu_prerast again (GS, non-fill polygon mode), that range is
++ * sized to the gpu_prerast arena and the TES and GS kernels run in the same
++ * iteration. The vertex/tiler iteration then draws that range. Nothing is
++ * dropped: the loop runs until every patch and index is drawn.
++ */
++static void
++gpu_prerast_tess(struct panvk_cmd_buffer *cmdbuf,
++                 const struct panvk_draw_info *draw)
++{
++   struct panvk_device *dev = to_panvk_device(cmdbuf->vk.base.device);
++   const struct vk_dynamic_graphics_state *dyns =
++      &cmdbuf->vk.dynamic_graphics_state;
++   const struct panvk_shader *vs = cmdbuf->state.gfx.vs.shader;
++   const struct panvk_shader *tcs = cmdbuf->state.gfx.tcs.shader;
++   const struct panvk_shader *tes = cmdbuf->state.gfx.tes.shader;
++   const struct panvk_shader *gs = cmdbuf->state.gfx.gs.shader;
++
++   if (!tcs || !tes || !tcs->gpu_prerast.tess.compiled ||
++       !vs->gpu_prerast.lowered_vs_compiled ||
++       !panvk_priv_mem_check_alloc(dev->gpu_prerast_tess_arena)) {
++      gpu_prerast_unhandled("tessellation shaders missing");
++      return;
++   }
++
++   const struct panvk_gpu_prerast_tess_info *tc = &tcs->gpu_prerast.tess;
++   const struct panvk_gpu_prerast_tess_info *te = &tes->gpu_prerast.tess;
++   const uint32_t domain =
++      te->domain != PANVK_GPU_PRERAST_TESS_UNSET ? te->domain : tc->domain;
++   const uint32_t spacing =
++      te->spacing != PANVK_GPU_PRERAST_TESS_UNSET ? te->spacing : tc->spacing;
++   const bool points = te->point_mode || tc->point_mode;
++   const bool ccw =
++      (te->ccw || tc->ccw) !=
++      (dyns->ts.domain_origin == VK_TESSELLATION_DOMAIN_ORIGIN_LOWER_LEFT);
++   const uint32_t ps = MAX2(dyns->ts.patch_control_points, 1);
++   const uint32_t max_patches = gpu_prerast_tess_max_patches(cmdbuf);
++
++   if (domain == PANVK_GPU_PRERAST_TESS_UNSET ||
++       spacing == PANVK_GPU_PRERAST_TESS_UNSET || !max_patches) {
++      gpu_prerast_unhandled("tessellation state");
++      return;
++   }
++
++   const bool indirect = draw->indirect.buffer_dev_addr != 0;
++   const bool indexed = draw->index.index_size != 0;
++   if (!indirect && (draw->vertex.count < ps || !draw->instance.count))
++      return;
++
++   /* The draw of the tessellator output, one index range per iteration. */
++   struct panvk_draw_info out = *draw;
++   out.prim = points          ? MESA_PRIM_POINTS
++              : domain == 2   ? MESA_PRIM_LINES
++                              : MESA_PRIM_TRIANGLES;
++   out.index.index_size = 4;
++   out.index.offset = 0;
++   out.index.restart_enable = false;
++   out.vertex.base = 0;
++   out.vertex.count = 0;
++   out.instance.base = 0;
++   out.instance.count = 1;
++   out.indirect.count_buffer_dev_addr = 0;
++   out.indirect.draw_count = 1;
++   out.indirect.stride = 5 * sizeof(uint32_t);
++   out.pstats_counted = true;
++   out.gpu_prerast_prim_base = 0;
++
++   const uint32_t vpp = mesa_vertices_per_prim(out.prim);
++   const enum panvk_gpu_prerast_poly_mode poly_mode =
++      gs ? PANVK_GPU_PRERAST_POLY_NONE
++         : panvk_per_arch(gpu_prerast_poly_mode)(cmdbuf, &out);
++   const bool nested =
++      panvk_per_arch(gpu_prerast_can_lower)(cmdbuf, &out, &tes->gpu_prerast);
++   uint32_t range = 0;
++
++   if (!nested && (gs || poly_mode != PANVK_GPU_PRERAST_POLY_NONE)) {
++      gpu_prerast_unhandled("tessellation gpu_prerast variants missing");
++      return;
++   }
++
++   if (nested) {
++      /* Same vertex budget as gpu_prerast_split(). */
++      uint32_t verts =
++         panvk_gpu_prerast_record_capacity(tes->gpu_prerast.io.record_stride);
++      if (gs)
++         verts = MIN2(verts,
++                      panvk_gpu_prerast_gs_cap_slots(&gs->gpu_prerast.gs) /
++                         MAX2(gs->gpu_prerast.gs.invocations, 1));
++      range = verts / vpp * vpp;
++      if (!range || !panvk_priv_mem_check_alloc(dev->gpu_prerast_arena)) {
++         gpu_prerast_unhandled("tessellation output range");
++         return;
++      }
++   }
++
++   const uint64_t arena = panvk_priv_mem_dev_addr(dev->gpu_prerast_tess_arena);
++   const uint64_t prerast_arena =
++      nested ? panvk_priv_mem_dev_addr(dev->gpu_prerast_arena) : 0;
++   struct panvk_gpu_prerast_tess_layout l;
++   panvk_gpu_prerast_tess_layout(arena, max_patches, tc->stride_el * 4, &l);
++
++   struct pan_ptr td = panvk_cmd_alloc_dev_mem(
++      cmdbuf, desc, sizeof(struct panlib_tess_draw), 16);
++   if (!td.gpu)
++      return;
++
++#define TD(f) (td.gpu + offsetof(struct panlib_tess_draw, f))
++   const struct panvk_pstats_query_state *pstats =
++      &cmdbuf->state.gfx.pstats_query;
++   struct panlib_tess_draw *t = td.cpu;
++
++   /* ponytail: the TES invocation count is a 32-bit add from the
++    * tessellator, it wraps past 4G domain points per query.
++    */
++   memset(t, 0, sizeof(*t));
++   t->p = (struct poly_tess_params){
++      .heap = TD(heap),
++      .patch_coord_buffer = l.heap,
++      .coord_allocs = l.coord_allocs,
++      .tcs_buffer = l.tcs,
++      .counts = l.counts,
++      .index_buffer = l.index,
++      .statistic = panvk_pstats_counter_addr(
++         pstats,
++         VK_QUERY_PIPELINE_STATISTIC_TESSELLATION_EVALUATION_SHADER_INVOCATIONS_BIT,
++         true),
++      .tcs_per_vertex_outputs = tc->per_vertex_outputs,
++      .input_patch_size = ps,
++      .output_patch_size = tc->out_patch_size,
++      .tcs_patch_constants = tc->patch_constants,
++      .tcs_stride_el = tc->stride_el,
++      .partitioning = spacing,
++      .points_mode = points,
++      .isolines = domain == 2,
++      .ccw = ccw,
++   };
++   t->heap.base = l.heap;
++   t->heap.size = l.heap_size;
++   t->input_patch_size = ps;
++   t->max_patches = max_patches;
++   t->indexed = indexed;
++   t->range = range;
++   t->verts_per_prim = vpp;
++   t->free.seqno = 1;
++
++   uint64_t src = draw->indirect.buffer_dev_addr;
++   if (!indirect) {
++      t->in_draw[0] = draw->vertex.count;
++      t->in_draw[1] = draw->instance.count;
++      if (indexed) {
++         t->in_draw[2] = draw->index.offset;
++         t->in_draw[3] = draw->vertex.base;
++         t->in_draw[4] = draw->instance.base;
++      } else {
++         t->in_draw[2] = draw->vertex.base;
++         t->in_draw[3] = draw->instance.base;
++      }
++      src = TD(in_draw);
++   }
++
++   struct cs_builder *b = panvk_get_cs_builder(cmdbuf, PANVK_SUBQUEUE_COMPUTE);
++   struct cs_builder *vt =
++      panvk_get_cs_builder(cmdbuf, PANVK_SUBQUEUE_VERTEX_TILER);
++   struct panvk_precomp_ctx ctx = panvk_per_arch(precomp_cs)(cmdbuf);
++   cmdbuf->state.gfx.sysvals.gpu_prerast_tess = TD(p);
++
++   /* Record-time TCS state, reused by every iteration. */
++   const struct panvk_shader_variant *tcs_v = panvk_shader_only_variant(tcs);
++   struct pan_compute_dim dim = {max_patches, 1, 1};
++   struct pan_ptr push;
++   if (prepare_prerast_desc(cmdbuf, tcs, &cmdbuf->state.gfx.tcs.desc) !=
++       VK_SUCCESS)
++      return;
++   uint64_t tsd =
++      panvk_per_arch(cmd_dispatch_prepare_tls)(cmdbuf, tcs_v, &dim, true);
++   if (!tsd || panvk_per_arch(cmd_prepare_gfx_push_uniforms)(
++                  cmdbuf, tcs_v, &push, 1) != VK_SUCCESS)
++      return;
++   if (shader_uses_sysval(tcs_v, graphics, gpu_prerast_params)) {
++      *(uint64_t *)((uint8_t *)push.cpu +
++                    shader_remapped_sysval_offset(
++                       tcs_v, sysval_offset(graphics, gpu_prerast_params))) =
++         arena + PANVK_GPU_PRERAST_PARAMS_OFFSET;
++   }
++   if (shader_uses_sysval(tcs_v, graphics, gpu_prerast_tess)) {
++      *(uint64_t *)((uint8_t *)push.cpu +
++                    shader_remapped_sysval_offset(
++                       tcs_v, sysval_offset(graphics, gpu_prerast_tess))) =
++         TD(p);
++   }
++
++   out.index.buffer_dev_addr = l.index;
++   out.index.buffer_size = l.index_size;
++   out.indirect.buffer_dev_addr = TD(draw);
++   out.prims_generated_counted = true;
++
++   struct panvk_draw_info vs_src = *draw;
++   vs_src.indirect.buffer_dev_addr = TD(vs_draw);
++   vs_src.indirect.count_buffer_dev_addr = 0;
++   vs_src.indirect.draw_count = 1;
++   vs_src.indirect.stride = sizeof(t->vs_draw);
++
++   struct panvk_dispatch_info tcs_dispatch = {
++      .direct.wg_count = {max_patches, 1, 1},
++      .indirect.buffer_dev_addr = TD(tcs_grid),
++      .barrier = PANVK_CSF_BARRIER_WAIT,
++   };
++   const struct panlib_precomp_grid tess_grid =
++      panlib_1d(DIV_ROUND_UP(max_patches, 64));
++   const uint64_t prims_generated =
++      gs ? 0 : cmdbuf->state.gfx.prims_generated_query.ptr;
++   const uint64_t prims_generated_gs =
++      gs ? cmdbuf->state.gfx.prims_generated_query.ptr : 0;
++   const uint32_t view_count =
++      cmdbuf->state.gfx.render.view_mask
++         ? util_bitcount(cmdbuf->state.gfx.render.view_mask)
++         : 1;
++   const enum mesa_prim gs_out_prim =
++      !gs ? MESA_PRIM_POINTS
++      : gs->gpu_prerast.gs.output_prim == MESA_PRIM_POINTS ? MESA_PRIM_POINTS
++      : gs->gpu_prerast.gs.output_prim == MESA_PRIM_LINE_STRIP
++         ? MESA_PRIM_LINE_STRIP
++         : MESA_PRIM_TRIANGLE_STRIP;
++   const uint64_t c_invs =
++      gs ? 0
++         : panvk_pstats_counter_addr(
++              pstats, VK_QUERY_PIPELINE_STATISTIC_CLIPPING_INVOCATIONS_BIT,
++              true);
++   const uint64_t c_prims =
++      gs ? 0
++         : panvk_pstats_counter_addr(
++              pstats, VK_QUERY_PIPELINE_STATISTIC_CLIPPING_PRIMITIVES_BIT,
++              true);
++   const uint64_t tcs_stat = panvk_pstats_counter_addr(
++      pstats, VK_QUERY_PIPELINE_STATISTIC_TESSELLATION_CONTROL_SHADER_PATCHES_BIT,
++      true);
++
++   /* Compute queue: the draw owns both arenas until the vertex/tiler loop
++    * ends. No CSF_SYNC barrier in the loop: it would bump the compute
++    * progress seqno once per iteration but only once at record time.
++    */
++   if (draw->indirect.buffer_dev_addr)
++      patch_vs_attribs(cmdbuf, draw, PANVK_SUBQUEUE_COMPUTE);
++   gpu_prerast_acquire_arena(cmdbuf, arena);
++   if (nested)
++      gpu_prerast_acquire_arena(cmdbuf, prerast_arena);
++   panlib_tess_setup(&ctx, panlib_1d(1), PANLIB_BARRIER_NONE, td.gpu, src,
++                     draw->indirect.count_buffer_dev_addr,
++                     draw->indirect.draw_index);
++   cs_wait_slots(b, dev->csf.sb.all_iters_mask);
++
++   /* No C-level exit from a cs_while body, it would leave the block open.
++    * Allocation failures are recorded on the command buffer instead.
++    */
++   bool ok = true;
++   cs_while(b, MALI_CS_CONDITION_ALWAYS, cs_undef()) {
++      gpu_prerast_sync32_take(cmdbuf, PANVK_SUBQUEUE_COMPUTE, TD(free));
++
++      panlib_tess_step(&ctx, panlib_1d(1), PANLIB_BARRIER_NONE, td.gpu,
++                       tcs_stat);
++      cs_wait_slots(b, dev->csf.sb.all_iters_mask);
++
++      ok &= gpu_prerast_vs(cmdbuf, &vs_src, vs, arena,
++                           PANVK_GPU_PRERAST_POLY_NONE, false,
++                           PANVK_CSF_BARRIER_WAIT, TD(chunk_vertex));
++      cs_wait_slots(b, dev->csf.sb.all_iters_mask);
++
++      if (shader_uses_sysval(tcs_v, graphics, gpu_prerast_params)) {
++         *(uint64_t *)((uint8_t *)push.cpu +
++                       shader_remapped_sysval_offset(
++                          tcs_v, sysval_offset(graphics, gpu_prerast_params))) =
++            arena + PANVK_GPU_PRERAST_PARAMS_OFFSET;
++      }
++      if (shader_uses_sysval(tcs_v, graphics, gpu_prerast_tess)) {
++         *(uint64_t *)((uint8_t *)push.cpu +
++                       shader_remapped_sysval_offset(
++                          tcs_v, sysval_offset(graphics, gpu_prerast_tess))) =
++            TD(p);
++      }
++      gpu_prerast_launch_cs_desc(cmdbuf, tcs_v, &cmdbuf->state.gfx.tcs.desc,
++                                 push.gpu, tsd, &tcs_dispatch);
++      cs_wait_slots(b, dev->csf.sb.all_iters_mask);
++
++      panlib_tessellate(&ctx, tess_grid, PANLIB_BARRIER_NONE, TD(p), domain,
++                        POLY_TESS_MODE_COUNT);
++      cs_wait_slots(b, dev->csf.sb.all_iters_mask);
++      panlib_tess_draw(&ctx, panlib_1d(1), PANLIB_BARRIER_NONE, td.gpu,
++                       c_invs, c_prims, prims_generated);
++      cs_wait_slots(b, dev->csf.sb.all_iters_mask);
++      panlib_tessellate(&ctx, tess_grid, PANLIB_BARRIER_NONE, TD(p), domain,
++                        POLY_TESS_MODE_WITH_COUNTS);
++      cs_wait_slots(b, dev->csf.sb.all_iters_mask);
++
++      if (nested) {
++         /* TES as the gpu_prerast VS over this iteration's index range. */
++         cmdbuf->state.gfx.vs.shader = tes;
++         gfx_state_set_dirty(cmdbuf, VS);
++         gfx_state_set_dirty(cmdbuf, VS_PUSH_UNIFORMS);
++         ok &= prepare_descs(cmdbuf, &out) == VK_SUCCESS &&
++               gpu_prerast_vs(cmdbuf, &out, tes, prerast_arena, poly_mode,
++                              false, PANVK_CSF_BARRIER_WAIT, 0);
++         if (gs) {
++            cs_wait_slots(b, dev->csf.sb.all_iters_mask);
++            ok &= gpu_prerast_gs_run(
++               cmdbuf, &out, prerast_arena,
++               prerast_arena + PANVK_GPU_PRERAST_RECORD_OFFSET,
++               prerast_arena + PANVK_GPU_PRERAST_INDEX_OFFSET,
++               TD(gs_prim_base), PANVK_CSF_BARRIER_WAIT);
++            /* Counted per range, like the GS output draw of gpu_prerast_draw. */
++            if (prims_generated_gs) {
++               cs_wait_slots(b, dev->csf.sb.all_iters_mask);
++               struct panlib_update_prims_generated_query_indirect_args args = {
++                  .prims_generated = prims_generated_gs,
++                  .max_draw_count = 1,
++                  .cmd_stride = sizeof(struct poly_indirect_draw),
++                  .cmd = prerast_arena + PANVK_GPU_PRERAST_GS_DRAW_OFFSET,
++                  .view_count = view_count,
++               };
++               panlib_update_prims_generated_query_indirect_struct(
++                  &ctx, panlib_1d(1), PANLIB_BARRIER_NONE, args,
++                  poly_compact_prim(gs_out_prim));
++            }
++         }
++         cmdbuf->state.gfx.vs.shader = vs;
++         gfx_state_set_dirty(cmdbuf, VS);
++         gfx_state_set_dirty(cmdbuf, VS_PUSH_UNIFORMS);
++      }
++
++      gpu_prerast_sync32_give(cmdbuf, PANVK_SUBQUEUE_COMPUTE, TD(ready));
++      cs_loop_conditional_break(b, __loop, MALI_CS_CONDITION_EQUAL,
++                                gpu_prerast_load_flag(b, TD(more)));
++   }
++
++   /* Vertex/tiler queue: draw each range once the compute side published
++    * it, then hand the arenas back to the compute side. The render context
++    * is set up here so that no one-time setup lands in the loop body.
++    */
++   if (!inherits_render_ctx(cmdbuf))
++      ok &= get_render_ctx(cmdbuf) == VK_SUCCESS;
++
++   struct panvk_draw_info raster = out;
++   cs_while(vt, MALI_CS_CONDITION_ALWAYS, cs_undef()) {
++      gpu_prerast_sync32_take(cmdbuf, PANVK_SUBQUEUE_VERTEX_TILER, TD(ready));
++
++      cmdbuf->state.gfx.vs.shader = tes;
++      gfx_state_set_dirty(cmdbuf, VS);
++      gfx_state_set_dirty(cmdbuf, VS_PUSH_UNIFORMS);
++      if (nested)
++         gpu_prerast_draw_generated(cmdbuf, &raster, prerast_arena, poly_mode);
++      else
++         panvk_cmd_draw(cmdbuf, raster);
++      cmdbuf->state.gfx.vs.shader = vs;
++      gfx_state_set_dirty(cmdbuf, VS);
++      gfx_state_set_dirty(cmdbuf, VS_PUSH_UNIFORMS);
++
++      /* Read "more" before giving the arenas back, the next compute
++       * iteration rewrites it.
++       */
++      cs_wait_slots(vt, dev->csf.sb.all_iters_mask);
++      struct cs_index more = gpu_prerast_load_flag(vt, TD(more));
++      struct cs_index more_keep = cs_scratch_reg32(vt, 4);
++      cs_add_imm32(vt, more_keep, more, 0);
++      gpu_prerast_sync32_give(cmdbuf, PANVK_SUBQUEUE_VERTEX_TILER, TD(free));
++      cs_loop_conditional_break(vt, __loop, MALI_CS_CONDITION_EQUAL,
++                                more_keep);
++   }
++#undef TD
++
++   if (nested)
++      gpu_prerast_release_arena(cmdbuf, prerast_arena);
++   gpu_prerast_release_arena(cmdbuf, arena);
++
++   if (!ok)
++      vk_command_buffer_set_error(&cmdbuf->vk, VK_ERROR_OUT_OF_DEVICE_MEMORY);
++}
++
+ static bool
+ gpu_prerast_needed(const struct panvk_cmd_buffer *cmdbuf,
+                    const struct panvk_draw_info *draw)
+ {
+    return !draw->gpu_prerast_generated &&
+-          (cmdbuf->state.gfx.gs.shader ||
++          (draw->prim == MESA_PRIM_PATCHES || cmdbuf->state.gfx.gs.shader ||
+            panvk_per_arch(gpu_prerast_poly_mode)(cmdbuf, draw) !=
+               PANVK_GPU_PRERAST_POLY_NONE);
+ }
+@@ -4092,6 +4611,11 @@ gpu_prerast_split(struct panvk_cmd_buffer *cmdbuf,
+                        panvk_gpu_prerast_gs_cap_slots(&gs->gpu_prerast.gs) /
+                           gs->gpu_prerast.gs.invocations);
+ 
++   /* Tessellation chunks on the GPU, see gpu_prerast_tess(). */
++   if (draw->prim == MESA_PRIM_PATCHES)
++      return false;
++
++   uint32_t align = 1, overlap = 0, prim_div = 1;
+    if ((uint64_t)draw->vertex.count * draw->instance.count <= max_verts)
+       return false;
+ 
+@@ -4105,7 +4629,6 @@ gpu_prerast_split(struct panvk_cmd_buffer *cmdbuf,
+       return true;
+    }
+ 
+-   uint32_t align = 1, overlap = 0, prim_div = 1;
+    switch (draw->prim) {
+    case MESA_PRIM_POINTS:
+       break;
+@@ -4173,8 +4696,10 @@ panvk_cmd_draw(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info draw)
+       raster_vs_variant(cmdbuf, draw.gpu_prerast_generated);
+    VkResult result;
+ 
+-   /* If there's no vertex shader, we can skip the draw. */
+-   if (!panvk_priv_mem_check_alloc(vs->spd))
++   /* If there's no vertex shader, we can skip the draw. With tessellation,
++    * the TES rasterizes and the VS may be empty.
++    */
++   if (draw.prim != MESA_PRIM_PATCHES && !panvk_priv_mem_check_alloc(vs->spd))
+       return;
+ 
+    /* Count once per API draw, before gpu_prerast splits or lowers it. */
+@@ -4215,6 +4740,11 @@ panvk_cmd_draw(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info draw)
+    if (result != VK_SUCCESS)
+       return;
+ 
++   if (!draw.gpu_prerast_generated && draw.prim == MESA_PRIM_PATCHES) {
++      gpu_prerast_tess(cmdbuf, &draw);
++      return;
++   }
++
+    if (!draw.gpu_prerast_generated && gpu_prerast_draw(cmdbuf, &draw))
+       return;
+ 
+@@ -4225,13 +4755,14 @@ panvk_cmd_draw(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info draw)
+ 
+    /* For indirect draws, we need to patch the descriptors we just emitted */
+    if (draw.indirect.buffer_dev_addr)
+-      patch_vs_attribs(cmdbuf, &draw);
++      patch_vs_attribs(cmdbuf, &draw, PANVK_SUBQUEUE_VERTEX_TILER);
+ 
+    result = prepare_draw(cmdbuf, &draw);
+    if (result != VK_SUCCESS)
+       return;
+ 
+-   update_prims_generated_query(cmdbuf, &draw);
++   if (!draw.prims_generated_counted)
++      update_prims_generated_query(cmdbuf, &draw);
+ 
+    if (draw.indirect.buffer_dev_addr)
+       launch_indirect_draw(cmdbuf, &draw);
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_query.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_query.c
+index d24fa287620..84d6ff2c69a 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_query.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_query.c
+@@ -798,7 +798,10 @@ panvk_per_arch(cmd_pstats_draw)(struct panvk_cmd_buffer *cmdbuf,
+    uint32_t counted = q->mask & (PSTAT(INPUT_ASSEMBLY_VERTICES) |
+                                  PSTAT(INPUT_ASSEMBLY_PRIMITIVES) |
+                                  PSTAT(VERTEX_SHADER_INVOCATIONS));
+-   if (!cmdbuf->state.gfx.gs.shader) {
++   const uint32_t patch_size =
++      cmdbuf->vk.dynamic_graphics_state.ts.patch_control_points;
++   /* The GS and tessellation kernels count clipping from their output. */
++   if (!cmdbuf->state.gfx.gs.shader && !cmdbuf->state.gfx.tes.shader) {
+       counted |= q->mask & (PSTAT(CLIPPING_INVOCATIONS) |
+                             PSTAT(CLIPPING_PRIMITIVES));
+    }
+@@ -816,7 +819,10 @@ panvk_per_arch(cmd_pstats_draw)(struct panvk_cmd_buffer *cmdbuf,
+       struct cs_builder *b =
+          panvk_get_cs_builder(cmdbuf, PANVK_SUBQUEUE_COMPUTE);
+       uint64_t prims =
+-         u_decomposed_prims_for_vertices(draw->prim, draw->vertex.count) *
++         (draw->prim == MESA_PRIM_PATCHES
++             ? draw->vertex.count / MAX2(patch_size, 1)
++             : u_decomposed_prims_for_vertices(draw->prim,
++                                               draw->vertex.count)) *
+          instances;
+ 
+       pstats_cs_add(b, panvk_pstats_counter_addr(
+@@ -876,6 +882,7 @@ panvk_per_arch(cmd_pstats_draw)(struct panvk_cmd_buffer *cmdbuf,
+       .restart = restart,
+       .prim = draw->prim,
+       .view_count = view_count,
++      .patch_size = patch_size,
+    };
+    struct panvk_precomp_ctx precomp_ctx = panvk_per_arch(precomp_cs)(cmdbuf);
+ 
+diff --git a/src/panfrost/vulkan/meson.build b/src/panfrost/vulkan/meson.build
+index 62f9748cc25..12661b10e50 100644
+--- a/src/panfrost/vulkan/meson.build
++++ b/src/panfrost/vulkan/meson.build
+@@ -168,12 +168,13 @@ foreach arch : [6, 7, 10, 11, 12, 13, 14]
+ 
+   panvk_per_arch_libs += static_library(
+     'panvk_v@0@'.format(arch),
+-    per_arch_files,
++    [per_arch_files, libpoly_shaders[1]],
+     include_directories : [
+       inc_include,
+       inc_src,
+       inc_panfrost,
+       inc_panvk_per_arch,
++      include_directories('../../poly/cl'),
+     ],
+     dependencies : [
+       idep_nir_headers,
+@@ -218,6 +219,7 @@ libvulkan_panfrost = shared_library(
+     libpanfrost_decode,
+     libpanfrost_lib,
+     libpanfrost_compiler,
++    libpoly_nir,
+   ],
+   dependencies : [
+     dep_dl,
+diff --git a/src/panfrost/vulkan/panvk_cmd_draw.h b/src/panfrost/vulkan/panvk_cmd_draw.h
+index 83964f086e1..40aff4f44ca 100644
+--- a/src/panfrost/vulkan/panvk_cmd_draw.h
++++ b/src/panfrost/vulkan/panvk_cmd_draw.h
+@@ -210,7 +210,7 @@ struct panvk_cmd_graphics_state {
+    struct {
+       const struct panvk_shader *shader;
+       struct panvk_shader_desc_state desc;
+-   } gs;
++   } gs, tcs, tes;
+ #endif
+ 
+    struct {
+@@ -460,6 +460,8 @@ struct panvk_draw_info {
+    bool gpu_prerast_generated;
+    /* Already counted by a pipeline statistics query (split chunks). */
+    bool pstats_counted;
++   /* The primitives generated query was updated by the tessellation kernels. */
++   bool prims_generated_counted;
+    uint32_t gpu_prerast_prim_base;
+ 
+ #if PAN_ARCH < 9
+diff --git a/src/panfrost/vulkan/panvk_cmd_meta.h b/src/panfrost/vulkan/panvk_cmd_meta.h
+index 3018e105348..031194b31dd 100644
+--- a/src/panfrost/vulkan/panvk_cmd_meta.h
++++ b/src/panfrost/vulkan/panvk_cmd_meta.h
+@@ -63,7 +63,7 @@ struct panvk_cmd_meta_graphics_save_ctx {
+    } vs;
+ 
+ #if PAN_ARCH >= 10
+-   const struct panvk_shader *gs;
++   const struct panvk_shader *gs, *tcs, *tes;
+ #endif
+ 
+    struct panvk_occlusion_query_state occlusion_query;
+diff --git a/src/panfrost/vulkan/panvk_device.h b/src/panfrost/vulkan/panvk_device.h
+index adaa57dbc0f..0355679151e 100644
+--- a/src/panfrost/vulkan/panvk_device.h
++++ b/src/panfrost/vulkan/panvk_device.h
+@@ -113,6 +113,7 @@ struct panvk_device {
+ 
+    struct panvk_device_draw_context* draw_ctx;
+    struct panvk_priv_mem gpu_prerast_arena;
++   struct panvk_priv_mem gpu_prerast_tess_arena;
+ 
+    struct {
+       struct pandecode_context *decode_ctx;
+diff --git a/src/panfrost/vulkan/panvk_gpu_prerast.h b/src/panfrost/vulkan/panvk_gpu_prerast.h
+index e6069d60d68..46d438a6043 100644
+--- a/src/panfrost/vulkan/panvk_gpu_prerast.h
++++ b/src/panfrost/vulkan/panvk_gpu_prerast.h
+@@ -9,10 +9,12 @@
+ #include "compiler/pan_compiler.h"
+ #include "panvk_macros.h"
+ #include "poly/geometry.h"
++#include "poly/tessellator.h"
++#include "libpan/tess_draw.h"
+ #include "util/macros.h"
+ #include "vulkan/vulkan_core.h"
+ 
+-#define PANVK_GPU_PRERAST_ABI_VERSION 4
++#define PANVK_GPU_PRERAST_ABI_VERSION 5
+ #define PANVK_GPU_PRERAST_MAX_EXECUTION_BYTES (256ull * 1024 * 1024)
+ #define PANVK_GPU_PRERAST_VS_REGION_END (32ull * 1024 * 1024)
+ #define PANVK_GPU_PRERAST_GS_INDEX_OFFSET PANVK_GPU_PRERAST_VS_REGION_END
+@@ -118,9 +120,25 @@ struct panvk_gpu_prerast_gs_info {
+    bool _pad;
+ };
+ 
++/* TCS/TES state the tessellation kernels need. The tessellation modes are
++ * recorded by both stages, the TES ones win when set. */
++struct panvk_gpu_prerast_tess_info {
++   uint64_t per_vertex_outputs;
++   uint32_t stride_el;
++   uint8_t patch_constants;
++   uint8_t out_patch_size;
++   uint8_t domain;
++   uint8_t spacing;
++   bool ccw;
++   bool point_mode;
++   bool compiled;
++   bool _pad;
++};
++
+ struct panvk_gpu_prerast_shader {
+    struct panvk_gpu_prerast_io io;
+    struct panvk_gpu_prerast_gs_info gs;
++   struct panvk_gpu_prerast_tess_info tess;
+    uint32_t requirements;
+    bool lowered_vs_compiled;
+    bool passthrough_vs_compiled;
+@@ -202,7 +220,10 @@ struct panvk_gpu_prerast_params {
+    uint32_t primitive_restart;
+    uint32_t index_offset;
+    uint32_t record_capacity;
+-   uint32_t _pad;
++   uint32_t draw_id;
++   /* Tessellation chunk start, added to the invocation IDs. */
++   uint32_t chunk_vertex;
++   uint32_t chunk_instance;
+    struct {
+       uint64_t indices;
+       uint64_t draw;
+@@ -230,6 +251,75 @@ panvk_gpu_prerast_record_capacity(uint32_t record_stride)
+    return MIN2(cap, PANVK_GPU_PRERAST_MAX_INVOCATIONS);
+ }
+ 
++/* The tessellation arena reuses the gpu_prerast header and VS region layout
++ * for the control points, the TCS outputs, domain points and indices live
++ * past it. Sized for patches tessellated at the maximum level.
++ */
++#define PANVK_GPU_PRERAST_TESS_ARENA_SIZE (96ull * 1024 * 1024)
++#define PANVK_GPU_PRERAST_TESS_DATA_OFFSET PANVK_GPU_PRERAST_VS_REGION_END
++#define PANVK_GPU_PRERAST_TESS_MAX_LEVEL 64
++#define PANVK_GPU_PRERAST_TESS_MAX_PATCH_SIZE 32
++#define PANVK_GPU_PRERAST_TESS_UNSET 0xff
++#define PANVK_GPU_PRERAST_TESS_MAX_POINTS                                      \
++   ((PANVK_GPU_PRERAST_TESS_MAX_LEVEL + 1) *                                   \
++    (PANVK_GPU_PRERAST_TESS_MAX_LEVEL + 1))
++#define PANVK_GPU_PRERAST_TESS_MAX_INDICES                                     \
++   (PANVK_GPU_PRERAST_TESS_MAX_LEVEL * PANVK_GPU_PRERAST_TESS_MAX_LEVEL * 6)
++
++static_assert(offsetof(struct panlib_tess_draw, total_patches) % 8 == 0 &&
++                 offsetof(struct panlib_tess_draw, ready) % 8 == 0 &&
++                 offsetof(struct panlib_tess_draw, free) % 8 == 0,
++              "panlib_tess_draw 64-bit fields and syncs must be aligned");
++
++struct panvk_gpu_prerast_tess_layout {
++   uint64_t tcs, counts, coord_allocs, heap, index;
++   uint32_t heap_size, index_size;
++};
++
++static inline uint64_t
++panvk_gpu_prerast_tess_patch_bytes(uint32_t tcs_stride_B)
++{
++   return ALIGN_POT((uint64_t)tcs_stride_B, 16) + 2 * sizeof(uint32_t) +
++          PANVK_GPU_PRERAST_TESS_MAX_POINTS * sizeof(struct poly_tess_point) +
++          16 + PANVK_GPU_PRERAST_TESS_MAX_INDICES * sizeof(uint32_t);
++}
++
++static inline uint32_t
++panvk_gpu_prerast_tess_max_patches(uint32_t tcs_stride_B,
++                                   uint32_t vs_record_stride,
++                                   uint32_t patch_size)
++{
++   uint64_t tess = (PANVK_GPU_PRERAST_TESS_ARENA_SIZE -
++                    PANVK_GPU_PRERAST_TESS_DATA_OFFSET - 4 * 16) /
++                   panvk_gpu_prerast_tess_patch_bytes(tcs_stride_B);
++   uint64_t vs =
++      panvk_gpu_prerast_record_capacity(vs_record_stride) / MAX2(patch_size, 1);
++   return MIN2(tess, vs);
++}
++
++static inline void
++panvk_gpu_prerast_tess_layout(uint64_t arena, uint32_t patches,
++                              uint32_t tcs_stride_B,
++                              struct panvk_gpu_prerast_tess_layout *l)
++{
++   uint64_t off = arena + PANVK_GPU_PRERAST_TESS_DATA_OFFSET;
++
++   l->tcs = off;
++   off += ALIGN_POT((uint64_t)patches * tcs_stride_B, 16);
++   l->counts = off;
++   off += ALIGN_POT((uint64_t)patches * sizeof(uint32_t), 16);
++   l->coord_allocs = off;
++   off += ALIGN_POT((uint64_t)patches * sizeof(uint32_t), 16);
++   l->heap = off;
++   l->heap_size = patches * (PANVK_GPU_PRERAST_TESS_MAX_POINTS *
++                                sizeof(struct poly_tess_point) + 16) + 16;
++   off += l->heap_size;
++   l->index = off;
++   l->index_size =
++      patches * PANVK_GPU_PRERAST_TESS_MAX_INDICES * sizeof(uint32_t);
++   assert(off + l->index_size <= arena + PANVK_GPU_PRERAST_TESS_ARENA_SIZE);
++}
++
+ struct panvk_gpu_prerast_arena {
+    uint32_t available;
+    uint32_t error;
+diff --git a/src/panfrost/vulkan/panvk_shader.h b/src/panfrost/vulkan/panvk_shader.h
+index cb37c93553e..f33581960b8 100644
+--- a/src/panfrost/vulkan/panvk_shader.h
++++ b/src/panfrost/vulkan/panvk_shader.h
+@@ -165,6 +165,7 @@ struct panvk_graphics_sysvals {
+ #if PAN_ARCH >= 10
+    aligned_u64 gpu_prerast_params;
+    aligned_u64 gpu_prerast_records;
++   aligned_u64 gpu_prerast_tess;
+ #endif
+ 
+    struct {
+@@ -486,6 +487,8 @@ panvk_shader_num_variants(mesa_shader_stage stage)
+ #if PAN_ARCH >= 10
+    if (stage == MESA_SHADER_GEOMETRY)
+       return PANVK_GS_VARIANTS;
++   if (stage == MESA_SHADER_TESS_EVAL)
++      return PANVK_VS_VARIANTS;
+ #endif
+ 
+    return 1;
+@@ -507,7 +510,8 @@ panvk_shader_variant_name(const struct panvk_shader *shader,
+    unsigned i = variant - shader->variants;
+    assert(i < panvk_shader_num_variants(shader->vk.stage));
+ 
+-   if (shader->vk.stage == MESA_SHADER_VERTEX) {
++   if (shader->vk.stage == MESA_SHADER_VERTEX ||
++       shader->vk.stage == MESA_SHADER_TESS_EVAL) {
+       assert(i < ARRAY_SIZE(panvk_vs_shader_variant_name));
+       return panvk_vs_shader_variant_name[i];
+    }
+diff --git a/src/panfrost/vulkan/panvk_vX_cmd_meta.c b/src/panfrost/vulkan/panvk_vX_cmd_meta.c
+index 28f2b4ee837..ed024c5ffe1 100644
+--- a/src/panfrost/vulkan/panvk_vX_cmd_meta.c
++++ b/src/panfrost/vulkan/panvk_vX_cmd_meta.c
+@@ -181,7 +181,11 @@ meta_gfx_start(struct panvk_cmd_buffer *cmdbuf,
+    save_ctx->vb0 = cmdbuf->state.gfx.vb.bufs[0];
+ #if PAN_ARCH >= 10
+    save_ctx->gs = cmdbuf->state.gfx.gs.shader;
++   save_ctx->tcs = cmdbuf->state.gfx.tcs.shader;
++   save_ctx->tes = cmdbuf->state.gfx.tes.shader;
+    cmdbuf->state.gfx.gs.shader = NULL;
++   cmdbuf->state.gfx.tcs.shader = NULL;
++   cmdbuf->state.gfx.tes.shader = NULL;
+ #endif
+ 
+    save_ctx->dyn_state.all = cmdbuf->vk.dynamic_graphics_state;
+@@ -251,6 +255,8 @@ meta_gfx_end(struct panvk_cmd_buffer *cmdbuf,
+    cmdbuf->state.gfx.vb.bufs[0] = save_ctx->vb0;
+ #if PAN_ARCH >= 10
+    cmdbuf->state.gfx.gs.shader = save_ctx->gs;
++   cmdbuf->state.gfx.tcs.shader = save_ctx->tcs;
++   cmdbuf->state.gfx.tes.shader = save_ctx->tes;
+ #endif
+ 
+ #if PAN_ARCH < 9
+diff --git a/src/panfrost/vulkan/panvk_vX_cmd_push_constant.c b/src/panfrost/vulkan/panvk_vX_cmd_push_constant.c
+index 365e209a23d..7c762bb46e4 100644
+--- a/src/panfrost/vulkan/panvk_vX_cmd_push_constant.c
++++ b/src/panfrost/vulkan/panvk_vX_cmd_push_constant.c
+@@ -102,7 +102,10 @@ panvk_per_arch(CmdPushConstants2KHR)(
+ {
+    VK_FROM_HANDLE(panvk_cmd_buffer, cmdbuf, commandBuffer);
+ 
+-   if (pPushConstantsInfo->stageFlags & VK_SHADER_STAGE_VERTEX_BIT)
++   if (pPushConstantsInfo->stageFlags &
++       (VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT |
++        VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT |
++        VK_SHADER_STAGE_GEOMETRY_BIT))
+       gfx_state_set_dirty(cmdbuf, VS_PUSH_UNIFORMS);
+ 
+    if (pPushConstantsInfo->stageFlags & VK_SHADER_STAGE_FRAGMENT_BIT)
+diff --git a/src/panfrost/vulkan/panvk_vX_device.c b/src/panfrost/vulkan/panvk_vX_device.c
+index 75a92e3dbd6..92e22138e64 100644
+--- a/src/panfrost/vulkan/panvk_vX_device.c
++++ b/src/panfrost/vulkan/panvk_vX_device.c
+@@ -603,6 +603,23 @@ panvk_per_arch(create_device)(struct panvk_physical_device *physical_device,
+          arena->available = 1;
+       }
+    }
++   if (device->vk.enabled_features.tessellationShader) {
++      device->gpu_prerast_tess_arena = panvk_pool_alloc_mem(
++         &device->mempools.rw,
++         (struct panvk_pool_alloc_info){
++            .size = PANVK_GPU_PRERAST_TESS_ARENA_SIZE,
++            .alignment = 4096,
++         });
++      if (!panvk_priv_mem_check_alloc(device->gpu_prerast_tess_arena)) {
++         result = panvk_error(device, VK_ERROR_OUT_OF_DEVICE_MEMORY);
++         goto err_free_priv_bos;
++      }
++      panvk_priv_mem_write(device->gpu_prerast_tess_arena, 0,
++                           struct panvk_gpu_prerast_arena, arena) {
++         memset(arena, 0, sizeof(*arena));
++         arena->available = 1;
++      }
++   }
+ #endif
+ 
+ #if PAN_ARCH >= 10
+@@ -731,6 +748,7 @@ err_free_mem_cache:
+ err_free_precomp:
+    panvk_precomp_cleanup(device);
+ err_free_priv_bos:
++   panvk_pool_free_mem(&device->gpu_prerast_tess_arena);
+    panvk_pool_free_mem(&device->gpu_prerast_arena);
+    if (device->printf.bo)
+       u_printf_destroy(&device->printf.ctx);
+@@ -792,6 +810,7 @@ panvk_per_arch(destroy_device)(struct panvk_device *device,
+     panvk_priv_bo_unref(device->indirect_varying_buffer);
+     panvk_priv_bo_unref(device->tiler_heap);
+     panvk_priv_bo_unref(device->sample_positions);
++    panvk_pool_free_mem(&device->gpu_prerast_tess_arena);
+     panvk_pool_free_mem(&device->gpu_prerast_arena);
+     panvk_device_cleanup_mempools(device);
+    vk_free(&device->vk.alloc, device->dump_region_size);
+diff --git a/src/panfrost/vulkan/panvk_vX_nir_lower_descriptors.c b/src/panfrost/vulkan/panvk_vX_nir_lower_descriptors.c
+index 54c293ecbcd..d37d06ed007 100644
+--- a/src/panfrost/vulkan/panvk_vX_nir_lower_descriptors.c
++++ b/src/panfrost/vulkan/panvk_vX_nir_lower_descriptors.c
+@@ -1201,6 +1201,7 @@ create_copy_table(nir_shader *nir, struct lower_desc_ctx *ctx)
+       break;
+    case MESA_SHADER_COMPUTE:
+    case MESA_SHADER_GEOMETRY:
++   case MESA_SHADER_TESS_CTRL:
+       dummy_sampler_idx = 0;
+       break;
+    default:
+diff --git a/src/panfrost/vulkan/panvk_vX_physical_device.c b/src/panfrost/vulkan/panvk_vX_physical_device.c
+index 3df5506c693..99d432549b1 100644
+--- a/src/panfrost/vulkan/panvk_vX_physical_device.c
++++ b/src/panfrost/vulkan/panvk_vX_physical_device.c
+@@ -309,7 +309,7 @@ panvk_per_arch(get_physical_device_features)(
+       .imageCubeArray = true,
+       .independentBlend = true,
+       .geometryShader = PAN_ARCH >= 10 && !PANVK_DEBUG(NO_GS),
+-      .tessellationShader = false,
++      .tessellationShader = PAN_ARCH >= 10,
+       .sampleRateShading = true,
+       .dualSrcBlend = true,
+       .logicOp = true,
+@@ -336,7 +336,7 @@ panvk_per_arch(get_physical_device_features)(
+          (PAN_ARCH >= 13 && instance->drirc.misc.enable_vertex_pipeline_stores_atomics) ||
+          instance->drirc.misc.force_enable_shader_atomics,
+       .fragmentStoresAndAtomics = true,
+-      .shaderTessellationAndGeometryPointSize = false,
++      .shaderTessellationAndGeometryPointSize = PAN_ARCH >= 10,
+       .shaderImageGatherExtended = true,
+       .shaderStorageImageExtendedFormats = true,
+       .shaderStorageImageMultisample = false,
+@@ -530,7 +530,7 @@ panvk_per_arch(get_physical_device_features)(
+       /* VK_EXT_extended_dynamic_state2 */
+       .extendedDynamicState2 = true,
+       .extendedDynamicState2LogicOp = true,
+-      .extendedDynamicState2PatchControlPoints = false,
++      .extendedDynamicState2PatchControlPoints = PAN_ARCH >= 10,
+ 
+       /* VK_EXT_extended_dynamic_state3 */
+       .extendedDynamicState3TessellationDomainOrigin = false,
+@@ -916,15 +916,14 @@ panvk_per_arch(get_physical_device_properties)(
+       .maxVertexInputBindingStride = MESA_VK_MAX_VERTEX_BINDING_STRIDE,
+       /* 32 vec4 varyings. */
+       .maxVertexOutputComponents = 128,
+-      /* Tesselation shaders not supported. */
+-      .maxTessellationGenerationLevel = 0,
+-      .maxTessellationPatchSize = 0,
+-      .maxTessellationControlPerVertexInputComponents = 0,
+-      .maxTessellationControlPerVertexOutputComponents = 0,
+-      .maxTessellationControlPerPatchOutputComponents = 0,
+-      .maxTessellationControlTotalOutputComponents = 0,
+-      .maxTessellationEvaluationInputComponents = 0,
+-      .maxTessellationEvaluationOutputComponents = 0,
++      .maxTessellationGenerationLevel = PAN_ARCH >= 10 ? 64 : 0,
++      .maxTessellationPatchSize = PAN_ARCH >= 10 ? 32 : 0,
++      .maxTessellationControlPerVertexInputComponents = PAN_ARCH >= 10 ? 128 : 0,
++      .maxTessellationControlPerVertexOutputComponents = PAN_ARCH >= 10 ? 128 : 0,
++      .maxTessellationControlPerPatchOutputComponents = PAN_ARCH >= 10 ? 120 : 0,
++      .maxTessellationControlTotalOutputComponents = PAN_ARCH >= 10 ? 4096 : 0,
++      .maxTessellationEvaluationInputComponents = PAN_ARCH >= 10 ? 128 : 0,
++      .maxTessellationEvaluationOutputComponents = PAN_ARCH >= 10 ? 128 : 0,
+       .maxGeometryShaderInvocations = PAN_ARCH >= 10 ? 32 : 0,
+       .maxGeometryInputComponents = PAN_ARCH >= 10 ? 64 : 0,
+       .maxGeometryOutputComponents = PAN_ARCH >= 10 ? 128 : 0,
+diff --git a/src/panfrost/vulkan/panvk_vX_shader.c b/src/panfrost/vulkan/panvk_vX_shader.c
+index 618ea1400de..387add5b10b 100644
+--- a/src/panfrost/vulkan/panvk_vX_shader.c
++++ b/src/panfrost/vulkan/panvk_vX_shader.c
+@@ -22,6 +22,8 @@
+ #include "panvk_shader.h"
+ #if PAN_ARCH >= 10
+ #include "panvk_gpu_prerast.h"
++#include "poly/nir/poly_nir.h"
++#include "libpoly.h"
+ #endif
+ 
+ #include "spirv/nir_spirv.h"
+@@ -630,10 +632,12 @@ panvk_preprocess_nir(struct vk_physical_device *vk_pdev,
+    if (nir->info.stage == MESA_SHADER_FRAGMENT)
+       NIR_PASS(_, nir, nir_opt_vectorize_io_vars, nir_var_shader_out);
+ 
+-   NIR_PASS(_, nir, nir_lower_io_vars_to_temporaries,
+-            nir_shader_get_entrypoint(nir), nir_var_shader_out);
++   if (nir->info.stage != MESA_SHADER_TESS_CTRL)
++      NIR_PASS(_, nir, nir_lower_io_vars_to_temporaries,
++               nir_shader_get_entrypoint(nir), nir_var_shader_out);
+ 
+-   if (nir->info.stage == MESA_SHADER_VERTEX)
++   if (nir->info.stage == MESA_SHADER_VERTEX ||
++       nir->info.stage == MESA_SHADER_TESS_EVAL)
+       NIR_PASS(_, nir, panvk_lower_clip_cull_vs);
+ 
+ #if PAN_ARCH < 9
+@@ -711,7 +715,7 @@ panvk_lower_gpu_prerast_sysval(nir_builder *b, nir_intrinsic_instr *intr,
+ }
+ 
+ static nir_def *
+-poly_nir_load_raw_vertex_id(nir_builder *b, nir_def *id)
++panvk_poly_load_raw_vertex_id(nir_builder *b, nir_def *id)
+ {
+    nir_def *p = nir_load_vertex_param_buffer_poly(b);
+    nir_def *index_size = nir_load_global(
+@@ -763,9 +767,9 @@ poly_nir_load_raw_vertex_id(nir_builder *b, nir_def *id)
+ }
+ 
+ static nir_def *
+-poly_nir_load_vertex_id(nir_builder *b, nir_def *id)
++panvk_poly_load_vertex_id(nir_builder *b, nir_def *id)
+ {
+-   return nir_iadd(b, poly_nir_load_raw_vertex_id(b, id),
++   return nir_iadd(b, panvk_poly_load_raw_vertex_id(b, id),
+                    nir_load_first_vertex(b));
+ }
+ 
+@@ -791,7 +795,7 @@ panvk_gpu_prerast_lower_sysval_intr(nir_builder *b, nir_intrinsic_instr *intr,
+ }
+ 
+ static bool
+-poly_nir_lower_sysvals(nir_shader *s)
++panvk_poly_lower_sysvals(nir_shader *s)
+ {
+    return nir_shader_intrinsics_pass(s, panvk_gpu_prerast_lower_sysval_intr,
+                                      nir_metadata_control_flow, NULL);
+@@ -802,37 +806,148 @@ panvk_gpu_prerast_lower_sw_vs_intr(nir_builder *b, nir_intrinsic_instr *intr,
+                                    UNUSED void *data)
+ {
+    b->cursor = nir_before_instr(&intr->instr);
+-   if (intr->intrinsic == nir_intrinsic_load_vertex_id) {
+-      nir_def *id = nir_channel(b, nir_load_global_invocation_id(b, 32), 0);
+-      nir_def *first_index = nir_load_global(
+-         b, 1, 32,
+-         nir_iadd_imm(b, nir_load_vertex_param_buffer_poly(b),
+-                      offsetof(struct panvk_gpu_prerast_params, index_offset)),
+-         .align_mul = 4);
+-      nir_def_replace(&intr->def,
+-                      poly_nir_load_vertex_id(b, nir_iadd(b, id, first_index)));
++#define LOAD_PARAM(field)                                                      \
++   nir_load_global(                                                            \
++      b, 1, 32,                                                                \
++      nir_iadd_imm(b, nir_load_vertex_param_buffer_poly(b),                    \
++                   offsetof(struct panvk_gpu_prerast_params, field)),          \
++      .align_mul = 4)
++   if (intr->intrinsic == nir_intrinsic_load_vertex_id ||
++       intr->intrinsic == nir_intrinsic_load_vertex_id_zero_base) {
++      nir_def *id =
++         nir_iadd(b, nir_channel(b, nir_load_global_invocation_id(b, 32), 0),
++                  LOAD_PARAM(chunk_vertex));
++      if (intr->intrinsic == nir_intrinsic_load_vertex_id)
++         id = panvk_poly_load_vertex_id(b,
++                                        nir_iadd(b, id, LOAD_PARAM(index_offset)));
++      nir_def_replace(&intr->def, id);
+       return true;
+    }
+-   if (intr->intrinsic == nir_intrinsic_load_vertex_id_zero_base) {
++   if (intr->intrinsic == nir_intrinsic_load_instance_id) {
+       nir_def_replace(
+-         &intr->def, nir_channel(b, nir_load_global_invocation_id(b, 32), 0));
++         &intr->def,
++         nir_iadd(b, nir_channel(b, nir_load_global_invocation_id(b, 32), 1),
++                  LOAD_PARAM(chunk_instance)));
+       return true;
+    }
+-   if (intr->intrinsic == nir_intrinsic_load_instance_id) {
+-      nir_def_replace(
+-         &intr->def, nir_channel(b, nir_load_global_invocation_id(b, 32), 1));
++   if (intr->intrinsic == nir_intrinsic_load_draw_id) {
++      nir_def_replace(&intr->def, LOAD_PARAM(draw_id));
+       return true;
+    }
++#undef LOAD_PARAM
+    return false;
+ }
+ 
+ static bool
+-poly_nir_lower_sw_vs(nir_shader *s)
++panvk_poly_lower_sw_vs(nir_shader *s)
+ {
+    return nir_shader_intrinsics_pass(s, panvk_gpu_prerast_lower_sw_vs_intr,
+                                      nir_metadata_control_flow, NULL);
+ }
+ 
++static bool
++panvk_tess_lower_intr(nir_builder *b, nir_intrinsic_instr *intr,
++                      UNUSED void *data)
++{
++   b->cursor = nir_before_instr(&intr->instr);
++
++   switch (intr->intrinsic) {
++   case nir_intrinsic_load_tess_param_buffer_poly:
++      nir_def_replace(&intr->def, load_sysval(b, graphics, 64,
++                                              gpu_prerast_tess));
++      return true;
++
++   case nir_intrinsic_load_primitive_id: {
++      nir_def *p = nir_load_tess_param_buffer_poly(b);
++      nir_def *base = nir_load_global(
++         b, 1, 32,
++         nir_iadd_imm(b, p,
++                      offsetof(struct panlib_tess_draw, prim_base)),
++         .align_mul = 4);
++      nir_def *id =
++         b->shader->info.stage == MESA_SHADER_TESS_CTRL
++            ? nir_channel(b, nir_load_workgroup_id(b), 0)
++            : poly_tes_patch_id(b, p, nir_load_vertex_id(b));
++      nir_def_replace(&intr->def, nir_iadd(b, id, base));
++      return true;
++   }
++
++   case nir_intrinsic_barrier:
++      /* poly narrows output barriers to a subgroup, but a patch can span
++       * several subgroups here. */
++      if (b->shader->info.tess.tcs_vertices_out <=
++          pan_subgroup_size(PAN_ARCH))
++         return false;
++      if (nir_intrinsic_execution_scope(intr) == SCOPE_SUBGROUP)
++         nir_intrinsic_set_execution_scope(intr, SCOPE_WORKGROUP);
++      if (nir_intrinsic_memory_scope(intr) == SCOPE_SUBGROUP)
++         nir_intrinsic_set_memory_scope(intr, SCOPE_WORKGROUP);
++      return true;
++
++   default:
++      return false;
++   }
++}
++
++static bool
++panvk_tess_lower(nir_shader *s)
++{
++   return nir_shader_intrinsics_pass(s, panvk_tess_lower_intr,
++                                     nir_metadata_none, NULL);
++}
++
++static void
++panvk_tess_record_info(struct panvk_gpu_prerast_tess_info *t,
++                       const nir_shader *nir)
++{
++   static const uint8_t spacing[] = {
++      [TESS_SPACING_EQUAL] = POLY_TESS_PARTITIONING_INTEGER,
++      [TESS_SPACING_FRACTIONAL_ODD] = POLY_TESS_PARTITIONING_FRACTIONAL_ODD,
++      [TESS_SPACING_FRACTIONAL_EVEN] = POLY_TESS_PARTITIONING_FRACTIONAL_EVEN,
++   };
++
++   t->domain = nir->info.tess._primitive_mode == TESS_PRIMITIVE_TRIANGLES ? 0
++               : nir->info.tess._primitive_mode == TESS_PRIMITIVE_QUADS   ? 1
++               : nir->info.tess._primitive_mode == TESS_PRIMITIVE_ISOLINES
++                  ? 2
++                  : PANVK_GPU_PRERAST_TESS_UNSET;
++   t->spacing = nir->info.tess.spacing != TESS_SPACING_UNSPECIFIED
++                   ? spacing[nir->info.tess.spacing]
++                   : PANVK_GPU_PRERAST_TESS_UNSET;
++   t->ccw = nir->info.tess.ccw;
++   t->point_mode = nir->info.tess.point_mode;
++}
++
++static unsigned glsl_type_size(const struct glsl_type *type, bool bindless);
++
++/* TES inputs become loads from the TCS output buffer, the TES then runs as
++ * a vertex shader over the tessellator indices. */
++static void
++panvk_lower_tes(nir_shader *nir, struct panvk_gpu_prerast_tess_info *t)
++{
++   panvk_tess_record_info(t, nir);
++
++   nir_builder b =
++      nir_builder_at(nir_after_impl(nir_shader_get_entrypoint(nir)));
++   nir_variable *prim_id = nir_variable_create(
++      nir, nir_var_shader_out, glsl_int_type(), "panvk_tes_primitive_id");
++   prim_id->data.location = VARYING_SLOT_PRIMITIVE_ID;
++   prim_id->data.interpolation = INTERP_MODE_FLAT;
++   nir_store_var(&b, prim_id, nir_load_primitive_id(&b), 1);
++   nir->info.outputs_written |= VARYING_BIT_PRIMITIVE_ID;
++
++   NIR_PASS(_, nir, nir_lower_io, nir_var_shader_in, glsl_type_size, 0);
++   NIR_PASS(_, nir, nir_opt_constant_folding);
++   NIR_PASS(_, nir, nir_remove_dead_variables, nir_var_shader_in, NULL);
++   NIR_PASS(_, nir, panvk_tess_lower);
++   /* poly_nir_lower_tes() adds a default point size unless outputs_written
++    * has PSIZ.
++    */
++   nir_shader_gather_info(nir, nir_shader_get_entrypoint(nir));
++   NIR_PASS(_, nir, poly_nir_lower_tes, true);
++   NIR_PASS(_, nir, panvk_tess_lower);
++}
++
+ static bool
+ panvk_gpu_prerast_lower_vs_before_gs_intr(nir_builder *b,
+                                           nir_intrinsic_instr *intr,
+@@ -859,9 +974,9 @@ panvk_gpu_prerast_lower_vs_before_gs_intr(nir_builder *b,
+       b, 1, 64,
+       nir_iadd_imm(b, p, offsetof(struct poly_vertex_params, output_buffer)),
+       .align_mul = 8);
+-   nir_def *linear =
+-      nir_iadd(b, nir_imul(b, nir_load_instance_id(b), nr_verts),
+-               nir_load_vertex_id_zero_base(b));
++   nir_def *gid = nir_load_global_invocation_id(b, 32);
++   nir_def *linear = nir_iadd(b, nir_imul(b, nir_channel(b, gid, 1), nr_verts),
++                              nir_channel(b, gid, 0));
+    nir_def *addr = nir_iadd(
+       b, out_buf,
+       nir_u2u64(b, nir_iadd_imm(b, nir_imul_imm(b, linear, nout * 16),
+@@ -992,7 +1107,7 @@ panvk_gpu_prerast_emit_generated_records(nir_shader *nir)
+                     offsetof(struct panvk_gpu_prerast_params, index_offset)),
+        .align_mul = 4);
+     index = nir_iadd(&b, vertex, index_offset);
+-    nir_def *raw = poly_nir_load_raw_vertex_id(&b, index);
++    nir_def *raw = panvk_poly_load_raw_vertex_id(&b, index);
+    nir_def *restart_enable = nir_load_global(
+       &b, 1, 32,
+       nir_iadd_imm(&b, params,
+@@ -2753,8 +2868,13 @@ panvk_compile_shader(struct panvk_device *dev,
+       return panvk_error(dev, VK_ERROR_OUT_OF_HOST_MEMORY);
+ 
+ #if PAN_ARCH >= 10
+-   if (info->stage == MESA_SHADER_VERTEX) {
+-      shader->gpu_prerast.io.abi_version = PANVK_GPU_PRERAST_ABI_VERSION;
++   shader->gpu_prerast.io.abi_version = PANVK_GPU_PRERAST_ABI_VERSION;
++
++   if (info->stage == MESA_SHADER_TESS_EVAL)
++      panvk_lower_tes(info->nir, &shader->gpu_prerast.tess);
++
++   if (info->stage == MESA_SHADER_VERTEX ||
++       info->stage == MESA_SHADER_TESS_EVAL) {
+       shader->gpu_prerast.io.clip_distance_array_size =
+          info->nir->info.clip_distance_array_size;
+       shader->gpu_prerast.io.cull_distance_array_size =
+@@ -2778,6 +2898,9 @@ panvk_compile_shader(struct panvk_device *dev,
+    };
+ 
+    switch (info->stage) {
++#if PAN_ARCH >= 10
++   case MESA_SHADER_TESS_EVAL:
++#endif
+    case MESA_SHADER_VERTEX: {
+ #if PAN_ARCH >= 10
+       /* Lowered/passthrough variants only exist on the gpu_prerast path. */
+@@ -2786,7 +2909,8 @@ panvk_compile_shader(struct panvk_device *dev,
+          BITSET_TEST(state->dynamic, MESA_VK_DYNAMIC_RS_POLYGON_MODE);
+       const bool want_prerast =
+          PANVK_DEBUG(GPU_PRERAST) ||
+-         (info->next_stage_mask & VK_SHADER_STAGE_GEOMETRY_BIT) ||
++         (info->next_stage_mask & (VK_SHADER_STAGE_GEOMETRY_BIT |
++                                   VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT)) ||
+          (dev->vk.enabled_features.fillModeNonSolid &&
+           (dyn_polygon_mode ||
+            state->rs->polygon_mode != VK_POLYGON_MODE_FILL));
+@@ -2895,8 +3019,8 @@ panvk_compile_shader(struct panvk_device *dev,
+                NIR_PASS(_, nir, pan_nir_lower_vs_inputs_poly, inputs.gpu_id);
+                NIR_PASS(_, nir, panvk_gpu_prerast_lower_vs_outputs);
+                panvk_gpu_prerast_emit_generated_records(nir);
+-               NIR_PASS(_, nir, poly_nir_lower_sw_vs);
+-               NIR_PASS(_, nir, poly_nir_lower_sysvals);
++               NIR_PASS(_, nir, panvk_poly_lower_sw_vs);
++               NIR_PASS(_, nir, panvk_poly_lower_sysvals);
+                NIR_PASS(_, nir, nir_shader_intrinsics_pass,
+                         panvk_lower_gpu_prerast_sysval,
+                         nir_metadata_control_flow, NULL);
+@@ -3043,6 +3167,57 @@ panvk_compile_shader(struct panvk_device *dev,
+       gs->kernel_compiled = true;
+       break;
+    }
++
++   case MESA_SHADER_TESS_CTRL: {
++      struct panvk_gpu_prerast_tess_info *t = &shader->gpu_prerast.tess;
++      nir_shader *nir = info->nir;
++
++      shader->gpu_prerast.has_side_effects = nir->info.writes_memory;
++
++      NIR_PASS(_, nir, nir_lower_var_copies);
++      NIR_PASS(_, nir, nir_lower_io, nir_var_shader_in | nir_var_shader_out,
++               glsl_type_size, 0);
++      NIR_PASS(_, nir, nir_opt_constant_folding);
++      nir_shader_gather_info(nir, nir_shader_get_entrypoint(nir));
++
++      panvk_tess_record_info(t, nir);
++      t->per_vertex_outputs = poly_tcs_per_vertex_outputs(nir);
++      t->patch_constants = util_last_bit(nir->info.patch_outputs_written);
++      t->out_patch_size = nir->info.tess.tcs_vertices_out;
++      t->stride_el = poly_tcs_output_stride(nir) / 4;
++
++      NIR_PASS(_, nir, panvk_tess_lower);
++      NIR_PASS(_, nir, poly_nir_lower_tcs, false);
++      NIR_PASS(_, nir, panvk_tess_lower);
++
++      panvk_lower_nir(dev, nir, info->set_layout_count, info->set_layouts,
++                      info->robustness, state, &shader->desc_info, false);
++      NIR_PASS(_, nir, panvk_poly_lower_sysvals);
++      NIR_PASS(_, nir, nir_shader_intrinsics_pass,
++               panvk_lower_gpu_prerast_sysval, nir_metadata_control_flow,
++               NULL);
++
++      nir->info.stage = MESA_SHADER_COMPUTE;
++      memset(&nir->info.cs, 0, sizeof(nir->info.cs));
++      nir->info.workgroup_size[0] = t->out_patch_size;
++      nir->info.workgroup_size[1] = 1;
++      nir->info.workgroup_size[2] = 1;
++
++      struct panvk_shader_variant *variant =
++         (struct panvk_shader_variant *)panvk_shader_only_variant(shader);
++      struct pan_compile_inputs k_inputs = inputs;
++      k_inputs.varying_layout = NULL;
++      k_inputs.view_mask = 0;
++      variant->own_bin = true;
++      result = panvk_compile_nir(dev, nir, info->flags, &k_inputs, state, NULL,
++                                 &shader->desc_info, variant);
++      if (result != VK_SUCCESS) {
++         panvk_shader_destroy(&dev->vk, &shader->vk, pAllocator);
++         return result;
++      }
++      t->compiled = true;
++      break;
++   }
+ #endif
+ 
+    case MESA_SHADER_FRAGMENT: {
+@@ -4070,11 +4245,23 @@ panvk_cmd_bind_shader(struct panvk_cmd_buffer *cmd, const mesa_shader_stage stag
+          gfx_state_set_dirty(cmd, FS);
+       }
+       break;
+-#endif
++   case MESA_SHADER_TESS_CTRL:
++      cmd->state.gfx.tcs.shader = shader;
++      break;
++   case MESA_SHADER_TESS_EVAL:
++      if (cmd->state.gfx.tes.shader != shader) {
++         cmd->state.gfx.tes.shader = shader;
++         gfx_state_set_dirty(cmd, VS);
++         gfx_state_set_dirty(cmd, VS_PUSH_UNIFORMS);
++         gfx_state_set_dirty(cmd, FS);
++      }
++      break;
++#else
+    case MESA_SHADER_TESS_CTRL:
+    case MESA_SHADER_TESS_EVAL:
+       assert(shader == NULL);
+       break;
++#endif
+    default:
+       assert(!"Unsupported stage");
+       break;

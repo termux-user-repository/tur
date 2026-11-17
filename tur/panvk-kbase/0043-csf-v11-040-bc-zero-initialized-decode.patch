@@ -1,0 +1,96 @@
+From: abhay-byte <zenithblue.dev@gmail.com>
+Subject: [PATCH csf-v11 040] panvk: decode BC emulated images leaving ZERO_INITIALIZED layout
+Generated-by: LLM
+
+Purpose: GPU-decode BC emulated images leaving VK_IMAGE_LAYOUT_ZERO_INITIALIZED_EXT
+Source/Reference: local fix, work/mesa 89274dbd817
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/039
+Validation test: dEQP-VK.memory.zero_initialize_device_memory.image_transition.bc1_* 1x1 pass (larger sizes share the pre-existing non-BC zero-init failure)
+
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_buffer.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_buffer.c
+index 4b9744f2f28cd7a1408dc2c137789dccaf86db9f..ee935eb98df64451ab4c1f0a4fbc0d2ac75199a9 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_buffer.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_buffer.c
+@@ -799,6 +799,8 @@ panvk_per_arch(CmdPipelineBarrier2)(VkCommandBuffer commandBuffer,
+    panvk_per_arch(emit_barrier)(cmdbuf, deps);
+ 
+    STACK_ARRAY_FINISH(crc_addrs);
++
++   panvk_per_arch(cmd_bc_decode_zero_initialized)(cmdbuf, pDependencyInfo);
+ }
+ 
+ static struct cs_buffer
+diff --git a/src/panfrost/vulkan/panvk_meta.h b/src/panfrost/vulkan/panvk_meta.h
+index eda6e2732820757eece2f5d3b5439db8ee02cf98..deb58ed2e64b116cda80f7deafa041c5bb1da9f9 100644
+--- a/src/panfrost/vulkan/panvk_meta.h
++++ b/src/panfrost/vulkan/panvk_meta.h
+@@ -191,4 +191,9 @@ VkResult panvk_per_arch(meta_get_copy_desc_job)(
+    const struct panvk_shader_desc_state *shader_desc_state,
+    uint32_t attrib_buf_idx_offset, struct pan_ptr *job_desc);
+ #endif
++
++struct panvk_cmd_buffer;
++
++void panvk_per_arch(cmd_bc_decode_zero_initialized)(
++   struct panvk_cmd_buffer *cmdbuf, const VkDependencyInfo *dep_info);
+ #endif
+diff --git a/src/panfrost/vulkan/panvk_vX_cmd_meta.c b/src/panfrost/vulkan/panvk_vX_cmd_meta.c
+index b858aeccac0fa9dd8171ee98283a144c3d589816..37c1356e3af69cb538fd815860ebc48bacb9a386 100644
+--- a/src/panfrost/vulkan/panvk_vX_cmd_meta.c
++++ b/src/panfrost/vulkan/panvk_vX_cmd_meta.c
+@@ -670,6 +670,52 @@ bc_decode_begin(struct panvk_cmd_buffer *cmdbuf,
+    meta_compute_start(cmdbuf, save);
+ }
+ 
++void
++panvk_per_arch(cmd_bc_decode_zero_initialized)(
++   struct panvk_cmd_buffer *cmdbuf, const VkDependencyInfo *dep_info)
++{
++   struct panvk_cmd_meta_compute_save_ctx save = {0};
++   bool started = false;
++
++   for (uint32_t i = 0; i < dep_info->imageMemoryBarrierCount; i++) {
++      const VkImageMemoryBarrier2 *b = &dep_info->pImageMemoryBarriers[i];
++      VK_FROM_HANDLE(panvk_image, img, b->image);
++
++      if (b->oldLayout != VK_IMAGE_LAYOUT_ZERO_INITIALIZED_EXT ||
++          b->newLayout == VK_IMAGE_LAYOUT_ZERO_INITIALIZED_EXT ||
++          !img->bc_emul)
++         continue;
++
++      if (!started) {
++         bc_decode_begin(cmdbuf, &save);
++         started = true;
++      }
++
++      const uint32_t level_count =
++         vk_image_subresource_level_count(&img->vk, &b->subresourceRange);
++      const uint32_t layer_count =
++         vk_image_subresource_layer_count(&img->vk, &b->subresourceRange);
++      for (uint32_t l = 0; l < level_count; l++) {
++         const uint32_t level = b->subresourceRange.baseMipLevel + l;
++         const VkImageSubresourceLayers subres = {
++            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
++            .mipLevel = level,
++            .baseArrayLayer = b->subresourceRange.baseArrayLayer,
++            .layerCount = layer_count,
++         };
++         bc_decode_region(cmdbuf, img, &subres, (VkOffset3D){0, 0, 0},
++                          vk_image_mip_level_extent(&img->vk, level));
++      }
++   }
++
++   if (started) {
++      meta_compute_end(cmdbuf, &save);
++      bc_decode_barrier(panvk_cmd_buffer_to_handle(cmdbuf),
++                        VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
++                        VK_ACCESS_2_MEMORY_READ_BIT);
++   }
++}
++
+ VKAPI_ATTR void VKAPI_CALL
+ panvk_per_arch(CmdCopyMemoryToImageKHR)(
+    VkCommandBuffer commandBuffer,

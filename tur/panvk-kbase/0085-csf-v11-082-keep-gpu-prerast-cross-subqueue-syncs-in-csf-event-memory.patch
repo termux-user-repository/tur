@@ -1,0 +1,378 @@
+From: abhay-byte <zenithblue.dev@gmail.com>
+Subject: [PATCH csf-v11 082] panvk: keep gpu_prerast cross-subqueue syncs in CSF event memory
+
+Generated-by: LLM
+
+Purpose: Keep the gpu_prerast arena and tessellation handshake syncs in CSF event memory so kbase can resume a subqueue group evicted while waiting on them; biblioklept
+Source/Reference: local, work/mesa-vpsa2-final dx-vpsa2-final b4dc1488527
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/081
+Validation test: CTS 65 newly enabled tessellation cases 5 runs 65 Pass 0 DeviceLost (was 1-3 DeviceLost per run); tessellation.invariance.outer_edge_division.quads_fractional_odd_spacing 24/24 Pass (hung about 1 in 8); 12132-case tess/geometry/transform_feedback.simple/draw list 7940 Pass 0 Fail 0 DeviceLost
+
+diff --git a/src/panfrost/libpan/tess_draw.h b/src/panfrost/libpan/tess_draw.h
+index ef749b9542d..7e269e27fac 100644
+--- a/src/panfrost/libpan/tess_draw.h
++++ b/src/panfrost/libpan/tess_draw.h
+@@ -9,11 +9,6 @@
+ #include "poly/geometry.h"
+ #include "poly/tessellator.h"
+ 
+-struct panlib_tess_sync {
+-   uint32_t seqno;
+-   uint32_t error;
+-};
+-
+ /* Per-draw tessellation state shared by the CS loop and the panlib_tess_*
+  * kernels. Each loop iteration either starts a new chunk of patches (VS, TCS,
+  * tessellator) or draws the next index range of the current chunk.
+@@ -57,7 +52,4 @@ struct panlib_tess_draw {
+ 
+    uint64_t total_patches;
+    uint64_t next_patch;
+-
+-   struct panlib_tess_sync ready;
+-   struct panlib_tess_sync free;
+ } PACKED;
+diff --git a/src/panfrost/vulkan/csf/panvk_cmd_buffer.h b/src/panfrost/vulkan/csf/panvk_cmd_buffer.h
+index 478f871f1b3..9cb9bdd840b 100644
+--- a/src/panfrost/vulkan/csf/panvk_cmd_buffer.h
++++ b/src/panfrost/vulkan/csf/panvk_cmd_buffer.h
+@@ -58,6 +58,15 @@ struct panvk_cs_sync64 {
+    uint32_t pad;
+ };
+ 
++/* The queue syncobjs BO holds a panvk_cs_sync64 per subqueue, then the
++ * panvk_cs_sync32 ready/free handshake of the gpu_prerast tessellation loops.
++ * That BO is CSF event memory on kbase, which kbase needs to re-evaluate the
++ * SYNC_WAIT of an evicted CSG.
++ */
++#define PANVK_QUEUE_TESS_READY_SYNC_OFFSET 64
++#define PANVK_QUEUE_TESS_FREE_SYNC_OFFSET  128
++#define PANVK_QUEUE_SYNCOBJS_SIZE          192
++
+ enum panvk_kbase_progress_marker {
+    PANVK_KBASE_PROGRESS_CMDBUF_START = 0x001,
+ 
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+index 909b2584fec..7b40ea4fd06 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+@@ -3643,6 +3643,18 @@ gpu_prerast_wait_compute(struct panvk_cmd_buffer *cmdbuf)
+                            MALI_CS_CONDITION_GREATER, sync_point, sync_addr);
+ }
+ 
++static uint64_t
++gpu_prerast_arena_sync(const struct panvk_device *dev, uint64_t arena)
++{
++   const bool tess =
++      arena == panvk_priv_mem_dev_addr(dev->gpu_prerast_tess_arena);
++
++   assert(tess || arena == panvk_priv_mem_dev_addr(dev->gpu_prerast_arena));
++   return dev->gpu_prerast_syncs->addr.dev +
++          (tess ? offsetof(struct panvk_gpu_prerast_syncs, tess_arena)
++                : offsetof(struct panvk_gpu_prerast_syncs, arena));
++}
++
+ static void
+ gpu_prerast_release_arena(struct panvk_cmd_buffer *cmdbuf, uint64_t arena)
+ {
+@@ -3653,8 +3665,7 @@ gpu_prerast_release_arena(struct panvk_cmd_buffer *cmdbuf, uint64_t arena)
+    struct cs_index one = cs_scratch_reg32(b, 2);
+ 
+    cs_wait_slots(b, dev->csf.sb.all_iters_mask);
+-   cs_move64_to(b, addr, arena + offsetof(struct panvk_gpu_prerast_arena,
+-                                          available));
++   cs_move64_to(b, addr, gpu_prerast_arena_sync(dev, arena));
+    cs_move32_to(b, one, 1);
+    cs_sync32_add(b, true, panvk_cs_signal_scope(cmdbuf), one, addr, cs_now());
+ }
+@@ -3884,16 +3895,16 @@ gpu_prerast_gs_run(struct panvk_cmd_buffer *cmdbuf,
+ static void
+ gpu_prerast_acquire_arena(struct panvk_cmd_buffer *cmdbuf, uint64_t arena)
+ {
++   const struct panvk_device *dev = to_panvk_device(cmdbuf->vk.base.device);
+    struct cs_builder *b = panvk_get_cs_builder(cmdbuf, PANVK_SUBQUEUE_COMPUTE);
+    struct cs_index addr = cs_scratch_reg64(b, 0);
+    struct cs_index value = cs_scratch_reg32(b, 2);
+ 
+-   cs_move64_to(b, addr,
+-                arena + offsetof(struct panvk_gpu_prerast_arena, available));
++   cs_move64_to(b, addr, gpu_prerast_arena_sync(dev, arena));
+    cs_move32_to(b, value, 0);
+    cs_sync32_wait(b, false, MALI_CS_CONDITION_GREATER, value, addr);
+    cs_move32_to(b, value, -1);
+-   cs_sync32_add(b, true, MALI_CS_SYNC_SCOPE_CSG, value, addr, cs_now());
++   cs_sync32_add(b, true, panvk_cs_signal_scope(cmdbuf), value, addr, cs_now());
+ }
+ 
+ static bool
+@@ -4373,32 +4384,45 @@ gpu_prerast_tess_max_patches(const struct panvk_cmd_buffer *cmdbuf)
+       ps);
+ }
+ 
++/* Loads the address of a tessellation sync of the queue syncobjs BO, see
++ * PANVK_QUEUE_TESS_READY_SYNC_OFFSET.
++ */
++static struct cs_index
++gpu_prerast_tess_sync(struct cs_builder *b, uint32_t offset)
++{
++   struct cs_index addr = cs_scratch_reg64(b, 0);
++
++   cs_load64_to(b, addr, cs_subqueue_ctx_reg(b),
++                offsetof(struct panvk_cs_subqueue_context, syncobjs));
++   cs_add_imm64(b, addr, addr, offset);
++   return addr;
++}
++
+ static void
+ gpu_prerast_sync32_take(struct panvk_cmd_buffer *cmdbuf,
+-                        enum panvk_subqueue_id subqueue, uint64_t sync)
++                        enum panvk_subqueue_id subqueue, uint32_t offset)
+ {
+    struct cs_builder *b = panvk_get_cs_builder(cmdbuf, subqueue);
+-   struct cs_index addr = cs_scratch_reg64(b, 0);
++   struct cs_index addr = gpu_prerast_tess_sync(b, offset);
+    struct cs_index value = cs_scratch_reg32(b, 2);
+ 
+-   cs_move64_to(b, addr, sync);
+    cs_move32_to(b, value, 0);
+    cs_sync32_wait(b, false, MALI_CS_CONDITION_GREATER, value, addr);
+    cs_move32_to(b, value, -1);
+-   cs_sync32_add(b, true, MALI_CS_SYNC_SCOPE_CSG, value, addr, cs_now());
++   cs_sync32_add(b, true, panvk_cs_signal_scope(cmdbuf), value, addr, cs_now());
+ }
+ 
+ static void
+ gpu_prerast_sync32_give(struct panvk_cmd_buffer *cmdbuf,
+-                        enum panvk_subqueue_id subqueue, uint64_t sync)
++                        enum panvk_subqueue_id subqueue, uint32_t offset)
+ {
+    struct panvk_device *dev = to_panvk_device(cmdbuf->vk.base.device);
+    struct cs_builder *b = panvk_get_cs_builder(cmdbuf, subqueue);
+-   struct cs_index addr = cs_scratch_reg64(b, 0);
+-   struct cs_index value = cs_scratch_reg32(b, 2);
+ 
+    cs_wait_slots(b, dev->csf.sb.all_iters_mask);
+-   cs_move64_to(b, addr, sync);
++   struct cs_index addr = gpu_prerast_tess_sync(b, offset);
++   struct cs_index value = cs_scratch_reg32(b, 2);
++
+    cs_move32_to(b, value, 1);
+    cs_sync32_add(b, true, panvk_cs_signal_scope(cmdbuf), value, addr, cs_now());
+ }
+@@ -4417,10 +4441,10 @@ gpu_prerast_load_flag(struct cs_builder *b, uint64_t addr)
+ }
+ 
+ /* GPU tessellation, as one CS loop on each of the compute and vertex/tiler
+- * queues, handshaking through the ready/free syncs of struct
+- * panlib_tess_draw. Each compute iteration either runs VS -> TCS ->
+- * tessellator on the next chunk of patches that fits the tessellation arena,
+- * or moves to the next index range of the current chunk. When the TES output
++ * queues, handshaking through the queue's tessellation ready/free syncs.
++ * Each compute iteration either runs VS -> TCS -> tessellator on the next
++ * chunk of patches that fits the tessellation arena, or moves to the next
++ * index range of the current chunk. When the TES output
+  * goes through gpu_prerast again (GS, non-fill polygon mode), that range is
+  * sized to the gpu_prerast arena and the TES and GS kernels run in the same
+  * iteration. The vertex/tiler iteration then draws that range. Nothing is
+@@ -4567,7 +4591,6 @@ gpu_prerast_tess(struct panvk_cmd_buffer *cmdbuf,
+    t->indexed = indexed;
+    t->range = range;
+    t->verts_per_prim = vpp;
+-   t->free.seqno = 1;
+ 
+    uint64_t src = draw->indirect.buffer_dev_addr;
+    if (!indirect) {
+@@ -4672,7 +4695,8 @@ gpu_prerast_tess(struct panvk_cmd_buffer *cmdbuf,
+     */
+    bool ok = true;
+    cs_while(b, MALI_CS_CONDITION_ALWAYS, cs_undef()) {
+-      gpu_prerast_sync32_take(cmdbuf, PANVK_SUBQUEUE_COMPUTE, TD(free));
++      gpu_prerast_sync32_take(cmdbuf, PANVK_SUBQUEUE_COMPUTE,
++                              PANVK_QUEUE_TESS_FREE_SYNC_OFFSET);
+ 
+       panlib_tess_step(&ctx, panlib_1d(1), PANLIB_BARRIER_NONE, td.gpu,
+                        tcs_stat);
+@@ -4734,7 +4758,8 @@ gpu_prerast_tess(struct panvk_cmd_buffer *cmdbuf,
+          gfx_state_set_dirty(cmdbuf, VS_PUSH_UNIFORMS);
+       }
+ 
+-      gpu_prerast_sync32_give(cmdbuf, PANVK_SUBQUEUE_COMPUTE, TD(ready));
++      gpu_prerast_sync32_give(cmdbuf, PANVK_SUBQUEUE_COMPUTE,
++                              PANVK_QUEUE_TESS_READY_SYNC_OFFSET);
+       cs_loop_conditional_break(b, __loop, MALI_CS_CONDITION_EQUAL,
+                                 gpu_prerast_load_flag(b, TD(more)));
+    }
+@@ -4748,7 +4773,8 @@ gpu_prerast_tess(struct panvk_cmd_buffer *cmdbuf,
+ 
+    struct panvk_draw_info raster = out;
+    cs_while(vt, MALI_CS_CONDITION_ALWAYS, cs_undef()) {
+-      gpu_prerast_sync32_take(cmdbuf, PANVK_SUBQUEUE_VERTEX_TILER, TD(ready));
++      gpu_prerast_sync32_take(cmdbuf, PANVK_SUBQUEUE_VERTEX_TILER,
++                              PANVK_QUEUE_TESS_READY_SYNC_OFFSET);
+ 
+       cmdbuf->state.gfx.vs.shader = tes;
+       gfx_state_set_dirty(cmdbuf, VS);
+@@ -4768,7 +4794,8 @@ gpu_prerast_tess(struct panvk_cmd_buffer *cmdbuf,
+       struct cs_index more = gpu_prerast_load_flag(vt, TD(more));
+       struct cs_index more_keep = cs_scratch_reg32(vt, 4);
+       cs_add_imm32(vt, more_keep, more, 0);
+-      gpu_prerast_sync32_give(cmdbuf, PANVK_SUBQUEUE_VERTEX_TILER, TD(free));
++      gpu_prerast_sync32_give(cmdbuf, PANVK_SUBQUEUE_VERTEX_TILER,
++                              PANVK_QUEUE_TESS_FREE_SYNC_OFFSET);
+       cs_loop_conditional_break(vt, __loop, MALI_CS_CONDITION_EQUAL,
+                                 more_keep);
+    }
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c b/src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c
+index 255818d2dd6..27190b7e6fa 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c
+@@ -1876,9 +1876,11 @@ init_queue(struct panvk_gpu_queue *queue)
+    struct panvk_device *dev = to_panvk_device(queue->vk.base.device);
+    VkResult result;
+ 
++   static_assert(sizeof(struct panvk_cs_sync64) * PANVK_SUBQUEUE_COUNT <=
++                    PANVK_QUEUE_TESS_READY_SYNC_OFFSET,
++                 "subqueue syncobjs overlap the tess syncs");
+    struct panvk_pool_alloc_info alloc_info = {
+-      .size =
+-         ALIGN_POT(sizeof(struct panvk_cs_sync64), 64) * PANVK_SUBQUEUE_COUNT,
++      .size = PANVK_QUEUE_SYNCOBJS_SIZE,
+       .alignment = 64,
+    };
+ 
+@@ -1905,8 +1907,21 @@ init_queue(struct panvk_gpu_queue *queue)
+       return panvk_errorf(dev, VK_ERROR_OUT_OF_DEVICE_MEMORY,
+                           "Failed to allocate subqueue sync objects");
+ 
++   /* The tessellation loops leave ready at 0 and free at 1. */
++   panvk_priv_mem_write(queue->syncobjs, PANVK_QUEUE_TESS_READY_SYNC_OFFSET,
++                        struct panvk_cs_sync32, sync) {
++      *sync = (struct panvk_cs_sync32){0};
++   }
++   panvk_priv_mem_write(queue->syncobjs, PANVK_QUEUE_TESS_FREE_SYNC_OFFSET,
++                        struct panvk_cs_sync32, sync) {
++      *sync = (struct panvk_cs_sync32){.seqno = 1};
++   }
++
+ #ifdef HAVE_PAN_KMOD_KBASE
+    if (gpu_queue_uses_kbase(dev)) {
++      kbase_clean_priv_mem(queue->syncobjs, PANVK_QUEUE_TESS_READY_SYNC_OFFSET,
++                           PANVK_QUEUE_SYNCOBJS_SIZE -
++                              PANVK_QUEUE_TESS_READY_SYNC_OFFSET);
+       result = kbase_init_seqnos(queue);
+       if (result != VK_SUCCESS)
+          return result;
+diff --git a/src/panfrost/vulkan/panvk_device.h b/src/panfrost/vulkan/panvk_device.h
+index 0355679151e..f029ee81c73 100644
+--- a/src/panfrost/vulkan/panvk_device.h
++++ b/src/panfrost/vulkan/panvk_device.h
+@@ -114,6 +114,8 @@ struct panvk_device {
+    struct panvk_device_draw_context* draw_ctx;
+    struct panvk_priv_mem gpu_prerast_arena;
+    struct panvk_priv_mem gpu_prerast_tess_arena;
++   /* struct panvk_gpu_prerast_syncs */
++   struct panvk_priv_bo *gpu_prerast_syncs;
+ 
+    struct {
+       struct pandecode_context *decode_ctx;
+diff --git a/src/panfrost/vulkan/panvk_gpu_prerast.h b/src/panfrost/vulkan/panvk_gpu_prerast.h
+index 89c8064a59b..da3b68a0332 100644
+--- a/src/panfrost/vulkan/panvk_gpu_prerast.h
++++ b/src/panfrost/vulkan/panvk_gpu_prerast.h
+@@ -316,10 +316,8 @@ panvk_gpu_prerast_record_capacity(uint32_t record_stride)
+ #define PANVK_GPU_PRERAST_TESS_MAX_INDICES                                     \
+    (PANVK_GPU_PRERAST_TESS_MAX_LEVEL * PANVK_GPU_PRERAST_TESS_MAX_LEVEL * 6)
+ 
+-static_assert(offsetof(struct panlib_tess_draw, total_patches) % 8 == 0 &&
+-                 offsetof(struct panlib_tess_draw, ready) % 8 == 0 &&
+-                 offsetof(struct panlib_tess_draw, free) % 8 == 0,
+-              "panlib_tess_draw 64-bit fields and syncs must be aligned");
++static_assert(offsetof(struct panlib_tess_draw, total_patches) % 8 == 0,
++              "panlib_tess_draw 64-bit fields must be aligned");
+ 
+ struct panvk_gpu_prerast_tess_layout {
+    uint64_t tcs, counts, coord_allocs, heap, index;
+@@ -371,13 +369,22 @@ panvk_gpu_prerast_tess_layout(uint64_t arena, uint32_t patches,
+ }
+ 
+ struct panvk_gpu_prerast_arena {
+-   uint32_t available;
+-   uint32_t error;
+-   uint32_t _pad[14];
++   uint32_t _pad[16];
+    struct panvk_gpu_prerast_params params;
+    uint8_t data[];
+ };
+ 
++/* Ownership syncs of the two arenas, {seqno, error} CQS pairs taken on the
++ * compute subqueue and given back on the vertex/tiler one. Each subqueue is
++ * its own CSG on kbase, and kbase re-evaluates the SYNC_WAIT of an evicted
++ * CSG through a kernel mapping that only CSF event memory has. A wait on any
++ * other memory never wakes up once its group is suspended.
++ */
++struct panvk_gpu_prerast_syncs {
++   uint32_t arena[2];
++   uint32_t tess_arena[2];
++};
++
+ struct panvk_gpu_prerast_sync_contract {
+    VkPipelineStageFlags2 producer_stages;
+    VkAccessFlags2 producer_access;
+diff --git a/src/panfrost/vulkan/panvk_vX_device.c b/src/panfrost/vulkan/panvk_vX_device.c
+index 28745813d87..adf39c2d4ce 100644
+--- a/src/panfrost/vulkan/panvk_vX_device.c
++++ b/src/panfrost/vulkan/panvk_vX_device.c
+@@ -602,7 +602,6 @@ panvk_per_arch(create_device)(struct panvk_physical_device *physical_device,
+       panvk_priv_mem_write(device->gpu_prerast_arena, 0,
+                            struct panvk_gpu_prerast_arena, arena) {
+          memset(arena, 0, sizeof(*arena));
+-         arena->available = 1;
+       }
+    }
+    if (device->vk.enabled_features.tessellationShader) {
+@@ -619,9 +618,25 @@ panvk_per_arch(create_device)(struct panvk_physical_device *physical_device,
+       panvk_priv_mem_write(device->gpu_prerast_tess_arena, 0,
+                            struct panvk_gpu_prerast_arena, arena) {
+          memset(arena, 0, sizeof(*arena));
+-         arena->available = 1;
+       }
+    }
++   if (panvk_priv_mem_check_alloc(device->gpu_prerast_arena) ||
++       panvk_priv_mem_check_alloc(device->gpu_prerast_tess_arena)) {
++      result = panvk_priv_bo_create(
++         device, sizeof(struct panvk_gpu_prerast_syncs),
++         device->kmod.dev->props.supported_bo_flags &
++            PAN_KMOD_BO_FLAG_CSF_EVENT,
++         VK_SYSTEM_ALLOCATION_SCOPE_DEVICE, &device->gpu_prerast_syncs);
++      if (result != VK_SUCCESS)
++         goto err_free_priv_bos;
++
++      struct panvk_gpu_prerast_syncs *syncs =
++         device->gpu_prerast_syncs->addr.host;
++      *syncs = (struct panvk_gpu_prerast_syncs){
++         .arena = {1},
++         .tess_arena = {1},
++      };
++   }
+ #endif
+ 
+ #if PAN_ARCH >= 10
+@@ -750,6 +765,7 @@ err_free_mem_cache:
+ err_free_precomp:
+    panvk_precomp_cleanup(device);
+ err_free_priv_bos:
++   panvk_priv_bo_unref(device->gpu_prerast_syncs);
+    panvk_pool_free_mem(&device->gpu_prerast_tess_arena);
+    panvk_pool_free_mem(&device->gpu_prerast_arena);
+    if (device->printf.bo)
+@@ -812,6 +828,7 @@ panvk_per_arch(destroy_device)(struct panvk_device *device,
+     panvk_priv_bo_unref(device->indirect_varying_buffer);
+     panvk_priv_bo_unref(device->tiler_heap);
+     panvk_priv_bo_unref(device->sample_positions);
++    panvk_priv_bo_unref(device->gpu_prerast_syncs);
+     panvk_pool_free_mem(&device->gpu_prerast_tess_arena);
+     panvk_pool_free_mem(&device->gpu_prerast_arena);
+     panvk_device_cleanup_mempools(device);

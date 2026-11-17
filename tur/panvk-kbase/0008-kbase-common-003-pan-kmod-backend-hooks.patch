@@ -1,0 +1,361 @@
+From: panvk-kbase-android worker <panvk-worker@localhost>
+Subject: [PATCH kbase-common 003] kmod: backend ops hooks for non-DRM backends
+
+Purpose: Extend pan_kmod with optional bo_import_fd/bo_export_fd/
+ bo_mmap/bo_munmap hooks, PAN_KBASE_MAX_NODES, CSF_EVENT flag,
+ pan_kmod_dev_create_with_driver() (select backend by name; kbase fd
+ is not a DRM fd so drmGetVersion cannot probe it), and route
+ export/mmap/munmap through the hooks.
+Source/Reference: https://github.com/wonderkast02/panvk-g720-kbase-csf
+ branch android-candidate-beta-1.9.4
+ (src/panfrost/lib/kmod/pan_kmod.[hc]), taken verbatim: no upstream
+ drift in these hunks, no arch lists touched.
+Tested GPU: none yet (compile-level).
+Tested Kbase UAPI: n/a.
+Mesa base range: 26.3.0-devel (pinned 5a07217f).
+Dependencies: 001 (HAVE_PAN_KMOD_* defines).
+Validation test: build pankmod_lib with kbase; DRM backends unchanged.
+
+--- a/src/panfrost/lib/kmod/pan_kmod.h
++++ b/src/panfrost/lib/kmod/pan_kmod.h
+@@ -43,6 +43,11 @@
+ #include "pan_trace.h"
+ #include "perf/mali_perf.h"
+ 
++/* Maximum number of /dev/mali* device nodes to probe. */
++#if defined(HAVE_PAN_KMOD_KBASE)
++#define PAN_KBASE_MAX_NODES 8
++#endif
++
+ #if defined(__cplusplus)
+ extern "C" {
+ #endif
+@@ -129,6 +134,9 @@
+     * the KMD to force non-coherent mappings on IO coherent setup.
+     */
+    PAN_KMOD_BO_FLAG_IO_COHERENT = BITFIELD_BIT(7),
++
++   /* kbase CSF event memory monitored for cross-CSG synchronization. */
++   PAN_KMOD_BO_FLAG_CSF_EVENT = BITFIELD_BIT(8),
+ };
+ 
+ /* Allowed group priority flags. */
+@@ -484,6 +492,19 @@
+    struct pan_kmod_bo *(*bo_import)(struct pan_kmod_dev *dev, uint32_t handle,
+                                     uint64_t size);
+ 
++   /* Import a dma-buf directly, without converting it to a DRM GEM handle.
++    * Non-DRM backends such as kbase can implement this instead of bo_import.
++    * This method is optional.
++    */
++   struct pan_kmod_bo *(*bo_import_fd)(struct pan_kmod_dev *dev, int fd,
++                                      uint64_t size);
++
++   /* Export a dma-buf directly, without converting a DRM GEM handle.  Returns
++    * a new close-on-exec fd on success, -1 otherwise.  This method is
++    * optional.
++    */
++   int (*bo_export_fd)(struct pan_kmod_bo *bo);
++
+    /* Post export operations.
+     * Return 0 on success, -1 otherwise.
+     * This method is optional.
+@@ -493,6 +514,25 @@
+    /* Get the file offset to use to mmap() a buffer object. */
+    off_t (*bo_get_mmap_offset)(struct pan_kmod_bo *bo);
+ 
++   /* Map a buffer object for CPU access.
++    * This method is optional. When missing, the BO is mapped by calling
++    * mmap() on the device fd with the offset returned by
++    * bo_get_mmap_offset().
++    * Backends where the CPU mapping is established at allocation time
++    * (kbase SAME_VA) implement this to return the existing mapping.
++    * Returns MAP_FAILED on error.
++    */
++   void *(*bo_mmap)(struct pan_kmod_bo *bo, int prot, int flags,
++                    void *host_addr);
++
++   /* Unmap a CPU mapping previously returned by pan_kmod_bo_mmap().
++    * This method is optional. When missing, munmap() is called directly.
++    * Backends where the CPU mapping is owned by the BO (kbase SAME_VA)
++    * implement this as a no-op and tear the mapping down at bo_free time.
++    * Returns 0 on success, -1 otherwise.
++    */
++   int (*bo_munmap)(struct pan_kmod_bo *bo, void *host_addr, size_t size);
++
+    /* Flush the pending BO map syncs. */
+    int (*flush_bo_map_syncs)(struct pan_kmod_dev *dev);
+ 
+@@ -631,6 +671,12 @@
+ pan_kmod_dev_create(int fd, uint32_t flags,
+                     const struct pan_kmod_allocator *allocator);
+ 
++struct pan_kmod_dev *
++pan_kmod_dev_create_with_driver(int fd, uint32_t flags,
++                                const char *driver_name,
++                                const struct pan_kmod_driver *driver,
++                                const struct pan_kmod_allocator *allocator);
++
+ void pan_kmod_dev_destroy(struct pan_kmod_dev *dev);
+ 
+ static inline struct pan_kmod_va_range
+@@ -706,10 +752,16 @@
+ 
+    int fd;
+ 
+-   if (drmPrimeHandleToFD(bo->dev->fd, bo->handle, DRM_CLOEXEC | DRM_RDWR,
+-                          &fd)) {
+-      mesa_loge("drmPrimeHandleToFD() failed (err=%d)", errno);
+-      return -1;
++   if (bo->dev->ops->bo_export_fd) {
++      fd = bo->dev->ops->bo_export_fd(bo);
++      if (fd < 0)
++         return -1;
++   } else {
++      if (drmPrimeHandleToFD(bo->dev->fd, bo->handle,
++                             DRM_CLOEXEC | DRM_RDWR, &fd)) {
++         mesa_loge("drmPrimeHandleToFD() failed (err=%d)", errno);
++         return -1;
++      }
+    }
+ 
+    if (bo->dev->ops->bo_export && bo->dev->ops->bo_export(bo, fd)) {
+@@ -757,6 +809,14 @@
+    if (bo->flags & PAN_KMOD_BO_FLAG_NO_MMAP)
+       return MAP_FAILED;
+ 
++   if (bo->dev->ops->bo_mmap) {
++      host_addr = bo->dev->ops->bo_mmap(bo, prot, flags, host_addr);
++      if (host_addr == MAP_FAILED)
++         mesa_loge("bo_mmap(..., size=%" PRIu64 ", prot=%d, flags=0x%x) failed: %s",
++                   bo->size, prot, flags, strerror(errno));
++      return host_addr;
++   }
++
+    mmap_offset = bo->dev->ops->bo_get_mmap_offset(bo);
+    if (mmap_offset < 0)
+       return MAP_FAILED;
+@@ -770,6 +830,20 @@
+    return host_addr;
+ }
+ 
++/* Unmap a CPU mapping obtained from pan_kmod_bo_mmap(). Callers must use
++ * this instead of munmap()/os_munmap(): on some backends (kbase SAME_VA)
++ * unmapping would destroy the GPU mapping too, so the backend keeps the
++ * mapping alive until the BO is freed.
++ */
++static inline int
++pan_kmod_bo_munmap(struct pan_kmod_bo *bo, void *host_addr, size_t size)
++{
++   if (bo->dev->ops->bo_munmap)
++      return bo->dev->ops->bo_munmap(bo, host_addr, size);
++
++   return os_munmap(host_addr, size);
++}
++
+ static inline bool
+ pan_kmod_can_sync_bo_map_from_userland(struct pan_kmod_dev *dev)
+ {
+@@ -856,7 +930,7 @@
+    simple_mtx_lock(&vm->sparse_dummy.lock);
+ 
+    if (!vm->sparse_dummy.bo) {
+-      struct pan_kmod_bo *bo = pan_kmod_bo_alloc(vm->dev, vm, PAN_PGSIZE_2M,
++      struct pan_kmod_bo *bo = pan_kmod_bo_alloc(vm->dev, NULL, PAN_PGSIZE_2M,
+                                                  PAN_KMOD_BO_FLAG_NO_MMAP);
+       if (!bo)
+          goto dummy_exit;
+--- a/src/panfrost/lib/kmod/pan_kmod.c
++++ b/src/panfrost/lib/kmod/pan_kmod.c
+@@ -3,6 +3,7 @@
+  * SPDX-License-Identifier: MIT
+  */
+ 
++#include <errno.h>
+ #include <string.h>
+ #include <xf86drm.h>
+ 
+@@ -12,21 +13,38 @@
+ #include "pan_kmod.h"
+ #include "pan_kmod_backend.h"
+ 
++#if defined(HAVE_PAN_KMOD_PANFROST)
+ extern const struct pan_kmod_ops panfrost_kmod_ops;
++#endif
++#if defined(HAVE_PAN_KMOD_PANTHOR)
+ extern const struct pan_kmod_ops panthor_kmod_ops;
++#endif
++#if defined(HAVE_PAN_KMOD_KBASE)
++extern const struct pan_kmod_ops kbase_kmod_ops;
++#endif
+ 
+ static const struct {
+    const char *name;
+    const struct pan_kmod_ops *ops;
+ } drivers[] = {
++#if defined(HAVE_PAN_KMOD_PANFROST)
+    {
+       "panfrost",
+       &panfrost_kmod_ops,
+    },
++#endif
++#if defined(HAVE_PAN_KMOD_PANTHOR)
+    {
+       "panthor",
+       &panthor_kmod_ops,
+    },
++#endif
++#if defined(HAVE_PAN_KMOD_KBASE)
++   {
++      "kbase",
++      &kbase_kmod_ops,
++   },
++#endif
+ };
+ 
+ static void *
+@@ -48,18 +66,49 @@
+ };
+ 
+ struct pan_kmod_dev *
++pan_kmod_dev_create_with_driver(int fd, uint32_t flags,
++                                const char *driver_name,
++                                const struct pan_kmod_driver *driver,
++                                const struct pan_kmod_allocator *allocator)
++{
++   if (!allocator)
++      allocator = &default_allocator;
++
++   if (!driver_name || !driver_name[0]) {
++      mesa_loge("invalid kernel driver name");
++      errno = EINVAL;
++      return NULL;
++   }
++
++   const struct pan_kmod_driver fallback_driver = {
++      .version = {
++         .major = 0,
++         .minor = 0,
++      },
++   };
++
++   if (!driver)
++      driver = &fallback_driver;
++
++   for (unsigned i = 0; i < ARRAY_SIZE(drivers); i++) {
++      if (!strcmp(drivers[i].name, driver_name))
++         return drivers[i].ops->dev_create(fd, flags, driver, allocator);
++   }
++
++   mesa_loge("kernel driver '%s' is not supported by this build", driver_name);
++   errno = ENODEV;
++   return NULL;
++}
++
++struct pan_kmod_dev *
+ pan_kmod_dev_create(int fd, uint32_t flags,
+                     const struct pan_kmod_allocator *allocator)
+ {
+    drmVersionPtr version = drmGetVersion(fd);
+-   struct pan_kmod_dev *dev = NULL;
+ 
+    if (!version)
+       return NULL;
+ 
+-   if (!allocator)
+-      allocator = &default_allocator;
+-
+    const char *drv_name = version->name;
+    const struct pan_kmod_driver drv_info = {
+       .version = {
+@@ -68,14 +117,8 @@
+       },
+    };
+ 
+-   for (unsigned i = 0; i < ARRAY_SIZE(drivers); i++) {
+-      if (!strcmp(drivers[i].name, drv_name)) {
+-         const struct pan_kmod_ops *ops = drivers[i].ops;
+-
+-         dev = ops->dev_create(fd, flags, &drv_info, allocator);
+-         break;
+-      }
+-   }
++   struct pan_kmod_dev *dev =
++      pan_kmod_dev_create_with_driver(fd, flags, drv_name, &drv_info, allocator);
+ 
+    drmFreeVersion(version);
+    return dev;
+@@ -155,6 +198,29 @@
+ 
+    simple_mtx_lock(&dev->handle_to_bo.lock);
+ 
++   if (dev->ops->bo_import_fd) {
++      size_t size = lseek(fd, 0, SEEK_END);
++      if (size == 0 || size == (size_t)-1) {
++         mesa_loge("invalid dmabuf size");
++         goto err_unlock;
++      }
++
++      bo = dev->ops->bo_import_fd(dev, fd, size);
++      if (!bo)
++         goto err_unlock;
++
++      slot = util_sparse_array_get(&dev->handle_to_bo.array, bo->handle);
++      if (!slot) {
++         bo->dev->ops->bo_free(bo);
++         bo = NULL;
++         goto err_unlock;
++      }
++
++      assert(*slot == NULL);
++      *slot = bo;
++      goto out_unlock;
++   }
++
+    uint32_t handle;
+    int ret = drmPrimeFDToHandle(dev->fd, fd, &handle);
+    if (ret)
+@@ -184,6 +250,7 @@
+ 
+    assert(p_atomic_read(&bo->refcnt) > 0);
+ 
++out_unlock:
+    simple_mtx_unlock(&dev->handle_to_bo.lock);
+ 
+    return bo;
+@@ -284,13 +351,28 @@
+        MAX_PENDING_SYNC_OPS)
+       pan_kmod_flush_bo_map_syncs_locked(dev);
+ 
+-   /* Architectures that use cache_ops_null.c will always return 0 for
+-    * util_cache_granularity(). But using that result would make
+-    * pan_kmod_deferred_bo_sync be initialized with size = 0.
+-    */
+-   uint64_t granularity = util_has_cache_ops() ? util_cache_granularity() : 64;
+-   uint64_t start = bo_offset & ~(granularity - 1);
+-   uint64_t end = ALIGN_POT(bo_offset + range, granularity);
++   uint64_t start = bo_offset & ~((uint64_t)util_cache_granularity() - 1);
++   uint64_t end = ALIGN_POT(bo_offset + range, util_cache_granularity());
++
++   /* A command buffer often dirties several neighboring slices of the same
++    * mapped BO before the next submit.  Coalesce those slices here so a
++    * kernel-backed cache-sync implementation (notably kbase MEM_SYNC) does
++    * not issue one ioctl per descriptor or upload. */
++   util_dynarray_foreach(&dev->pending_bo_syncs.array,
++                         struct pan_kmod_deferred_bo_sync, sync) {
++      uint64_t sync_end = sync->start + sync->size;
++
++      if (sync->bo == bo && sync->type == type &&
++          start <= sync_end && sync->start <= end) {
++         uint64_t merged_start = MIN2(start, sync->start);
++         uint64_t merged_end = MAX2(end, sync_end);
++
++         sync->start = merged_start;
++         sync->size = merged_end - merged_start;
++         simple_mtx_unlock(&dev->pending_bo_syncs.lock);
++         return;
++      }
++   }
+ 
+    struct pan_kmod_deferred_bo_sync new_sync = {
+       .bo = bo,

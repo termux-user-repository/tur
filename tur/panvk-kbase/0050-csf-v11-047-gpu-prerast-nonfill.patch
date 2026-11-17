@@ -1,0 +1,79 @@
+From: abhay-byte <zenithblue.dev@gmail.com>
+Subject: [PATCH csf-v11 047] panvk: route non-fill polygon draws through GPU prerast
+Generated-by: LLM
+
+Purpose: Use the GPU prerast path for polygon line and point modes; biblioklept
+Source/Reference: local fix, work/mesa bff7a7889fa
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/046
+Validation test: integrated build NINJA_RC=0; geometry smoke 23/23 without PANVK_DEBUG (not isolated per patch)
+
+diff --git a/src/panfrost/vulkan/csf/panvk_gpu_prerast.c b/src/panfrost/vulkan/csf/panvk_gpu_prerast.c
+index e6d331ae72d..dedd94314d3 100644
+--- a/src/panfrost/vulkan/csf/panvk_gpu_prerast.c
++++ b/src/panfrost/vulkan/csf/panvk_gpu_prerast.c
+@@ -77,7 +77,7 @@ panvk_per_arch(gpu_prerast_can_lower)(
+                       panvk_per_arch(gpu_prerast_poly_mode)(cmdbuf, draw) !=
+                          PANVK_GPU_PRERAST_POLY_NONE;
+     if (!(PANVK_DEBUG(GPU_PRERAST) || poly || gs) ||
+-        (!gs && shader->has_side_effects) ||
++        (!gs && !poly && shader->has_side_effects) ||
+         !shader->lowered_vs_compiled || !shader->passthrough_vs_compiled ||
+         (poly && !shader->polygon_compiled) ||
+         (gs && (!gs->gpu_prerast.gs.kernel_compiled ||
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+index 0a60ca173ed..bf45f148686 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+@@ -3833,6 +3833,15 @@ gpu_prerast_draw(struct panvk_cmd_buffer *cmdbuf,
+       cs_store32(compute, value, draw_params, 16);
+    }
+ 
++   /* The polygon kernel fills this in, but it is not run for draws past the
++    * indirect count. */
++   if (poly_mode != PANVK_GPU_PRERAST_POLY_NONE) {
++      cs_move64_to(compute, draw_params, poly_draw);
++      cs_move32_to(compute, value, 0);
++      for (unsigned i = 0; i < 5; i++)
++         cs_store32(compute, value, draw_params, i * 4);
++   }
++
+    struct pan_ptr push;
+    const struct panvk_shader_variant *lowered = panvk_shader_gpu_prerast_variant(
+       shader, PANVK_VS_VARIANT_GPU_LOWERED);
+@@ -4031,7 +4040,10 @@ static bool
+ gpu_prerast_needed(const struct panvk_cmd_buffer *cmdbuf,
+                    const struct panvk_draw_info *draw)
+ {
+-   return !draw->gpu_prerast_generated && cmdbuf->state.gfx.gs.shader;
++   return !draw->gpu_prerast_generated &&
++          (cmdbuf->state.gfx.gs.shader ||
++           panvk_per_arch(gpu_prerast_poly_mode)(cmdbuf, draw) !=
++              PANVK_GPU_PRERAST_POLY_NONE);
+ }
+ 
+ /* Returns true if the draw was split into draws that fit the arena. */
+diff --git a/src/panfrost/vulkan/panvk_vX_shader.c b/src/panfrost/vulkan/panvk_vX_shader.c
+index 760d0bd0e58..ade8419b26f 100644
+--- a/src/panfrost/vulkan/panvk_vX_shader.c
++++ b/src/panfrost/vulkan/panvk_vX_shader.c
+@@ -2725,11 +2725,15 @@ panvk_compile_shader(struct panvk_device *dev,
+    case MESA_SHADER_VERTEX: {
+ #if PAN_ARCH >= 10
+       /* Lowered/passthrough variants only exist on the gpu_prerast path. */
++      const bool dyn_polygon_mode =
++         !state || !state->rs ||
++         BITSET_TEST(state->dynamic, MESA_VK_DYNAMIC_RS_POLYGON_MODE);
+       const bool want_prerast =
+          PANVK_DEBUG(GPU_PRERAST) ||
+          (info->next_stage_mask & VK_SHADER_STAGE_GEOMETRY_BIT) ||
+-         (state && state->rs &&
+-          state->rs->polygon_mode != VK_POLYGON_MODE_FILL);
++         (dev->vk.enabled_features.fillModeNonSolid &&
++          (dyn_polygon_mode ||
++           state->rs->polygon_mode != VK_POLYGON_MODE_FILL));
+       const enum panvk_vs_variant last_variant =
+          want_prerast ? PANVK_VS_VARIANT_GPU_PASSTHROUGH : PANVK_VS_VARIANT_HW;
+       struct panvk_gpu_prerast_out_types out_types = {0};

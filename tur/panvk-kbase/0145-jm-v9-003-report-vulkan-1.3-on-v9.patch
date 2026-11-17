@@ -1,0 +1,259 @@
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: 2026-10-11
+Subject: [PATCH jm-v9 003] panvk/jm: v9 multiview and layered rendering, report Vulkan 1.3 biblioklept
+
+Purpose: Make Vulkan 1.3 true on Valhall v9 JM instead of capping it at 1.1.
+DXVK 3.x refuses a 1.1 device ("Device does not support Vulkan 1.3").
+v9 shares every Vulkan 1.2/1.3 core feature implementation with v10+
+(descriptors, compiler, sync2, dynamic rendering, timeline semaphores on
+the kbase software timeline, host query reset, maintenance4, ...), and
+the v9 JM backend implements the core commands. The one core gap was
+multiview (required since 1.1, already advertised): the v9 draw path only
+encoded layer 0 and a vertex shader reading ViewIndex hit an unlowered
+intrinsic. Layered rendering (vk_meta copies into array layers write
+gl_Layer) had the same layer 0 limit.
+
+v9 JM now uses the Bifrost scheme: a draw is recorded once per view (or
+per framebuffer layer when the VS writes gl_Layer), each copy with its own
+tiler context and the view or layer in the layer_id sysval;
+lower_layer_writes() drops primitives whose gl_Layer is not the drawn
+layer; ViewIndex in the VS reads layer_id, in the FS the FBD frame
+argument. The tiler context of layer N gets layer_offset N so its FBD
+selects internal list 0, and the per-layer pre/post frame DCD offset is
+Bifrost-only (v9 allocates one set). A VS without a gl_Layer write is drawn
+in layer 0 only (writes_layer, serialized with the shader).
+
+The 1.1 override of the old 003 is dropped, so get_api_version() returns
+the upstream 1.3 for v9. vkCmdDrawIndirectCount (1.2 core) comes in 009.
+Source/Reference: https://github.com/Noysz/panvk-g99-jm (commit 6ce0d46e419a, MIT; patches/0042-v9-vs-layer-write-lowering, 0048-v9-layered-rendering-per-layer-draws, writes_layer from 0063-v9-geometry-shader), adapted to the FristOneRR-based v9 draw path of 002
+Tested GPU: build-checked; device run on Mali-G57 MC2 (Lenovo TB336FU, gpu_id 0x90930010) pending, see worklogs/v9-jm/PROGRESS.md
+Tested Kbase UAPI: JM 11.38
+Mesa base range: 5a07217f + g615-v11-csf series + jm-v9 001-006
+Dependencies: jm-v9/002 (v9 draw path)
+Validation test: PanProbe (apps/panvk-test), worklogs/v9-jm/PROGRESS.md
+
+---
+diff --git a/src/panfrost/vulkan/jm/panvk_vX_cmd_buffer.c b/src/panfrost/vulkan/jm/panvk_vX_cmd_buffer.c
+index 9230e5d..9533f3c 100644
+--- a/src/panfrost/vulkan/jm/panvk_vX_cmd_buffer.c
++++ b/src/panfrost/vulkan/jm/panvk_vX_cmd_buffer.c
+@@ -203,7 +203,11 @@ panvk_per_arch(cmd_close_batch)(struct panvk_cmd_buffer *cmdbuf)
+ 
+          fbd_info.layer = layer_id;
+          fbd_info.frame_shaders = fs;
+-         fbd_info.frame_shaders.dcd_pointer += layer_id * 3 * pan_size(DRAW);
++         /* Bifrost has one set of pre/post frame DCDs per layer, v9 one set
++          * for all layers (alloc_pre_post_dcds()), the frame shaders read
++          * the layer from the FBD frame argument. */
++         if (PAN_ARCH < 9)
++            fbd_info.frame_shaders.dcd_pointer += layer_id * 3 * pan_size(DRAW);
+ 
+          const struct pan_fb_descs fb_descs = {
+             .fbd = fbd.cpu,
+@@ -363,10 +367,16 @@ panvk_per_arch(cmd_prepare_tiler_context)(struct panvk_cmd_buffer *cmdbuf,
+    }
+ 
+ out_set_layer_ctx:
+-   if (PAN_ARCH >= 9)
++   if (PAN_ARCH >= 9) {
+       batch->tiler.ctx.valhall.desc = tiler_desc;
+-   else
++      /* One tiler context per layer, primitives land in internal layer 0
++       * of their own context (the VS drops the hardware layer write), so
++       * the FBD of layer N must select list N - N = 0. */
++      assert(layer_idx <= UINT8_MAX);
++      batch->tiler.ctx.valhall.layer_offset = layer_idx;
++   } else {
+       batch->tiler.ctx.bifrost.desc = tiler_desc;
++   }
+ 
+    return VK_SUCCESS;
+ }
+diff --git a/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c
+index b6d9423..00cb21d 100644
+--- a/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c
+@@ -2422,7 +2422,7 @@ v9_emit_malloc_vertex_job(struct panvk_cmd_buffer *cmdbuf,
+ }
+ 
+ static void
+-v9_cmd_draw(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info *info)
++v9_cmd_draw_layer(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info *info)
+ {
+    /* ponytail: JM tessellation from FristOneRR not ported; needs libpoly tess + panvk_tess_info */
+    if (info->prim == MESA_PRIM_PATCHES)
+@@ -2460,8 +2460,7 @@ v9_cmd_draw(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info *info)
+    result = panvk_per_arch(cmd_alloc_tls_desc)(cmdbuf, true);
+    if (result != VK_SUCCESS)
+       return;
+-   result = panvk_per_arch(cmd_prepare_tiler_context)(cmdbuf, 0);
+-   (void)0;
++   result = panvk_per_arch(cmd_prepare_tiler_context)(cmdbuf, info->layer_id);
+    if (result != VK_SUCCESS)
+       return;
+ 
+@@ -2525,6 +2524,29 @@ v9_cmd_draw(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info *info)
+       gfx_state_set_dirty(cmdbuf, VS_PUSH_UNIFORMS);
+ }
+ 
++/* Multiview and layered rendering, same scheme as the Bifrost path: the draw
++ * is recorded once per view (or per framebuffer layer when the VS writes
++ * gl_Layer), each copy with its own tiler context and the view or layer in
++ * the layer_id sysval. The fragment jobs are emitted per layer when the
++ * batch is closed. */
++static void
++v9_cmd_draw(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info *info)
++{
++   uint32_t view_mask = cmdbuf->state.gfx.render.view_mask;
++   uint32_t layer_count = view_mask ? util_bitcount(view_mask)
++                                    : cmdbuf->state.gfx.render.layer_count;
++   const struct panvk_shader *vs = cmdbuf->state.gfx.vs.shader;
++
++   /* Without a gl_Layer write, primitives go to layer 0 only. */
++   if (!view_mask && (!vs || !vs->writes_layer))
++      layer_count = 1;
++
++   for (uint32_t i = 0; i < MAX2(layer_count, 1); i++) {
++      info->layer_id = view_mask ? u_bit_scan(&view_mask) : i;
++      v9_cmd_draw_layer(cmdbuf, info);
++   }
++}
++
+ VKAPI_ATTR void VKAPI_CALL
+ panvk_per_arch(CmdDraw)(VkCommandBuffer commandBuffer, uint32_t vertexCount,
+                         uint32_t instanceCount, uint32_t firstVertex,
+diff --git a/src/panfrost/vulkan/panvk_cmd_draw.h b/src/panfrost/vulkan/panvk_cmd_draw.h
+index dc50e8b..c60e682 100644
+--- a/src/panfrost/vulkan/panvk_cmd_draw.h
++++ b/src/panfrost/vulkan/panvk_cmd_draw.h
+@@ -558,7 +558,7 @@ struct panvk_draw_info {
+    bool prims_generated_counted;
+    uint32_t gpu_prerast_prim_base;
+ 
+-#if PAN_ARCH < 9
++#if PAN_ARCH <= 9
+    uint32_t layer_id;
+ #endif
+ };
+diff --git a/src/panfrost/vulkan/panvk_shader.h b/src/panfrost/vulkan/panvk_shader.h
+index 0a7e06e..3c8b77c 100644
+--- a/src/panfrost/vulkan/panvk_shader.h
++++ b/src/panfrost/vulkan/panvk_shader.h
+@@ -185,12 +185,14 @@ struct panvk_graphics_sysvals {
+ 
+    struct panvk_input_attachment_info iam[INPUT_ATTACHMENT_MAP_SIZE];
+ 
+-#if PAN_ARCH < 9
+-   /* gl_Layer on Bifrost is a bit of hack. We have to issue one draw per
+-    * layer, and filter primitives at the VS level.
++#if PAN_ARCH <= 9
++   /* gl_Layer on Bifrost and v9 JM is a bit of hack. We have to issue one
++    * draw per layer, and filter primitives at the VS level.
+     */
+    int32_t layer_id;
++#endif
+ 
++#if PAN_ARCH < 9
+    struct {
+       aligned_u64 sets[PANVK_DESC_TABLE_GFX_COUNT];
+    } desc;
+@@ -492,6 +494,12 @@ struct panvk_shader {
+    struct panvk_gpu_prerast_shader gpu_prerast;
+ #endif
+ 
++#if PAN_ARCH == 9
++   /* The shader writes gl_Layer. Without it a layered draw only renders
++    * layer 0, so v9 JM does not replicate the draw. */
++   bool writes_layer;
++#endif
++
+    struct panvk_shader_variant variants[];
+ };
+ 
+diff --git a/src/panfrost/vulkan/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/panvk_vX_cmd_draw.c
+index 85c5563..4b3bc1e 100644
+--- a/src/panfrost/vulkan/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/panvk_vX_cmd_draw.c
+@@ -925,6 +925,8 @@ panvk_per_arch(cmd_prepare_draw_sysvals)(struct panvk_cmd_buffer *cmdbuf,
+ #if PAN_ARCH < 9
+    set_gfx_sysval(cmdbuf, dirty_sysvals, vs.raw_vertex_offset,
+                   info->vertex.raw_offset);
++#endif
++#if PAN_ARCH <= 9
+    set_gfx_sysval(cmdbuf, dirty_sysvals, layer_id, info->layer_id);
+ #endif
+ 
+diff --git a/src/panfrost/vulkan/panvk_vX_shader.c b/src/panfrost/vulkan/panvk_vX_shader.c
+index 38b3e87..18fdb05 100644
+--- a/src/panfrost/vulkan/panvk_vX_shader.c
++++ b/src/panfrost/vulkan/panvk_vX_shader.c
+@@ -127,6 +127,11 @@ panvk_lower_sysvals(nir_builder *b, nir_instr *instr, void *data)
+          val = nir_imm_zero(b, 1, 32);
+          break;
+       } else if (b->shader->info.stage == MESA_SHADER_VERTEX) {
++#if PAN_ARCH == 9
++         /* v9 JM records one draw per view, with the view in layer_id. */
++         val = load_sysval(b, graphics, bit_size, layer_id);
++         break;
++#endif
+          /* On v14+ we have real multiview and view_index comes from a preload
+           * in the vertex stage.  On earlier generations, view_index in vertex
+           * shaders gets lowered away by nir_lower_multiview() so we should
+@@ -229,7 +234,7 @@ panvk_lower_sysvals(nir_builder *b, nir_instr *instr, void *data)
+    return true;
+ }
+ 
+-#if PAN_ARCH < 9
++#if PAN_ARCH <= 9
+ static bool
+ lower_gl_pos_layer_writes(nir_builder *b, nir_instr *instr, void *data)
+ {
+@@ -651,9 +656,13 @@ panvk_preprocess_nir(struct vk_physical_device *vk_pdev,
+        nir->info.stage == MESA_SHADER_TESS_EVAL)
+       NIR_PASS(_, nir, panvk_lower_clip_cull_vs);
+ 
+-#if PAN_ARCH < 9
++#if PAN_ARCH <= 9
+    /* This needs to be done just after the io_to_temporaries pass, because we
+     * rely on out temporaries to collect the final layer_id value.
++    *
++    * v9 JM uses the Bifrost scheme too: one draw per layer, each with its
++    * own tiler context, and primitives whose gl_Layer is not the drawn layer
++    * are dropped in the VS.
+     */
+    NIR_PASS(_, nir, lower_layer_writes);
+ #endif
+@@ -3394,6 +3403,13 @@ panvk_compile_shader(struct panvk_device *dev,
+       .robust_descriptors = dev->vk.enabled_features.nullDescriptor,
+    };
+ 
++#if PAN_ARCH == 9
++   /* lower_layer_writes() removed the gl_Layer store, the variable stays. */
++   shader->writes_layer =
++      nir_find_variable_with_location(info->nir, nir_var_shader_out,
++                                      VARYING_SLOT_LAYER) != NULL;
++#endif
++
+    switch (info->stage) {
+ #if PAN_ARCH >= 10
+    case MESA_SHADER_TESS_EVAL:
+@@ -4266,6 +4282,9 @@ panvk_deserialize_shader(struct vk_device *vk_dev, struct blob_reader *blob,
+    if (shader->gpu_prerast.io.abi_version != PANVK_GPU_PRERAST_ABI_VERSION)
+       blob->overrun = true;
+ #endif
++#if PAN_ARCH == 9
++   shader->writes_layer = blob_read_uint8(blob);
++#endif
+ 
+    result = shader_desc_info_deserialize(device, blob, shader);
+    if (result != VK_SUCCESS) {
+@@ -4388,6 +4407,9 @@ panvk_shader_serialize(struct vk_device *vk_dev,
+ #if PAN_ARCH >= 10
+    blob_write_bytes(blob, &shader->gpu_prerast, sizeof(shader->gpu_prerast));
+ #endif
++#if PAN_ARCH == 9
++   blob_write_uint8(blob, shader->writes_layer);
++#endif
+ 
+    shader_desc_info_serialize(blob, shader);
+ 

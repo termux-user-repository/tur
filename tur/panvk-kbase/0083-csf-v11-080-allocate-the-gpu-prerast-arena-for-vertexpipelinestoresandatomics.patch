@@ -1,0 +1,27 @@
+From: abhay-byte <zenithblue.dev@gmail.com>
+Subject: [PATCH csf-v11 080] panvk: allocate the gpu_prerast arena when vertexPipelineStoresAndAtomics is enabled
+
+Generated-by: LLM
+
+Purpose: Allocate the gpu_prerast arena when only vertexPipelineStoresAndAtomics is enabled so lowered VS draws do not fault on a NULL arena; biblioklept
+Source/Reference: local, work/mesa-vpsa2-final dx-vpsa2-final 63cafca3896
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/079
+Validation test: tests/dxvk/vulkan/vertex-stores 10/10 PASS (was MMU fault, DeviceLost on every case)
+
+diff --git a/src/panfrost/vulkan/panvk_vX_device.c b/src/panfrost/vulkan/panvk_vX_device.c
+index d098222d95f..28745813d87 100644
+--- a/src/panfrost/vulkan/panvk_vX_device.c
++++ b/src/panfrost/vulkan/panvk_vX_device.c
+@@ -587,7 +587,8 @@ panvk_per_arch(create_device)(struct panvk_physical_device *physical_device,
+ #if PAN_ARCH >= 10
+    if (PANVK_DEBUG(GPU_PRERAST) || device->vk.enabled_features.fillModeNonSolid ||
+        device->vk.enabled_features.geometryShader ||
+-       device->vk.enabled_features.transformFeedback) {
++       device->vk.enabled_features.transformFeedback ||
++       device->vk.enabled_features.vertexPipelineStoresAndAtomics) {
+       device->gpu_prerast_arena = panvk_pool_alloc_mem(
+          &device->mempools.rw,
+          (struct panvk_pool_alloc_info){
