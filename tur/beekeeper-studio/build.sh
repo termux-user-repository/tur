@@ -3,12 +3,11 @@ TERMUX_PKG_DESCRIPTION="Modern and easy to use SQL client and database manager"
 TERMUX_PKG_LICENSE="GPL-3.0, custom"
 TERMUX_PKG_LICENSE_FILE="LICENSE.md, LICENSE-COMMERCIAL.md"
 TERMUX_PKG_MAINTAINER="Gouranga Das Samrat <gouranga.das.khulna@gmail.com>"
-TERMUX_PKG_VERSION="6.2.2"
+TERMUX_PKG_VERSION="6.3.0"
 TERMUX_PKG_SRCURL="https://github.com/beekeeper-studio/beekeeper-studio/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz"
-TERMUX_PKG_SHA256=93b95c7aeaab64ab8fbdee7d31a69700ee648fb4e2a1f286dc3637408ea5a215
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_SHA256=212ab8c0edd5e6e103827a8b8e11dec5ef8b0b4d9257027a776e9e71c0e48f50
 TERMUX_PKG_DEPENDS="electron43, libx11"
-TERMUX_PKG_BUILD_DEPENDS="electron43-headers, pkg-config, yarn"
+TERMUX_PKG_BUILD_DEPENDS="electron43-headers, pkg-config"
 TERMUX_PKG_BUILD_IN_SRC=true
 # Chromium/Electron don't support i686 on Linux.
 TERMUX_PKG_EXCLUDED_ARCHES="i686"
@@ -19,66 +18,61 @@ TERMUX_PKG_UPDATE_TAG_TYPE="latest-release-tag"
 termux_step_make() {
 	termux_setup_electron "$TERMUX_PKG_SRCDIR/apps/studio/package.json"
 
-	# The yarn in $TERMUX_PREFIX/bin has a shebang for the target node,
-	# so wrap yarn.js with the host node
-	local bin="$TERMUX_PKG_BUILDDIR/_bin"
-	mkdir -p "$bin"
-	cat > "$bin/yarn" <<-EOF
-		#!/bin/sh
-		exec node $TERMUX_PREFIX/share/yarn/bin/yarn.js "\$@"
-	EOF
-	chmod 0755 "$bin/yarn"
-	export PATH="$bin:$PATH"
-
-	# better-sqlite3 12.x doesn't compile against the V8 headers of electron 42,
-	# 13.x uses Node-API. This changes the lockfile so --frozen-lockfile can't be used
-	jq '.resolutions["better-sqlite3"] = "^13.0.3"' package.json > package.json.new
-	mv package.json.new package.json
+	local _pnpm_version _pnpm_dir
+	_pnpm_version="$(jq -r '.packageManager | sub("^pnpm@"; "") | sub("\\+.*$"; "")' package.json)"
+	_pnpm_dir="$TERMUX_PKG_TMPDIR/pnpm"
+	mkdir -p "$_pnpm_dir"
+	npm install --prefix "$_pnpm_dir" "pnpm@${_pnpm_version}"
+	export PATH="$_pnpm_dir/node_modules/.bin:$PATH"
+	export PNPM_CONFIG_PM_ON_FAIL=ignore
 
 	# Install scripts are skipped, sqlanywhere's one exits non-zero without
 	# the SAP client. better-sqlite3 is built by hand below
-	yarn install --ignore-scripts --network-timeout 600000
+	pnpm install --frozen-lockfile --ignore-scripts --fetch-timeout 600000
 
 	# libsql, duckdb and sqlanywhere have no android binaries and their loaders
-	# throw on require, which stops the app at startup. Stub them to fail on use
+	# throw on require, which stops the app at startup. Stub them to fail on use.
+	# With pnpm, node_modules/<name> is a symlink into node_modules/.pnpm, so the
+	# real package directories are replaced to keep the layout (and the
+	# dependency tree that electron-builder collects) intact
 	local _name _dir
 	for _name in libsql @duckdb/node-api sqlanywhere; do
-		for _dir in node_modules apps/studio/node_modules; do
-			[[ -d "$_dir/$_name" ]] || continue
-			rm -rf "${_dir:?}/$_name"
-			mkdir -p "$_dir/$_name"
+		while IFS= read -r _dir; do
+			rm -rf "${_dir:?}"
+			mkdir -p "$_dir"
 			echo "{\"name\":\"$_name\",\"version\":\"0.0.0\",\"main\":\"index.js\"}" \
-				> "$_dir/$_name/package.json"
+				> "$_dir/package.json"
 			sed "s|@NAME@|$_name|g" "$TERMUX_PKG_BUILDER_DIR/unsupported-driver-stub.js" \
-				> "$_dir/$_name/index.js"
-		done
+				> "$_dir/index.js"
+		done < <(find node_modules/.pnpm -type d -path "*/node_modules/$_name" -prune)
 	done
 
-	# Optional prebuilds of those drivers that yarn picked for the build host
-	rm -rf node_modules/@duckdb/node-bindings* node_modules/@libsql/{darwin,linux,win32}-*
+	# Optional prebuilds of those drivers that pnpm picked for the build host,
+	# and the symlinks to them left dangling in the virtual store
+	rm -rf node_modules/.pnpm/@duckdb+node-bindings* \
+		node_modules/.pnpm/@libsql+{darwin,linux,win32}-*
+	find node_modules/.pnpm -xtype l \
+		\( -path "*/@duckdb/node-bindings*" -o -path "*/@libsql/*" \) -delete
 
 	# better-sqlite3 has to be built from source against the electron headers
 	# set above, its prebuilds target the build host
-	for _dir in node_modules apps/studio/node_modules; do
-		[[ -d "$_dir/better-sqlite3" ]] || continue
-		(cd "$_dir/better-sqlite3" && npm run build-release)
+	while IFS= read -r _dir; do
+		(cd "$_dir" && npm run build-release)
 		# Its loader prefers prebuilds/ and takes this android as musl,
 		# so the musl prebuild would be loaded instead of the one built here
-		rm -rf "$_dir/better-sqlite3/prebuilds"
-	done
+		rm -rf "$_dir/prebuilds"
+	done < <(find node_modules/.pnpm -type d -path "*/node_modules/better-sqlite3" -prune)
 
-	# ui-kit has to be built before the app
-	yarn lib:build
-
+	# "build" builds ui-kit first (build:deps), then bundles the app
 	export NODE_OPTIONS="--max-old-space-size=4096"
-	yarn workspace beekeeper-studio build
+	pnpm --filter beekeeper-studio build
 
 	# Only app.asar and the extra resources are needed from electron-builder;
 	# termux_setup_electron already provides a placeholder "electron" binary
 	# in $TERMUX_ELECTRON_DIST
 	(
 		cd apps/studio
-		yarn electron-builder \
+		pnpm exec electron-builder \
 			--linux --"$TERMUX_ELECTRON_ARCH" --dir \
 			--config ./electron-builder-config.js \
 			-c.electronDist="$TERMUX_ELECTRON_DIST" \
