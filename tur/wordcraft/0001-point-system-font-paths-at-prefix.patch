@@ -1,0 +1,13 @@
+diff --git a/crates/fonts/src/fontdb/names.rs b/crates/fonts/src/fontdb/names.rs
+index 4d94585..d816151 100644
+--- a/crates/fonts/src/fontdb/names.rs
++++ b/crates/fonts/src/fontdb/names.rs
+@@ -235,7 +235,7 @@ pub fn system_font_dirs() -> Vec<std::path::PathBuf> {
+             dirs.push(std::path::PathBuf::from(l).join("Microsoft\\Windows\\Fonts"));
+         }
+     } else {
+-        dirs.extend(["/usr/share/fonts", "/usr/local/share/fonts"].map(Into::into));
++        dirs.extend(["@TERMUX_PREFIX@/share/fonts", "@TERMUX_PREFIX@/local/share/fonts"].map(Into::into));
+         if let Some(h) = &home {
+             dirs.push(h.join(".fonts"));
+             dirs.push(h.join(".local/share/fonts"));
