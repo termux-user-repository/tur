@@ -1,0 +1,45 @@
+diff --git a/crates/engine/src/spell.rs b/crates/engine/src/spell.rs
+index 8bc88e6..598e2ce 100644
+--- a/crates/engine/src/spell.rs
++++ b/crates/engine/src/spell.rs
+@@ -519,7 +519,7 @@ pub fn search_dirs() -> Vec<PathBuf> {
+         let data = std::env::var_os("XDG_DATA_HOME").map(PathBuf::from).or_else(|| home.as_ref().map(|h| h.join(".local/share")));
+         out.extend(data.iter().map(|d| d.join("deckcraft/dictionaries")));
+         out.extend(data.iter().map(|d| d.join("hunspell")));
+-        for d in ["/usr/share/hunspell", "/usr/share/myspell", "/usr/share/myspell/dicts", "/usr/local/share/hunspell", "/app/share/hunspell"] {
++        for d in ["@TERMUX_PREFIX@/share/hunspell", "@TERMUX_PREFIX@/share/myspell", "@TERMUX_PREFIX@/share/myspell/dicts", "@TERMUX_PREFIX@/local/share/hunspell", "/app/share/hunspell"] {
+             out.push(d.into());
+         }
+     }
+diff --git a/crates/fonts/src/fontdb.rs b/crates/fonts/src/fontdb.rs
+index e542c8d..e38b977 100644
+--- a/crates/fonts/src/fontdb.rs
++++ b/crates/fonts/src/fontdb.rs
+@@ -630,7 +630,7 @@ pub fn system_font_dirs() -> Vec<std::path::PathBuf> {
+             dirs.push(l.join("Microsoft\\FontCache\\4\\CloudFonts"));
+         }
+     } else {
+-        dirs.extend(["/usr/share/fonts", "/usr/local/share/fonts"].map(Into::into));
++        dirs.extend(["@TERMUX_PREFIX@/share/fonts", "@TERMUX_PREFIX@/local/share/fonts"].map(Into::into));
+         if let Some(h) = &home {
+             dirs.push(h.join(".fonts"));
+             dirs.push(h.join(".local/share/fonts"));
+@@ -663,15 +663,15 @@ fn xdg_font_dirs(data_home: Option<&str>, data_dirs: Option<&str>, home: Option<
+             }
+         }
+     }
+-    let dirs = data_dirs.filter(|d| !d.is_empty()).unwrap_or("/usr/local/share:/usr/share");
++    let dirs = data_dirs.filter(|d| !d.is_empty()).unwrap_or("@TERMUX_PREFIX@/local/share:@TERMUX_PREFIX@/share");
+     v.extend(dirs.split(':').filter(|d| d.starts_with('/')).take(64).map(|d| std::path::Path::new(d).join("fonts")));
+     v
+ }
+ 
+ /// The fontconfig configuration files: `/etc/fonts/fonts.conf` and `/etc/fonts/conf.d/*.conf`.
+ fn fontconfig_files() -> Vec<std::path::PathBuf> {
+-    let mut v = vec![std::path::PathBuf::from("/etc/fonts/fonts.conf"), std::path::PathBuf::from("/etc/fonts/local.conf")];
+-    if let Ok(entries) = std::fs::read_dir("/etc/fonts/conf.d") {
++    let mut v = vec![std::path::PathBuf::from("@TERMUX_PREFIX@/etc/fonts/fonts.conf"), std::path::PathBuf::from("@TERMUX_PREFIX@/etc/fonts/local.conf")];
++    if let Ok(entries) = std::fs::read_dir("@TERMUX_PREFIX@/etc/fonts/conf.d") {
+         let mut files: Vec<_> = entries.flatten().map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "conf")).collect();
+         files.sort();
+         files.truncate(512);
