@@ -1,0 +1,273 @@
+diff --git a/crates/engine/src/cmd/spelling.rs b/crates/engine/src/cmd/spelling.rs
+index 470cf6c..a3ba614 100644
+--- a/crates/engine/src/cmd/spelling.rs
++++ b/crates/engine/src/cmd/spelling.rs
+@@ -28,7 +28,7 @@ fn dictionary() -> &'static HashSet<String> {
+         #[cfg(not(target_arch = "wasm32"))]
+         {
+             let mut set = HashSet::new();
+-            for path in ["/usr/share/dict/words", "/usr/share/dict/american-english", "/usr/share/dict/british-english"] {
++            for path in ["@TERMUX_PREFIX@/share/dict/words", "@TERMUX_PREFIX@/share/dict/american-english", "@TERMUX_PREFIX@/share/dict/british-english"] {
+                 if let Ok(text) = std::fs::read_to_string(path) {
+                     for w in text.lines().take(2_000_000) {
+                         set.insert(w.trim().to_lowercase());
+diff --git a/crates/sandbox/src/policy.rs b/crates/sandbox/src/policy.rs
+index d39f07f..b846d7e 100644
+--- a/crates/sandbox/src/policy.rs
++++ b/crates/sandbox/src/policy.rs
+@@ -40,14 +40,14 @@ impl Policy {
+     /// Paths that don't exist here are skipped.
+     pub fn with_system_libraries(mut self) -> Policy {
+         if cfg!(target_os = "linux") {
+-            for dir in ["/lib", "/lib64", "/usr/lib", "/usr/lib64"] {
++            for dir in ["@TERMUX_PREFIX@/lib", "/lib", "/lib64", "/usr/lib", "/usr/lib64"] {
+                 // The dynamic loader is executed, so its directories get execute access.
+                 if Path::new(dir).exists() {
+                     self.exec.push(dir.into());
+                 }
+             }
+             // What the C library and Python's `zoneinfo` read for the time zone.
+-            for path in ["/etc/ld.so.cache", "/etc/localtime", "/usr/share/zoneinfo"] {
++            for path in ["/etc/ld.so.cache", "@TERMUX_PREFIX@/etc/localtime", "/etc/localtime", "@TERMUX_PREFIX@/share/zoneinfo", "/usr/share/zoneinfo"] {
+                 if Path::new(path).exists() {
+                     self.read.push(path.into());
+                 }
+@@ -56,7 +56,7 @@ impl Policy {
+         // Fonts, which a plot's text is drawn with. Only the system's: fonts in the home folder stay
+         // out of reach. macOS's own `/System/Library/Fonts` comes with its base profile.
+         let fonts: &[&str] = if cfg!(target_os = "linux") {
+-            &["/usr/share/fonts", "/usr/local/share/fonts"]
++            &["@TERMUX_PREFIX@/share/fonts", "@TERMUX_PREFIX@/local/share/fonts", "/usr/share/fonts", "/usr/local/share/fonts"]
+         } else if cfg!(target_os = "macos") {
+             &["/Library/Fonts"]
+         } else {
+diff --git a/crates/ui-egui/src/fonts.rs b/crates/ui-egui/src/fonts.rs
+index da7dd57..7b04c38 100644
+--- a/crates/ui-egui/src/fonts.rs
++++ b/crates/ui-egui/src/fonts.rs
+@@ -83,7 +83,7 @@ pub fn system_font_dirs() -> Vec<PathBuf> {
+                 dirs.push(PathBuf::from(l).join("Microsoft\\Windows\\Fonts"));
+             }
+         } else {
+-            dirs.extend(["/usr/share/fonts", "/usr/local/share/fonts", "/usr/share/fonts/TTF"].map(Into::into));
++            dirs.extend(["@TERMUX_PREFIX@/share/fonts", "@TERMUX_PREFIX@/local/share/fonts", "@TERMUX_PREFIX@/share/fonts/TTF"].map(Into::into));
+             if let Some(h) = &home {
+                 dirs.push(h.join(".fonts"));
+                 dirs.push(h.join(".local/share/fonts"));
+diff --git a/crates/ui-egui/src/theme/font_fallback.rs b/crates/ui-egui/src/theme/font_fallback.rs
+index 7d99a7e..90b4d9c 100644
+--- a/crates/ui-egui/src/theme/font_fallback.rs
++++ b/crates/ui-egui/src/theme/font_fallback.rs
+@@ -151,17 +151,17 @@ const LINUX_CJK_DIRS: [&str; 22] = [
+     "/run/host/local-fonts",
+     "/run/host/local-fonts/noto-cjk",
+     "/run/host/user-fonts",
+-    "/usr/share/fonts/opentype/noto",
+-    "/usr/share/fonts/google-noto-cjk",
+-    "/usr/share/fonts/noto-cjk",
+-    "/usr/share/fonts/truetype/noto",
+-    "/usr/share/fonts/noto",
+-    "/usr/share/fonts/truetype",
+-    "/usr/share/fonts/TTF",
+-    "/usr/share/fonts",
+-    "/usr/local/share/fonts",
+-    "/usr/local/share/fonts/noto-cjk",
+-    "/usr/share/fonts/chromeos/notocjk",
++    "@TERMUX_PREFIX@/share/fonts/opentype/noto",
++    "@TERMUX_PREFIX@/share/fonts/google-noto-cjk",
++    "@TERMUX_PREFIX@/share/fonts/noto-cjk",
++    "@TERMUX_PREFIX@/share/fonts/truetype/noto",
++    "@TERMUX_PREFIX@/share/fonts/noto",
++    "@TERMUX_PREFIX@/share/fonts/truetype",
++    "@TERMUX_PREFIX@/share/fonts/TTF",
++    "@TERMUX_PREFIX@/share/fonts",
++    "@TERMUX_PREFIX@/local/share/fonts",
++    "@TERMUX_PREFIX@/local/share/fonts/noto-cjk",
++    "@TERMUX_PREFIX@/share/fonts/chromeos/notocjk",
+ ];
+ 
+ /// The Windows fonts folder (`%WINDIR%\Fonts`, or the default install location).
+@@ -239,11 +239,11 @@ pub(super) fn cjk_hangul() -> Vec<(String, u32)> {
+ #[cfg(not(target_arch = "wasm32"))]
+ fn linux_noto_dirs() -> [&'static str; 5] {
+     [
+-        "/usr/share/fonts/truetype/noto",
+-        "/usr/share/fonts/opentype/noto",
+-        "/usr/share/fonts/truetype",
+-        "/usr/share/fonts",
+-        "/usr/share/fonts/chromeos/noto", // ChromeOS's Linux container (#1762)
++        "@TERMUX_PREFIX@/share/fonts/truetype/noto",
++        "@TERMUX_PREFIX@/share/fonts/opentype/noto",
++        "@TERMUX_PREFIX@/share/fonts/truetype",
++        "@TERMUX_PREFIX@/share/fonts",
++        "@TERMUX_PREFIX@/share/fonts/chromeos/noto", // ChromeOS's Linux container (#1762)
+     ]
+ }
+ 
+@@ -268,7 +268,7 @@ pub(super) fn thai() -> Vec<(String, u32)> {
+         &["/System/Library/Fonts/Supplemental/Thonburi.ttc", "/System/Library/Fonts/SukhumvitSet.ttc"],
+         &["NotoSansThai-Regular.ttf", "tlwg/Garuda.ttf", "garuda/Garuda.ttf"],
+         // Fedora ships the variable Noto Sans Thai; its default instance is Regular.
+-        "/usr/share/fonts/google-noto-vf/NotoSansThai[wght].ttf",
++        "@TERMUX_PREFIX@/share/fonts/google-noto-vf/NotoSansThai[wght].ttf",
+     )
+ }
+ 
+@@ -278,7 +278,7 @@ pub(super) fn thai() -> Vec<(String, u32)> {
+ pub(super) fn lao() -> Vec<(String, u32)> {
+     let mac_sup = "/System/Library/Fonts/Supplemental";
+     let win = windows_fonts();
+-    let lin = ["/usr/share/fonts/truetype/noto", "/usr/share/fonts/opentype/noto", "/usr/share/fonts/truetype", "/usr/share/fonts"];
++    let lin = ["@TERMUX_PREFIX@/share/fonts/truetype/noto", "@TERMUX_PREFIX@/share/fonts/opentype/noto", "@TERMUX_PREFIX@/share/fonts/truetype", "@TERMUX_PREFIX@/share/fonts"];
+     let mut v: Vec<(String, u32)> = vec![
+         (format!("{win}\\LeelawUI.ttf"), 0), // Leelawadee UI
+         (format!("{win}\\dokchamp.ttf"), 0), // DokChampa
+@@ -309,7 +309,7 @@ pub(super) fn hebrew() -> Vec<(String, u32)> {
+             "/System/Library/Fonts/Lucida Grande.ttc",
+         ],
+         &["NotoSansHebrew-Regular.ttf", "dejavu/DejaVuSans.ttf", "freefont/FreeSans.ttf"],
+-        "/usr/share/fonts/google-noto-vf/NotoSansHebrew[wght].ttf",
++        "@TERMUX_PREFIX@/share/fonts/google-noto-vf/NotoSansHebrew[wght].ttf",
+     )
+ }
+ 
+@@ -322,7 +322,7 @@ pub(super) fn arabic() -> Vec<(String, u32)> {
+         &["tahoma.ttf", "arial.ttf", "segoeui.ttf"],
+         &["/System/Library/Fonts/GeezaPro.ttc", "/System/Library/Fonts/Supplemental/GeezaPro.ttc"],
+         &["NotoSansArabic-Regular.ttf", "NotoNaskhArabic-Regular.ttf", "noto/NotoSansArabic-Regular.ttf", "noto/NotoNaskhArabic-Regular.ttf"],
+-        "/usr/share/fonts/google-noto-vf/NotoSansArabic[wght].ttf",
++        "@TERMUX_PREFIX@/share/fonts/google-noto-vf/NotoSansArabic[wght].ttf",
+     );
+     for family in ["Noto Sans Arabic", "Noto Naskh Arabic", "Amiri"] {
+         v.extend(crate::fonts::faces_of(family).into_iter().map(|face| (face.path.to_string_lossy().into_owned(), face.index)));
+@@ -340,13 +340,13 @@ fn symbols() -> Vec<(String, u32)> {
+     let win = std::env::var("WINDIR").map(|w| format!("{w}\\Fonts")).unwrap_or_else(|_| "C:\\Windows\\Fonts".into());
+     let mut v: Vec<(String, u32)> = vec![(format!("{win}\\seguisym.ttf"), 0), ("/System/Library/Fonts/Apple Symbols.ttf".into(), 0)];
+     for d in [
+-        "/usr/share/fonts/truetype/dejavu",
+-        "/usr/share/fonts/dejavu-sans-fonts",
+-        "/usr/share/fonts/TTF",
+-        "/usr/share/fonts/dejavu",
+-        "/usr/share/fonts/truetype/ttf-dejavu",
+-        "/usr/local/share/fonts/dejavu",
+-        "/usr/local/share/fonts",
++        "@TERMUX_PREFIX@/share/fonts/truetype/dejavu",
++        "@TERMUX_PREFIX@/share/fonts/dejavu-sans-fonts",
++        "@TERMUX_PREFIX@/share/fonts/TTF",
++        "@TERMUX_PREFIX@/share/fonts/dejavu",
++        "@TERMUX_PREFIX@/share/fonts/truetype/ttf-dejavu",
++        "@TERMUX_PREFIX@/local/share/fonts/dejavu",
++        "@TERMUX_PREFIX@/local/share/fonts",
+     ] {
+         v.push((format!("{d}/DejaVuSans.ttf"), 0));
+     }
+@@ -359,13 +359,13 @@ fn symbols() -> Vec<(String, u32)> {
+ pub(super) fn symbols_more() -> Vec<(String, u32)> {
+     let mut v: Vec<(String, u32)> = Vec::new();
+     for d in [
+-        "/usr/share/fonts/noto",
+-        "/usr/share/fonts/truetype/noto",
+-        "/usr/share/fonts/opentype/noto",
+-        "/usr/share/fonts/google-noto-sans-symbols-2-fonts",
+-        "/usr/share/fonts/google-noto",
+-        "/usr/local/share/fonts/noto",
+-        "/usr/share/fonts/chromeos/noto",
++        "@TERMUX_PREFIX@/share/fonts/noto",
++        "@TERMUX_PREFIX@/share/fonts/truetype/noto",
++        "@TERMUX_PREFIX@/share/fonts/opentype/noto",
++        "@TERMUX_PREFIX@/share/fonts/google-noto-sans-symbols-2-fonts",
++        "@TERMUX_PREFIX@/share/fonts/google-noto",
++        "@TERMUX_PREFIX@/local/share/fonts/noto",
++        "@TERMUX_PREFIX@/share/fonts/chromeos/noto",
+     ] {
+         v.push((format!("{d}/NotoSansSymbols2-Regular.ttf"), 0));
+     }
+diff --git a/crates/ui-egui/src/theme/font_setup.rs b/crates/ui-egui/src/theme/font_setup.rs
+index 31e4c63..9b60361 100644
+--- a/crates/ui-egui/src/theme/font_setup.rs
++++ b/crates/ui-egui/src/theme/font_setup.rs
+@@ -296,7 +296,7 @@ pub(super) fn candidates(role: &str) -> Vec<(String, u32)> {
+     let mac_sup = "/System/Library/Fonts/Supplemental";
+     let win = std::env::var("WINDIR").map(|w| format!("{w}\\Fonts")).unwrap_or_else(|_| "C:\\Windows\\Fonts".into());
+     // ChromeOS's Linux container (Crostini) mounts the host's fonts under `chromeos/` (#1762).
+-    let lin = ["/usr/share/fonts/truetype", "/usr/share/fonts", "/usr/local/share/fonts", "/usr/share/fonts/TTF", "/usr/share/fonts/chromeos"];
++    let lin = ["@TERMUX_PREFIX@/share/fonts/truetype", "@TERMUX_PREFIX@/share/fonts", "@TERMUX_PREFIX@/local/share/fonts", "@TERMUX_PREFIX@/share/fonts/TTF", "@TERMUX_PREFIX@/share/fonts/chromeos"];
+     let mut v: Vec<(String, u32)> = Vec::new();
+     let mut add = |s: String, i: u32| v.push((s, i));
+     match role {
+@@ -311,10 +311,10 @@ pub(super) fn candidates(role: &str) -> Vec<(String, u32)> {
+                 add(p, 0);
+             }
+             // Fedora keeps each family in its own package folder (#54).
+-            add("/usr/share/fonts/abattis-cantarell-fonts/Cantarell-Regular.otf".into(), 0);
+-            add("/usr/share/fonts/google-noto/NotoSans-Regular.ttf".into(), 0);
+-            add("/usr/share/fonts/dejavu-sans-fonts/DejaVuSans.ttf".into(), 0);
+-            add("/usr/share/fonts/liberation-sans-fonts/LiberationSans-Regular.ttf".into(), 0);
++            add("@TERMUX_PREFIX@/share/fonts/abattis-cantarell-fonts/Cantarell-Regular.otf".into(), 0);
++            add("@TERMUX_PREFIX@/share/fonts/google-noto/NotoSans-Regular.ttf".into(), 0);
++            add("@TERMUX_PREFIX@/share/fonts/dejavu-sans-fonts/DejaVuSans.ttf".into(), 0);
++            add("@TERMUX_PREFIX@/share/fonts/liberation-sans-fonts/LiberationSans-Regular.ttf".into(), 0);
+         }
+         "ui-bold" => {
+             add(format!("{mac_sys}/HelveticaNeue.ttc"), 1);
+@@ -322,9 +322,9 @@ pub(super) fn candidates(role: &str) -> Vec<(String, u32)> {
+             for p in in_dirs(&lin, &["noto/NotoSans-Bold.ttf", "dejavu/DejaVuSans-Bold.ttf", "liberation/LiberationSans-Bold.ttf"]) {
+                 add(p, 0);
+             }
+-            add("/usr/share/fonts/google-noto/NotoSans-Bold.ttf".into(), 0);
+-            add("/usr/share/fonts/dejavu-sans-fonts/DejaVuSans-Bold.ttf".into(), 0);
+-            add("/usr/share/fonts/liberation-sans-fonts/LiberationSans-Bold.ttf".into(), 0);
++            add("@TERMUX_PREFIX@/share/fonts/google-noto/NotoSans-Bold.ttf".into(), 0);
++            add("@TERMUX_PREFIX@/share/fonts/dejavu-sans-fonts/DejaVuSans-Bold.ttf".into(), 0);
++            add("@TERMUX_PREFIX@/share/fonts/liberation-sans-fonts/LiberationSans-Bold.ttf".into(), 0);
+         }
+         "cell" | "cell-bold" | "cell-italic" | "cell-bold-italic" => {
+             let (carlito, calibri_win, calibri_mac, arial_mac, arial_win, lib, dejavu) = match role {
+@@ -367,15 +367,15 @@ pub(super) fn candidates(role: &str) -> Vec<(String, u32)> {
+                 add(p, 0);
+             }
+             // Fedora keeps each family in its own package folder, as for the UI fonts (#54).
+-            add(format!("/usr/share/fonts/google-carlito-fonts/{carlito}"), 0);
++            add(format!("@TERMUX_PREFIX@/share/fonts/google-carlito-fonts/{carlito}"), 0);
+             add(home_fonts(carlito), 0);
+             add(format!("{mac_sup}/{arial_mac}"), 0);
+             add(format!("{win}\\{arial_win}"), 0);
+             for p in in_dirs(&lin, &[&format!("liberation/{lib}"), &format!("dejavu/{dejavu}")]) {
+                 add(p, 0);
+             }
+-            add(format!("/usr/share/fonts/liberation-sans-fonts/{lib}"), 0);
+-            add(format!("/usr/share/fonts/dejavu-sans-fonts/{dejavu}"), 0);
++            add(format!("@TERMUX_PREFIX@/share/fonts/liberation-sans-fonts/{lib}"), 0);
++            add(format!("@TERMUX_PREFIX@/share/fonts/dejavu-sans-fonts/{dejavu}"), 0);
+         }
+         "serif" => {
+             add(format!("{mac_sup}/Times New Roman.ttf"), 0);
+@@ -383,8 +383,8 @@ pub(super) fn candidates(role: &str) -> Vec<(String, u32)> {
+             for p in in_dirs(&lin, &["liberation/LiberationSerif-Regular.ttf", "dejavu/DejaVuSerif.ttf"]) {
+                 add(p, 0);
+             }
+-            add("/usr/share/fonts/liberation-serif-fonts/LiberationSerif-Regular.ttf".into(), 0);
+-            add("/usr/share/fonts/dejavu-serif-fonts/DejaVuSerif.ttf".into(), 0);
++            add("@TERMUX_PREFIX@/share/fonts/liberation-serif-fonts/LiberationSerif-Regular.ttf".into(), 0);
++            add("@TERMUX_PREFIX@/share/fonts/dejavu-serif-fonts/DejaVuSerif.ttf".into(), 0);
+         }
+         "math" => {
+             add(format!("{mac_sup}/STIXTwoMath.otf"), 0);
+@@ -430,14 +430,14 @@ pub(super) fn candidates(role: &str) -> Vec<(String, u32)> {
+             for p in in_dirs(&lin, &["dejavu/DejaVuSansMono.ttf"]) {
+                 add(p, 0);
+             }
+-            add("/usr/share/fonts/dejavu-sans-mono-fonts/DejaVuSansMono.ttf".into(), 0);
++            add("@TERMUX_PREFIX@/share/fonts/dejavu-sans-mono-fonts/DejaVuSansMono.ttf".into(), 0);
+             // Fedora installs DejaVu Sans Mono only on request. Liberation Mono comes with LibreOffice
+             // (in Workstation and KDE by default), Noto Sans Mono (variable, Regular by default) always.
+             for p in in_dirs(&lin, &["liberation/LiberationMono-Regular.ttf"]) {
+                 add(p, 0);
+             }
+-            add("/usr/share/fonts/liberation-mono-fonts/LiberationMono-Regular.ttf".into(), 0);
+-            add("/usr/share/fonts/google-noto-vf/NotoSansMono[wght].ttf".into(), 0);
++            add("@TERMUX_PREFIX@/share/fonts/liberation-mono-fonts/LiberationMono-Regular.ttf".into(), 0);
++            add("@TERMUX_PREFIX@/share/fonts/google-noto-vf/NotoSansMono[wght].ttf".into(), 0);
+         }
+         _ => {}
+     }
