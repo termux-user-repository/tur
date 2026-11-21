@@ -2,7 +2,7 @@ TERMUX_PKG_HOMEPAGE=https://github.com/coder/code-server
 TERMUX_PKG_DESCRIPTION="Run VS Code on any machine anywhere and access it in the browser"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="4.145.2"
+TERMUX_PKG_VERSION="4.146.0"
 TERMUX_PKG_SRCURL=git+https://github.com/coder/code-server
 TERMUX_PKG_DEPENDS="libandroid-spawn, libsecret, krb5, nodejs-24, ripgrep"
 TERMUX_PKG_BUILD_IN_SRC=true
@@ -60,12 +60,18 @@ termux_step_host_build() {
 	env -i PATH="$PATH" sudo apt update
 	env -i PATH="$PATH" sudo apt install -yq libxkbfile-dev libsecret-1-dev libkrb5-dev
 	_setup_nodejs_24
+	npm install pnpm@12.16.0
+	export PATH="$TERMUX_PKG_HOSTBUILD_DIR/node_modules/.bin:$PATH"
 	cd $TERMUX_PKG_SRCDIR
-	npm ci
-	npm install ternary-stream
-	npm run build
-	npm run build:vscode
-	npm run release
+	cd lib/vscode/build
+	pnpm install --dangerously-allow-all-builds
+	cd ..
+	pnpm run preinstall
+	cd ../..
+	pnpm install --dangerously-allow-all-builds
+	pnpm run build
+	pnpm run build:vscode
+	pnpm run release
 	mv $TERMUX_PREFIX/bin.bp $TERMUX_PREFIX/bin
 }
 
@@ -107,7 +113,7 @@ termux_step_make() {
 	chmod 755 release-standalone/lib/node
 	export FORCE_NODE_VERSION=true
 	pushd release-standalone
-	npm install --unsafe-perm --omit=dev
+	pnpm install --dangerously-allow-all-builds
 	rm -fr ./lib/vscode/extensions/node_modules/.bin
 	popd
 
