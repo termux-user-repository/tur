@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://github.com/yorukot/superfile
 TERMUX_PKG_DESCRIPTION="Pretty fancy and modern terminal file manager"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@everywhereless"
-TERMUX_PKG_VERSION="1.6.0"
+TERMUX_PKG_VERSION="1.6.1"
 TERMUX_PKG_SRCURL="https://github.com/yorukot/superfile/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz"
-TERMUX_PKG_SHA256=7340ce9e3e7db401164310dd5d2d1dfa3ccf76118ac49d192b0fac2a292c5b0d
+TERMUX_PKG_SHA256=cdca43cebee4b302104274084d67de31e244b4add39a247a76ab2ae3b255e7d6
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_AUTO_UPDATE=true
 
