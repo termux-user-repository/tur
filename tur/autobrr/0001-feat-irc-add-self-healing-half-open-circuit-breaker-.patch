@@ -1,14 +1,14 @@
-From e2ac69cc8561875f4c9e23523c0e2cbdc2604210 Mon Sep 17 00:00:00 2001
+From 46a193071d7cf754e06782bfef37fa1f41bdeb94 Mon Sep 17 00:00:00 2001
 From: Pankaj Kumar <pankaj.pal9@gmail.com>
-Date: Mon, 19 Oct 2026 10:24:11 +0530
-Subject: [PATCH 1/2] feat(irc): add self-healing half-open circuit breaker for
+Date: Fri, 20 Nov 2026 04:43:40 +0530
+Subject: [PATCH] feat(irc): add self-healing half-open circuit breaker for
  connection flapping
 
 ---
- internal/irc/clock.go         | 109 ++++++++++++++
- internal/irc/flapping_test.go | 260 ++++++++++++++++++++++++++++++++++
- internal/irc/handler.go       | 198 ++++++++++++++++++++++++--
- 3 files changed, 556 insertions(+), 11 deletions(-)
+ internal/irc/clock.go         | 109 ++++++++
+ internal/irc/flapping_test.go | 509 ++++++++++++++++++++++++++++++++++
+ internal/irc/handler.go       | 317 ++++++++++++++++++++-
+ 3 files changed, 923 insertions(+), 12 deletions(-)
  create mode 100644 internal/irc/clock.go
 
 diff --git a/internal/irc/clock.go b/internal/irc/clock.go
@@ -127,7 +127,7 @@ index 00000000..109dab9c
 +	}
 +}
 diff --git a/internal/irc/flapping_test.go b/internal/irc/flapping_test.go
-index efc919dd..dddb6eda 100644
+index bc160c47..a27d224d 100644
 --- a/internal/irc/flapping_test.go
 +++ b/internal/irc/flapping_test.go
 @@ -5,6 +5,7 @@ package irc
@@ -138,9 +138,9 @@ index efc919dd..dddb6eda 100644
  	"sync"
  	"testing"
  	"time"
-@@ -181,3 +182,262 @@ func TestStaleDisconnectCannotTripBreakerOnReplacement(t *testing.T) {
- 	require.Equal(t, ircLive, h.clientState, "stale disconnect stopped the replacement client")
- 	require.Len(t, h.shortSessionEnds, flappingStopThreshold-1, "stale disconnect changed breaker strikes")
+@@ -210,3 +211,511 @@ func TestStopResetsNickLossBreaker(t *testing.T) {
+ 
+ 	require.False(t, recordNickLoss(h, started.Add(2*time.Minute)), "losses from before a stop counted toward the breaker")
  }
 +
 +func TestFlappingBreakerHalfOpenRecovery(t *testing.T) {
@@ -401,38 +401,292 @@ index efc919dd..dddb6eda 100644
 +	require.False(t, h.halfOpenAttempt, "stale timer callback must not trigger half-open attempt")
 +	require.Equal(t, ircStopped, h.clientState)
 +}
++
++func TestFlappingBreakerPreferredNickReconnectCarriesOver(t *testing.T) {
++	initial := time.Date(2026, time.October, 19, 12, 0, 0, 0, time.UTC)
++	clock := newMockClock(initial)
++
++	h, _ := newTestHandler()
++	h.clock = clock
++	h.stateMachine.currentState = StateFullyOperational
++
++	client := &ircevent.Connection{}
++	reconnected := false
++	h.reconnectFn = func(c *ircevent.Connection) {
++		reconnected = true
++	}
++
++	h.m.Lock()
++	h.clientState = ircLive
++	h.client = client
++	h.halfOpenAttempt = true
++	h.flappingCooldown = flappingInitialCooldown
++	h.connectedSince = initial
++	h.network.Nick = "autobrr"
++	h.currentNick = "autobrr_"
++	if h.refusedOnFallback == nil {
++		h.refusedOnFallback = make(map[string]bool)
++	}
++	h.refusedOnFallback["#channel"] = true
++	h.m.Unlock()
++
++	ch := &Channel{Name: "#channel", Enabled: true}
++	h.channels.Set("#channel", ch)
++
++	// Regain nick -> triggers intentional reconnect
++	msg := ircmsg.MakeMessage(nil, "autobrr_", "NICK", "autobrr")
++	h.onNick(client, msg)
++
++	require.True(t, reconnected, "client.Reconnect should be triggered")
++	h.m.RLock()
++	require.True(t, h.handlerRequestedReconnect, "handlerRequestedReconnect must be set")
++	h.m.RUnlock()
++
++	// Short session disconnect due to intentional reconnect (e.g. at 5s)
++	clock.Advance(5 * time.Second)
++	h.onClientDisconnect(client, ircmsg.Message{})
++
++	h.m.RLock()
++	require.False(t, h.handlerRequestedReconnect, "handlerRequestedReconnect must be cleared")
++	require.True(t, h.halfOpenAttempt, "halfOpenAttempt must carry over")
++	require.Equal(t, flappingInitialCooldown, h.flappingCooldown, "cooldown must not escalate on intentional reconnect")
++	require.Empty(t, h.shortSessionEnds, "intentional reconnect must not record a short session strike")
++	h.m.RUnlock()
++
++	// Reconnect comes up
++	h.onConnect(client, ircmsg.Message{})
++
++	// Advance 30s on the new connection -> probe survives
++	clock.Advance(flappingSessionMinLifetime)
++
++	h.m.RLock()
++	defer h.m.RUnlock()
++	require.False(t, h.halfOpenAttempt, "halfOpenAttempt must be false after surviving")
++	require.Nil(t, h.flappingSurvivalTimer, "survival timer must be cleared after healing")
++}
++
++func TestFlappingBreakerPreferredNickReconnectSecondDropPenalized(t *testing.T) {
++	initial := time.Date(2026, time.October, 19, 12, 0, 0, 0, time.UTC)
++	clock := newMockClock(initial)
++
++	h, _ := newTestHandler()
++	h.clock = clock
++	h.stateMachine.currentState = StateFullyOperational
++
++	client := &ircevent.Connection{}
++	h.reconnectFn = func(c *ircevent.Connection) {}
++
++	h.m.Lock()
++	h.clientState = ircLive
++	h.client = client
++	h.halfOpenAttempt = true
++	h.flappingCooldown = flappingInitialCooldown
++	h.connectedSince = initial
++	h.network.Nick = "autobrr"
++	h.currentNick = "autobrr_"
++	if h.refusedOnFallback == nil {
++		h.refusedOnFallback = make(map[string]bool)
++	}
++	h.refusedOnFallback["#channel"] = true
++	h.m.Unlock()
++
++	ch := &Channel{Name: "#channel", Enabled: true}
++	h.channels.Set("#channel", ch)
++
++	// Regain nick -> triggers intentional reconnect
++	msg := ircmsg.MakeMessage(nil, "autobrr_", "NICK", "autobrr")
++	h.onNick(client, msg)
++
++	// Disconnect 1: intentional reconnect
++	clock.Advance(5 * time.Second)
++	h.onClientDisconnect(client, ircmsg.Message{})
++
++	// Reconnect comes up
++	h.onConnect(client, ircmsg.Message{})
++
++	// Disconnect 2: drops unexpectedly after 5s
++	clock.Advance(5 * time.Second)
++	h.onClientDisconnect(client, ircmsg.Message{})
++
++	h.m.RLock()
++	defer h.m.RUnlock()
++	require.False(t, h.halfOpenAttempt, "halfOpenAttempt must be cleared after drop")
++	require.Equal(t, flappingInitialCooldown*2, h.flappingCooldown, "cooldown must double after second drop")
++	require.Equal(t, ircStopped, h.clientState)
++}
++
++func TestFlappingBreakerInterveningClaimPreventsProbeErrorClobber(t *testing.T) {
++	h, _ := newTestHandler()
++	h.m.Lock()
++	h.flappingCooldown = flappingInitialCooldown
++	h.clientState = ircStopped
++	gen := h.flappingRetryGen
++	h.m.Unlock()
++
++	done := make(chan struct{})
++	h.halfOpenDone = func() { close(done) }
++	h.runFn = func() error {
++		// Simulate an intervening Run() or startHandler claiming a new connection
++		h.m.Lock()
++		h.connectGen++
++		h.clientState = ircConnecting
++		h.m.Unlock()
++		return errors.New("probe dial failure")
++	}
++
++	h.tryHalfOpenReconnect(gen)
++
++	<-done
++
++	h.m.RLock()
++	defer h.m.RUnlock()
++	// Should not have touched clientState or scheduled cooldown
++	require.Equal(t, ircConnecting, h.clientState, "newer connection state must not be clobbered by stale probe")
++}
++
++func TestFlappingBreakerPreferredNickReconnectDialFailure(t *testing.T) {
++	initial := time.Date(2026, time.October, 19, 12, 0, 0, 0, time.UTC)
++	clock := newMockClock(initial)
++
++	h, _ := newTestHandler()
++	h.clock = clock
++	h.stateMachine.currentState = StateFullyOperational
++
++	client := &ircevent.Connection{}
++	h.reconnectFn = func(c *ircevent.Connection) {}
++
++	h.m.Lock()
++	h.clientState = ircLive
++	h.client = client
++	h.halfOpenAttempt = true
++	h.flappingCooldown = flappingInitialCooldown
++	h.connectedSince = initial
++	h.network.Nick = "autobrr"
++	h.currentNick = "autobrr_"
++	if h.refusedOnFallback == nil {
++		h.refusedOnFallback = make(map[string]bool)
++	}
++	h.refusedOnFallback["#channel"] = true
++	h.m.Unlock()
++
++	ch := &Channel{Name: "#channel", Enabled: true}
++	h.channels.Set("#channel", ch)
++
++	// Regain nick -> triggers intentional reconnect
++	msg := ircmsg.MakeMessage(nil, "autobrr_", "NICK", "autobrr")
++	h.onNick(client, msg)
++
++	// Intentional reconnect disconnect at 5s
++	clock.Advance(5 * time.Second)
++	h.onClientDisconnect(client, ircmsg.Message{})
++
++	h.m.RLock()
++	require.True(t, h.halfOpenAttempt, "halfOpenAttempt must carry over")
++	require.True(t, h.connectedSince.IsZero(), "connectedSince must be reset")
++	require.NotNil(t, h.flappingReconnectTimer, "reconnect watchdog must be armed")
++	h.m.RUnlock()
++
++	// Replacement dial fails
++	h.handleReplacementDialError(client, errors.New("connection refused"))
++
++	h.m.RLock()
++	require.False(t, h.halfOpenAttempt, "halfOpenAttempt must be false after dial failure")
++	require.Equal(t, flappingInitialCooldown*2, h.flappingCooldown, "cooldown must double after replacement dial failure")
++	require.Equal(t, ircStopped, h.clientState)
++	require.Nil(t, h.flappingReconnectTimer, "reconnect timer must be cancelled")
++	require.NotNil(t, h.flappingRetryTimer, "retry timer must be scheduled")
++	h.m.RUnlock()
++}
++
++func TestFlappingBreakerPreferredNickReconnectTimeout(t *testing.T) {
++	initial := time.Date(2026, time.October, 19, 12, 0, 0, 0, time.UTC)
++	clock := newMockClock(initial)
++
++	h, _ := newTestHandler()
++	h.clock = clock
++	h.stateMachine.currentState = StateFullyOperational
++
++	client := &ircevent.Connection{}
++	h.reconnectFn = func(c *ircevent.Connection) {}
++
++	h.m.Lock()
++	h.clientState = ircLive
++	h.client = client
++	h.halfOpenAttempt = true
++	h.flappingCooldown = flappingInitialCooldown
++	h.connectedSince = initial
++	h.network.Nick = "autobrr"
++	h.currentNick = "autobrr_"
++	if h.refusedOnFallback == nil {
++		h.refusedOnFallback = make(map[string]bool)
++	}
++	h.refusedOnFallback["#channel"] = true
++	h.m.Unlock()
++
++	ch := &Channel{Name: "#channel", Enabled: true}
++	h.channels.Set("#channel", ch)
++
++	// Regain nick -> triggers intentional reconnect
++	msg := ircmsg.MakeMessage(nil, "autobrr_", "NICK", "autobrr")
++	h.onNick(client, msg)
++
++	// Intentional reconnect disconnect at 5s
++	clock.Advance(5 * time.Second)
++	h.onClientDisconnect(client, ircmsg.Message{})
++
++	h.m.RLock()
++	require.True(t, h.halfOpenAttempt, "halfOpenAttempt must carry over")
++	require.NotNil(t, h.flappingReconnectTimer, "reconnect watchdog must be armed")
++	h.m.RUnlock()
++
++	// Advance clock past flappingReconnectTimeout without onConnect
++	clock.Advance(flappingReconnectTimeout)
++
++	h.m.RLock()
++	require.False(t, h.halfOpenAttempt, "halfOpenAttempt must be cleared after timeout")
++	require.Equal(t, flappingInitialCooldown*2, h.flappingCooldown, "cooldown must double after replacement timeout")
++	require.Equal(t, ircStopped, h.clientState)
++	require.Nil(t, h.flappingReconnectTimer, "reconnect timer must be cleared")
++	require.NotNil(t, h.flappingRetryTimer, "retry timer must be scheduled")
++	h.m.RUnlock()
++}
 diff --git a/internal/irc/handler.go b/internal/irc/handler.go
-index 4b60ad20..e52b0fa1 100644
+index 0b479cc6..62270a43 100644
 --- a/internal/irc/handler.go
 +++ b/internal/irc/handler.go
-@@ -69,6 +69,8 @@ const (
+@@ -69,6 +69,9 @@ const (
  	flappingSessionMinLifetime = 30 * time.Second
  	flappingStopThreshold      = 5
  	flappingWindow             = 15 * time.Minute
 +	flappingInitialCooldown    = 15 * time.Minute
 +	flappingMaxCooldown        = 60 * time.Minute
++	flappingReconnectTimeout   = 30 * time.Second
  )
  
- // restartQuitTimeout bounds how long a restart waits for the server to close the
-@@ -126,6 +128,17 @@ type Handler struct {
- 	authenticated    bool
- 	saslauthed       bool
+ // Services move a client that does not identify off a registered nick, and
+@@ -141,6 +144,21 @@ type Handler struct {
+ 	authenticated     bool
+ 	saslauthed        bool
  
 +	clock                 clock
 +	runFn                 func() error
 +	halfOpenDone          func()
-+	flappingCooldown      time.Duration
-+	flappingRetryAt       time.Time
-+	flappingRetryTimer    timer
-+	flappingSurvivalTimer timer
-+	flappingRetryGen      uint64
-+	flappingSurvivalGen   uint64
-+	halfOpenAttempt       bool
++	flappingCooldown       time.Duration
++	flappingRetryAt        time.Time
++	flappingRetryTimer     timer
++	flappingSurvivalTimer  timer
++	flappingReconnectTimer timer
++	flappingRetryGen       uint64
++	flappingSurvivalGen    uint64
++	flappingReconnectGen   uint64
++	halfOpenAttempt           bool
++	handlerRequestedReconnect bool
++	reconnectFn               func(client *ircevent.Connection)
 +
  	identifyAttempt     identifyForm
  	identifyEscalated   bool
  	identifyFormLearned identifyForm
-@@ -166,6 +179,7 @@ func NewHandler(log zerolog.Logger, eventBus eventBus, sse sseServer, network do
+@@ -183,6 +201,7 @@ func NewHandler(log zerolog.Logger, eventBus eventBus, sse sseServer, network do
  		connectionErrors: []string{},
  		channels:         haxmap.New[string, *Channel](),
  		caseMapping:      ircCaseMappingRFC1459,
@@ -440,7 +694,7 @@ index 4b60ad20..e52b0fa1 100644
  	}
  
  	// init state machine
-@@ -299,6 +313,10 @@ func (h *Handler) removeIndexer() {
+@@ -316,6 +335,10 @@ func (h *Handler) removeIndexer() {
  // Run connects the network and blocks until the connection is live, the network
  // is stopped, or the attempt fails for good.
  func (h *Handler) Run() error {
@@ -451,7 +705,7 @@ index 4b60ad20..e52b0fa1 100644
  	connectGen, err := h.claimConnect()
  	if err != nil {
  		return err
-@@ -310,11 +328,27 @@ func (h *Handler) Run() error {
+@@ -327,11 +350,26 @@ func (h *Handler) Run() error {
  // claimConnect moves a stopped handler to connecting. The service claims
  // synchronously and connects in the background, so a Stop that lands after the
  // claim cancels the attempt instead of being overtaken by it.
@@ -475,37 +729,63 @@ index 4b60ad20..e52b0fa1 100644
 +			h.m.Unlock()
 +			return 0, connectionInProgress
 +		}
-+		if !h.halfOpenAttempt {
-+			h.cancelFlappingTimersLocked()
-+			h.flappingCooldown = flappingInitialCooldown
-+			h.flappingRetryAt = time.Time{}
-+		}
++		h.halfOpenAttempt = false
++		h.cancelFlappingTimersLocked()
++		h.flappingCooldown = flappingInitialCooldown
++		h.flappingRetryAt = time.Time{}
  	}
  	h.clientState = ircConnecting
  	h.currentNick = ""
-@@ -341,7 +375,6 @@ func (h *Handler) connect(connectGen uint64) (err error) {
- 	// this used to be TraceLevel but was changed to DebugLevel during connect to see the info without needing to change loglevel
+@@ -359,6 +397,14 @@ func (h *Handler) connect(connectGen uint64) (err error) {
  	// we change back to TraceLevel in the handleJoined method.
  	subLogger := zstdlog.NewStdLoggerWithLevel(h.log.With().Logger(), zerolog.TraceLevel)
--
+ 
++	h.m.RLock()
++	isHalfOpen := h.halfOpenAttempt
++	h.m.RUnlock()
++
++	var attempts uint = 0
++	if isHalfOpen {
++		attempts = 1
++	}
  	// either we will successfully transition to `StateRunning`, or else
  	// we need to reset the state to `ircStopped`. A Stop followed by a new Run can
  	// land before this deferred reset, so only touch the state if it is still ours.
-@@ -840,8 +873,12 @@ func (h *Handler) stop() *ircevent.Connection {
- 	h.m.Lock()
+@@ -460,7 +506,12 @@ func (h *Handler) connect(connectGen uint64) (err error) {
+ 		stop := context.AfterFunc(ctx, cancelDial)
+ 		defer stop()
+ 
+-		return dial(dialCtx, network, addr)
++		conn, dialErr := dial(dialCtx, network, addr)
++		if dialErr != nil {
++			h.handleReplacementDialError(client, dialErr)
++			return nil, dialErr
++		}
++		return conn, nil
+ 	}
+ 
+ 	if network.Auth.Mechanism == domain.IRCAuthMechanismSASLPlain {
+@@ -618,7 +669,7 @@ func (h *Handler) connect(connectGen uint64) (err error) {
+ 				}
+ 			}),
+ 			retry.Context(ctx),
+-			retry.Attempts(0),
++			retry.Attempts(attempts),
+ 			retry.Delay(connectRetryDelay),
+ 			retry.MaxDelay(connectRetryMaxDelay),
+ 			retry.MaxJitter(connectRetryMaxJitter),
+@@ -857,6 +908,10 @@ func (h *Handler) stop() *ircevent.Connection {
  	h.connectedSince = time.Time{}
  	h.haveDisconnected = false
--	h.failedNickServAttempts = 0
  	h.resetFlappingBreakerLocked()
 +	h.cancelFlappingTimersLocked()
 +	h.flappingCooldown = flappingInitialCooldown
 +	h.flappingRetryAt = time.Time{}
 +	h.halfOpenAttempt = false
-+	h.failedNickServAttempts = 0
+ 	h.nickLosses = nil
  	h.resetSessionLocked()
  	h.currentNick = ""
- 	client := h.client
-@@ -901,9 +938,21 @@ func (h *Handler) onConnect(client *ircevent.Connection, _ ircmsg.Message) {
+@@ -917,9 +972,22 @@ func (h *Handler) onConnect(client *ircevent.Connection, _ ircmsg.Message) {
  
  	// not gated on client.Connected(): irc-go only reports the connection as
  	// active once Connect returns, after the connect callbacks have run
@@ -516,6 +796,7 @@ index 4b60ad20..e52b0fa1 100644
 +
 +	if h.halfOpenAttempt {
 +		h.log.Info().Str("network", networkName).Msg("half-open probe connected; arming 30s survival timer")
++		h.cancelFlappingReconnectTimerLocked()
 +		if h.flappingSurvivalTimer != nil {
 +			h.flappingSurvivalTimer.Stop()
 +		}
@@ -528,7 +809,7 @@ index 4b60ad20..e52b0fa1 100644
  	reconnected := h.haveDisconnected && h.clientState == ircLive
  	if reconnected {
  		h.haveDisconnected = false
-@@ -951,7 +1000,7 @@ func (h *Handler) onClientDisconnect(client *ircevent.Connection, _ ircmsg.Messa
+@@ -967,7 +1035,7 @@ func (h *Handler) onClientDisconnect(client *ircevent.Connection, _ ircmsg.Messa
  		return
  	}
  
@@ -537,35 +818,48 @@ index 4b60ad20..e52b0fa1 100644
  	sessionLifetime := time.Duration(0)
  	if !h.connectedSince.IsZero() {
  		sessionLifetime = endedAt.Sub(h.connectedSince)
-@@ -960,6 +1009,15 @@ func (h *Handler) onClientDisconnect(client *ircevent.Connection, _ ircmsg.Messa
+@@ -976,6 +1044,28 @@ func (h *Handler) onClientDisconnect(client *ircevent.Connection, _ ircmsg.Messa
  	h.connectedSince = time.Time{}
  	h.currentNick = ""
  
++	handlerReconnect := h.handlerRequestedReconnect
++	h.handlerRequestedReconnect = false
++
 +	if h.flappingSurvivalTimer != nil {
 +		h.flappingSurvivalGen++
 +		h.flappingSurvivalTimer.Stop()
 +		h.flappingSurvivalTimer = nil
 +	}
++	h.cancelFlappingReconnectTimerLocked()
 +
 +	isHalfOpen := h.halfOpenAttempt
-+	h.halfOpenAttempt = false
++	if !handlerReconnect {
++		h.halfOpenAttempt = false
++	} else if isHalfOpen {
++		h.armFlappingReconnectTimerLocked()
++	}
++	if isHalfOpen && sessionLifetime >= flappingSessionMinLifetime {
++		h.flappingCooldown = flappingInitialCooldown
++		h.flappingRetryAt = time.Time{}
++		h.clearConnectErrorLocked("connection flapping")
++	}
 +
  	// a reconnect starts the identify ladder over: the nick we get back may
  	// differ, and the previous connection's escalation says nothing about this one
  	h.resetSessionLocked()
-@@ -968,8 +1026,10 @@ func (h *Handler) onClientDisconnect(client *ircevent.Connection, _ ircmsg.Messa
+@@ -984,8 +1074,10 @@ func (h *Handler) onClientDisconnect(client *ircevent.Connection, _ ircmsg.Messa
  
  	manuallyDisconnected := h.clientState == ircStopped
  	networkName := h.network.Name
 -	stopForFlapping := !manuallyDisconnected && h.recordSessionEndLocked(sessionLifetime, endedAt)
-+	stopForFlapping := !manuallyDisconnected && (h.recordSessionEndLocked(sessionLifetime, endedAt) || (isHalfOpen && sessionLifetime < flappingSessionMinLifetime))
++	stopForFlapping := !manuallyDisconnected && !handlerReconnect && (h.recordSessionEndLocked(sessionLifetime, endedAt) || (isHalfOpen && sessionLifetime < flappingSessionMinLifetime))
  	var flappingError string
 +	var cooldown time.Duration
 +	var retryAt time.Time
  	if stopForFlapping {
  		flappingError = fmt.Sprintf("connection flapping: %d sessions lasted under %s within %s; network stopped to avoid repeated reconnects", flappingStopThreshold, flappingSessionMinLifetime, flappingWindow)
  		if !slices.Contains(h.connectionErrors, flappingError) {
-@@ -985,6 +1045,16 @@ func (h *Handler) onClientDisconnect(client *ircevent.Connection, _ ircmsg.Messa
+@@ -1001,6 +1093,16 @@ func (h *Handler) onClientDisconnect(client *ircevent.Connection, _ ircmsg.Messa
  		h.resetFlappingBreakerLocked()
  		h.resetChannelState()
  		h.stateMachine.OnError(flappingError)
@@ -582,7 +876,7 @@ index 4b60ad20..e52b0fa1 100644
  	}
  
  	h.m.Unlock()
-@@ -1000,13 +1070,15 @@ func (h *Handler) onClientDisconnect(client *ircevent.Connection, _ ircmsg.Messa
+@@ -1016,13 +1118,15 @@ func (h *Handler) onClientDisconnect(client *ircevent.Connection, _ ircmsg.Messa
  			Int("sessions", flappingStopThreshold).
  			Dur("min_lifetime", flappingSessionMinLifetime).
  			Dur("window", flappingWindow).
@@ -600,7 +894,7 @@ index 4b60ad20..e52b0fa1 100644
  		})
  
  		if client != nil {
-@@ -1059,6 +1131,110 @@ func (h *Handler) resetFlappingBreakerLocked() {
+@@ -1075,6 +1179,182 @@ func (h *Handler) resetFlappingBreakerLocked() {
  	h.shortSessionEnds = nil
  }
  
@@ -614,6 +908,7 @@ index 4b60ad20..e52b0fa1 100644
 +func (h *Handler) cancelFlappingTimersLocked() {
 +	h.flappingRetryGen++
 +	h.flappingSurvivalGen++
++	h.flappingReconnectGen++
 +	if h.flappingRetryTimer != nil {
 +		h.flappingRetryTimer.Stop()
 +		h.flappingRetryTimer = nil
@@ -621,6 +916,77 @@ index 4b60ad20..e52b0fa1 100644
 +	if h.flappingSurvivalTimer != nil {
 +		h.flappingSurvivalTimer.Stop()
 +		h.flappingSurvivalTimer = nil
++	}
++	if h.flappingReconnectTimer != nil {
++		h.flappingReconnectTimer.Stop()
++		h.flappingReconnectTimer = nil
++	}
++}
++
++func (h *Handler) cancelFlappingReconnectTimerLocked() {
++	h.flappingReconnectGen++
++	if h.flappingReconnectTimer != nil {
++		h.flappingReconnectTimer.Stop()
++		h.flappingReconnectTimer = nil
++	}
++}
++
++func (h *Handler) armFlappingReconnectTimerLocked() {
++	h.cancelFlappingReconnectTimerLocked()
++
++	h.flappingReconnectGen++
++	gen := h.flappingReconnectGen
++	client := h.client
++
++	h.flappingReconnectTimer = h.getClock().AfterFunc(flappingReconnectTimeout, func() {
++		h.m.Lock()
++		defer h.m.Unlock()
++
++		if gen != h.flappingReconnectGen || !h.halfOpenAttempt || h.client != client || !h.connectedSince.IsZero() {
++			return
++		}
++
++		h.log.Info().Str("network", h.network.Name).Msg("probe replacement connection timed out; circuit breaker backing off")
++		h.flappingReconnectTimer = nil
++		h.halfOpenAttempt = false
++		h.clientState = ircStopped
++
++		endedAt := h.getClock().Now()
++		nextCooldown := min(h.flappingCooldown*2, flappingMaxCooldown)
++		if nextCooldown <= 0 {
++			nextCooldown = flappingInitialCooldown
++		}
++		h.scheduleFlappingCooldownLocked(nextCooldown, endedAt)
++
++		if client != nil {
++			go client.Quit()
++		}
++	})
++}
++
++func (h *Handler) handleReplacementDialError(client *ircevent.Connection, dialErr error) {
++	h.m.Lock()
++	defer h.m.Unlock()
++
++	if h.client != client || !h.halfOpenAttempt || h.clientState != ircLive || !h.connectedSince.IsZero() {
++		return
++	}
++
++	h.log.Error().Err(dialErr).Msg("probe replacement dial failed; scheduling cooldown")
++
++	h.cancelFlappingReconnectTimerLocked()
++	h.halfOpenAttempt = false
++	h.clientState = ircStopped
++
++	endedAt := h.getClock().Now()
++	nextCooldown := min(h.flappingCooldown*2, flappingMaxCooldown)
++	if nextCooldown <= 0 {
++		nextCooldown = flappingInitialCooldown
++	}
++	h.scheduleFlappingCooldownLocked(nextCooldown, endedAt)
++
++	if client != nil {
++		go client.Quit()
 +	}
 +}
 +
@@ -664,7 +1030,7 @@ index 4b60ad20..e52b0fa1 100644
 +			}
 +			h.log.Error().Err(err).Str("network", h.GetNetwork().Name).Msg("half-open reconnect failed to run")
 +			h.m.Lock()
-+			if h.halfOpenAttempt && (h.clientState == ircStopped || h.clientState == ircConnecting) {
++			if h.connectGen == connectGen && h.halfOpenAttempt && (h.clientState == ircStopped || h.clientState == ircConnecting) {
 +				h.clientState = ircStopped
 +				h.halfOpenAttempt = false
 +				nextCooldown := min(h.flappingCooldown*2, flappingMaxCooldown)
@@ -711,6 +1077,36 @@ index 4b60ad20..e52b0fa1 100644
  // onNotice handles NOTICE events
  func (h *Handler) onNotice(msg ircmsg.Message) {
  	if h.identifiersEqual(msg.Nick(), "NickServ") {
+@@ -1506,8 +1786,20 @@ func (h *Handler) onNick(client *ircevent.Connection, msg ircmsg.Message) {
+ 	}
+ 
+ 	if reconnect {
++		h.m.Lock()
++		if h.client != client {
++			h.m.Unlock()
++			return
++		}
++		h.handlerRequestedReconnect = true
++		h.m.Unlock()
++
+ 		h.log.Info().Str("nick", newNick).Msg("regained nick after an invite-only refusal on a fallback nick, reconnecting")
+-		client.Reconnect()
++		if h.reconnectFn != nil {
++			h.reconnectFn(client)
++		} else {
++			client.Reconnect()
++		}
+ 		return
+ 	}
+ 
+@@ -2506,6 +2798,7 @@ func (h *Handler) resetSessionLocked() {
+ 	h.failedNickServAttempts = 0
+ 	h.requestedNick = ""
+ 	h.refusedOnFallback = nil
++	h.handlerRequestedReconnect = false
+ 	h.resetIdentifyForm()
+ }
+ 
 -- 
-2.56.0
+2.56.1
 
