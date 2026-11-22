@@ -1,41 +1,34 @@
 name: Build Oh-my-peraTur
 
 'on':
-workflow_dispatch:
-push:
-paths:
-- 'tur/oh-my-pera/'
-- 'common-files/'
-- 'setup-environment.sh'
-- '.github/workflows/build.yml'
-
-permissions:
-contents: read
+  workflow_dispatch:
 
 jobs:
-build:
-name: Build ARM64 package
-runs-on: ubuntu-24.04
+  build:
+    runs-on: ubuntu-24.04
 
-steps:
-  - name: Checkout repository
-    uses: actions/checkout@v4
-    with:
-      fetch-depth: 0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-  - name: Prepare TUR build environment
-    run: |
-      chmod +x setup-environment.sh
-      ./setup-environment.sh
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git curl wget python3
 
-  - name: Build package
-    run: |
-      ./scripts/run-docker.sh ./build-package.sh -I -a aarch64 oh-my-pera
+      - name: Prepare TUR
+        run: |
+          chmod +x setup-environment.sh
+          ./setup-environment.sh
 
-  - name: Upload Debian package
-    uses: actions/upload-artifact@v4
-    with:
-      name: oh-my-peraTur-aarch64
-      path: output/**/*.deb
-      if-no-files-found: error
-      retention-days: 14
+      - name: Build ARM64
+        run: |
+          ./scripts/run-docker.sh ./build-package.sh -I -a aarch64 oh-my-pera
+
+      - name: Upload DEB
+        uses: actions/upload-artifact@v4
+        with:
+          name: oh-my-peraTur-aarch64
+          path: output/**/*.deb
+          if-no-files-found: error
