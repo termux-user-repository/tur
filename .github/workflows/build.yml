@@ -6,47 +6,26 @@ name: Build Oh-my-pera
     paths:
       - 'tur/oh-my-pera/**'
       - '.github/workflows/build.yml'
-    branches:
-      - master
-      - main
 
 jobs:
   build:
-    name: Build Oh-my-pera ARM64
     runs-on: ubuntu-22.04
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Clone Termux build system
+      - name: Build Oh-my-pera only
         run: |
-          git clone --depth 1 https://github.com/termux/termux-packages.git
+          sudo apt-get update
+          sudo apt-get install -y dpkg-dev
 
-      - name: Copy only Oh-my-pera package
-        run: |
-          mkdir -p termux-packages/packages/oh-my-pera
-          cp -a tur/oh-my-pera/. termux-packages/packages/oh-my-pera/
+          mkdir -p output
 
-      - name: Build package
-        working-directory: termux-packages
-        run: |
-          ./scripts/run-docker.sh ./build-package.sh -a aarch64 oh-my-pera
+          dpkg-deb --build tur/oh-my-pera output/oh-my-pera.deb
 
-      - name: Prepare artifact
-        run: |
-          mkdir -p upload
-          DEB=$(find termux-packages/output -maxdepth 1 -type f -name 'oh-my-pera_*.deb' | head -n 1)
-          if [ -z "$DEB" ]; then
-            echo "Oh-my-pera DEB was not generated!"
-            exit 1
-          fi
-          cp "$DEB" upload/oh-my-pera_aarch64.deb
-          ls -lh upload/
-
-      - name: Upload Oh-my-pera only
+      - name: Upload package
         uses: actions/upload-artifact@v4
         with:
-          name: oh-my-pera-deb
-          path: upload/oh-my-pera_aarch64.deb
-          if-no-files-found: error
+          name: oh-my-pera
+          path: output/oh-my-pera.deb
