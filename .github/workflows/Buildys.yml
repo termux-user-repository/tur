@@ -7,29 +7,41 @@ name: Build Oh-my-pera DEB
       - master
       - main
 
+permissions:
+  contents: read
+
 jobs:
   build:
+    name: Build ARM64 DEB
     runs-on: ubuntu-22.04
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git curl wget
+
       - name: Clone Termux packages
-        run: git clone --depth 1 https://github.com/termux/termux-packages.git
+        run: |
+          git clone --depth 1 https://github.com/termux/termux-packages.git
 
       - name: Copy package
         run: |
           mkdir -p termux-packages/packages/oh-my-pera
-          cp -r tur/oh-my-pera/. termux-packages/packages/oh-my-pera/
+          cp -a tur/oh-my-pera/. termux-packages/packages/oh-my-pera/
 
-      - name: Build DEB
+      - name: Build ARM64 package
         working-directory: termux-packages
-        run: ./scripts/run-docker.sh ./build-package.sh -a aarch64 oh-my-pera
+        run: |
+          ./scripts/run-docker.sh ./build-package.sh -a aarch64 oh-my-pera
 
       - name: Upload DEB
         uses: actions/upload-artifact@v4
         with:
-          name: oh-my-pera-deb
+          name: oh-my-pera-aarch64-deb
           path: termux-packages/output/*.deb
           if-no-files-found: error
+          retention-days: 14
