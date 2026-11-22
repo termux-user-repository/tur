@@ -1,34 +1,51 @@
-name: Build Oh-my-peraTur
+name: Build Oh-my-pera DEB
 
-'on':
-  workflow_dispatch:
+on:
+workflow_dispatch:
+push:
+branches:
+- master
+- main
+paths:
+- 'tur/oh-my-pera/**'
+- '.github/workflows/build.yml'
+
+permissions:
+contents: read
 
 jobs:
-  build:
-    runs-on: ubuntu-24.04
+build:
+name: Build ARM64 DEB
+runs-on: ubuntu-22.04
 
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+steps:
+  - name: Checkout Oh-my-pera
+    uses: actions/checkout@v4
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y git curl wget python3
+  - name: Install build environment
+    run: |
+      sudo apt-get update
+      sudo apt-get install -y git wget curl proot tar xz-utils
 
-      - name: Prepare TUR
-        run: |
-          chmod +x setup-environment.sh
-          ./setup-environment.sh
+  - name: Clone Termux build system
+    run: |
+      git clone --depth 1 https://github.com/termux/termux-packages.git
+      cp -a tur/oh-my-pera termux-packages/packages/oh-my-pera
 
-      - name: Build ARM64
-        run: |
-          ./scripts/run-docker.sh ./build-package.sh -I -a aarch64 oh-my-pera
+  - name: Setup Termux build environment
+    working-directory: termux-packages
+    run: |
+      ./scripts/setup-ubuntu.sh
 
-      - name: Upload DEB
-        uses: actions/upload-artifact@v4
-        with:
-          name: oh-my-peraTur-aarch64
-          path: output/**/*.deb
-          if-no-files-found: error
+  - name: Build ARM64 package
+    working-directory: termux-packages
+    run: |
+      ./build-package.sh -I -a aarch64 oh-my-pera
+
+  - name: Upload DEB
+    uses: actions/upload-artifact@v4
+    with:
+      name: oh-my-pera-aarch64-deb
+      path: termux-packages/output/*.deb
+      if-no-files-found: error
+      retention-days: 14
