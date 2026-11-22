@@ -1,0 +1,20 @@
+#!/data/data/com.termux/files/usr/bin/bash
+
+DATA="$PREFIX/share/oh-my-pera"
+
+if [ ! -d "$DATA" ]; then
+echo "Oh-my-perA: theme files not found!"
+exit 1
+fi
+
+mkdir -p "$HOME/.termux"
+
+cp -af "$DATA/." "$HOME/.termux/"
+
+if [ -d "$HOME/.termux/boot" ]; then
+chmod +x "$HOME/.termux/boot/"*.sh 2>/dev/null || true
+fi
+
+termux-reload-settings
+
+echo "Loaded :D"
