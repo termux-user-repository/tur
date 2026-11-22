@@ -1,17 +1,11 @@
 name: Build Oh-my-peraTur
 
-on:
+'on':
 workflow_dispatch:
-push:
-paths:
-- 'packages/oh-my-pera/**'
-- '.github/workflows/build.yml'
-
-permissions:
-contents: read
 
 jobs:
 build:
+name: Build ARM64 package
 runs-on: ubuntu-24.04
 
 steps:
@@ -20,27 +14,17 @@ steps:
     with:
       fetch-depth: 0
 
-  - name: Install build dependencies
+  - name: Install dependencies
     run: |
       sudo apt-get update
-      sudo apt-get install -y \
-        git curl wget \
-        build-essential \
-        docker.io \
-        jq \
-        python3 \
-        zip unzip
-
-  - name: Prepare Docker
-    run: |
-      sudo systemctl start docker
+      sudo apt-get install -y git curl wget build-essential docker.io
 
   - name: Build package
     run: |
       chmod +x build-package.sh
       ./build-package.sh -I -a aarch64 oh-my-pera
 
-  - name: Upload Debian package
+  - name: Upload package
     uses: actions/upload-artifact@v4
     with:
       name: oh-my-peraTur-aarch64
