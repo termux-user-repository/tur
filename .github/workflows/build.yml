@@ -6,46 +6,41 @@ push:
 branches:
 - master
 - main
-paths:
-- 'tur/oh-my-pera/**'
-- '.github/workflows/build.yml'
 
 permissions:
 contents: read
 
 jobs:
 build:
-name: Build ARM64 DEB
-runs-on: ubuntu-22.04
+runs-on: ubuntu-latest
 
 steps:
-  - name: Checkout Oh-my-pera
+  - name: Checkout repository
     uses: actions/checkout@v4
-
-  - name: Install build environment
-    run: |
-      sudo apt-get update
-      sudo apt-get install -y git wget curl proot tar xz-utils
 
   - name: Clone Termux build system
     run: |
       git clone --depth 1 https://github.com/termux/termux-packages.git
-      cp -a tur/oh-my-pera termux-packages/packages/oh-my-pera
 
-  - name: Setup Termux build environment
+  - name: Copy Oh-my-pera package
+    run: |
+      mkdir -p termux-packages/packages/oh-my-pera
+      cp -a tur/oh-my-pera/. termux-packages/packages/oh-my-pera/
+
+  - name: Load Termux Docker builder
     working-directory: termux-packages
     run: |
-      ./scripts/setup-ubuntu.sh
+      ./scripts/run-docker.sh true
 
-  - name: Build ARM64 package
+  - name: Build ARM64 DEB
     working-directory: termux-packages
     run: |
-      ./build-package.sh -I -a aarch64 oh-my-pera
+      ./scripts/run-docker.sh ./build-package.sh -f -I -a aarch64 oh-my-pera
 
   - name: Upload DEB
     uses: actions/upload-artifact@v4
     with:
-      name: oh-my-pera-aarch64-deb
+      name: oh-my-pera-aarch64
       path: termux-packages/output/*.deb
       if-no-files-found: error
       retention-days: 14
