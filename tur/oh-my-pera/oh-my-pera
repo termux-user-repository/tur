@@ -15,6 +15,18 @@ if [ -d "$HOME/.termux/boot" ]; then
 chmod +x "$HOME/.termux/boot/"*.sh 2>/dev/null || true
 fi
 
+
+#so this makes the PS1= ↓
+
+# Install Oh-my-pera Bash prompt
+if ! grep -qF '# OH-MY-PERA PROMPT' "$HOME/.bashrc" 2>/dev/null; then
+    cat >> "$HOME/.bashrc" <<'EOF'
+
+# OH-MY-PERA PROMPT
+PS1='\[\e[1;35m\]╭─[\[\e[1;36m\]OHMY\[\e[1;35m\]] \[\e[1;32m\]\w\[\e[0m\]\n\[\e[1;35m\]╰─\[\e[1;31m\]#\[\e[0m\] '
+EOF
+fi
+
 termux-reload-settings
 
 echo "Loaded :D"
