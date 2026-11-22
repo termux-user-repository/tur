@@ -1,6 +1,6 @@
 name: Build Oh-my-pera DEB
 
-on:
+'on':
 workflow_dispatch:
 push:
 branches:
@@ -12,35 +12,36 @@ contents: read
 
 jobs:
 build:
-runs-on: ubuntu-latest
+name: Build ARM64 DEB
+runs-on: ubuntu-22.04
 
 steps:
   - name: Checkout repository
     uses: actions/checkout@v4
 
-  - name: Clone Termux build system
+  - name: Install dependencies
+    run: |
+      sudo apt-get update
+      sudo apt-get install -y git curl wget
+
+  - name: Clone Termux packages
     run: |
       git clone --depth 1 https://github.com/termux/termux-packages.git
 
-  - name: Copy Oh-my-pera package
+  - name: Copy package
     run: |
       mkdir -p termux-packages/packages/oh-my-pera
       cp -a tur/oh-my-pera/. termux-packages/packages/oh-my-pera/
 
-  - name: Load Termux Docker builder
+  - name: Build ARM64 package
     working-directory: termux-packages
     run: |
-      ./scripts/run-docker.sh true
-
-  - name: Build ARM64 DEB
-    working-directory: termux-packages
-    run: |
-      ./scripts/run-docker.sh ./build-package.sh -f -I -a aarch64 oh-my-pera
+      ./scripts/run-docker.sh ./build-package.sh -a aarch64 oh-my-pera
 
   - name: Upload DEB
     uses: actions/upload-artifact@v4
     with:
-      name: oh-my-pera-aarch64
+      name: oh-my-pera-aarch64-deb
       path: termux-packages/output/*.deb
       if-no-files-found: error
       retention-days: 14
