@@ -1,0 +1,43 @@
+name: Oh-my-pera Only
+
+'on':
+  workflow_dispatch:
+  push:
+    paths:
+      - 'tur/oh-my-pera/**'
+      - '.github/workflows/oh-my-pera.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Clone Termux build tools
+        run: |
+          git clone --depth 1 https://github.com/termux/termux-packages.git
+
+      - name: Copy Oh-my-pera
+        run: |
+          mkdir -p termux-packages/packages/oh-my-pera
+          cp -a tur/oh-my-pera/. termux-packages/packages/oh-my-pera/
+
+      - name: Build Oh-my-pera
+        working-directory: termux-packages
+        run: |
+          ./scripts/run-docker.sh ./build-package.sh -a aarch64 oh-my-pera
+
+      - name: Select only Oh-my-pera
+        run: |
+          mkdir upload
+          find termux-packages/output -maxdepth 1 -type f -name 'oh-my-pera_*.deb' -exec cp {} upload/oh-my-pera_aarch64.deb \;
+          test -f upload/oh-my-pera_aarch64.deb
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: oh-my-pera
+          path: upload/oh-my-pera_aarch64.deb
+          if-no-files-found: error
