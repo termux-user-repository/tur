@@ -1,33 +1,41 @@
 name: Build Oh-my-peraTur
 
 'on':
-  workflow_dispatch:
+workflow_dispatch:
+push:
+paths:
+- 'tur/oh-my-pera/'
+- 'common-files/'
+- 'setup-environment.sh'
+- '.github/workflows/build.yml'
+
+permissions:
+contents: read
 
 jobs:
-  build:
-    name: Build ARM64 package
-    runs-on: ubuntu-24.04
+build:
+name: Build ARM64 package
+runs-on: ubuntu-24.04
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+steps:
+  - name: Checkout repository
+    uses: actions/checkout@v4
+    with:
+      fetch-depth: 0
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y git curl wget build-essential docker.io
+  - name: Prepare TUR build environment
+    run: |
+      chmod +x setup-environment.sh
+      ./setup-environment.sh
 
-      - name: Build package
-        run: |
-          chmod +x build-package.sh
-          ./build-package.sh -I -a aarch64 oh-my-pera
+  - name: Build package
+    run: |
+      ./scripts/run-docker.sh ./build-package.sh -I -a aarch64 oh-my-pera
 
-      - name: Upload package
-        uses: actions/upload-artifact@v4
-        with:
-          name: oh-my-peraTur-aarch64
-          path: debs/*.deb
-          if-no-files-found: error
-          retention-days: 14
+  - name: Upload Debian package
+    uses: actions/upload-artifact@v4
+    with:
+      name: oh-my-peraTur-aarch64
+      path: output/**/*.deb
+      if-no-files-found: error
+      retention-days: 14
