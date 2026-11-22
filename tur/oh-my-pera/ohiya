@@ -1,0 +1,221 @@
+#!/data/data/com.termux/files/usr/bin/python
+
+import curses
+import os
+import sys
+
+VERSION = "1.0"
+
+class OhiyaEditor:
+    def __init__(self, stdscr, filename):
+        self.scr = stdscr
+        self.filename = filename
+        self.lines = [""]
+        self.y = 0
+        self.x = 0
+        self.offset = 0
+        self.modified = False
+        self.load()
+
+    def load(self):
+        if self.filename and os.path.isfile(self.filename):
+            with open(self.filename, "r", encoding="utf-8") as f:
+                self.lines = f.read().splitlines() or [""]
+        elif self.filename:
+            self.lines = [""]
+
+    def save(self):
+        if not self.filename:
+            self.filename = self.prompt("Save as: ")
+            if not self.filename:
+                return
+
+        with open(self.filename, "w", encoding="utf-8") as f:
+            f.write("\n".join(self.lines))
+
+        self.modified = False
+        self.message = "File saved successfully!"
+
+    def prompt(self, label):
+        curses.echo()
+        self.scr.addstr(curses.LINES - 1, 0, label)
+        self.scr.clrtoeol()
+        self.scr.refresh()
+        value = self.scr.getstr(
+            curses.LINES - 1, len(label), 200
+        ).decode("utf-8", "replace")
+        curses.noecho()
+        return value
+
+    def draw(self):
+        self.scr.erase()
+        height, width = self.scr.getmaxyx()
+
+        self.scr.attron(curses.color_pair(1))
+        self.scr.addnstr(
+            0, 0,
+            "  OHIYA EDITOR  |  Oh-my-pera v" + VERSION,
+            width - 1
+        )
+        self.scr.attroff(curses.color_pair(1))
+
+        visible = height - 3
+
+        if self.y < self.offset:
+            self.offset = self.y
+        elif self.y >= self.offset + visible:
+            self.offset = self.y - visible + 1
+
+        for row in range(visible):
+            line_index = self.offset + row
+            screen_y = row + 1
+
+            self.scr.attron(curses.color_pair(2))
+            self.scr.addnstr(
+                screen_y, 0,
+                f"{line_index + 1:4} │",
+                min(7, width - 1)
+            )
+            self.scr.attroff(curses.color_pair(2))
+
+            if line_index < len(self.lines):
+                self.scr.addnstr(
+                    screen_y, 7,
+                    self.lines[line_index],
+                    max(0, width - 8)
+                )
+
+        status = (
+            f" {self.filename or 'Untitled'} "
+            f"| LINE {self.y + 1} "
+            f"| COL {self.x + 1} "
+            f"| {'MODIFIED' if self.modified else 'SAVED'} "
+        )
+
+        self.scr.attron(curses.color_pair(3))
+        self.scr.addnstr(height - 2, 0, status.ljust(width - 1), width - 1)
+        self.scr.attroff(curses.color_pair(3))
+
+        self.scr.attron(curses.color_pair(1))
+        self.scr.addnstr(
+            height - 1, 0,
+            " CTRL+S Save   CTRL+Q Quit   OHIYA ",
+            width - 1
+        )
+        self.scr.attroff(curses.color_pair(1))
+
+        cursor_x = min(7 + self.x, width - 1)
+        cursor_y = min(self.y - self.offset + 1, height - 3)
+
+        self.scr.move(cursor_y, cursor_x)
+        self.scr.refresh()
+
+    def run(self):
+        curses.start_color()
+        curses.use_default_colors()
+
+        curses.init_pair(1, curses.COLOR_CYAN, curses.COLOR_BLUE)
+        curses.init_pair(2, curses.COLOR_CYAN, -1)
+        curses.init_pair(3, curses.COLOR_BLACK, curses.COLOR_CYAN)
+
+        self.scr.keypad(True)
+        curses.curs_set(1)
+
+        self.message = ""
+
+        while True:
+            self.draw()
+            key = self.scr.getch()
+            line = self.lines[self.y]
+
+            if key == 17:  # CTRL+Q
+                if self.modified:
+                    answer = self.prompt("Unsaved changes! Quit? (y/n): ")
+                    if answer.lower() != "y":
+                        continue
+                break
+
+            elif key == 19:  # CTRL+S
+                self.save()
+
+            elif key == curses.KEY_UP:
+                self.y = max(0, self.y - 1)
+                self.x = min(self.x, len(self.lines[self.y]))
+
+            elif key == curses.KEY_DOWN:
+                self.y = min(len(self.lines) - 1, self.y + 1)
+                self.x = min(self.x, len(self.lines[self.y]))
+
+            elif key == curses.KEY_LEFT:
+                if self.x > 0:
+                    self.x -= 1
+                elif self.y > 0:
+                    self.y -= 1
+                    self.x = len(self.lines[self.y])
+
+            elif key == curses.KEY_RIGHT:
+                if self.x < len(line):
+                    self.x += 1
+                elif self.y < len(self.lines) - 1:
+                    self.y += 1
+                    self.x = 0
+
+            elif key in (curses.KEY_BACKSPACE, 127, 8):
+                if self.x > 0:
+                    self.lines[self.y] = (
+                        line[:self.x - 1] + line[self.x:]
+                    )
+                    self.x -= 1
+                    self.modified = True
+                elif self.y > 0:
+                    previous_length = len(self.lines[self.y - 1])
+                    self.lines[self.y - 1] += line
+                    del self.lines[self.y]
+                    self.y -= 1
+                    self.x = previous_length
+                    self.modified = True
+
+            elif key in (10, 13, curses.KEY_ENTER):
+                self.lines.insert(
+                    self.y + 1,
+                    line[self.x:]
+                )
+                self.lines[self.y] = line[:self.x]
+                self.y += 1
+                self.x = 0
+                self.modified = True
+
+            elif key == curses.KEY_DC:
+                if self.x < len(line):
+                    self.lines[self.y] = line[:self.x] + line[self.x + 1:]
+                    self.modified = True
+                elif self.y < len(self.lines) - 1:
+                    self.lines[self.y] += self.lines[self.y + 1]
+                    del self.lines[self.y + 1]
+                    self.modified = True
+
+            elif key == curses.KEY_HOME:
+                self.x = 0
+
+            elif key == curses.KEY_END:
+                self.x = len(line)
+
+            elif 32 <= key <= 0x10FFFF:
+                try:
+                    char = chr(key)
+                    self.lines[self.y] = (
+                        line[:self.x] + char + line[self.x:]
+                    )
+                    self.x += 1
+                    self.modified = True
+                except ValueError:
+                    pass
+
+
+def main():
+    filename = sys.argv[1] if len(sys.argv) > 1 else None
+    curses.wrapper(lambda scr: OhiyaEditor(scr, filename).run())
+
+
+if __name__ == "__main__":
+    main()
