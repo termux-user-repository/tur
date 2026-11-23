@@ -8,6 +8,7 @@ TERMUX_PKG_SHA256="f9fffdfac6b9668eb8497e661a6ccd24cf83a0f459a41902ad0a782e63b39
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_AUTO_UPDATE=true
 
+
 termux_step_make() {
   termux_setup_golang
 
