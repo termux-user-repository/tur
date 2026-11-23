@@ -2,7 +2,7 @@ TERMUX_PKG_HOMEPAGE=https://github.com/coder/code-server
 TERMUX_PKG_DESCRIPTION="Run VS Code on any machine anywhere and access it in the browser"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="4.145.2"
+TERMUX_PKG_VERSION="4.146.0"
 TERMUX_PKG_SRCURL=git+https://github.com/coder/code-server
 TERMUX_PKG_DEPENDS="libandroid-spawn, libsecret, krb5, nodejs-24, ripgrep"
 TERMUX_PKG_BUILD_IN_SRC=true
@@ -60,12 +60,18 @@ termux_step_host_build() {
 	env -i PATH="$PATH" sudo apt update
 	env -i PATH="$PATH" sudo apt install -yq libxkbfile-dev libsecret-1-dev libkrb5-dev
 	_setup_nodejs_24
+	npm install pnpm@12.16.0
+	export PATH="$TERMUX_PKG_HOSTBUILD_DIR/node_modules/.bin:$PATH"
 	cd $TERMUX_PKG_SRCDIR
-	npm ci
-	npm install ternary-stream
-	npm run build
-	npm run build:vscode
-	npm run release
+	cd lib/vscode/build
+	pnpm install --dangerously-allow-all-builds
+	cd ..
+	pnpm run preinstall
+	cd ../..
+	pnpm install --dangerously-allow-all-builds
+	pnpm run build
+	pnpm run build:vscode
+	pnpm run release
 	mv $TERMUX_PREFIX/bin.bp $TERMUX_PREFIX/bin
 }
 
@@ -79,37 +85,38 @@ termux_step_make() {
 	mv $TERMUX_PREFIX/bin $TERMUX_PREFIX/bin.bp
 
 	if [ $TERMUX_ARCH = "arm" ]; then
-		export NPM_CONFIG_ARCH=armv7l
+		export npm_config_arch=arm
 	elif [ $TERMUX_ARCH = "x86_64" ]; then
-		export NPM_CONFIG_ARCH=amd64
+		export npm_config_arch=x64
 	elif [ $TERMUX_ARCH = "aarch64" ]; then
-		export NPM_CONFIG_ARCH=arm64
+		export npm_config_arch=arm64
 	else
 		termux_error_exit "Unsupported arch: $TERMUX_ARCH"
 	fi
-
-	export npm_config_arch=$NPM_CONFIG_ARCH
 	export npm_config_build_from_source=true
 
 	# Create a dummy librt.so
 	rm -f $TERMUX_PREFIX/lib/librt.{so,a}
 	echo "INPUT(-landroid-spawn)" >> $TERMUX_PREFIX/lib/librt.so
 
-	# Upstream removed the `release:standalone` npm script in v4.122.x. Replicate
-	# the old ci/build/build-standalone-release.sh here so native modules are
-	# (re)built for the target arch via `npm install`, which the new KEEP_MODULES
-	# path in `npm run release` does not do.
-	rsync -a release/ release-standalone
-	mkdir -p release-standalone/bin release-standalone/lib
-	rsync ci/build/code-server.sh release-standalone/bin/code-server
-	chmod 755 release-standalone/bin/code-server
-	rsync "$(node -p process.execPath)" release-standalone/lib/node
-	chmod 755 release-standalone/lib/node
-	export FORCE_NODE_VERSION=true
-	pushd release-standalone
-	npm install --unsafe-perm --omit=dev
-	rm -fr ./lib/vscode/extensions/node_modules/.bin
-	popd
+	export PATH="$TERMUX_PKG_HOSTBUILD_DIR/node_modules/.bin:$PATH"
+	(
+		cd lib/vscode/remote
+		pnpm rebuild --dangerously-allow-all-builds
+	)
+	pnpm rebuild argon2 --dangerously-allow-all-builds
+	local _src _rel _dest
+	while IFS= read -r _src; do
+		_rel="${_src#lib/vscode/remote/node_modules/}"
+		_dest="lib/vscode-reh-web-linux-x64/node_modules/${_rel}"
+		mkdir -p "$(dirname "$_dest")"
+		cp -f "$_src" "$_dest"
+	done < <(find lib/vscode/remote/node_modules -name '*.node' -not -path '*/obj.target/*')
+
+	rm -rf release-standalone
+	export RELEASE_PATH=release-standalone
+	KEEP_MODULES=1 pnpm run release
+	rm -fr release-standalone/lib/vscode/extensions/node_modules/.bin
 
 	mv $TERMUX_PREFIX/bin.bp $TERMUX_PREFIX/bin
 }
@@ -128,6 +135,13 @@ termux_step_make_install() {
 
 	# Replace nodejs
 	ln -sf $TERMUX_PREFIX/opt/nodejs-24/bin/node $TERMUX_PREFIX/lib/code-server/lib/node
+
+	# Clean extensions that are compiled for gnu libc
+	pushd $TERMUX_PREFIX/lib/code-server/lib/
+	rm -rf vscode/extensions/copilot
+	rm -rf vscode/node_modules/\@github/copilot-sdk-linux-*
+	rm -rf vscode/node_modules/\@vscode/sandbox-runtime
+	popd # $TERMUX_PREFIX/lib/code-server/lib/
 
 	# Map Termux arch to the Node `process.arch` directory name that
 	# @vscode/ripgrep-universal resolves at runtime (bin/<platform>-<arch>/rg).
