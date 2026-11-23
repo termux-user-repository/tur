@@ -12,6 +12,7 @@ TERMUX_PKG_AUTO_UPDATE=true
 termux_step_make() {
   termux_setup_golang
 
+
   cd "${TERMUX_PKG_SRCDIR}/cmd/subfinder"
   go build -v -ldflags="-s -w" -o "${TERMUX_PKG_BUILDDIR}/subfinder" .
 }
