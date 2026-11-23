@@ -1,0 +1,10 @@
+TERMUX_PKG_HOMEPAGE=https://ameva.pro/
+TERMUX_PKG_DESCRIPTION="Unified AMEVA on-device AI suite metapackage"
+TERMUX_PKG_LICENSE="Apache-2.0"
+TERMUX_PKG_MAINTAINER="@uno-km"
+TERMUX_PKG_VERSION="2.0.0"
+TERMUX_PKG_DEPENDS="amv-aichain, amv-bitnet, amv-diffusion, amv-llamacpp, amv-stt, amv-train, amv-tts, amv-vision"
+TERMUX_PKG_AUTO_UPDATE=false
+TERMUX_PKG_PLATFORM_INDEPENDENT=true
+TERMUX_PKG_SKIP_SRC_EXTRACT=true
+TERMUX_PKG_METAPACKAGE=true
