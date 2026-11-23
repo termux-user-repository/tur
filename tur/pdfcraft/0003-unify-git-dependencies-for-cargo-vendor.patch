@@ -1,0 +1,105 @@
+diff --git a/Cargo.toml b/Cargo.toml
+index f587a20..d1977f0 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -12,7 +12,7 @@ rust-version = "1.95"
+ repository = "https://github.com/storytold/pdfcraft"
+ 
+ [workspace.dependencies]
+-craft-markdown = { version = "0.1.0", git = "https://github.com/storytold/craft-libs", rev = "fbb3f47f7ae712192586984af11ca8f6c0f64d33" }
++craft-markdown = { version = "0.1.0", git = "https://github.com/storytold/craft-libs", rev = "1546550b0d4b79b8156a1fefaac8b3b317a4aee0" }
+ # Small, revision-bound UI drafts; the existing engine remains the owner of PDF edits/history.
+ edit-session = { path = "vendor/edit-session", version = "=0.1.0-alpha.2" }
+ # Shared frontend components; engines remain independent of egui.
+@@ -29,8 +29,8 @@ craft-i18n = { git = "https://github.com/storytold/craft-libs", version = "0.1.0
+ # Shared system spooler; document composition remains in pdfcraft-print.
+ craft-print = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "e2dc681a3" }
+ # ICC transforms for app-managed print colour; at craft-print's commit, so one craft-libs checkout.
+-craft-cms = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "e2dc681a3" }
+-craft-zip = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "e2dc681a3" }
++craft-cms = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "8503f24cb845268f47f97e829491114fe9ad1bfa" }
++craft-zip = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "1546550b0d4b79b8156a1fefaac8b3b317a4aee0" }
+ # Whether a path stored in a document may be opened (GoToR link targets).
+ craft-docpath = { version = "0.1.0", git = "https://github.com/storytold/craft-libs", rev = "e2dc681a3" }
+ # craft-update: app-specific pretend versions apply to startup and manual checks.
+@@ -38,19 +38,19 @@ craft-update = { git = "https://github.com/storytold/craft-libs", version = "=0.
+ craft-pdf = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "9eb02be84f21898e247daeb2af5827c9fe85a3a0", features = ["cos", "crypt", "filters", "fonts"] }
+ # The writers the Word and RTF exports map onto (storytold/craft-libs#793). craft-rtf, craft-wordmodel and
+ # craft-docx move together: craft_rtf::doc::export takes its own revision's Document.
+-craft-rtf = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "b8eaa8e2f3561f9fa27fcf3b7f67ce915e93caa3" }
++craft-rtf = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "1546550b0d4b79b8156a1fefaac8b3b317a4aee0" }
+ # Shared Base64 encoder; use the existing RTF revision to reuse its codepage dependency.
+-craft-mime = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "b8eaa8e2f3561f9fa27fcf3b7f67ce915e93caa3" }
++craft-mime = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "1546550b0d4b79b8156a1fefaac8b3b317a4aee0" }
+ craft-csv = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "e2dc681a3" }
+ craft-xml = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "1546550b0d4b79b8156a1fefaac8b3b317a4aee0" }
+ craft-image-codecs = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "a7c6c9d61c6b36f4aec55b044f257340083fd571" }
+-craft-tiff = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "e2dc681a3" }
+-craft-jpeg = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "e2dc681a3" }
+-craft-docx = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "b8eaa8e2f3561f9fa27fcf3b7f67ce915e93caa3" }
+-craft-wordmodel = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "b8eaa8e2f3561f9fa27fcf3b7f67ce915e93caa3" }
+-craft-pptx = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "010702ee9b030844c852939095b1da0d0656a890" }
+-craft-drawingml = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "010702ee9b030844c852939095b1da0d0656a890" }
+-craft-opc = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "e2dc681a3" }
++craft-tiff = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "a7c6c9d61c6b36f4aec55b044f257340083fd571" }
++craft-jpeg = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "a7c6c9d61c6b36f4aec55b044f257340083fd571" }
++craft-docx = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "1546550b0d4b79b8156a1fefaac8b3b317a4aee0" }
++craft-wordmodel = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "1546550b0d4b79b8156a1fefaac8b3b317a4aee0" }
++craft-pptx = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "1546550b0d4b79b8156a1fefaac8b3b317a4aee0" }
++craft-drawingml = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "1546550b0d4b79b8156a1fefaac8b3b317a4aee0" }
++craft-opc = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "1546550b0d4b79b8156a1fefaac8b3b317a4aee0" }
+ # Shared MCP stdio framing and JSON-RPC 2.0 envelopes (storytold/craft-libs#778).
+ craft-mcp-server = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "fbb2d4b299d87191a79444c6e4e02d69d9325059" }
+ craft-jsonrpc = { git = "https://github.com/storytold/craft-libs", version = "0.1.0", rev = "fbb2d4b299d87191a79444c6e4e02d69d9325059" }
+diff --git a/crates/preflight/Cargo.toml b/crates/preflight/Cargo.toml
+index aabde13..f2a0b9d 100644
+--- a/crates/preflight/Cargo.toml
++++ b/crates/preflight/Cargo.toml
+@@ -11,7 +11,7 @@ repository.workspace = true
+ workspace = true
+ 
+ [dependencies]
+-craft-cms-v2 = { package = "craft-cms", version = "0.1.0", git = "https://github.com/storytold/craft-libs", rev = "8503f24cb845268f47f97e829491114fe9ad1bfa" }
++craft-cms = { workspace = true }
+ craft-xml = { workspace = true }
+ pdfcraft-content = { workspace = true }
+ pdfcraft-cos = { workspace = true }
+diff --git a/crates/preflight/src/icc.rs b/crates/preflight/src/icc.rs
+index 81764fb..09b44da 100644
+--- a/crates/preflight/src/icc.rs
++++ b/crates/preflight/src/icc.rs
+@@ -2,7 +2,7 @@
+ //! Keep v2.1 rather than substituting the shared v4 built-in profile.
+ 
+ pub fn srgb() -> Vec<u8> {
+-    craft_cms_v2::builtin::srgb_v2()
++    craft_cms::builtin::srgb_v2()
+ }
+ 
+ #[cfg(test)]
+diff --git a/crates/print/Cargo.toml b/crates/print/Cargo.toml
+index bec4e28..094191d 100644
+--- a/crates/print/Cargo.toml
++++ b/crates/print/Cargo.toml
+@@ -18,7 +18,7 @@ pdfcraft-model = { workspace = true }
+ thiserror = { workspace = true }
+ 
+ [target.'cfg(windows)'.dependencies]
+-winprint = { version = "0.2.1", git = "https://github.com/storytold/winprint.rs", rev = "5f80b9baf6b58937c401656634e42d33f00ddf49", default-features = false }
++winprint = { version = "0.2.1", git = "https://github.com/storytold/winprint.rs", rev = "72951d7455ebcab569fbd9386c513d3d9f53fb02", default-features = false }
+ 
+ [dev-dependencies]
+ pdfcraft-render = { workspace = true }
+diff --git a/crates/xfa/Cargo.toml b/crates/xfa/Cargo.toml
+index ca8d308..c2b7273 100644
+--- a/crates/xfa/Cargo.toml
++++ b/crates/xfa/Cargo.toml
+@@ -11,7 +11,7 @@ repository.workspace = true
+ workspace = true
+ 
+ [dependencies]
+-craft-xfa = { version = "0.1.0", git = "https://github.com/storytold/craft-libs", rev = "23acc704933a9a5619a5cd1cddc9bb1fb5a9b2d3" }
++craft-xfa = { version = "0.1.0", git = "https://github.com/storytold/craft-libs", rev = "1546550b0d4b79b8156a1fefaac8b3b317a4aee0" }
+ pdfcraft-cos = { workspace = true }
+ pdfcraft-fonts = { workspace = true }
+ craft-xml = { workspace = true }
