@@ -43,7 +43,7 @@ index 598a9a8..fdc79ab 100644
      #[cfg(not(all(unix, not(target_arch = "wasm32"))))]
      {
 diff --git a/crates/render/src/system_font.rs b/crates/render/src/system_font.rs
-index 8fcd167..39c946c 100644
+index 3779c2d..388c8cd 100644
 --- a/crates/render/src/system_font.rs
 +++ b/crates/render/src/system_font.rs
 @@ -265,7 +265,7 @@ fn candidates(script: Script, family: ChineseFamily, bold: bool) -> Vec<Candidat
@@ -56,7 +56,7 @@ index 8fcd167..39c946c 100644
      files.into_iter().map(|path| Candidate { path, region }).collect()
  }
 diff --git a/crates/ui-egui/src/platform/system_fonts.rs b/crates/ui-egui/src/platform/system_fonts.rs
-index 570e5de..c1ef2e2 100644
+index 3935bf6..1b7f955 100644
 --- a/crates/ui-egui/src/platform/system_fonts.rs
 +++ b/crates/ui-egui/src/platform/system_fonts.rs
 @@ -425,7 +425,7 @@ fn unix_fonts(files: &'static [&'static str]) -> Vec<PathBuf> {
