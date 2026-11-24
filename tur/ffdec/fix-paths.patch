@@ -1,8 +1,8 @@
 diff --git a/build.xml b/build.xml
-index e02160dfb..6f2bd332f 100644
+index 11aa90ae9..e766fa2e2 100644
 --- a/build.xml
 +++ b/build.xml
-@@ -218,8 +218,8 @@
+@@ -239,8 +239,8 @@
              toFile="${app.deb.desktop.temp}"
              name="${product.name}"
              comment="${app.description.short}"
@@ -10,10 +10,10 @@ index e02160dfb..6f2bd332f 100644
 -            icon="/usr/share/java/${app.package}/icon.png"
 +            exec="@TERMUX_PREFIX@/bin/${app.package}"
 +            icon="@TERMUX_PREFIX@/share/java/${app.package}/icon.png"
-             categories="Development;Network;Utility;WebDevelopment;Java"
-         />
-         <deb 
-@@ -231,11 +231,11 @@
+             categories="Development;Utility;WebDevelopment;Debugger;IDE;Java"
+             mimeType="application/x-shockwave-flash"
+             type="Application"
+@@ -254,11 +254,11 @@
              <version upstream="${version}" />
              <maintainer name="${vendor}" email="${app.vendor.mail}"/>
              <description synopsis="${app.description.short}">${app.description}</description>
@@ -28,7 +28,7 @@ index e02160dfb..6f2bd332f 100644
          </deb>
          <property name="deb.file" value="${releases.dir}/${prefix.filename}_${version}${version.suffix}.deb" />        
          <move file="${deb.file.orig}" tofile="${deb.file}" />
-@@ -340,7 +340,7 @@
+@@ -377,7 +377,7 @@
      </target>
      <target name="osx-app-bundle-no-dist" depends="-loadversion">
          <property name="app.script.temp" value="${app.bundle.dir}/${app.osx.dir}.app/Contents/MacOS/${app.osx.dir}"/>
