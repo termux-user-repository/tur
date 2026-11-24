@@ -12,10 +12,10 @@ index 5e4010f..1689540 100644
  serde_json = { workspace = true }
  # Records from every crate go to standard error and the log file (src/logging.rs).
 diff --git a/apps/pdfcraft/src/main.rs b/apps/pdfcraft/src/main.rs
-index 797e14e..cee7d6a 100644
+index 784cd68..70a47a0 100644
 --- a/apps/pdfcraft/src/main.rs
 +++ b/apps/pdfcraft/src/main.rs
-@@ -271,7 +271,7 @@ fn main() -> eframe::Result {
+@@ -282,7 +282,7 @@ fn main() -> eframe::Result {
      let apple_events = apple_events::AppleEvents::install();
      // Set once the app is created, which is after the renderer has started.
      let started = Rc::new(Cell::new(false));
@@ -24,7 +24,7 @@ index 797e14e..cee7d6a 100644
      let result = eframe::run_native(
          "PdfCraft",
          native_options(launch.integrated, launch.window_controls.is_some(), first),
-@@ -292,7 +292,7 @@ fn main() -> eframe::Result {
+@@ -303,7 +303,7 @@ fn main() -> eframe::Result {
              log::error!("the GPU renderer (wgpu) didn't start: {e}. Starting with OpenGL instead; set PDFCRAFT_RENDERER=gl to skip wgpu.");
              eframe::run_native(
                  "PdfCraft",

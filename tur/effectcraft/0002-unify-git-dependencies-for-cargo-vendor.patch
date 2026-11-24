@@ -1,0 +1,54 @@
+diff --git a/Cargo.toml b/Cargo.toml
+index 8a9a9d0..67c502b 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -11,21 +11,21 @@ rust-version = "1.95"
+ repository = "https://github.com/storytold/effectcraft"
+ 
+ [workspace.dependencies]
+-craft-timeline = { git = "https://github.com/storytold/craft-libs", rev = "0d6dd8bed815b8366869a800d2bf22588ca62dcb", default-features = false }
++craft-timeline = { git = "https://github.com/storytold/craft-libs", rev = "33be35625e252cc4f06aa375b3b428521faea37d", default-features = false }
+ craft-mime = { version = "0.1.0", git = "https://github.com/storytold/craft-libs", rev = "5a7a63a21dd03dd1a2bc6c308a3a6ce818caae87" }
+ craft-pdf = { git = "https://github.com/storytold/craft-libs", rev = "068e079c7be4b100a8a6b305b31ac881e069727e", version = "=0.1.0", default-features = false, features = ["read"] }
+ craft-docpath = { version = "0.1.0", git = "https://github.com/storytold/craft-libs", rev = "5a7a63a21dd03dd1a2bc6c308a3a6ce818caae87" }
+ craft-jsonrpc = { version = "0.1.0", git = "https://github.com/storytold/craft-libs", rev = "bc186ca719958fcce3b6ee24794277eabed14609" }
+ craft-quit = { version = "0.1.0", git = "https://github.com/storytold/craft-libs", rev = "5a7a63a21dd03dd1a2bc6c308a3a6ce818caae87" }
+ craft-ecproj-format = { version = "0.1.0", git = "https://github.com/storytold/craft-libs", rev = "5a7a63a21dd03dd1a2bc6c308a3a6ce818caae87" }
+-craft-dpx = { version = "0.1.0", git = "https://github.com/storytold/craft-libs", rev = "5a7a63a21dd03dd1a2bc6c308a3a6ce818caae87" }
++craft-dpx = { version = "0.1.0", git = "https://github.com/storytold/craft-libs", rev = "33be35625e252cc4f06aa375b3b428521faea37d" }
+ craft-ps = { version = "0.1.0", git = "https://github.com/storytold/craft-libs", rev = "068e079c7be4b100a8a6b305b31ac881e069727e", default-features = false, features = ["read"] }
+-craft-exr = { version = "0.1.0", git = "https://github.com/storytold/craft-libs", rev = "3b8e426a260695af840a2cd79a064d40778f939e" }
++craft-exr = { version = "0.1.0", git = "https://github.com/storytold/craft-libs", rev = "33be35625e252cc4f06aa375b3b428521faea37d" }
+ craft-gif = { version = "0.1.0", git = "https://github.com/storytold/craft-libs", rev = "ba25ccd233934d1b2f74e3c0f235168bf5f13ef3" }
+ craft-tga = { version = "0.1.0", git = "https://github.com/storytold/craft-libs", rev = "33be35625e252cc4f06aa375b3b428521faea37d" }
+-craft-psd = { version = "0.1.0", git = "https://github.com/storytold/craft-libs", rev = "53198114310dbc2b41e18e4eaf2fd83e69964189" }
++craft-psd = { version = "0.1.0", git = "https://github.com/storytold/craft-libs", rev = "33be35625e252cc4f06aa375b3b428521faea37d" }
+ craft-codepage = { version = "0.1.0", git = "https://github.com/storytold/craft-libs", rev = "5a7a63a21dd03dd1a2bc6c308a3a6ce818caae87" }
+-craft-svg = { version = "0.1.0", git = "https://github.com/storytold/craft-libs", rev = "3dff4793f1a5bd1f99a4fe3280d48f515158dff3" }
++craft-svg = { version = "0.1.0", git = "https://github.com/storytold/craft-libs", rev = "33be35625e252cc4f06aa375b3b428521faea37d" }
+ craft-webp = { version = "0.1.0", git = "https://github.com/storytold/craft-libs", rev = "5a7a63a21dd03dd1a2bc6c308a3a6ce818caae87" }
+ craft-lottie = { version = "0.1.0", git = "https://github.com/storytold/craft-libs", rev = "5a7a63a21dd03dd1a2bc6c308a3a6ce818caae87" }
+ craft-mesh = { version = "0.1.0", git = "https://github.com/storytold/craft-libs", rev = "5a7a63a21dd03dd1a2bc6c308a3a6ce818caae87", default-features = false, features = ["stl", "obj", "gltf", "fbx"] }
+diff --git a/crates/media/Cargo.toml b/crates/media/Cargo.toml
+index c23ceeb..26c6801 100644
+--- a/crates/media/Cargo.toml
++++ b/crates/media/Cargo.toml
+@@ -10,7 +10,6 @@ rust-version.workspace = true
+ workspace = true
+ 
+ [dependencies]
+-craft-audio-markers = { package = "craft-audio", version = "0.1.0", git = "https://github.com/storytold/craft-libs", rev = "30596f73c5ef851ba3dad9cf145669f391e2eb0d", default-features = false }
+ craft-docpath = { workspace = true }
+ effectcraft-time = { workspace = true }
+ effectcraft-color = { workspace = true }
+diff --git a/crates/media/src/wav_markers.rs b/crates/media/src/wav_markers.rs
+index bc198d1..83f7e8a 100644
+--- a/crates/media/src/wav_markers.rs
++++ b/crates/media/src/wav_markers.rs
+@@ -1,5 +1,5 @@
+ //! WAV cue/adtl/RF64/XMP metadata is parsed by craft-audio; timeline policy remains here.
+-use craft_audio_markers::wav_markers as shared;
++use craft_audio::wav_markers as shared;
+ use effectcraft_color::Label;
+ use effectcraft_project::Marker;
+ use effectcraft_time::Tick;

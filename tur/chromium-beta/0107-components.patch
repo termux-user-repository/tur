@@ -1,0 +1,19 @@
+--- a/components/one_time_tokens/core/browser/gmail_otp_service_impl.cc
++++ b/components/one_time_tokens/core/browser/gmail_otp_service_impl.cc
+@@ -22,9 +22,6 @@
+ #include "components/one_time_tokens/core/browser/one_time_token_log_sink.h"
+ #include "services/metrics/public/cpp/ukm_source_id.h"
+ 
+-#define RecordSenderDomainMatchRejectionReason RecordSenderDomainMatchRejectionReason_gmail_otp_service_impl
+-#define RecordSenderDomainMatchAcceptedMatchType RecordSenderDomainMatchAcceptedMatchType_gmail_otp_service_impl
+-
+ namespace one_time_tokens {
+ 
+ namespace {
+@@ -336,6 +333,3 @@
+ }
+ 
+ }  // namespace one_time_tokens
+-
+-#undef RecordSenderDomainMatchRejectionReason
+-#undef RecordSenderDomainMatchAcceptedMatchType

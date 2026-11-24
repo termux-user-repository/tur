@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://getartcraft.com/apps/pdfcraft
 TERMUX_PKG_DESCRIPTION="PDF reader, editor and toolkit; an open-source clean-room PDF application in pure Rust"
 TERMUX_PKG_LICENSE="MIT, Apache-2.0"
 TERMUX_PKG_MAINTAINER="@termux-user-repository"
-TERMUX_PKG_VERSION="0.21.1"
+TERMUX_PKG_VERSION="0.22.0"
 TERMUX_PKG_SRCURL="https://github.com/storytold/pdfcraft/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz"
-TERMUX_PKG_SHA256=d6cb5a437aa531fe3ae91250e2b6aa52cf4208cc521c17fc30aeccc917c0e9f5
+TERMUX_PKG_SHA256=e9165e846d61fdd2fcc5f53c587178750b791f4b0fa6d57212b7e0adab20be7f
 TERMUX_PKG_DEPENDS="libx11, libxcb, libxcursor, libxi, libxrandr, libxkbcommon, vulkan-loader-android, hicolor-icon-theme"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_AUTO_UPDATE=true
@@ -31,6 +31,8 @@ termux_step_pre_configure() {
 		! -wholename ./vendor/wayland-cursor \
 		! -path './vendor/smithay-client-toolkit*' \
 		! -path './vendor/craft*' \
+		! -path './vendor/hayro*' \
+		! -path './vendor/krilla*' \
 		! -path './vendor/winprint*' \
 		! -path './vendor/egui*' \
 		! -path './vendor/epaint*' \

@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://github.com/storytold/effectcraft
 TERMUX_PKG_DESCRIPTION="Native open-source motion-graphics and effects editor in pure Rust (eframe/wgpu)"
 TERMUX_PKG_LICENSE="MIT, Apache-2.0"
 TERMUX_PKG_MAINTAINER="@termux"
-TERMUX_PKG_VERSION="0.24.1"
+TERMUX_PKG_VERSION="0.25.1"
 TERMUX_PKG_SRCURL="https://github.com/storytold/effectcraft/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz"
-TERMUX_PKG_SHA256=f913a744eb29e1fe411ad6c806178513ee5afba2c59a89872dfdfc4ecfc44358
+TERMUX_PKG_SHA256=55cd297c37f354e71ada2432f773b9be1f191ae2cc73f397229e4defe82b5f98
 TERMUX_PKG_DEPENDS="libx11, libxcb, libxcursor, libxi, libxrandr, libxkbcommon, vulkan-loader-android, hicolor-icon-theme, alsa-lib, alsa-plugins"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_AUTO_UPDATE=true
@@ -29,6 +29,7 @@ termux_step_pre_configure() {
 		! -path './vendor/smithay-client-toolkit*' \
 		! -path './vendor/craft*' \
 		! -path './vendor/filmcraft*' \
+		! -path './vendor/vectorcraft*' \
 		! -path './vendor/egui*' \
 		! -path './vendor/epaint*' \
 		! -path './vendor/ecolor*' \
