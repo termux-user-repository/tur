@@ -9,9 +9,6 @@ TERMUX_PKG_SHA256=642f1cd4abcf16c2100eb8fdc2a84691a2af3d78549af4efce7398c2c6a78e
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_AUTO_UPDATE=true
 
-# The repository also tags its other releases (swift-v*, oci-v*, mcpb-v*, linux-packages-v* and
-# more), so its latest release or tag is not always qrscan. A qrscan version is a plain vX.Y.Z
-# tag whose release carries the CLI source archive.
 termux_pkg_auto_update() {
 	local api="https://api.github.com/repos/qrcode-ai-com/qrcode-barcode-scanner-rust"
 	local -a curl_opts=(-fsSL -H "Accept: application/vnd.github+json")
@@ -43,10 +40,6 @@ termux_pkg_auto_update() {
 
 	termux_pkg_upgrade_version "${latest_version}"
 }
-
-# The archive holds the whole workspace and its Cargo.lock; only the qrscan crate is built. Keep
-# the workspace release profile (overflow checks in the rxing reader) and never set
-# CARGO_PROFILE_RELEASE_PANIC=abort: the engine catches reader panics.
 
 termux_step_pre_configure() {
 	termux_setup_rust
