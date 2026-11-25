@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://github.com/M-Igashi/mp3rgain
 TERMUX_PKG_DESCRIPTION="Lossless MP3 and AAC volume normalizer using ReplayGain, compatible with mp3gain"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@M-Igashi"
-TERMUX_PKG_VERSION="3.17.0"
+TERMUX_PKG_VERSION="3.17.1"
 TERMUX_PKG_SRCURL="https://github.com/M-Igashi/mp3rgain/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz"
-TERMUX_PKG_SHA256=cc8a6782ae71db41a38da47611aaf7efdf7e2497e3fa4780fc10df30474deae2
+TERMUX_PKG_SHA256=638dcb8d3c259524d07202d789ec09a9059ab72f4cc0ac533a3c1aa54d5fe53d
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_BUILD_IN_SRC=true
 
