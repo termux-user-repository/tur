@@ -1,0 +1,17 @@
+Description: Declare tempdevs unconditionally in wizard page 120
+ When building without HAVE_EEZE, tempdevs is still used in the fallback check.
+Author: fervi <fervi@users.noreply.github.com>
+Forwarded: not-needed
+
+--- a/src/modules/wizard/page_120.c
++++ b/src/modules/wizard/page_120.c
+@@ -96,9 +96,7 @@
+ E_API int
+ wizard_page_show(E_Wizard_Page *pg EINA_UNUSED)
+ {
+-#ifdef HAVE_EEZE
+    Eina_List *tempdevs = NULL;
+-#endif
+    int hav_temperature = 0;
+ #if defined (__FreeBSD__) || defined (__OpenBSD__) || defined (__NetBSD__)
+    // figure out on bsd if we have temp sensors

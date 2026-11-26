@@ -1,0 +1,16 @@
+Description: Define PT_CONTINUE as PTRACE_CONT if not defined (needed on Android Bionic)
+Author: fervi <fervi@users.noreply.github.com>
+Forwarded: not-needed
+
+--- a/src/bin/e_start_main.c
++++ b/src/bin/e_start_main.c
+@@ -24,6 +24,9 @@
+ #ifdef HAVE_SYS_PTRACE_H
+ # ifdef __linux__
+ #  include <sys/ptrace.h>
++#  ifndef PT_CONTINUE
++#   define PT_CONTINUE PTRACE_CONT
++#  endif
+ # else
+ #  undef HAVE_SYS_PTRACE_H
+ # endif

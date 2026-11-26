@@ -1,0 +1,10 @@
+--- a/meson/meson_inst.sh	2026-11-04 15:12:52.584595873 +0100
++++ b/meson/meson_inst.sh	2026-11-04 15:12:52.586914324 +0100
+@@ -1,6 +1,2 @@
+ #!/bin/sh
+-
+-for x in "$@" ; do
+-	chown root "$DESTDIR/$x"
+-	chmod a=rx,u+xs "$DESTDIR/$x"
+-done
++exit 0

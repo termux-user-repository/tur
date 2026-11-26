@@ -1,0 +1,30 @@
+--- a/src/bin/e_util_suid.h	2026-11-04 15:13:00.381598564 +0100
++++ b/src/bin/e_util_suid.h	2026-11-04 15:16:29.950852314 +0100
+@@ -84,6 +84,7 @@
+         return 36;
+      }
+ 
++#ifndef __ANDROID__
+    if (setuid(0) != 0)
+      {
+         E_UTIL_SUID_ERR("Unable to assume root user privileges\n");
+@@ -94,6 +95,7 @@
+         E_UTIL_SUID_ERR("Unable to assume root group privileges\n");
+         return 38;
+      }
++#endif
+ 
+    pwent = getpwuid(getuid());
+    if (!pwent)
+@@ -247,7 +249,11 @@
+ # endif
+ #endif
+    // pass 3 - set path and ifs to minimal defaults
++#ifndef __ANDROID__
+    putenv("PATH=/bin:/usr/bin:/sbin:/usr/sbin");
++#else
++   putenv("PATH=@TERMUX_PREFIX@/bin:/bin:/usr/bin");
++#endif
+    putenv("IFS= \t\n");
+    return 0;
+ }

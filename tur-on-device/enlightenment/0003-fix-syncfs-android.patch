@@ -1,0 +1,15 @@
+Description: Fall back to fsync on Android where syncfs is not available in API 24
+Author: fervi <fervi@users.noreply.github.com>
+Forwarded: not-needed
+
+--- a/src/bin/e_fm_op.c
++++ b/src/bin/e_fm_op.c
+@@ -1164,7 +1164,7 @@
+ static void
+ _syncfs(int fd)
+ {
+-#if defined __linux__
++#if defined(__linux__) && !defined(__ANDROID__)
+    syncfs(fd);
+ #else
+    fsync(fd);

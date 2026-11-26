@@ -1,0 +1,80 @@
+Description: Disable setuid/setreuid and fix fallback paths on Android
+ On Android, seccomp policy blocks setuid/setreuid syscalls with SIGSYS.
+ Termux applications run under a single unprivileged UID and cannot change UIDs.
+ Also, /tmp does not exist on Android; use @TERMUX_PREFIX@/tmp and @TERMUX_HOME@.
+Author: fervi <fervi@users.noreply.github.com>
+Forwarded: not-needed
+
+--- a/src/lib/eina/eina_vpath.c
++++ b/src/lib/eina/eina_vpath.c
+@@ -51,7 +51,7 @@
+ {
+    char buf[PATH_MAX];
+    struct stat st;
+-#if defined(HAVE_GETUID) && defined(HAVE_GETEUID)
++#if defined(HAVE_GETUID) && defined(HAVE_GETEUID) && !defined(__ANDROID__)
+    uid_t uid = getuid();
+
+    if (setuid(geteuid()) != 0)
+@@ -108,7 +108,7 @@
+              abort();
+           }
+      }
+-#if defined(HAVE_GETUID) && defined(HAVE_GETEUID)
++#if defined(HAVE_GETUID) && defined(HAVE_GETEUID) && !defined(__ANDROID__)
+   if (setreuid(uid, geteuid()) != 0)
+      {
+         fprintf(stderr,
+@@ -130,21 +130,21 @@
+    uid_t uid = geteuid();
+    struct stat st;
+
+-   snprintf(buf, sizeof(buf), "/tmp/%i", (int)uid);
++   snprintf(buf, sizeof(buf), "@TERMUX_PREFIX@/tmp/%i", (int)uid);
+    if (mkdir(buf,  S_IRUSR | S_IWUSR | S_IXUSR) < 0)
+      {
+         if (errno != EEXIST)
+           {
+-             if (stat("/tmp", &st) == 0)
+-               snprintf(buf, sizeof(buf), "/tmp");
++             if (stat("@TERMUX_PREFIX@/tmp", &st) == 0)
++               snprintf(buf, sizeof(buf), "@TERMUX_PREFIX@/tmp");
+              else
+                snprintf(buf, sizeof(buf), "/");
+           }
+      }
+    if (stat(buf, &st) != 0)
+      {
+-        if (stat("/tmp", &st) == 0)
+-          snprintf(buf, sizeof(buf), "/tmp");
++        if (stat("@TERMUX_PREFIX@/tmp", &st) == 0)
++          snprintf(buf, sizeof(buf), "@TERMUX_PREFIX@/tmp");
+         else
+           snprintf(buf, sizeof(buf), "/");
+      }
+--- a/src/lib/eina/eina_util.c
++++ b/src/lib/eina/eina_util.c
+@@ -87,7 +87,11 @@
+                }
+           }
+ # endif
++# ifdef __ANDROID__
++        home = "@TERMUX_HOME@";
++# else
+         home = "/tmp";
++# endif
+      }
+ #endif
+    home = strdup(home);
+@@ -119,7 +123,11 @@
+         if (!tmp || !*tmp) tmp = getenv("TEMPDIR");
+         if (!tmp || !*tmp) tmp = getenv("TEMP");
+      }
++# ifdef __ANDROID__
++   if (!tmp || !*tmp) tmp = "@TERMUX_PREFIX@/tmp";
++# else
+    if (!tmp || !*tmp) tmp = "/tmp";
++# endif
+ #endif
+
+ #if defined(__MACH__) && defined(__APPLE__)

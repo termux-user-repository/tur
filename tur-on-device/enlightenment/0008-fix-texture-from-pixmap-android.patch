@@ -1,0 +1,52 @@
+Description: Disable texture_from_pixmap and default GL wizard on Android
+ In Termux:X11 on Android, Mesa Zink lacks DRI3 hardware buffer sharing with
+ the X11 server (EGL_NATIVE_PIXMAP_KHR / glXCreatePixmap fail).
+ Disabling texture_from_pixmap ensures that window contents are properly
+ updated and rendered instead of displaying invisible/blank window interiors.
+Author: fervi <fervi@users.noreply.github.com>
+Forwarded: not-needed
+
+--- a/src/bin/e_comp_cfdata.c
++++ b/src/bin/e_comp_cfdata.c
+@@ -77,7 +77,11 @@
+    cfg->fps_corner = 0;
+    cfg->fps_show = 0;
+    cfg->indirect = 0;
++#if defined(__ANDROID__)
++   cfg->texture_from_pixmap = 0;
++#else
+    cfg->texture_from_pixmap = 1;
++#endif
+ //   cfg->lock_fps = 0;
+    cfg->grab = 0;
+    cfg->vsync = 1;
+--- a/src/bin/e_comp_object.c
++++ b/src/bin/e_comp_object.c
+@@ -4101,9 +4101,13 @@
+           {
+            case E_PIXMAP_TYPE_X:
+              /* native requires gl enabled, texture from pixmap enabled, and a non-shaped client */
++#if defined(__ANDROID__)
++             set = 0;
++#else
+              set = e_comp->gl &&
+                    e_comp_config_get()->texture_from_pixmap &&
+                    !cw->ec->shaped;
++#endif
+              break;
+            case E_PIXMAP_TYPE_WL:
+              set = !e_pixmap_is_pixels(cw->ec->pixmap);
+--- a/src/modules/wizard/page_150.c
++++ b/src/modules/wizard/page_150.c
+@@ -43,7 +43,11 @@
+              const char *str;
+              Evas_GL_API *glapi = evas_gl_api_get(gl);
+              str = (char*)glapi->glGetString(GL_RENDERER);
++#if defined(__ANDROID__)
++             if (0)
++#else
+              if (str && (!strcasestr(str, "llvmpipe")))
++#endif
+                do_gl = do_vsync = 1;
+              evas_gl_free(gl);
+           }

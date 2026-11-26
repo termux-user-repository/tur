@@ -1,0 +1,11 @@
+--- a/src/lib/ethumb/ethumb.c	2026-11-04 15:12:42.000381470 +0100
++++ b/src/lib/ethumb/ethumb.c	2026-11-04 15:12:42.003425991 +0100
+@@ -269,7 +269,7 @@
+ #if defined(HAVE_GETUID) && defined(HAVE_GETEUID)
+    else
+      {
+-        struct passwd *pw = getpwent();
++        struct passwd *pw = getpwuid(getuid());
+ 
+         if ((!pw) || (!pw->pw_dir)) goto error_plugins_ext;
+         snprintf(buf, sizeof(buf), "%s/.thumbnails", pw->pw_dir);
