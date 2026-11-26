@@ -1,0 +1,11 @@
+--- a/Makefile
++++ b/Makefile
+@@ -27,7 +27,7 @@
+ HOST    = $(shell gcc -dumpmachine)
+ TARGET := $(shell gcc -dumpmachine)
+ 
+-prefix	      := $(dir $(shell which gnatls))..
++prefix	      := $(dir $(shell command -v gnatls))..
+ BUILD         = production
+ PROCESSORS    = 0
+ BUILD_DIR     =
