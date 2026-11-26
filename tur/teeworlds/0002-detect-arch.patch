@@ -1,0 +1,28 @@
+Description: Add aarch64 and riscv architecture definitions
+Author: IntinteDAO <lordfervi@protonmail.com>
+
+--- a/src/base/detect.h
++++ b/src/base/detect.h
+@@ -139,6 +139,22 @@
+ 	#endif
+ #endif
+ 
++#if defined(__aarch64__)
++	#define CONF_ARCH_AARCH64 1
++	#define CONF_ARCH_STRING "aarch64"
++	#if !defined(CONF_ARCH_ENDIAN_LITTLE) && !defined(CONF_ARCH_ENDIAN_BIG)
++		#define CONF_ARCH_ENDIAN_LITTLE 1
++	#endif
++#endif
++
++#if defined(__riscv)
++	#define CONF_ARCH_RISCV 1
++	#define CONF_ARCH_STRING "riscv"
++	#if !defined(CONF_ARCH_ENDIAN_LITTLE) && !defined(CONF_ARCH_ENDIAN_BIG)
++		#define CONF_ARCH_ENDIAN_LITTLE 1
++	#endif
++#endif
++
+ 
+ #ifndef CONF_FAMILY_STRING
+ #define CONF_FAMILY_STRING "unknown"
