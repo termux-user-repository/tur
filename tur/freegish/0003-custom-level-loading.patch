@@ -1,0 +1,31 @@
+Description: Fallback to user directory for loading and saving levels
+ Allows loading custom user levels from ~/.freegish/level/ and saving
+ created levels to user directory if system directory is read-only.
+Author: Fervi (IntinteDAO) <lordfervi@protonmail.com>
+
+--- a/src/game/level.c
++++ b/src/game/level.c
+@@ -201,6 +201,9 @@
+   sprintf(path, "%s/%s/level/%s", datapacks_folder, loaded_datapack, filename); // MAYBE: add ability to list several datapacks and try loading them one by one
+   path[255] = 0; // safety first
+ 
++  if ((fp=fopen(path,"wb"))==NULL)
++    fp=fopen(userpath(path,"level",filename),"wb");
++
+   if ((fp=fopen(path,"wb"))!=NULL)
+     {
+     version=11;
+@@ -322,7 +325,12 @@
+   sprintf(filename_with_folder, "%s/%s/level/%s", datapacks_folder, loaded_datapack, filename); // MAYBE: add ability to list several datapacks and try loading them one by one
+   filename_with_folder[255] = 0; // safety first
+ 
+-  if ((fp=fopen(filename_with_folder,"rb"))==NULL) return LOADLEVELRESULT_FILEERROR;
++  if ((fp=fopen(filename_with_folder,"rb"))==NULL)
++    {
++    char user_lvl[PATH_MAX];
++    if ((fp=fopen(userpath(user_lvl,"level",filename),"rb"))==NULL)
++      return LOADLEVELRESULT_FILEERROR;
++    }
+ 
+   fread2(&version,4,1,fp);
+ 
