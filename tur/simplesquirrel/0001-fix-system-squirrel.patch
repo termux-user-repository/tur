@@ -1,0 +1,13 @@
+Description: Set include directory when using system squirrel
+Author: Fervi (IntinteDAO) <lordfervi@protonmail.com>
+
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -23,6 +23,7 @@
+ else()
+   find_library(SQUIRREL names squirrel)
+   find_library(SQUIRREL_STDLIB names sqstdlib)
++  set(SQUIRREL_INCLUDE_DIR @TERMUX_PREFIX@/include)
+ endif()
+ 
+ # Grab the files
