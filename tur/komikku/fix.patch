@@ -1,0 +1,52 @@
+diff --git a/bin/komikku.in b/bin/komikku.in
+index 37377c3b..940f0cda 100755
+--- a/bin/komikku.in
++++ b/bin/komikku.in
+@@ -61,12 +61,15 @@ if __name__ == '__main__':
+     try:
+         locale.textdomain('@projectname@')
+         locale.bindtextdomain('@projectname@', '@localedir@')
+-    except AttributeError as e:
+-        # Python built without gettext support doesn't have bindtextdomain() and textdomain()
++    except (AttributeError, OSError) as e:
+         print('Could not bind the gettext translation domain. Some translations will not work.')
+         print('Error: {}'.format(e))
+-    gettext.textdomain('@projectname@')
+-    gettext.bindtextdomain('@projectname@', '@localedir@')
++    try:
++        gettext.textdomain('@projectname@')
++        gettext.bindtextdomain('@projectname@', '@localedir@')
++    except (AttributeError, OSError) as e:
++        print('Could not bind the gettext translation domain (gettext). Some translations will not work.')
++        print('Error: {}'.format(e))
+ 
+     resource = Gio.Resource.load(os.path.join('@pkgdatadir@', '@appid@.gresource'))
+     resource._register()
+diff --git a/komikku/consts.py b/komikku/consts.py
+index 71263741..b96462af 100644
+--- a/komikku/consts.py
++++ b/komikku/consts.py
+@@ -108,8 +108,8 @@ PROGRESSBAR_THEMES = {
+ 
+ DOWNLOAD_MAX_DELAY = 1  # in seconds
+ REQUESTS_TIMEOUT = 5
+-USER_AGENT = 'Mozilla/5.0 (X11; Linux x86_64; rv:129.0) Gecko/20100101 Firefox/129.0'
+-USER_AGENT_MOBILE = 'Mozilla/5.0 (Linux; U; Android 4.1.1; en-gb; Build/KLP) AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Safari/534.30'
++USER_AGENT = 'Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0'
++USER_AGENT_MOBILE = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.6478.122 Mobile Safari/537.36'
+ 
+ TIMEZONE = datetime.datetime.now(tz=datetime.UTC).astimezone().tzinfo
+ 
+diff --git a/komikku/webview.py b/komikku/webview.py
+index 9cd73303..ced03367 100644
+--- a/komikku/webview.py
++++ b/komikku/webview.py
+@@ -70,8 +70,7 @@ class WebviewPage(Adw.NavigationPage):
+ 
+         # User agent: Gnome Web like
+         cpu_arch = platform.machine()
+-        session_type = GLib.getenv('XDG_SESSION_TYPE')
+-        session_type = session_type.capitalize() if session_type else 'Wayland'
++        session_type = (GLib.getenv('XDG_SESSION_TYPE') or 'unknown').capitalize()
+         custom_part = f'{session_type}; Linux {cpu_arch}'  # noqa: E702
+         self.user_agent = f'Mozilla/5.0 ({custom_part}) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/60.5 Safari/605.1.15'
