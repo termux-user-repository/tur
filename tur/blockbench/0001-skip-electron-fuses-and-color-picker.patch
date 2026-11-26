@@ -1,0 +1,24 @@
+diff --git a/package.json b/package.json
+index 86851dd..e4a6f03 100644
+--- a/package.json
++++ b/package.json
+@@ -49,8 +49,7 @@
+ 			"entitlementsInherit": "build/entitlements.mac.plist"
+ 		},
+ 		"files": [
+-			"!**/node_modules/electron-color-picker/library/darwin/**/*",
+-			"!**/node_modules/electron-color-picker/library/linux/**/*",
++			"!**/node_modules/electron-color-picker/**/*",
+ 			"assets/",
+ 			"build/",
+ 			"css/",
+@@ -117,9 +116,6 @@
+ 			"category": "Graphics;3DGraphics",
+ 			"icon": "build/icon.png"
+ 		},
+-		"electronFuses": {
+-			"runAsNode": false
+-		},
+ 		"fileAssociations": [
+ 			{
+ 				"ext": "bbmodel",
