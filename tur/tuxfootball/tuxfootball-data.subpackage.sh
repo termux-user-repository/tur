@@ -1,0 +1,5 @@
+TERMUX_SUBPKG_DESCRIPTION="Data files for Tux Football"
+TERMUX_SUBPKG_PLATFORM_INDEPENDENT=true
+TERMUX_SUBPKG_INCLUDE="
+share/tuxfootball
+"
