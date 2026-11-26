@@ -1,0 +1,23 @@
+diff --git a/src/main.rs b/src/main.rs
+index d7ae36d..fb6e2dc 100644
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -98,6 +98,18 @@ fn init_css() {
+ fn main() {
+     env_logger::init();
+ 
++    // Termux: Set SSL certificate paths so openssl-probe can find them
++    if std::env::var("SSL_CERT_FILE").is_err() {
++        let cert_file = "@TERMUX_PREFIX@/etc/tls/cert.pem";
++        if std::path::Path::new(cert_file).exists() {
++            // Safety: At this point the application is still single-threaded.
++            unsafe {
++                std::env::set_var("SSL_CERT_FILE", cert_file);
++                std::env::set_var("SSL_CERT_DIR", "@TERMUX_PREFIX@/etc/tls/certs");
++            }
++        }
++    }
++
+     // Before version 4.18, the NGL renderer is not so good, and Pipeline defaults to the old GL renderer.
+     // Since 4.18, the old renderer was removed, and we will have to use the default.
+     // See their annoucement of removal https://blog.gtk.org/2025/02/01/whats-new-in-gtk-winter-2025-edition/

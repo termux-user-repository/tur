@@ -1,0 +1,194 @@
+<?xml version="1.0"?>
+<dump>
+  <enum name="ClapperPlayerState" get-type="clapper_player_state_get_type">
+    <member name="CLAPPER_PLAYER_STATE_STOPPED" nick="stopped" value="0"/>
+    <member name="CLAPPER_PLAYER_STATE_BUFFERING" nick="buffering" value="1"/>
+    <member name="CLAPPER_PLAYER_STATE_PAUSED" nick="paused" value="2"/>
+    <member name="CLAPPER_PLAYER_STATE_PLAYING" nick="playing" value="3"/>
+  </enum>  <enum name="ClapperPlayerSeekMethod" get-type="clapper_player_seek_method_get_type">
+    <member name="CLAPPER_PLAYER_SEEK_METHOD_ACCURATE" nick="accurate" value="0"/>
+    <member name="CLAPPER_PLAYER_SEEK_METHOD_NORMAL" nick="normal" value="1"/>
+    <member name="CLAPPER_PLAYER_SEEK_METHOD_FAST" nick="fast" value="2"/>
+  </enum>  <enum name="ClapperPlayerMessageDestination" get-type="clapper_player_message_destination_get_type">
+    <member name="CLAPPER_PLAYER_MESSAGE_DESTINATION_PLAYER" nick="player" value="0"/>
+    <member name="CLAPPER_PLAYER_MESSAGE_DESTINATION_REACTABLES" nick="reactables" value="1"/>
+    <member name="CLAPPER_PLAYER_MESSAGE_DESTINATION_APPLICATION" nick="application" value="2"/>
+  </enum>  <enum name="ClapperQueueProgressionMode" get-type="clapper_queue_progression_mode_get_type">
+    <member name="CLAPPER_QUEUE_PROGRESSION_NONE" nick="none" value="0"/>
+    <member name="CLAPPER_QUEUE_PROGRESSION_CONSECUTIVE" nick="consecutive" value="1"/>
+    <member name="CLAPPER_QUEUE_PROGRESSION_REPEAT_ITEM" nick="repeat-item" value="2"/>
+    <member name="CLAPPER_QUEUE_PROGRESSION_CAROUSEL" nick="carousel" value="3"/>
+    <member name="CLAPPER_QUEUE_PROGRESSION_SHUFFLE" nick="shuffle" value="4"/>
+  </enum>  <enum name="ClapperMarkerType" get-type="clapper_marker_type_get_type">
+    <member name="CLAPPER_MARKER_TYPE_UNKNOWN" nick="unknown" value="0"/>
+    <member name="CLAPPER_MARKER_TYPE_TITLE" nick="title" value="1"/>
+    <member name="CLAPPER_MARKER_TYPE_CHAPTER" nick="chapter" value="2"/>
+    <member name="CLAPPER_MARKER_TYPE_TRACK" nick="track" value="3"/>
+    <member name="CLAPPER_MARKER_TYPE_CUSTOM_1" nick="custom-1" value="101"/>
+    <member name="CLAPPER_MARKER_TYPE_CUSTOM_2" nick="custom-2" value="102"/>
+    <member name="CLAPPER_MARKER_TYPE_CUSTOM_3" nick="custom-3" value="103"/>
+  </enum>  <enum name="ClapperStreamType" get-type="clapper_stream_type_get_type">
+    <member name="CLAPPER_STREAM_TYPE_UNKNOWN" nick="unknown" value="0"/>
+    <member name="CLAPPER_STREAM_TYPE_VIDEO" nick="video" value="1"/>
+    <member name="CLAPPER_STREAM_TYPE_AUDIO" nick="audio" value="2"/>
+    <member name="CLAPPER_STREAM_TYPE_SUBTITLE" nick="subtitle" value="3"/>
+  </enum>  <enum name="ClapperDiscovererDiscoveryMode" get-type="clapper_discoverer_discovery_mode_get_type">
+    <member name="CLAPPER_DISCOVERER_DISCOVERY_ALWAYS" nick="always" value="0"/>
+    <member name="CLAPPER_DISCOVERER_DISCOVERY_NONCURRENT" nick="noncurrent" value="1"/>
+  </enum>  <flags name="ClapperEnhancerParamFlags" get-type="clapper_enhancer_param_flags_get_type">
+    <member name="CLAPPER_ENHANCER_PARAM_GLOBAL" nick="global" value="131072"/>
+    <member name="CLAPPER_ENHANCER_PARAM_LOCAL" nick="local" value="262144"/>
+    <member name="CLAPPER_ENHANCER_PARAM_FILEPATH" nick="filepath" value="524288"/>
+    <member name="CLAPPER_ENHANCER_PARAM_DIRPATH" nick="dirpath" value="1048576"/>
+  </flags>
+  <flags name="ClapperReactableItemUpdatedFlags" get-type="clapper_reactable_item_updated_flags_get_type">
+    <member name="CLAPPER_REACTABLE_ITEM_UPDATED_TITLE" nick="title" value="1"/>
+    <member name="CLAPPER_REACTABLE_ITEM_UPDATED_DURATION" nick="duration" value="2"/>
+    <member name="CLAPPER_REACTABLE_ITEM_UPDATED_TIMELINE" nick="timeline" value="4"/>
+    <member name="CLAPPER_REACTABLE_ITEM_UPDATED_TAGS" nick="tags" value="8"/>
+    <member name="CLAPPER_REACTABLE_ITEM_UPDATED_REDIRECT_URI" nick="redirect-uri" value="16"/>
+    <member name="CLAPPER_REACTABLE_ITEM_UPDATED_CACHE_LOCATION" nick="cache-location" value="32"/>
+  </flags>
+  <class name="ClapperStream" get-type="clapper_stream_get_type" parents="GstObject,GInitiallyUnowned,GObject">
+    <property name="stream-type" type="ClapperStreamType" flags="1073742059" default-value="CLAPPER_STREAM_TYPE_UNKNOWN"/>
+    <property name="title" type="gchararray" flags="1073742049" default-value="NULL"/>
+  </class>
+  <class name="ClapperAudioStream" get-type="clapper_audio_stream_get_type" parents="ClapperStream,GstObject,GInitiallyUnowned,GObject">
+    <property name="codec" type="gchararray" flags="1073742049" default-value="NULL"/>
+    <property name="bitrate" type="guint" flags="1073742049" default-value="0"/>
+    <property name="sample-format" type="gchararray" flags="1073742049" default-value="NULL"/>
+    <property name="sample-rate" type="gint" flags="1073742049" default-value="0"/>
+    <property name="channels" type="gint" flags="1073742049" default-value="0"/>
+    <property name="lang-code" type="gchararray" flags="1073742049" default-value="NULL"/>
+    <property name="lang-name" type="gchararray" flags="1073742049" default-value="NULL"/>
+  </class>
+  <class name="ClapperEnhancerProxy" get-type="clapper_enhancer_proxy_get_type" parents="GstObject,GInitiallyUnowned,GObject">
+    <property name="friendly-name" type="gchararray" flags="1073742049" default-value="NULL"/>
+    <property name="module-name" type="gchararray" flags="1073742049" default-value="NULL"/>
+    <property name="module-dir" type="gchararray" flags="1073742049" default-value="NULL"/>
+    <property name="description" type="gchararray" flags="1073742049" default-value="NULL"/>
+    <property name="version" type="gchararray" flags="1073742049" default-value="NULL"/>
+    <property name="target-creation-allowed" type="gboolean" flags="1073742051" default-value="FALSE"/>
+  </class>
+  <class name="ClapperEnhancerProxyList" get-type="clapper_enhancer_proxy_list_get_type" parents="GstObject,GInitiallyUnowned,GObject">
+    <implements name="GListModel"/>
+    <property name="n-proxies" type="guint" flags="1073742049" default-value="0"/>
+  </class>
+  <class name="ClapperMarker" get-type="clapper_marker_get_type" parents="GstObject,GInitiallyUnowned,GObject">
+    <property name="marker-type" type="ClapperMarkerType" flags="1073742059" default-value="CLAPPER_MARKER_TYPE_UNKNOWN"/>
+    <property name="title" type="gchararray" flags="1073742059" default-value="NULL"/>
+    <property name="start" type="gdouble" flags="1073742059" default-value="0.000000"/>
+    <property name="end" type="gdouble" flags="1073742059" default-value="-1.000000"/>
+  </class>
+  <class name="ClapperTimeline" get-type="clapper_timeline_get_type" parents="GstObject,GInitiallyUnowned,GObject">
+    <implements name="GListModel"/>
+    <property name="n-markers" type="guint" flags="1073742049" default-value="0"/>
+  </class>
+  <class name="ClapperMediaItem" get-type="clapper_media_item_get_type" parents="GstObject,GInitiallyUnowned,GObject">
+    <property name="id" type="guint" flags="1073742049" default-value="4294967295"/>
+    <property name="uri" type="gchararray" flags="1073742059" default-value="NULL"/>
+    <property name="suburi" type="gchararray" flags="1073742051" default-value="NULL"/>
+    <property name="redirect-uri" type="gchararray" flags="1073742049" default-value="NULL"/>
+    <property name="cache-location" type="gchararray" flags="1073742059" default-value="NULL"/>
+    <property name="tags" type="GstTagList" flags="1073742049"/>
+    <property name="title" type="gchararray" flags="1073742049" default-value="NULL"/>
+    <property name="container-format" type="gchararray" flags="-1073741599" default-value="NULL"/>
+    <property name="duration" type="gdouble" flags="1073742049" default-value="0.000000"/>
+    <property name="timeline" type="ClapperTimeline" flags="1073742049"/>
+  </class>
+  <class name="ClapperFeature" get-type="clapper_feature_get_type" parents="GstObject,GInitiallyUnowned,GObject">
+  </class>
+  <class name="ClapperHarvest" get-type="clapper_harvest_get_type" parents="GstObject,GInitiallyUnowned,GObject">
+  </class>
+  <class name="ClapperThreadedObject" get-type="clapper_threaded_object_get_type" parents="GstObject,GInitiallyUnowned,GObject">
+  </class>
+  <class name="ClapperQueue" get-type="clapper_queue_get_type" parents="GstObject,GInitiallyUnowned,GObject">
+    <implements name="GListModel"/>
+    <property name="current-item" type="ClapperMediaItem" flags="1073742049"/>
+    <property name="current-index" type="guint" flags="1073742051" default-value="4294967295"/>
+    <property name="n-items" type="guint" flags="1073742049" default-value="0"/>
+    <property name="progression-mode" type="ClapperQueueProgressionMode" flags="1073742051" default-value="CLAPPER_QUEUE_PROGRESSION_NONE"/>
+    <property name="gapless" type="gboolean" flags="1073742051" default-value="FALSE"/>
+    <property name="instant" type="gboolean" flags="1073742051" default-value="FALSE"/>
+  </class>
+  <class name="ClapperStreamList" get-type="clapper_stream_list_get_type" parents="GstObject,GInitiallyUnowned,GObject">
+    <implements name="GListModel"/>
+    <property name="current-stream" type="ClapperStream" flags="1073742049"/>
+    <property name="current-index" type="guint" flags="1073742051" default-value="4294967295"/>
+    <property name="n-streams" type="guint" flags="1073742049" default-value="0"/>
+  </class>
+  <class name="ClapperPlayer" get-type="clapper_player_get_type" parents="ClapperThreadedObject,GstObject,GInitiallyUnowned,GObject">
+    <property name="queue" type="ClapperQueue" flags="1073742049"/>
+    <property name="video-streams" type="ClapperStreamList" flags="1073742049"/>
+    <property name="audio-streams" type="ClapperStreamList" flags="1073742049"/>
+    <property name="subtitle-streams" type="ClapperStreamList" flags="1073742049"/>
+    <property name="enhancer-proxies" type="ClapperEnhancerProxyList" flags="1073742049"/>
+    <property name="autoplay" type="gboolean" flags="1073742051" default-value="FALSE"/>
+    <property name="position" type="gdouble" flags="1073742049" default-value="0.000000"/>
+    <property name="speed" type="gdouble" flags="1073742051" default-value="1.000000"/>
+    <property name="state" type="ClapperPlayerState" flags="1073742049" default-value="CLAPPER_PLAYER_STATE_STOPPED"/>
+    <property name="mute" type="gboolean" flags="1073742051" default-value="FALSE"/>
+    <property name="volume" type="gdouble" flags="1073742051" default-value="1.000000"/>
+    <property name="video-sink" type="GstElement" flags="1073742051"/>
+    <property name="audio-sink" type="GstElement" flags="1073742051"/>
+    <property name="video-filter" type="GstElement" flags="1073742051"/>
+    <property name="audio-filter" type="GstElement" flags="1073742051"/>
+    <property name="current-video-decoder" type="GstElement" flags="1073742049"/>
+    <property name="current-audio-decoder" type="GstElement" flags="1073742049"/>
+    <property name="video-enabled" type="gboolean" flags="1073742051" default-value="TRUE"/>
+    <property name="audio-enabled" type="gboolean" flags="1073742051" default-value="TRUE"/>
+    <property name="subtitles-enabled" type="gboolean" flags="1073742051" default-value="TRUE"/>
+    <property name="download-dir" type="gchararray" flags="1073742051" default-value="NULL"/>
+    <property name="download-enabled" type="gboolean" flags="1073742051" default-value="FALSE"/>
+    <property name="adaptive-start-bitrate" type="guint" flags="1073742051" default-value="1600000"/>
+    <property name="adaptive-min-bitrate" type="guint" flags="1073742051" default-value="0"/>
+    <property name="adaptive-max-bitrate" type="guint" flags="1073742051" default-value="0"/>
+    <property name="adaptive-bandwidth" type="guint" flags="1073742049" default-value="0"/>
+    <property name="audio-offset" type="gdouble" flags="1073742051" default-value="0.000000"/>
+    <property name="subtitle-offset" type="gdouble" flags="1073742051" default-value="0.000000"/>
+    <property name="subtitle-font-desc" type="gchararray" flags="1073742051" default-value="NULL"/>
+    <signal name="error" return="void" when="last" no-recurse="1" no-hooks="1">
+      <param type="GError"/>
+      <param type="gchararray"/>
+    </signal>
+    <signal name="warning" return="void" when="last" no-recurse="1" no-hooks="1">
+      <param type="GError"/>
+      <param type="gchararray"/>
+    </signal>
+    <signal name="message" return="void" when="last" no-recurse="1" detailed="1" no-hooks="1">
+      <param type="GstMessage"/>
+    </signal>
+    <signal name="seek-done" return="void" when="last" no-recurse="1" no-hooks="1">
+    </signal>
+    <signal name="download-complete" return="void" when="last" no-recurse="1" no-hooks="1">
+      <param type="ClapperMediaItem"/>
+      <param type="gchararray"/>
+    </signal>
+    <signal name="missing-plugin" return="void" when="last" no-recurse="1" no-hooks="1">
+      <param type="gchararray"/>
+      <param type="gchararray"/>
+    </signal>
+  </class>
+  <class name="ClapperSubtitleStream" get-type="clapper_subtitle_stream_get_type" parents="ClapperStream,GstObject,GInitiallyUnowned,GObject">
+    <property name="lang-code" type="gchararray" flags="1073742049" default-value="NULL"/>
+    <property name="lang-name" type="gchararray" flags="1073742049" default-value="NULL"/>
+  </class>
+  <class name="ClapperVideoStream" get-type="clapper_video_stream_get_type" parents="ClapperStream,GstObject,GInitiallyUnowned,GObject">
+    <property name="codec" type="gchararray" flags="1073742049" default-value="NULL"/>
+    <property name="width" type="gint" flags="1073742049" default-value="0"/>
+    <property name="height" type="gint" flags="1073742049" default-value="0"/>
+    <property name="fps" type="gdouble" flags="1073742049" default-value="0.000000"/>
+    <property name="bitrate" type="guint" flags="1073742049" default-value="0"/>
+    <property name="pixel-format" type="gchararray" flags="1073742049" default-value="NULL"/>
+  </class>
+  <interface name="ClapperExtractable" get-type="clapper_extractable_get_type">
+  </interface>
+  <interface name="ClapperPlaylistable" get-type="clapper_playlistable_get_type">
+  </interface>
+  <interface name="ClapperReactable" get-type="clapper_reactable_get_type">
+    <prerequisite name="GstObject"/>
+  </interface>
+  <class name="ClapperDiscoverer" get-type="clapper_discoverer_get_type" parents="ClapperFeature,GstObject,GInitiallyUnowned,GObject">
+    <property name="discovery-mode" type="ClapperDiscovererDiscoveryMode" flags="1073742051" default-value="CLAPPER_DISCOVERER_DISCOVERY_NONCURRENT"/>
+  </class>
+</dump>
