@@ -1,0 +1,64 @@
+--- ./src/python/bcc/__init__.py
++++ ./src/python/bcc/__init__.py
+@@ -323,7 +323,7 @@
+     class timespec(ct.Structure):
+         _fields_ = [('tv_sec', ct.c_long), ('tv_nsec', ct.c_long)]
+ 
+-    _librt = ct.CDLL('librt.so.1', use_errno=True)
++    _librt = ct.CDLL('libc.so', use_errno=True)
+     _clock_gettime = _librt.clock_gettime
+     _clock_gettime.argtypes = [ct.c_int, ct.POINTER(timespec)]
+ 
+--- ./src/python/bcc/libbcc.py
++++ ./src/python/bcc/libbcc.py
+@@ -14,7 +14,7 @@
+ 
+ import ctypes as ct
+ 
+-lib = ct.CDLL("libbcc.so.0", use_errno=True)
++lib = ct.CDLL("libbcc.so", use_errno=True)
+ 
+ # needed for perf_event_attr() ctype
+ from .perf import Perf
+--- ./src/python/bcc/perf.py
++++ ./src/python/bcc/perf.py
+@@ -147,7 +147,7 @@
+         PERF_EVENT_IOC_ENABLE = 9216
+ 
+         # fetch syscall routines
+-        libc = ct.CDLL('libc.so.6', use_errno=True)
++        libc = ct.CDLL('libc.so', use_errno=True)
+         syscall = libc.syscall          # not declaring vararg types
+         ioctl = libc.ioctl              # not declaring vararg types
+ 
+--- ./tests/python/test_clang.py
++++ ./tests/python/test_clang.py
+@@ -928,7 +928,7 @@
+         b[b"dummy"][ct.c_ulong(0)] = c_val
+         b[b"dummy"][ct.c_ulong(1)] = c_val
+         b.attach_kprobe(event=b.get_syscall_fnname(b"sync"), fn_name=b"do_trace")
+-        libc = ct.CDLL("libc.so.6")
++        libc = ct.CDLL("libc.so")
+         libc.sync()
+         self.assertEqual(1, b[b"dummy"][ct.c_ulong(0)].value)
+         self.assertEqual(2, b[b"dummy"][ct.c_ulong(1)].value)
+--- ./tests/python/test_uprobes.py
++++ ./tests/python/test_uprobes.py
+@@ -33,7 +33,7 @@
+         b = bcc.BPF(text=text)
+         b.attach_uprobe(name=b"c", sym=b"malloc_stats", fn_name=b"count", pid=test_pid)
+         b.attach_uretprobe(name=b"c", sym=b"malloc_stats", fn_name=b"count", pid=test_pid)
+-        libc = ctypes.CDLL("libc.so.6")
++        libc = ctypes.CDLL("libc.so")
+         libc.malloc_stats.restype = None
+         libc.malloc_stats.argtypes = []
+         libc.malloc_stats()
+@@ -83,7 +83,7 @@
+     return 0;
+ }"""
+         # Need to import libc from ctypes to access unshare(2)
+-        libc = ctypes.CDLL("libc.so.6", use_errno=True)
++        libc = ctypes.CDLL("libc.so", use_errno=True)
+ 
+         # Need to find path to libz.so.1
+         libz_path = None
