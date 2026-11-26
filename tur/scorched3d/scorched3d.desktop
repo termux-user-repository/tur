@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Exec=scorched3d
+Icon=scorched3d
+Terminal=false
+Name=Scorched 3D
+Comment=3D artillery game similar to Scorched Earth
+Comment[pl_PL]=Artyleryjska gra 3D podobna do Scorched Earth
+Keywords=tank;tanks;multiplayer;multi-player;
+Categories=Game;ArcadeGame;
+StartupNotify=true
