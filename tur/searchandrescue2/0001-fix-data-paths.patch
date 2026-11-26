@@ -1,0 +1,23 @@
+Description: Fix hardcoded data and icon paths for Termux
+Author: Fervi (IntinteDAO) <lordfervi@protonmail.com>
+
+--- a/src/config.h
++++ b/src/config.h
+@@ -502,7 +502,7 @@
+ #define SAR_DEF_LOCAL_DATA_DIR  ".config/sar2"
+ 
+ /* Game data dir */
+-#define SAR_DEF_GLOBAL_DATA_DIR "/usr/share/sar2"
++#define SAR_DEF_GLOBAL_DATA_DIR "@TERMUX_PREFIX@/share/games/sar2"
+ 
+ /* Subdirs, one of each in the local and global game dirs */
+ #define SAR_DEF_AIRCRAFTS_DIR		"aircrafts"
+@@ -564,7 +564,7 @@
+ #ifdef __MSW__
+ # define SAR_DEF_SAR_ICON_FILE		"sar2.ico"
+ #else
+-# define SAR_DEF_SAR_ICON_FILE		"/usr/share/pixmaps/sar2.xpm"
++# define SAR_DEF_SAR_ICON_FILE		"@TERMUX_PREFIX@/share/pixmaps/sar2.xpm"
+ #endif
+ 
+ /* Standard Texture Reference Names
