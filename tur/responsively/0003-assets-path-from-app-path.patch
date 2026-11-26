@@ -1,0 +1,13 @@
+diff --git a/desktop-app/src/main/main.ts b/desktop-app/src/main/main.ts
+index 6b2ed18..24e3b1d 100644
+--- a/desktop-app/src/main/main.ts
++++ b/desktop-app/src/main/main.ts
+@@ -110,7 +110,7 @@ const createWindow = async () => {
+   };
+ 
+   const RESOURCES_PATH = app.isPackaged
+-    ? path.join(process.resourcesPath, 'assets')
++    ? path.join(path.dirname(app.getAppPath()), 'assets')
+     : path.join(__dirname, '../../assets');
+ 
+   const getAssetPath = (...paths: string[]): string => {
