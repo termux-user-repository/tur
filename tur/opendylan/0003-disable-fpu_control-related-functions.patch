@@ -1,0 +1,50 @@
+diff --git a/sources/lib/run-time/x86-linux-exceptions.c b/sources/lib/run-time/x86-linux-exceptions.c
+index 0c4150a1e..7bda60f2b 100644
+--- a/sources/lib/run-time/x86-linux-exceptions.c
++++ b/sources/lib/run-time/x86-linux-exceptions.c
+@@ -10,7 +10,9 @@
+ #include <signal.h>
+ #include <sys/ucontext.h>
+ #include <ucontext.h>
++#ifndef __ANDROID__
+ #include <fpu_control.h>
++#endif
+ 
+ #include "stack-walker.h"
+ 
+@@ -46,11 +48,15 @@ extern void dylan_float_underflow_handler();
+ /* FPU Control Word mask enabling exceptions for divide-by-zero,
+  * invalid, overflow, and underflow
+  */
++#ifndef __ANDROID__
+ #define DYLAN_FPU_CW (_FPU_DEFAULT              \
+                       & ~(_FPU_MASK_ZM          \
+                           | _FPU_MASK_IM        \
+                           | _FPU_MASK_OM        \
+                           | _FPU_MASK_UM))
++#else
++#define DYLAN_FPU_CW 0
++#endif
+ 
+ static inline void chain_sigaction(const struct sigaction *act,
+                                    int sig, siginfo_t *info, void *uap)
+@@ -159,7 +165,9 @@ static void EstablishDylanExceptionHandlers(void)
+ 
+   /* Set the FPU control word */
+   cw = DYLAN_FPU_CW;
++  #ifndef __ANDROID__
+   _FPU_SETCW(cw);
++  #endif
+ }
+ 
+ static void RemoveDylanExceptionHandlers (void)
+@@ -176,7 +184,9 @@ void RestoreFPState (ucontext_t *uc)
+   if (uc->uc_mcontext.fpregs) {
+     uc->uc_mcontext.fpregs->cw = cw;
+   }
++  #ifndef __ANDROID__
+   _FPU_SETCW(cw);
++  #endif
+ }
+ 
+ static void DylanFPEHandler (int sig, siginfo_t *info, void *uap)
