@@ -1,0 +1,280 @@
+Description: Fix cross-DSO dynamic_cast across module boundaries on Android
+ On Android Bionic, dlopened shared libraries retain distinct RTTI typeinfo
+ addresses for header-only abstract interfaces. dynamic_cast fails when
+ cross-casting from GfModule* to interfaces like ITrackLoader, IPhysicsEngine,
+ etc. Provide queryInterface() fallback using static_cast within each module
+ translation unit, and use RTLD_GLOBAL in linuxspec.cpp.
+Author: Fervi <lordfervi@protonmail.com>
+
+--- a/src/libs/tgf/tgf.hpp
++++ b/src/libs/tgf/tgf.hpp
+@@ -35,6 +35,8 @@
+ #include <vector>
+ #include <map>
+ #include <ostream>
++#include <typeinfo>
++#include <cstring>
+ 
+ #include "tgf.h"
+ 
+@@ -79,9 +81,14 @@
+ 	template <class Interface>
+ 	Interface* getInterface()
+ 	{
+-		return dynamic_cast<Interface*>(this);
++		Interface* p = dynamic_cast<Interface*>(this);
++		if (p)
++			return p;
++		return (Interface*)queryInterface(typeid(Interface).name());
+ 	}
+ 
++	virtual void* queryInterface(const char* /*typeName*/) { return 0; }
++
+  public: // Services for the module implementation.
+ 
+ 	//! Register a new module instance (aimed at being called by the GfModuleOpen function).
+--- a/src/libs/tgf/linuxspec.cpp
++++ b/src/libs/tgf/linuxspec.cpp
+@@ -108,7 +108,7 @@
+ 	GfLogInfo("Loading module %s\n", sopath);
+ 
+ 	/* Load the shared library */
+-	handle = dlopen(sopath, RTLD_LAZY);
++	handle = dlopen(sopath, RTLD_LAZY | RTLD_GLOBAL);
+ 	if (handle)
+ 	{
+ 		/* Initialize the module */
+@@ -178,7 +178,7 @@
+ 	GfLogTrace("Querying module %s\n", sopath);
+ 
+ 	/* Load the shared library */
+-	handle = dlopen(sopath, RTLD_LAZY);
++	handle = dlopen(sopath, RTLD_LAZY | RTLD_GLOBAL);
+ 	if (handle)
+ 	{
+ 		/* Initialize the module */
+@@ -262,7 +262,7 @@
+ 				if (!GfModIsInList(sopath, *modlist))
+ 				{
+ 					/* Load the shared library */
+ 					GfLogInfo("Loading module %s\n", sopath);
+-					handle = dlopen(sopath, RTLD_LAZY);
++					handle = dlopen(sopath, RTLD_LAZY | RTLD_GLOBAL);
+ 					if (handle)
+ 					{
+ 						/* Initialize the module */
+@@ -359,7 +359,7 @@
+ 				if (!GfModIsInList(sopath, *modlist))
+ 				{
+ 					/* Load the shared library */
+ 					GfLogTrace("Querying module %s\n", sopath);
+-					handle = dlopen(sopath, RTLD_LAZY);
++					handle = dlopen(sopath, RTLD_LAZY | RTLD_GLOBAL);
+ 					if (handle)
+ 					{
+ 						/* Initialize the module */
+--- a/src/modules/track/trackv1/trackitf.h
++++ b/src/modules/track/trackv1/trackitf.h
+@@ -22,6 +22,7 @@
+ #define _TRACKITF_H__
+ 
+ //#include <itrack.h>
++#include <cstring>
+ #include <itrackloader.h>
+ 
+ #include <tgf.hpp>
+@@ -48,6 +49,13 @@
+ 	virtual tTrack* load(const char* filename, bool grExts = false);
+ 	virtual void unload();
+ 
++	virtual void* queryInterface(const char* typeName)
++	{
++		if (strstr(typeName, "ITrackLoader"))
++			return static_cast<ITrackLoader*>(this);
++		return 0;
++	}
++
+ 	// Implementation of ITrack ?
+ 	//virtual tdble globalHeight(tTrackSeg*, tdble x, tdble y);
+ 	//virtual tdble localHeight(tTrkLocPos* pos);
+--- a/src/modules/racing/standardgame/standardgame.h
++++ b/src/modules/racing/standardgame/standardgame.h
+@@ -22,6 +22,7 @@
+ #ifndef _STANDARDGAME_H_
+ #define _STANDARDGAME_H_
+ 
++#include <cstring>
+ #include <iphysicsengine.h>
+ #include <iraceengine.h>
+ #include <itrackloader.h>
+@@ -52,6 +53,13 @@
+ {
+ public:
+ 
++	virtual void* queryInterface(const char* typeName)
++	{
++		if (strstr(typeName, "IRaceEngine"))
++			return static_cast<IRaceEngine*>(this);
++		return 0;
++	}
++
+ 	// Implementation of IRaceEngine.
+ 	virtual void reset();
+ 	virtual void cleanup();
+--- a/src/modules/simu/simuv5/simuv5.h
++++ b/src/modules/simu/simuv5/simuv5.h
+@@ -22,6 +22,7 @@
+ #ifndef _SIMUV5_H_
+ #define _SIMUV5_H_
+ 
++#include <cstring>
+ #include <iphysicsengine.h>
+ #include <tgf.hpp>
+ 
+@@ -50,6 +51,13 @@
+ {
+  public:
+ 
++	virtual void* queryInterface(const char* typeName)
++	{
++		if (strstr(typeName, "IPhysicsEngine"))
++			return static_cast<IPhysicsEngine*>(this);
++		return 0;
++	}
++
+ 	// Implementation of IPhysicsEngine.
+ 	virtual void initialize(int nCars, struct Track* pTrack);
+ 	virtual void configureCar(struct CarElt* pCar);
+--- a/src/modules/graphic/osggraph/OsgGraph.h
++++ b/src/modules/graphic/osggraph/OsgGraph.h
+@@ -23,6 +23,7 @@
+ #ifndef _OSGGRAPH_H_
+ #define _OSGGRAPH_H_
+ 
++#include <cstring>
+ #include <igraphicsengine.h>
+ 
+ #include <tgf.hpp>
+@@ -52,6 +53,12 @@
+ class OSGGRAPH_API OsgGraph : public GfModule, public IGraphicsEngine
+ {
+ public:
++	virtual void* queryInterface(const char* typeName)
++	{
++		if (strstr(typeName, "IGraphicsEngine"))
++			return static_cast<IGraphicsEngine*>(this);
++		return 0;
++	}
+ 
+     // Implementation of IGraphicsEngine.
+     virtual bool loadTrack(struct Track* pTrack);
+--- a/src/modules/graphic/ssggraph/ssggraph.h
++++ b/src/modules/graphic/ssggraph/ssggraph.h
+@@ -23,6 +23,7 @@
+ #ifndef _SSGGRAPH_H_
+ #define _SSGGRAPH_H_
+ 
++#include <cstring>
+ #include <igraphicsengine.h>
+ 
+ #include <tgf.hpp>
+@@ -52,6 +53,13 @@
+ {
+  public:
+ 
++	virtual void* queryInterface(const char* typeName)
++	{
++		if (strstr(typeName, "IGraphicsEngine"))
++			return static_cast<IGraphicsEngine*>(this);
++		return 0;
++	}
++
+ 	// Implementation of IGraphicsEngine.
+ 	virtual bool loadTrack(struct Track* pTrack);
+ 	virtual bool loadCars(struct Situation *pSituation);
+--- a/src/modules/sound/snddefault/snddefault.h
++++ b/src/modules/sound/snddefault/snddefault.h
+@@ -23,6 +23,7 @@
+ #ifndef _SNDDEFAULT_H_
+ #define _SNDDEFAULT_H_
+ 
++#include <cstring>
+ #include <isoundengine.h>
+ #include <tgf.hpp>
+ 
+@@ -50,6 +51,13 @@
+ {
+  public:
+ 
++	virtual void* queryInterface(const char* typeName)
++	{
++		if (strstr(typeName, "ISoundEngine"))
++			return static_cast<ISoundEngine*>(this);
++		return 0;
++	}
++
+ 	virtual void init(Situation* s);
+         virtual void shutdown();
+         virtual void refresh(Situation* s, Camera* camera);
+--- a/src/modules/userinterface/legacymenu/legacymenu.h
++++ b/src/modules/userinterface/legacymenu/legacymenu.h
+@@ -23,6 +23,7 @@
+ #ifndef _LEGACYMENU_H_
+ #define _LEGACYMENU_H_
+ 
++#include <cstring>
+ #include <iuserinterface.h>
+ #include <tgf.hpp>
+ 
+@@ -56,6 +57,13 @@
+ // Implementation of IUserInterface.
+ public:
+ 
++	virtual void* queryInterface(const char* typeName)
++	{
++		if (strstr(typeName, "IUserInterface"))
++			return static_cast<IUserInterface*>(this);
++		return 0;
++	}
++
+ 	//! Activation of the user interface (splash if any, main menu ...).
+ 	virtual bool activate();
+ 
+--- a/src/modules/userinterface/textonly/textonly.h
++++ b/src/modules/userinterface/textonly/textonly.h
+@@ -23,6 +23,7 @@
+ #ifndef _TEXTONLY_H_
+ #define _TEXTONLY_H_
+ 
++#include <cstring>
+ #include <iuserinterface.h>
+ #include <tgf.hpp>
+ 
+@@ -49,6 +50,13 @@
+ // Implementation of IUserInterface.
+ public:
+ 
++	virtual void* queryInterface(const char* typeName)
++	{
++		if (strstr(typeName, "IUserInterface"))
++			return static_cast<IUserInterface*>(this);
++		return 0;
++	}
++
+ 	//! Activation of the user interface (splash if any, main menu ...).
+ 	virtual bool activate();
+ 
+--- a/src/modules/racing/standardgame/racetrack.cpp
++++ b/src/modules/racing/standardgame/racetrack.cpp
+@@ -126,6 +126,11 @@
+ 
+     snprintf(buf, sizeof(buf), "tracks/%s/%s/%s.%s", catName, trackName, trackName, TRKEXT);
+     ReInfo->track = ReTrackLoader().load(buf);
++    if (!ReInfo->track)
++    {
++        GfLogError("ReTrackInit: Failed to load track '%s'\n", buf);
++        return -1;
++    }
+ 
+     snprintf(buf, sizeof(buf), "Loading %s track", ReInfo->track->name);
+     ReUI().addLoadingMessage(buf);
