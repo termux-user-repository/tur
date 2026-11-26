@@ -1,0 +1,99 @@
+From: abhay-byte <zenithblue.dev@gmail.com>
+Subject: [PATCH csf-v11 077] panvk: use system scope for subqueue sync signals on kbase
+
+Generated-by: LLM
+
+Purpose: Signal cross-subqueue sync objects with SYSTEM scope on kbase so CS SYNC_WAITs blocked on sibling subqueues are woken; biblioklept
+Source/Reference: local, work/mesa-p5 dx-p5 2d0a0c23af8
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/076
+Validation test: CTS dEQP-VK.synchronization{,2}.{signal_order,basic}.* 1357 Pass 0 Fail 0 timeout (was 11-16 timeouts); renderpasses.dynamic_rendering attachment list 3x 0 DeviceLost (was 2 per run)
+
+diff --git a/src/panfrost/vulkan/csf/panvk_instr.h b/src/panfrost/vulkan/csf/panvk_instr.h
+index 788fcdad508..34d20705bb5 100644
+--- a/src/panfrost/vulkan/csf/panvk_instr.h
++++ b/src/panfrost/vulkan/csf/panvk_instr.h
+@@ -4,6 +4,7 @@
+  */
+ 
+ #include "panvk_cmd_buffer.h"
++#include "panvk_physical_device.h"
+ #include "panvk_queue.h"
+ 
+ enum panvk_instr_work_type {
+@@ -90,6 +91,16 @@ void panvk_per_arch(panvk_instr_end_work_async)(
+    const struct panvk_instr_end_args *const args,
+    struct cs_async_op ts_async_op);
+ 
++static inline enum mali_cs_sync_scope
++panvk_cs_signal_scope(const struct panvk_cmd_buffer *cmdbuf)
++{
++   if (to_panvk_physical_device(cmdbuf->vk.base.device->physical)
++          ->kbase_node_path[0])
++      return MALI_CS_SYNC_SCOPE_SYSTEM;
++
++   return MALI_CS_SYNC_SCOPE_CSG;
++}
++
+ #define PANVK_INSTR_SYNC_OPS(__cnt_width)                                      \
+    static inline void panvk_instr_sync##__cnt_width##_add(                     \
+       struct panvk_cmd_buffer *cmdbuf, enum panvk_subqueue_id id,              \
+@@ -99,6 +110,8 @@ void panvk_per_arch(panvk_instr_end_work_async)(
+       struct cs_builder *b = panvk_get_cs_builder(cmdbuf, id);                 \
+       panvk_per_arch(panvk_instr_begin_work)(                                  \
+          id, cmdbuf, PANVK_INSTR_WORK_TYPE_SYNC##__cnt_width##_ADD);           \
++      if (scope == MALI_CS_SYNC_SCOPE_CSG)                                     \
++         scope = panvk_cs_signal_scope(cmdbuf);                                \
+       cs_sync##__cnt_width##_add(b, propagate_error, scope, val, addr, async); \
+       struct panvk_instr_end_args instr_info = {                               \
+          .sync = {.addr_regs = addr, .val_regs = val},                         \
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+index 201919746a5..56f40199713 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+@@ -3655,7 +3655,7 @@ gpu_prerast_release_arena(struct panvk_cmd_buffer *cmdbuf, uint64_t arena)
+    cs_move64_to(b, addr, arena + offsetof(struct panvk_gpu_prerast_arena,
+                                           available));
+    cs_move32_to(b, one, 1);
+-   cs_sync32_add(b, true, MALI_CS_SYNC_SCOPE_CSG, one, addr, cs_now());
++   cs_sync32_add(b, true, panvk_cs_signal_scope(cmdbuf), one, addr, cs_now());
+ }
+ 
+ static void
+@@ -4399,7 +4399,7 @@ gpu_prerast_sync32_give(struct panvk_cmd_buffer *cmdbuf,
+    cs_wait_slots(b, dev->csf.sb.all_iters_mask);
+    cs_move64_to(b, addr, sync);
+    cs_move32_to(b, value, 1);
+-   cs_sync32_add(b, true, MALI_CS_SYNC_SCOPE_CSG, value, addr, cs_now());
++   cs_sync32_add(b, true, panvk_cs_signal_scope(cmdbuf), value, addr, cs_now());
+ }
+ 
+ /* Loads a 32-bit flag into scratch register 0 for a loop exit test. */
+@@ -6243,7 +6243,7 @@ issue_fragment_jobs(struct panvk_cmd_buffer *cmdbuf)
+ #endif
+ 
+       if (free_render_descs) {
+-         cs_sync32_add(b, true, MALI_CS_SYNC_SCOPE_CSG, release_sz,
++         cs_sync32_add(b, true, panvk_cs_signal_scope(cmdbuf), release_sz,
+                        ringbuf_sync_addr, async);
+       }
+ 
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_event.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_event.c
+index 45c8fd3fe24..511be875e56 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_event.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_event.c
+@@ -156,9 +156,9 @@ panvk_per_arch(CmdSetEvent2)(VkCommandBuffer commandBuffer, VkEvent _event,
+             }
+ 
+             cs_move32_to(b, seqno, 1);
+-            cs_sync32_set(b, false, MALI_CS_SYNC_SCOPE_CSG, seqno, sync_addr,
+-                          cs_defer(sb_mask | SB_MASK(DEFERRED_FLUSH),
+-                                   SB_ID(DEFERRED_SYNC)));
++            cs_sync32_set(b, false, panvk_cs_signal_scope(cmdbuf), seqno,
++                          sync_addr, cs_defer(sb_mask | SB_MASK(DEFERRED_FLUSH),
++                                              SB_ID(DEFERRED_SYNC)));
+          }
+       }
+    }

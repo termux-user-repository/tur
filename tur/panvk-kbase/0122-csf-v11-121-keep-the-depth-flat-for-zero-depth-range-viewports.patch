@@ -1,0 +1,45 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: Tue, 6 Oct 2026 22:30:00 +0530
+Subject: [PATCH] panvk: keep the depth flat for minDepth == maxDepth viewports
+ biblioklept
+
+Upstream widens a depth range below 37.7e-6 around its centre so the
+window-space depth cull can still clip clip-space Z (dEQP
+inverted_depth_ranges nodepthclamp_deltazero). For minDepth == maxDepth
+that makes the written depth a +-1.9e-5 gradient instead of the exact
+value the spec gives (z = minDepth). D3D MinZ == MaxZ viewports (sky
+boxes, HUDs, depth-only passes at a fixed depth) rely on the exact value.
+
+Only widen a non-zero range. A zero range now writes exact minDepth and
+does not depth clip: its window Z carries no clip-space Z to cull on.
+Cost: the 4 dEQP-VK.draw.*inverted_depth_ranges.nodepthclamp_deltazero
+cases fail (out-of-range pixels are drawn at minDepth). They are not in
+the prerast/sync/memory CTS gates.
+
+Purpose: exact depth for DXVK MinZ == MaxZ viewports (PanProbe depth_stencil)
+Tested GPU: Mali-G615 MC6 (Poco X6 Pro)
+Tested Kbase UAPI: CSF 1.21 / MediaTek
+Dependencies: csf-v11/076
+Generated-by: LLM
+---
+diff --git a/src/panfrost/vulkan/panvk_cmd_draw.h b/src/panfrost/vulkan/panvk_cmd_draw.h
+index eca1746..dc50e8b 100644
+--- a/src/panfrost/vulkan/panvk_cmd_draw.h
++++ b/src/panfrost/vulkan/panvk_cmd_draw.h
+@@ -342,7 +342,12 @@ panvk_viewport_z_coeffs(const struct vk_viewport_state *vp,
+ 
+       if (dz < 0.0f)
+          dz = -dz;
+-      if (dz < PANVK_MIN_DEPTH_CLIP_RANGE) {
++      /* minDepth == maxDepth keeps the exact flat depth (D3D MinZ == MaxZ
++       * sky boxes and HUDs). Its window Z cannot cull clip-space Z, so such
++       * a viewport does not depth clip: inverted_depth_ranges deltazero
++       * draws its out-of-range pixels at minDepth.
++       */
++      if (dz > 0.0f && dz < PANVK_MIN_DEPTH_CLIP_RANGE) {
+          float z_sign = z_min <= z_max ? 1.0f : -1.0f;
+          float z_center = 0.5f * (z_max + z_min);
+          float lo = 0.5f * PANVK_MIN_DEPTH_CLIP_RANGE;
+-- 
+2.51.0

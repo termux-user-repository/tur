@@ -1,0 +1,66 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: Wed, 7 Oct 2026 10:10:00 +0530
+Subject: [PATCH] panvk: run v13 vertex stores through gpu_prerast biblioklept
+
+vertexPipelineStoresAndAtomics is on by default on v10+, but on v13+
+a VS with stores or atomics still ran through IDVS. gpu_prerast skipped
+side-effect shaders when PAN_ARCH >= 13. On a G925 (gpu_id 0xd8300015,
+v13) this breaks the atomic return values:
+
+  vertex_stores: CASE iter0 FAIL outv[0,16] inconsistent got (1000,1000)
+                 want (1000,1001) or (1017,1000) total=32
+  draw_params:   FAIL case base_vertex_instance got_count=12 exp_count=12
+                 first_missing=(100,7,458852,1007) (7 cases)
+
+Treat v13+ like v10-v12: a VS that writes memory gets the gpu_prerast
+variants and its draws are lowered, so the VS runs once per vertex.
+On the G925, PanProbe goes from 34/36 to 36/36. v10-v12 paths are
+unchanged, because each edited condition was already true below v13.
+
+Draws gpu_prerast cannot lower (multi-draw indirect, a draw larger than
+the arena) still fall back to IDVS on v13+.
+
+---
+ src/panfrost/vulkan/csf/panvk_gpu_prerast.c | 3 +--
+ src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c | 2 +-
+ src/panfrost/vulkan/panvk_vX_shader.c       | 2 +-
+ 3 files changed, 3 insertions(+), 4 deletions(-)
+
+--- a/src/panfrost/vulkan/csf/panvk_gpu_prerast.c
++++ b/src/panfrost/vulkan/csf/panvk_gpu_prerast.c
+@@ -79,11 +79,10 @@
+     const bool xfb = cmdbuf->state.gfx.xfb.active &&
+                      panvk_gpu_prerast_has_xfb(gs ? &gs->gpu_prerast.xfb
+                                                   : &shader->xfb);
+-    const bool side_effects = PAN_ARCH < 13 && shader->has_side_effects;
++    const bool side_effects = shader->has_side_effects;
+     const bool vp_select = !gs && shader->vp_scissor_loc;
+     if (!(PANVK_DEBUG(GPU_PRERAST) || poly || gs || xfb || side_effects ||
+           vp_select) ||
+-        (PAN_ARCH >= 13 && !gs && !poly && !xfb && shader->has_side_effects) ||
+         !shader->lowered_vs_compiled || !shader->passthrough_vs_compiled ||
+         (poly && !shader->polygon_compiled) ||
+         (gs && (!gs->gpu_prerast.gs.kernel_compiled ||
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+@@ -5356,7 +5356,7 @@
+                    const struct panvk_draw_info *draw)
+ {
+    return gpu_prerast_needed(cmdbuf, draw) ||
+-          (PAN_ARCH < 13 && !draw->gpu_prerast_generated &&
++          (!draw->gpu_prerast_generated &&
+            cmdbuf->state.gfx.vs.shader->gpu_prerast.has_side_effects);
+ }
+
+--- a/src/panfrost/vulkan/panvk_vX_shader.c
++++ b/src/panfrost/vulkan/panvk_vX_shader.c
+@@ -3402,7 +3402,7 @@
+          BITSET_TEST(state->dynamic, MESA_VK_DYNAMIC_RS_POLYGON_MODE);
+       const bool want_prerast =
+          PANVK_DEBUG(GPU_PRERAST) || info->nir->xfb_info ||
+-         (PAN_ARCH < 13 && info->nir->info.writes_memory) ||
++         info->nir->info.writes_memory ||
+          (info->next_stage_mask & (VK_SHADER_STAGE_GEOMETRY_BIT |
+                                    VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT)) ||
+          (dev->vk.enabled_features.fillModeNonSolid &&

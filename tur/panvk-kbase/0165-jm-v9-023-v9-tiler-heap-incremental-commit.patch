@@ -1,0 +1,187 @@
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: 2026-10-11
+Subject: [PATCH jm-v9 023] panvk/jm: v9 tiler heap committed in 2 MiB steps, one heap per overlap half biblioklept
+
+Purpose: Stop the 128 MiB v9 tiler heap from being committed in full on
+the first frame.
+The heap is a GROW_ON_GPF region and kbase commits every page from the
+current commit up to a faulting one. The descriptor's Top pointed at the
+end of the region (or of an overlap half), and the tiler takes chunks
+from both Bottom and Top, so the first top-side allocation committed the
+whole region; the second overlap half started 64 MiB in, which did the
+same for the first half.
+- kbase: v9 JM GPU-only growable regions commit one 2 MiB step and are
+  allocated with BASE_MEM_TILER_ALIGN_TOP (JM-only, bit 20), so
+  start + commit is 2 MiB aligned, as kbase does for its JIT heaps. A
+  kernel that refuses the flag (EINVAL or ENOMEM) gets the old
+  allocation.
+- panvk: Top is base + 2 MiB. PANVK_OVERLAP (on by default) gets a
+  second 128 MiB heap BO instead of two halves of one, so each pass type
+  grows from its own base and keeps the full heap size.
+Source/Reference: bmdhacks/malisx2 src/vk/mali_jm_heap.c, src/kbase/uapi_jm.h (MIT)
+Tested GPU: build-checked (universal Android build v6-v14); G615 (v11) PanProbe regression with the universal .so; Mali-G57 run pending (none attached)
+Tested Kbase UAPI: JM 11.38 (pending)
+Mesa base range: 5a07217f + g615-v11-csf series + jm-v9 001-022
+Dependencies: jm-v9 001, 002
+Validation test: PanProbe all on a G57, /proc/<pid>/smaps or kbase mem_profile before/after (pending)
+
+---
+ src/panfrost/lib/kmod/kbase_kmod.c           | 26 +++++++++++++++++++++++++-
+ src/panfrost/vulkan/jm/panvk_vX_cmd_buffer.c | 18 ++++++++++++++++++
+ src/panfrost/vulkan/jm/panvk_vX_gpu_queue.c  |  4 +++-
+ src/panfrost/vulkan/panvk_device.h           |  3 +++
+ src/panfrost/vulkan/panvk_vX_device.c        | 11 +++++++++++
+ 5 files changed, 60 insertions(+), 2 deletions(-)
+
+diff --git a/src/panfrost/lib/kmod/kbase_kmod.c b/src/panfrost/lib/kmod/kbase_kmod.c
+index 477b548..1b7035b 100644
+--- a/src/panfrost/lib/kmod/kbase_kmod.c
++++ b/src/panfrost/lib/kmod/kbase_kmod.c
+@@ -93,6 +93,9 @@ struct base_jd_atom {
+    __u8 padding[15];
+ };
+ 
++/* JM-only memory flag (mali_base_jm_kernel.h); CSF reserves bit 20. */
++#define KBASE_JM_MEM_TILER_ALIGN_TOP ((uint64_t)1 << 20)
++
+ #define BASE_JD_EVENT_DONE     0x01
+ #define BASE_JD_EVENT_ERR_MASK 0x40
+ 
+@@ -2023,6 +2026,18 @@ kbase_kmod_bo_alloc(struct pan_kmod_dev *dev,
+       commit_pages = (kmod_flags & PAN_KMOD_BO_FLAG_NO_MMAP)
+                         ? 0
+                         : MIN2(extension, va_pages);
++
++      /* v9 JM GPU-only growable regions (tiler heap, indirect varyings):
++       * commit one 2 MiB step and let the kernel place the region so that
++       * start + commit is 2 MiB aligned (TILER_ALIGN_TOP, JM-only flag, as
++       * kbase gives its own JIT heaps). The tiler heap descriptor's Top is
++       * then the end of the committed step, and GROW_ON_GPF commits the
++       * region step by step instead of all at once (bmdhacks/malisx2, MIT). */
++      if (!kbase_dev->is_csf && pan_arch(dev->props.gpu_id) == 9 &&
++          (kmod_flags & PAN_KMOD_BO_FLAG_NO_MMAP)) {
++         alloc_flags |= KBASE_JM_MEM_TILER_ALIGN_TOP;
++         commit_pages = MIN2(extension, va_pages);
++      }
+    }
+ 
+    /* MEM_ALLOC_EX (nr 59, 64 bytes) exists on CSF uAPI 1.9+ and the kernel
+@@ -2077,7 +2092,16 @@ kbase_kmod_bo_alloc(struct pan_kmod_dev *dev,
+          },
+       };
+ 
+-      if (ioctl(dev->fd, KBASE_IOCTL_MEM_ALLOC, &req)) {
++      int ret = ioctl(dev->fd, KBASE_IOCTL_MEM_ALLOC, &req);
++      if (ret && (errno == EINVAL || errno == ENOMEM) &&
++          (alloc_flags & KBASE_JM_MEM_TILER_ALIGN_TOP)) {
++         /* Kernel without TILER_ALIGN_TOP: the old full-size behaviour. */
++         req.in.flags = alloc_flags & ~KBASE_JM_MEM_TILER_ALIGN_TOP;
++         req.in.commit_pages = 0;
++         ret = ioctl(dev->fd, KBASE_IOCTL_MEM_ALLOC, &req);
++         commit_pages = 0;
++      }
++      if (ret) {
+          mesa_loge("kbase: KBASE_IOCTL_MEM_ALLOC failed: %s", strerror(errno));
+          goto err_free_bo;
+       }
+diff --git a/src/panfrost/vulkan/jm/panvk_vX_cmd_buffer.c b/src/panfrost/vulkan/jm/panvk_vX_cmd_buffer.c
+index 09400e9..b7845ed 100644
+--- a/src/panfrost/vulkan/jm/panvk_vX_cmd_buffer.c
++++ b/src/panfrost/vulkan/jm/panvk_vX_cmd_buffer.c
+@@ -325,6 +325,23 @@ panvk_per_arch(cmd_prepare_tiler_context)(struct panvk_cmd_buffer *cmdbuf,
+       batch->tiler.ctx_descs.gpu + (pan_size(TILER_CONTEXT) * layer_idx);
+ 
+    pan_pack(&batch->tiler.heap_templ, TILER_HEAP, cfg) {
++#if PAN_ARCH == 9
++      /* Each overlap half gets its own heap. Top is the end of the first
++       * 2 MiB chunk, not of the region: the tiler takes chunks from both
++       * Bottom and Top, and kbase GROW_ON_GPF commits every page up to the
++       * faulting one, so a Top at the region end committed all of it on the
++       * first top-side allocation (bmdhacks/malisx2, MIT). */
++      if (panvk_overlap_enabled()) { /* v67b */
++         static unsigned next_half;
++         batch->heap_half = __atomic_fetch_add(&next_half, 1, __ATOMIC_RELAXED) & 1;
++      }
++      const struct panvk_priv_bo *heap =
++         batch->heap_half ? dev->tiler_heap2 : dev->tiler_heap;
++      cfg.size = pan_kmod_bo_size(heap->bo);
++      cfg.base = heap->addr.dev;
++      cfg.bottom = heap->addr.dev;
++      cfg.top = cfg.base + MIN2(cfg.size, 2 * 1024 * 1024);
++#else
+       cfg.size = pan_kmod_bo_size(dev->tiler_heap->bo);
+       cfg.base = dev->tiler_heap->addr.dev;
+       cfg.bottom = dev->tiler_heap->addr.dev;
+@@ -338,6 +355,7 @@ panvk_per_arch(cmd_prepare_tiler_context)(struct panvk_cmd_buffer *cmdbuf,
+          cfg.bottom = cfg.base;
+          cfg.top = cfg.base + half;
+       }
++#endif
+    }
+ 
+    pan_pack(&batch->tiler.ctx_templ, TILER_CONTEXT, cfg) {
+diff --git a/src/panfrost/vulkan/jm/panvk_vX_gpu_queue.c b/src/panfrost/vulkan/jm/panvk_vX_gpu_queue.c
+index cf4df11..7a2023f 100644
+--- a/src/panfrost/vulkan/jm/panvk_vX_gpu_queue.c
++++ b/src/panfrost/vulkan/jm/panvk_vX_gpu_queue.c
+@@ -453,7 +453,9 @@ panvk_per_arch(gpu_queue_submit)(struct vk_queue *vk_queue, struct vk_queue_subm
+             bos[bo_idx++] = batch->blit.dst;
+ 
+          if (batch->vtc_jc.first_tiler)
+-            bos[bo_idx++] = dev->tiler_heap->bo;
++            bos[bo_idx++] = (PAN_ARCH == 9 && batch->heap_half)
++                               ? dev->tiler_heap2->bo
++                               : dev->tiler_heap->bo;
+ 
+          bos[bo_idx++] = dev->sample_positions->bo;
+          assert(bo_idx == nr_bos);
+diff --git a/src/panfrost/vulkan/panvk_device.h b/src/panfrost/vulkan/panvk_device.h
+index e90787b..2b96abd 100644
+--- a/src/panfrost/vulkan/panvk_device.h
++++ b/src/panfrost/vulkan/panvk_device.h
+@@ -72,6 +72,9 @@ struct panvk_device {
+    } kmod;
+ 
+    struct panvk_priv_bo *tiler_heap;
++   /* v9: second heap for the odd passes of PANVK_OVERLAP (v67b), so each
++    * heap grows from its own base (kbase commits up to the faulting page). */
++   struct panvk_priv_bo *tiler_heap2;
+    struct panvk_priv_bo *indirect_varying_buffer;
+    struct panvk_priv_bo *sample_positions;
+ 
+diff --git a/src/panfrost/vulkan/panvk_vX_device.c b/src/panfrost/vulkan/panvk_vX_device.c
+index 5afdac8..edb350b 100644
+--- a/src/panfrost/vulkan/panvk_vX_device.c
++++ b/src/panfrost/vulkan/panvk_vX_device.c
+@@ -685,6 +685,15 @@ panvk_per_arch(create_device)(struct panvk_physical_device *physical_device,
+    if (result != VK_SUCCESS)
+       goto err_free_priv_bos;
+ 
++#if PAN_ARCH == 9
++   result = panvk_priv_bo_create(
++      device, 128 * 1024 * 1024,
++      PAN_KMOD_BO_FLAG_NO_MMAP | PAN_KMOD_BO_FLAG_ALLOC_ON_FAULT,
++      VK_SYSTEM_ALLOCATION_SCOPE_DEVICE, &device->tiler_heap2);
++   if (result != VK_SUCCESS)
++      goto err_free_priv_bos;
++#endif
++
+    result = panvk_priv_bo_create(
+       device,
+       PANVK_JM_MAX_VERTICES_INDIRECT * PANVK_JM_MAX_PER_VTX_ATTRIBUTES_INDIRECT_SIZE,
+@@ -808,6 +817,7 @@ err_free_priv_bos:
+    panvk_priv_bo_unref(device->sample_positions);
+    panvk_priv_bo_unref(device->indirect_varying_buffer);
+    panvk_priv_bo_unref(device->tiler_heap);
++   panvk_priv_bo_unref(device->tiler_heap2);
+    panvk_device_cleanup_mempools(device);
+    vk_free(&device->vk.alloc, device->dump_region_size);
+ err_free_heaps:
+@@ -862,6 +872,7 @@ panvk_per_arch(destroy_device)(struct panvk_device *device,
+    panvk_priv_bo_unref(device->tiler_oom.handlers_bo);
+     panvk_priv_bo_unref(device->indirect_varying_buffer);
+     panvk_priv_bo_unref(device->tiler_heap);
++    panvk_priv_bo_unref(device->tiler_heap2);
+     panvk_priv_bo_unref(device->sample_positions);
+     panvk_device_cleanup_tls(device);
+     panvk_priv_bo_unref(device->gpu_prerast_syncs);

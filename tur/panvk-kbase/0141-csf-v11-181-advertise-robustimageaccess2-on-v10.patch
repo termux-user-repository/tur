@@ -1,0 +1,62 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: Thu, 8 Oct 2026 11:30:00 +0530
+Subject: [PATCH] panvk: advertise robustImageAccess2 on v10+ biblioklept
+
+robustImageAccess2 was hard-coded off. Upstream Mesa main (1375dc60,
+2026-10-08) still has it off for every arch, so there is nothing to
+backport. vkd3d-proton refuses to create a device without it
+(libs/vkd3d/device.c:2639, "Robustness2 features not supported").
+
+The Valhall image path already gets the robustImageAccess2 results from
+the hardware, with no shader bounds checks:
+
+- Storage image loads lower to LD_TEX and stores, atomics and R64
+  accesses to LEA_TEX plus a global access (pan_nir_lower_image.c).
+  Both instructions bound-check every coordinate against the texture
+  descriptor; the upper 16 coordinate bits are folded into an unused
+  coordinate so they fail that check too (pack_image_coords).
+- texelFetch uses TEX_FETCH on the same descriptor, which checks x, y,
+  layer and LOD against the view.
+- Out-of-bounds texels come back as zero in the format's components
+  with the descriptor swizzle filling the rest, so a format without
+  alpha reads (0,0,0,1) and RGBA reads (0,0,0,0). Out-of-bounds stores
+  and atomics are dropped and atomics return 0.
+
+The new PanProbe robust_image_access2 test checks those cases on
+R32_UINT and RGBA8_UNORM (x, y, layer, negative, 65536-aliased
+coordinates, LOD, texel buffer, OOB store/atomic leaving the image
+unchanged); the beta.18-rc1 build already passes all of them on G615
+with only robustImageAccess enabled, so the shader code is unchanged.
+
+G615 CTS (glibc ICD, 12,024 cases): every non-null-descriptor
+robustness2 image case passes (4,332 pass / 0 fail / 7,548
+NotSupported, r32/rg32/rgba32 f/i/ui and r64, comp/frag/vert), and
+pipeline_robustness.image_robustness only has the 12 frag_fast_gpl
+sampled-image failures that beta.17 already had.
+
+Gate it with EXT_robustness2 and nullDescriptor (PAN_ARCH >= 10). v10
+uses the same LD_TEX/LEA_TEX/TEX_FETCH path; its texel buffers get the
+software checks from csf-v11/122 (robustBufferAccess2).
+defaultRobustnessImages stays ROBUST_IMAGE_ACCESS.
+
+Purpose: robustImageAccess2 on v10+, vkd3d-proton hard requirement (D3D12CreateDevice)
+Upstream-commit: none (upstream main 1375dc60 still reports robustImageAccess2 = false)
+Tested GPU: Mali-G615 MC6 (Poco X6 Pro, v11); v10/v12/v13 untested on hardware
+Tested Kbase UAPI: CSF 1.21 / MediaTek
+Dependencies: csf-v11/122
+Generated-by: LLM
+---
+diff --git a/src/panfrost/vulkan/panvk_vX_physical_device.c b/src/panfrost/vulkan/panvk_vX_physical_device.c
+index 8c3608d..8826aa7c 100644
+--- a/src/panfrost/vulkan/panvk_vX_physical_device.c
++++ b/src/panfrost/vulkan/panvk_vX_physical_device.c
+@@ -649,7 +649,7 @@ panvk_per_arch(get_physical_device_features)(
+
+       /* VK_KHR_robustness2 */
+       .robustBufferAccess2 = PAN_ARCH >= 10,
+-      .robustImageAccess2 = false,
++      .robustImageAccess2 = PAN_ARCH >= 10,
+       .nullDescriptor = PAN_ARCH >= 10,
+
+       /* VK_EXT_shader_tile_image */

@@ -1,0 +1,135 @@
+From: panvk-kbase-android worker <panvk-worker@localhost>
+Subject: [PATCH kbase-common 005] panvk: enumerate /dev/mali* kbase nodes
+
+Purpose: Enumerate Kbase non-DRM nodes (/dev/mali0..7) alongside DRM
+ render nodes during vkEnumeratePhysicalDevices, via the common
+ .enumerate hook. Adds PANVK_DEBUG_KBASE_DIAG as a NEW bit 20 (does not
+ rename upstream flags, unlike the reference).
+Source/Reference: https://github.com/wonderkast02/panvk-g720-kbase-csf
+ branch android-candidate-beta-1.9.4
+ (src/panfrost/vulkan/panvk_instance.[hc]), adapted: upstream copyright,
+ pan_trace include/init, dri options and debug-flag names kept; only the
+ kbase includes, new debug bit, enumerate function and hook switch taken.
+Tested GPU: none yet (compile-level).
+Tested Kbase UAPI: n/a.
+Mesa base range: 26.3.0-devel (pinned 5a07217f).
+Dependencies: 004 (panvk_physical_device_init_kbase).
+Validation test: vkEnumeratePhysicalDevices lists Mali on /dev/mali0,
+ DRM path unchanged.
+
+diff --git a/src/panfrost/vulkan/panvk_instance.h b/src/panfrost/vulkan/panvk_instance.h
+--- a/src/panfrost/vulkan/panvk_instance.h
++++ b/src/panfrost/vulkan/panvk_instance.h
+@@ -34,6 +34,7 @@
+    PANVK_DEBUG_NO_EXTENDED_VA_RANGE = 1 << 17,
+    PANVK_DEBUG_HSR_PREPASS = 1 << 18,
+    PANVK_DEBUG_NO_CRC = 1 << 19,
++   PANVK_DEBUG_KBASE_DIAG = 1 << 20,
+ };
+
+ extern uint64_t panvk_debug;
+diff --git a/src/panfrost/vulkan/panvk_instance.c b/src/panfrost/vulkan/panvk_instance.c
+--- a/src/panfrost/vulkan/panvk_instance.c
++++ b/src/panfrost/vulkan/panvk_instance.c
+@@ -15,6 +15,12 @@
+ #include "util/os_misc.h"
+ #include "util/u_call_once.h"
+
++#if defined(HAVE_PAN_KMOD_KBASE)
++#include <limits.h>
++#include <stdio.h>
++#include <unistd.h>
++#endif
++
+ #include "vk_alloc.h"
+ #include "vk_log.h"
+
+@@ -52,6 +58,7 @@
+    {"no_extended_va_range", PANVK_DEBUG_NO_EXTENDED_VA_RANGE},
+    {"hsr_prepass", PANVK_DEBUG_HSR_PREPASS},
+    {"no_crc", PANVK_DEBUG_NO_CRC},
++   {"kbase_diag", PANVK_DEBUG_KBASE_DIAG},
+    {NULL, 0},
+ };
+
+@@ -159,6 +166,69 @@
+    return VK_SUCCESS;
+ }
+
++static VkResult
++panvk_enumerate_physical_devices(struct vk_instance *vk_instance)
++{
++   struct panvk_instance *instance =
++      container_of(vk_instance, struct panvk_instance, vk);
++
++   /* Enumerate DRM render nodes (panfrost / panthor). */
++   drmDevicePtr drm_devices[256];
++   int max_drm = drmGetDevices2(0, drm_devices, ARRAY_SIZE(drm_devices));
++
++   if (max_drm > 0) {
++      for (int i = 0; i < max_drm; i++) {
++         struct vk_physical_device *pdevice = NULL;
++         VkResult result =
++            panvk_physical_device_try_create(vk_instance, drm_devices[i],
++                                             &pdevice);
++         if (result == VK_ERROR_INCOMPATIBLE_DRIVER)
++            continue;
++         if (result != VK_SUCCESS) {
++            drmFreeDevices(drm_devices, max_drm);
++            return result;
++         }
++         list_addtail(&pdevice->link, &vk_instance->physical_devices.list);
++      }
++      drmFreeDevices(drm_devices, max_drm);
++   }
++
++#if defined(HAVE_PAN_KMOD_KBASE)
++   /* Enumerate kbase (Mali) non-DRM nodes. */
++   for (int i = 0; i < PAN_KBASE_MAX_NODES; i++) {
++      char path[PATH_MAX];
++      snprintf(path, sizeof(path), "/dev/mali%d", i);
++
++      /* Missing optional nodes are normal and should not emit loader
++       * warnings.  Existing nodes still go through full initialization so
++       * permission and uAPI failures remain visible. */
++      if (access(path, F_OK) != 0)
++         continue;
++
++      struct panvk_physical_device *device =
++         vk_zalloc(&instance->vk.alloc, sizeof(*device), 8,
++                   VK_SYSTEM_ALLOCATION_SCOPE_INSTANCE);
++      if (!device)
++         return panvk_error(instance, VK_ERROR_OUT_OF_HOST_MEMORY);
++
++      VkResult result =
++         panvk_physical_device_init_kbase(device, instance, path);
++      if (result != VK_SUCCESS) {
++         vk_free(&instance->vk.alloc, device);
++         /* No device at this path; try the next node. */
++         if (result == VK_ERROR_INCOMPATIBLE_DRIVER)
++            continue;
++         /* A real failure; stop enumeration. */
++         return result;
++      }
++
++      list_addtail(&device->vk.link, &vk_instance->physical_devices.list);
++   }
++#endif /* HAVE_PAN_KMOD_KBASE */
++
++   return VK_SUCCESS;
++}
++
+ static void
+ panvk_destroy_physical_device(struct vk_physical_device *device)
+ {
+@@ -258,8 +328,8 @@
+       .priv = &instance->vk.alloc,
+    };
+
+-   instance->vk.physical_devices.try_create_for_drm =
+-      panvk_physical_device_try_create;
++   instance->vk.physical_devices.enumerate =
++      panvk_enumerate_physical_devices;
+    instance->vk.physical_devices.destroy = panvk_destroy_physical_device;
+
+    if (PANVK_DEBUG(STARTUP))

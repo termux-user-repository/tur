@@ -1,0 +1,49 @@
+From: abhay-byte <zenithblue.dev@gmail.com>
+Subject: [PATCH csf-v11 069] panvk: expose VK_EXT_memory_priority and VK_EXT_pageable_device_local_memory on v10+
+
+Generated-by: LLM
+
+Purpose: Expose VK_EXT_memory_priority and VK_EXT_pageable_device_local_memory on v10+ (hint ignored, vkSetDeviceMemoryPriorityEXT no-op); biblioklept
+Source/Reference: local, work/mesa-p3 dx-p3 d54e50f024e
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/068
+Validation test: CTS dEQP-VK.memory.*priority* 224 Pass, *pageable* 202 Pass, dEQP-VK.api.info.* 7799 Pass, 0 Fail
+
+diff --git a/src/panfrost/vulkan/panvk_device_memory.c b/src/panfrost/vulkan/panvk_device_memory.c
+index 95b8e0c502f..5e2b64e25e9 100644
+--- a/src/panfrost/vulkan/panvk_device_memory.c
++++ b/src/panfrost/vulkan/panvk_device_memory.c
+@@ -560,3 +560,9 @@ panvk_GetDeviceMemoryOpaqueCaptureAddress(
+ 
+    return memory->addr.dev;
+ }
++
++VKAPI_ATTR void VKAPI_CALL
++panvk_SetDeviceMemoryPriorityEXT(VkDevice device, VkDeviceMemory memory,
++                                 float priority)
++{
++}
+diff --git a/src/panfrost/vulkan/panvk_vX_physical_device.c b/src/panfrost/vulkan/panvk_vX_physical_device.c
+index 993c02b6e85..bb14863c5bf 100644
+--- a/src/panfrost/vulkan/panvk_vX_physical_device.c
++++ b/src/panfrost/vulkan/panvk_vX_physical_device.c
+@@ -186,6 +186,8 @@ panvk_per_arch(get_physical_device_extensions)(
+       .EXT_map_memory_placed = true,
+       .EXT_nested_command_buffer = PAN_ARCH >= 10,
+       .EXT_memory_budget = true,
++      .EXT_memory_priority = PAN_ARCH >= 10,
++      .EXT_pageable_device_local_memory = PAN_ARCH >= 10,
+       .EXT_non_seamless_cube_map = true,
+       .EXT_mutable_descriptor_type = PAN_ARCH >= 9,
+       .EXT_multisampled_render_to_single_sampled = true,
+@@ -720,6 +722,8 @@ panvk_per_arch(get_physical_device_features)(
+       .memoryMapPlaced = true,
+       .memoryMapRangePlaced = false,
+       .memoryUnmapReserve = true,
++      .memoryPriority = PAN_ARCH >= 10,
++      .pageableDeviceLocalMemory = PAN_ARCH >= 10,
+ 
+       /* VK_EXT_non_seamless_cube_map */
+       .nonSeamlessCubeMap = true,

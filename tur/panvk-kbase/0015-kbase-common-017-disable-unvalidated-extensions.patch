@@ -1,0 +1,33 @@
+From: panvk-kbase-android worker <panvk-worker@localhost>
+Subject: [PATCH kbase-common 017] panvk: hide unvalidated extensions
+
+Do not expose depth-clamp-zero-one, pipeline-binary, or robustness2 until
+their advertised behavior has direct workload coverage on the target.
+
+diff --git a/src/panfrost/vulkan/panvk_vX_physical_device.c b/src/panfrost/vulkan/panvk_vX_physical_device.c
+--- a/src/panfrost/vulkan/panvk_vX_physical_device.c
++++ b/src/panfrost/vulkan/panvk_vX_physical_device.c
+@@ -56,7 +56,7 @@ panvk_per_arch(get_device_extensions)(const struct panvk_physical_device *device)
+       .KHR_create_renderpass2 = true,
+       .KHR_dedicated_allocation = true,
+       .KHR_descriptor_update_template = true,
+-      .KHR_depth_clamp_zero_one = true,
++      .KHR_depth_clamp_zero_one = false,
+       .KHR_depth_stencil_resolve = true,
+       .KHR_device_group = true,
+       .KHR_draw_indirect_count = PAN_ARCH >= 10,
+@@ -89,12 +89,12 @@ panvk_per_arch(get_device_extensions)(const struct panvk_physical_device *device)
+       .KHR_maintenance9 = true,
+       .KHR_map_memory2 = true,
+       .KHR_multiview = true,
+-      .KHR_pipeline_binary = true,
++      .KHR_pipeline_binary = false,
+       .KHR_pipeline_executable_properties = true,
+       .KHR_pipeline_library = true,
+       .KHR_push_descriptor = true,
+       .KHR_relaxed_block_layout = true,
+-      .KHR_robustness2 = PAN_ARCH >= 10,
++      .KHR_robustness2 = false,
+       .KHR_sampler_mirror_clamp_to_edge = true,
+       .KHR_sampler_ycbcr_conversion = true,
+       .KHR_separate_depth_stencil_layouts = true,

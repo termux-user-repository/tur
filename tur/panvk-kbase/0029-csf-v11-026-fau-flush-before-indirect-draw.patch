@@ -1,0 +1,25 @@
+From: Mikhail Mlhcnn <mikhail@advnirr.org>
+Subject: [PATCH csf-v11 026] panvk/csf: flush the FAU stores before indirect draws read them
+
+Purpose: flush FAU stores before indirect draws read them (upstream CSF fix)
+Source/Reference: upstream Mesa commit fbb4993c5d7 (author preserved)
+Backport-of: fbb4993c5d7
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/025
+Validation test: tests/dxvk/vulkan device matrix (dx5 IDVS+gpu_prerast 13/13, clip-cull 13/13, multi-viewport 5/5, fill-mode 17/17)
+
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+index 49216422420ff8009f06248e62c58ec25ace01dd..07bad5f29eb78f1b3f06123537220440c07bd300 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+@@ -3380,6 +3380,8 @@ launch_indirect_draw(struct panvk_cmd_buffer *cmdbuf,
+                        shader_remapped_sysval_offset(
+                           vs, sysval_offset(graphics, vs.base_instance)));
+          }
++
++         cs_flush_stores(b);
+       }
+ 
+       /* NIR expects zero-based instance ID, but even if it did have an

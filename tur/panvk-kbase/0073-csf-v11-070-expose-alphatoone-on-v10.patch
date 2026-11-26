@@ -1,0 +1,35 @@
+From: abhay-byte <zenithblue.dev@gmail.com>
+Subject: [PATCH csf-v11 070] panvk: expose alphaToOne on v10+
+
+Generated-by: LLM
+
+Purpose: Expose alphaToOne and extendedDynamicState3AlphaToOneEnable on v10+ (blend shader forces alpha to 1.0 on the GPU); biblioklept
+Source/Reference: local, work/mesa-p3 dx-p3 ca862d5b4d8
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/069
+Validation test: CTS *alpha_to_one* 484 cases 123 Pass 0 Fail
+
+diff --git a/src/panfrost/vulkan/panvk_vX_physical_device.c b/src/panfrost/vulkan/panvk_vX_physical_device.c
+index bb14863c5bf..548613ff618 100644
+--- a/src/panfrost/vulkan/panvk_vX_physical_device.c
++++ b/src/panfrost/vulkan/panvk_vX_physical_device.c
+@@ -324,7 +324,7 @@ panvk_per_arch(get_physical_device_features)(
+       .depthBounds = false,
+       .wideLines = true,
+       .largePoints = true,
+-      .alphaToOne = false,
++      .alphaToOne = PAN_ARCH >= 10,
+       .multiViewport = PAN_ARCH >= 10,
+       .samplerAnisotropy = true,
+       .textureCompressionETC2 = has_texture_compression_etc2(device),
+@@ -542,7 +542,7 @@ panvk_per_arch(get_physical_device_features)(
+       .extendedDynamicState3RasterizationSamples = true,
+       .extendedDynamicState3SampleMask = true,
+       .extendedDynamicState3AlphaToCoverageEnable = true,
+-      .extendedDynamicState3AlphaToOneEnable = false,
++      .extendedDynamicState3AlphaToOneEnable = PAN_ARCH >= 10,
+       .extendedDynamicState3LogicOpEnable = true,
+       .extendedDynamicState3ColorBlendEnable = true,
+       .extendedDynamicState3ColorBlendEquation = true,

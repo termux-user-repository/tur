@@ -1,0 +1,57 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: Wed, 7 Oct 2026 20:00:00 +0530
+Subject: [PATCH] pan/bi: keep LCRA constraint rows sparse up to a quarter of the nodes biblioklept
+
+A constraint row switched to a dense array (one entry per node) after
+256 elements. The solver's forbidden-register scan and the constraint
+counts then walk every node for each such row, so on big shaders with
+long-lived values solving was dominated by scanning zeros, and growing
+the state after spilling reallocated every dense row.
+
+Rows now stay sorted sparse arrays until they hold a quarter of the
+nodes, where a dense row becomes the smaller one. With the sorted
+constraint queue (csf-v11/160) building such rows is cheap. The
+representation does not change any result: output is identical on all
+67539 corpus shaders. Host: solve time 1590 -> 394 ms on 65 very large
+synthetic shaders (total 7.2 -> 5.2 s), 27 -> 14 ms on 18 NFS-range
+ones.
+---
+diff --git a/src/panfrost/compiler/bifrost/bi_ra.c b/src/panfrost/compiler/bifrost/bi_ra.c
+--- a/src/panfrost/compiler/bifrost/bi_ra.c
++++ b/src/panfrost/compiler/bifrost/bi_ra.c
+@@ -133,9 +133,11 @@ lcra_add_node_interference(struct lcra_state *l, unsigned i, unsigned cmask_i,
+       return;
+    }
+ 
+-   /* Use dense arrays after adding 256 elements */
+-   nodearray_orr(&l->linear[j], i, constraint_fw, 256, l->node_count);
+-   nodearray_orr(&l->linear[i], j, constraint_bw, 256, l->node_count);
++   /* Keep rows sparse until they hold a quarter of the nodes, where a dense
++    * row gets smaller. The solver scans a dense row in full for every use,
++    * which dominated solving big shaders with a 256 element limit. */
++   nodearray_orr(&l->linear[j], i, constraint_fw, ~0u, l->node_count);
++   nodearray_orr(&l->linear[i], j, constraint_bw, ~0u, l->node_count);
+ }
+ 
+ /* Sorts the queued constraints into the rows: counting sort by key, then
+@@ -149,8 +151,8 @@ lcra_flush_pending(struct lcra_state *l)
+    unsigned n = l->node_count;
+    unsigned count = util_dynarray_num_elements(l->pending, uint64_t);
+    uint64_t *a = l->pending->data;
+-   /* Also scratch for merging a row: sparse rows hold at most 256 keys */
+-   uint64_t *b = malloc(sizeof(uint64_t) * (count + 257));
++   /* Also scratch for merging a row: sparse rows hold under n / 4 keys */
++   uint64_t *b = malloc(sizeof(uint64_t) * (count + n / 4 + 1));
+    unsigned *pos = malloc(sizeof(unsigned) * (n + 1));
+ 
+    memset(pos, 0, sizeof(unsigned) * (n + 1));
+@@ -204,7 +206,7 @@ lcra_flush_pending(struct lcra_state *l)
+ 
+       nodearray_reset(row);
+ 
+-      if (u <= 256 && u < n / 4) {
++      if (u < n / 4) {
+          row->sparse = malloc(sizeof(nodearray_sparse) * u);
+          memcpy(row->sparse, b, sizeof(nodearray_sparse) * u);
+          row->size = row->sparse_capacity = u;

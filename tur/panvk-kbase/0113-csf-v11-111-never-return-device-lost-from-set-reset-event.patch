@@ -1,0 +1,94 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: Tue, 6 Oct 2026 00:40:00 +0530
+Subject: [PATCH] panvk: never return VK_ERROR_DEVICE_LOST from
+ SetEvent/ResetEvent
+
+vkSetEvent/vkResetEvent may only fail with OUT_OF_HOST_MEMORY or
+OUT_OF_DEVICE_MEMORY. 085 returned DEVICE_LOST when the
+KBASE_IOCTL_CS_EVENT_SIGNAL notification failed. By then the event word
+is already written and cleaned to memory, and the CSF scheduler
+re-evaluates the wait on its next tick or GPU event, so a lost
+notification costs only wake-up latency. kbase_kmod already logs the
+ioctl failure. Return VK_SUCCESS.
+
+Item 10 review: 085 (kbase event memory + CS_EVENT_SIGNAL), 087
+(tessellation compute loop under conditional rendering) and 088 (TES
+primitive id for tess-fed GS) use only kbase ABI, cs_builder ops whose
+LOAD/STORE/BRANCH/SYNC_ADD32/WAIT encodings stay compatible in v12-v14
+genxml, and NIR. Tessellation, GS and conditional rendering are exposed
+on v10-v14. So the patches are documented, not gated.
+
+Purpose: Vulkan-valid SetEvent/ResetEvent results on kbase; biblioklept
+Source/Reference: Vulkan spec vkSetEvent/vkResetEvent return codes (src/vulkan/registry/vk.xml)
+Tested GPU: none (build only); behaviour unchanged unless CS_EVENT_SIGNAL fails
+Tested Kbase UAPI: n/a
+Mesa base range: 5a07217f
+Dependencies: csf-v11/085, csf-v11/110 (series order)
+Validation test: deqp-vk api.event.* / synchronization.basic.event.* on G615 (tester)
+---
+ src/panfrost/vulkan/csf/panvk_vX_event.c | 22 +++++++++++-----------
+ 1 file changed, 11 insertions(+), 11 deletions(-)
+
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_event.c b/src/panfrost/vulkan/csf/panvk_vX_event.c
+index 90da0e8..c9efff5 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_event.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_event.c
+@@ -51,10 +51,12 @@ panvk_event_cache_op(const void *start, size_t size, bool invalidate)
+ 
+ /* Push the CPU write out of the cache, then on kbase ask the kernel to
+  * re-evaluate CSF event waits. The signal is a no-op on other backends
+- * (cs_event_signal is NULL). Returns false only when the backend reports
+- * that the notification failed.
++ * (cs_event_signal is NULL). SetEvent/ResetEvent may only fail with
++ * OUT_OF_HOST/DEVICE_MEMORY, so a failed notification is not reported: the
++ * event word is already written and the CSF scheduler re-evaluates waits on
++ * its next tick or GPU event, so only the wake-up latency suffers.
+  */
+-static bool
++static void
+ panvk_event_publish(struct panvk_device *dev, struct panvk_event *event)
+ {
+ #ifdef HAVE_PAN_KMOD_KBASE
+@@ -67,7 +69,8 @@ panvk_event_publish(struct panvk_device *dev, struct panvk_event *event)
+    }
+ #endif
+ 
+-   return pan_kmod_cs_event_signal(dev->kmod.dev) == 0;
++   /* kbase_kmod logs the failure. */
++   (void)pan_kmod_cs_event_signal(dev->kmod.dev);
+ }
+ 
+ VKAPI_ATTR VkResult VKAPI_CALL
+@@ -116,9 +119,8 @@ panvk_per_arch(CreateEvent)(VkDevice _device,
+                               PANVK_SUBQUEUE_COUNT, sobjs) {
+       memset(sobjs, 0, sizeof(struct panvk_cs_sync32) * PANVK_SUBQUEUE_COUNT);
+    }
+-   /* Reset state. A failed signal here still leaves a valid event; the next
+-    * SetEvent reports it. */
+-   (void)panvk_event_publish(device, event);
++   /* Reset state. */
++   panvk_event_publish(device, event);
+ 
+    *pEvent = panvk_event_to_handle(event);
+    return VK_SUCCESS;
+@@ -188,8 +190,7 @@ panvk_per_arch(SetEvent)(VkDevice _device, VkEvent _event)
+       for (uint32_t i = 0; i < PANVK_SUBQUEUE_COUNT; i++)
+          syncobjs[i].seqno = 1;
+    }
+-   if (!panvk_event_publish(device, event))
+-      return panvk_error(device, VK_ERROR_DEVICE_LOST);
++   panvk_event_publish(device, event);
+ 
+    return VK_SUCCESS;
+ }
+@@ -204,8 +205,7 @@ panvk_per_arch(ResetEvent)(VkDevice _device, VkEvent _event)
+                               PANVK_SUBQUEUE_COUNT, syncobjs) {
+       memset(syncobjs, 0, sizeof(*syncobjs) * PANVK_SUBQUEUE_COUNT);
+    }
+-   if (!panvk_event_publish(device, event))
+-      return panvk_error(device, VK_ERROR_DEVICE_LOST);
++   panvk_event_publish(device, event);
+ 
+    return VK_SUCCESS;
+ }

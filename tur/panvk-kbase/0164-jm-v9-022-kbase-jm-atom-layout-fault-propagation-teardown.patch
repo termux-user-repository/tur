@@ -1,0 +1,317 @@
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: 2026-10-11
+Subject: [PATCH jm-v9 022] panvk/kbase: JM atom layout probe, fault propagation within a submit, teardown wait biblioklept
+
+Purpose: Port the kbase JM robustness fixes from malisx2 that 001 lacks.
+1. Atom layout. Our base_jd_atom is base_jd_atom_v2 (56 bytes) padded to
+   64. Stock kbase reads stride 64 as base_jd_atom (leading seq_nr): the
+   old probe only fell back to 56 when stride 64 was refused or its event
+   failed, so a stock kernel could get stride 64 and read every atom 8
+   bytes off (not seen on our MediaTek devices). MediaTek kbase with the bandwidth monitor appends a u32 frame_nr:
+   it accepts strides 64 (read as v2) and 72 only. Probe with one
+   dependency-only atom at stride 72 and check the returned udata: EINVAL
+   means stock kbase (use 56), accepted means MediaTek (use 64, as
+   before). MediaTek devices keep the stride they had.
+2. Fault propagation. Only the last PANVK_KBASE_SYNC_TARGET_COUNT (3)
+   batch atoms of a submit are waited on, and cross-batch dependencies
+   were ORDER, so a fault in an earlier batch signalled the submit's
+   fences and exported sync_files as success. v9 now uses DATA
+   dependencies on atoms of the same vkQueueSubmit; dependencies on
+   earlier submits and semaphore waits stay ORDER so one fault does not
+   fail all later work.
+3. Teardown. destroy_gpu_queue waits up to 2 s for the queue's last
+   atoms before the device frees the tiler heap and pools under them.
+4. Wait clock. The JM wait function read CLOCK_MONOTONIC_RAW against
+   vk_sync deadlines, which are CLOCK_MONOTONIC (os_time); the two drift
+   apart with uptime, so a finite fence timeout could end early or be
+   reported as DEVICE_LOST. v9 now uses CLOCK_MONOTONIC and recomputes
+   the remaining time per waited atom (found in review).
+Already present, not ported: 256-atom-per-submit cap (we submit one atom
+per JOB_SUBMIT); render pass split at 8192 jobs (v9 batches split at
+5 * 1024 jobs and before the 16-bit job index overflows); TLS sizing
+(pan_query_thread_tls_alloc: THREAD_TLS_ALLOC, else max threads).
+Source/Reference: bmdhacks/malisx2 src/kbase/jm.c, src/kbase/uapi_jm.h,
+src/vk/mali_jm_queue.c (MIT)
+Tested GPU: build-checked (universal Android build v6-v14); G615 (v11) PanProbe regression with the universal .so; Mali-G57 run pending (none attached)
+Tested Kbase UAPI: JM 11.38 (MediaTek) expected unchanged; stock JM not available
+Mesa base range: 5a07217f + g615-v11-csf series + jm-v9 001-021
+Dependencies: jm-v9 001, 008
+Validation test: logcat "JM atom layout" line on a G57; PanProbe all (pending)
+
+---
+ src/panfrost/lib/kmod/kbase_kmod.c          | 53 ++++++++++++----
+ src/panfrost/vulkan/jm/panvk_queue.h        |  6 ++
+ src/panfrost/vulkan/jm/panvk_vX_gpu_queue.c | 93 ++++++++++++++++++++++-------
+ 3 files changed, 121 insertions(+), 31 deletions(-)
+
+diff --git a/src/panfrost/lib/kmod/kbase_kmod.c b/src/panfrost/lib/kmod/kbase_kmod.c
+index 2ccb370..477b548 100644
+--- a/src/panfrost/lib/kmod/kbase_kmod.c
++++ b/src/panfrost/lib/kmod/kbase_kmod.c
+@@ -1351,39 +1351,70 @@ kbase_kmod_alias_destroy(struct pan_kmod_dev *dev, uint64_t va, uint64_t size,
+    munmap((void *)(uintptr_t)va, size * nents);
+ }
+ 
++/* struct base_jd_atom above is the kernel's base_jd_atom_v2 (56 bytes)
++ * padded with zeros to 64.  Stock kbase reads stride 56 as base_jd_atom_v2
++ * and stride 64 as base_jd_atom (a leading seq_nr, so our layout would be
++ * read 8 bytes off), and refuses stride 72 with EINVAL before reading any
++ * atom.  MediaTek kbase built with its GPU bandwidth monitor appends a u32
++ * frame_nr to both structs: it accepts only stride 64, read as
++ * base_jd_atom_v2 + frame_nr (our padding gives frame_nr 0), and 72.
++ * Submitting one dependency-only atom at stride 72 tells them apart.
++ * Probe from bmdhacks/malisx2 (MIT, src/kbase/jm.c). */
+ static unsigned
+ kbase_probe_atom_stride(int fd)
+ {
+    STATIC_ASSERT(sizeof(struct base_jd_atom) == 64);
+    STATIC_ASSERT(sizeof(struct base_jd_event_v2) == 24);
+ 
+-   struct base_jd_atom atom = { .atom_number = 255 };
++   /* seq_nr + base_jd_atom_v2 + frame_nr + tail padding (our zero pad). */
++   struct {
++      __u64 seq_nr;
++      struct base_jd_atom atom;
++   } probe = {
++      .atom = {
++         .udata = { .blob = { 0x6d616c6973783270ull, 0x61746f6d2d70726full } },
++         .atom_number = 255,
++      },
++   };
++   STATIC_ASSERT(sizeof(probe) == 72);
+    struct kbase_ioctl_job_submit sub = {
+-      .addr = (uintptr_t)&atom,
++      .addr = (uintptr_t)&probe,
+       .nr_atoms = 1,
+-      .stride = 64,
++      .stride = sizeof(probe),
+    };
+ 
+-   if (ioctl(fd, KBASE_IOCTL_JOB_SUBMIT, &sub) < 0)
+-      return 56;
++   if (ioctl(fd, KBASE_IOCTL_JOB_SUBMIT, &sub) < 0) {
++      if (errno == EINVAL) {
++         mesa_logi("kbase: stock JM atom layout (stride 72 refused), stride 56");
++         return 56;
++      }
++      mesa_logw("kbase: JM atom layout probe failed (%s), stride 64",
++                strerror(errno));
++      return 64;
++   }
+ 
++   struct base_jd_event_v2 ev = { 0 };
++   ssize_t n = -1;
+    struct pollfd pfd = { .fd = fd, .events = POLLIN };
+    int ret;
+    do {
+       ret = poll(&pfd, 1, 1000);
+    } while (ret < 0 && errno == EINTR);
+-
+    if (ret > 0 && (pfd.revents & POLLIN)) {
+-      struct base_jd_event_v2 ev;
+-      ssize_t n;
+       do {
+          n = read(fd, &ev, sizeof(ev));
+       } while (n < 0 && errno == EINTR);
+-      if (n == (ssize_t)sizeof(ev) &&
+-          (ev.event_code & BASE_JD_EVENT_ERR_MASK))
+-         return 56;
+    }
+ 
++   if (n == (ssize_t)sizeof(ev) && ev.atom_number == 255 &&
++       ev.udata.blob[0] == probe.atom.udata.blob[0] &&
++       ev.udata.blob[1] == probe.atom.udata.blob[1])
++      mesa_logi("kbase: MediaTek JM atom layout (frame_nr), stride 64, "
++                "probe event 0x%x", ev.event_code);
++   else
++      mesa_logw("kbase: stride 72 accepted but the probe atom came back "
++                "as %u (n=%zd); unknown atom layout, stride 64",
++                ev.atom_number, n);
+    return 64;
+ }
+ 
+diff --git a/src/panfrost/vulkan/jm/panvk_queue.h b/src/panfrost/vulkan/jm/panvk_queue.h
+index 6d8364b..f52a756 100644
+--- a/src/panfrost/vulkan/jm/panvk_queue.h
++++ b/src/panfrost/vulkan/jm/panvk_queue.h
+@@ -14,6 +14,8 @@
+ 
+ #include "panvk_device.h"
+ 
++#include "util/bitset.h"
++
+ #include "vk_queue.h"
+ #include "vk_sync.h"
+ 
+@@ -38,6 +40,10 @@ struct panvk_gpu_queue {
+    /* v67b: last fragment atom per tiler heap half, last vtc atom */
+    uint64_t half_frag_atom[2];
+    uint64_t last_vtc_atom;
++#if PAN_ARCH == 9
++   /* Atom numbers submitted by the current vkQueueSubmit (see dep_type()). */
++   BITSET_DECLARE(submit_atoms, 256);
++#endif
+ };
+ 
+ VK_DEFINE_HANDLE_CASTS(panvk_gpu_queue, vk.base, VkQueue, VK_OBJECT_TYPE_QUEUE)
+diff --git a/src/panfrost/vulkan/jm/panvk_vX_gpu_queue.c b/src/panfrost/vulkan/jm/panvk_vX_gpu_queue.c
+index 447de37..cf4df11 100644
+--- a/src/panfrost/vulkan/jm/panvk_vX_gpu_queue.c
++++ b/src/panfrost/vulkan/jm/panvk_vX_gpu_queue.c
+@@ -26,6 +26,7 @@
+ #include "panvk_physical_device.h"
+ #include "panvk_priv_bo.h"
+ #include "panvk_queue.h"
++#include "util/os_time.h"
+ 
+ #include "vk_framebuffer.h"
+ #include "vk_sync.h"
+@@ -72,6 +73,32 @@ panvk_overlap_enabled(void)
+    }
+    return on;
+ }
++
++/* Dependency type on an earlier GPU atom of this queue. Within one
++ * vkQueueSubmit it is DATA, so a GPU fault fails the rest of the submit and
++ * reaches its fences and exported sync_files (only the last
++ * PANVK_KBASE_SYNC_TARGET_COUNT batch atoms are waited on). Atoms of
++ * earlier submits and semaphore waits stay ORDER: a fault there must not
++ * fail unrelated later work. From bmdhacks/malisx2 (MIT). */
++static uint8_t
++dep_type(const struct panvk_gpu_queue *queue, uint64_t atom)
++{
++#if PAN_ARCH == 9
++   if (atom && atom < 256 && BITSET_TEST(queue->submit_atoms, atom))
++      return BASE_JD_DEP_TYPE_DATA;
++#endif
++   return BASE_JD_DEP_TYPE_ORDER;
++}
++
++static void
++note_submitted(struct panvk_gpu_queue *queue, uint64_t atom)
++{
++#if PAN_ARCH == 9
++   if (atom && atom < 256)
++      BITSET_SET(queue->submit_atoms, atom);
++#endif
++}
++
+ static uint64_t
+ panvk_queue_submit_batch(struct panvk_gpu_queue *queue,
+                          struct panvk_cmd_buffer *cmdbuf,
+@@ -142,13 +169,16 @@ panvk_queue_submit_batch(struct panvk_gpu_queue *queue,
+          uint32_t vtc_core_req = (BASE_JD_REQ_CS | BASE_JD_REQ_T | BASE_JD_REQ_V);
+             const bool v67_ov = panvk_overlap_enabled() && batch->frag_jc.first_job &&
+                                 !queue->in_dep && queue->frag_warmed_up; /* v67b */
++            const uint64_t dep0 =
++                v67_ov ? queue->half_frag_atom[batch->heap_half & 1] : /* v67b */
++                (queue->last_any_atom ? queue->last_any_atom : queue->last_frag_atom);
+             vtc_atom = kbase_kmod_job_submit_dep(dev->kmod.dev, batch->vtc_jc.first_job, vtc_core_req, bos, nr_bos,
+-                (v67_ov ? queue->half_frag_atom[batch->heap_half & 1] : /* v67b */
+-                 (queue->last_any_atom ? queue->last_any_atom : queue->last_frag_atom)),
+-                BASE_JD_DEP_TYPE_ORDER, v67_ov ? queue->last_vtc_atom : queue->in_dep,
+-                BASE_JD_DEP_TYPE_ORDER,
++                dep0, dep_type(queue, dep0),
++                v67_ov ? queue->last_vtc_atom : queue->in_dep,
++                v67_ov ? dep_type(queue, queue->last_vtc_atom) : BASE_JD_DEP_TYPE_ORDER,
+                 batch->frag_jc.first_job != 0 && queue->frag_warmed_up);
+             assert(vtc_atom);
++            note_submitted(queue, vtc_atom);
+             queue->last_vtc_atom = vtc_atom; /* v67b */
+             queue->in_dep = 0;
+             queue->last_any_atom = vtc_atom;
+@@ -205,14 +235,19 @@ panvk_queue_submit_batch(struct panvk_gpu_queue *queue,
+          (void)0;
+          frag_atom = 0;
+       } else {
++         const bool frag_ov =
++            panvk_overlap_enabled() && vtc_atom && !queue->in_dep; /* v67b */
+          frag_atom = kbase_kmod_job_submit_dep(dev->kmod.dev, batch->frag_jc.first_job,
+                                              BASE_JD_REQ_FS, bos, nr_bos,
+                                              vtc_atom ? vtc_atom : queue->last_any_atom,
+-                                             vtc_atom ? BASE_JD_DEP_TYPE_DATA : BASE_JD_DEP_TYPE_ORDER,
+-                                             (panvk_overlap_enabled() && vtc_atom && !queue->in_dep)
+-                                                ? queue->last_frag_atom : queue->in_dep, /* v67b */
+-                                             BASE_JD_DEP_TYPE_ORDER, false);
++                                             vtc_atom ? BASE_JD_DEP_TYPE_DATA
++                                                      : dep_type(queue, queue->last_any_atom),
++                                             frag_ov ? queue->last_frag_atom : queue->in_dep,
++                                             frag_ov ? dep_type(queue, queue->last_frag_atom)
++                                                     : BASE_JD_DEP_TYPE_ORDER,
++                                             false);
+          assert(frag_atom);
++         note_submitted(queue, frag_atom);
+          queue->half_frag_atom[batch->heap_half & 1] = frag_atom; /* v67b */
+          queue->last_frag_atom = frag_atom; queue->last_any_atom = frag_atom;
+          if (!vtc_atom) {
+@@ -295,26 +330,31 @@ panvk_jm_kbase_wait_atoms(void *data, const uint64_t targets[PANVK_KBASE_SYNC_TA
+ {
+    struct pan_kmod_dev *kmod_dev = data;
+ 
+-   int64_t timeout_ns;
+-   if (abs_timeout_ns == UINT64_MAX) {
+-      timeout_ns = -1;
+-   } else {
+-      struct timespec now;
+-      clock_gettime(CLOCK_MONOTONIC_RAW, &now);
+-      int64_t now_ns = (int64_t)now.tv_sec * 1000000000ll + now.tv_nsec;
+-      timeout_ns = (int64_t)abs_timeout_ns - now_ns;
+-      if (timeout_ns < 0)
+-         timeout_ns = 0;
+-   }
++   /* vk_sync deadlines are CLOCK_MONOTONIC (os_time). MONOTONIC_RAW drifts
++    * from it with uptime, which turned timeouts into DEVICE_LOST. */
++#if PAN_ARCH == 9
++   const clockid_t clk = CLOCK_MONOTONIC;
++#else
++   const clockid_t clk = CLOCK_MONOTONIC_RAW;
++#endif
+ 
+    for (unsigned i = 0; i < PANVK_KBASE_SYNC_TARGET_COUNT; i++) {
+       if (!targets[i])
+          continue;
++
++      int64_t timeout_ns = -1;
++      if (abs_timeout_ns != UINT64_MAX) {
++         struct timespec now;
++         clock_gettime(clk, &now);
++         int64_t now_ns = (int64_t)now.tv_sec * 1000000000ll + now.tv_nsec;
++         timeout_ns = MAX2((int64_t)abs_timeout_ns - now_ns, 0);
++      }
++
+       if (!P4_WAIT(kmod_dev, targets[i], timeout_ns))
+          {
+          if (abs_timeout_ns != UINT64_MAX) {
+             struct timespec now2;
+-            clock_gettime(CLOCK_MONOTONIC_RAW, &now2);
++            clock_gettime(clk, &now2);
+             int64_t now2_ns = (int64_t)now2.tv_sec * 1000000000ll + now2.tv_nsec;
+             if (now2_ns >= (int64_t)abs_timeout_ns)
+                return VK_TIMEOUT;
+@@ -336,6 +376,10 @@ panvk_per_arch(gpu_queue_submit)(struct vk_queue *vk_queue, struct vk_queue_subm
+    uint64_t targets[PANVK_KBASE_SYNC_TARGET_COUNT] = {0};
+    unsigned ntargets = 0;
+ 
++#if PAN_ARCH == 9
++   BITSET_ZERO(queue->submit_atoms);
++#endif
++
+    if (submit->wait_count) {
+       (void)0;
+ 
+@@ -527,6 +571,15 @@ void panvk_per_arch(destroy_gpu_queue)(struct vk_queue *vk_queue)
+    struct panvk_gpu_queue *queue = container_of(vk_queue, struct panvk_gpu_queue, vk);
+    struct panvk_device *dev = to_panvk_device(vk_queue->base.device);
+ 
++#if PAN_ARCH == 9
++   /* Device teardown frees the tiler heap and pools next: give jobs still in
++    * flight (app skipped vkDeviceWaitIdle, or exits mid-frame) up to 2 s
++    * instead of unmapping memory under them (bmdhacks/malisx2, MIT). */
++   if (vk_sync_wait(&dev->vk, queue->sync, 0, VK_SYNC_WAIT_COMPLETE,
++                    os_time_get_absolute_timeout(2000000000ll)) == VK_TIMEOUT)
++      mesa_logw("panvk: JM queue destroyed with jobs still running");
++#endif
++
+    vk_queue_finish(&queue->vk);
+    vk_sync_destroy(&dev->vk, queue->sync);
+    vk_free(&dev->vk.alloc, queue);

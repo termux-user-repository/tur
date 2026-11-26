@@ -1,0 +1,38 @@
+From: panvk-kbase-android worker <panvk-worker@localhost>
+Subject: [PATCH app-loader 001] android: export ICD symbols alongside HMI
+
+Purpose: Make the Android/Bionic libvulkan_panfrost.so hot-loadable inside
+ an ordinary application process (Samba S3, loader-test APK, Winlator /
+ AdrenoTools-style loaders): export vk_icdGetInstanceProcAddr,
+ vk_icdGetPhysicalDeviceProcAddr and
+ vk_icdNegotiateLoaderICDInterfaceVersion IN ADDITION to HMI, while
+ keeping Android WSI + AHardwareBuffer interop. Without this, enabling
+ Android WSI selects the HAL-only symbol scheme and hides the ICD entry
+ points (the exact failure Gate A guards).
+Source/Reference: plan sec.6.1 + G52 lesson; upstream files
+ src/vulkan/vulkan-android.sym (HAL-only) and src/vulkan/meson.build.
+ New file src/vulkan/vulkan-app-loader.sym rides in
+ patches/app-loader/files/.
+Tested GPU: none yet (Gate A static check after rebuild).
+Tested Kbase UAPI: n/a.
+Mesa base range: 26.3.0-devel (pinned 5a07217f).
+Dependencies: none.
+Validation test: scripts/validate-binary.sh --abi android asserts all
+ three ICD exports visible and HMI still present.
+
+diff --git a/src/vulkan/meson.build b/src/vulkan/meson.build
+--- a/src/vulkan/meson.build
++++ b/src/vulkan/meson.build
+@@ -9,8 +9,10 @@
+ if with_platform_android
+   vulkan_icd_symbols = files('vulkan-icd-android-symbols.txt')
+   if with_ld_version_script
+-    vulkan_icd_link_args += ['-Wl,--version-script', join_paths(meson.current_source_dir(), 'vulkan-android.sym')]
+-    vulkan_icd_link_depends += files('vulkan-android.sym')
++    # panvk-kbase-android: application-loadable ICD (HMI + ICD symbols).
++    # New file; see patches/app-loader/files/src/vulkan/.
++    vulkan_icd_link_args += ['-Wl,--version-script', join_paths(meson.current_source_dir(), 'vulkan-app-loader.sym')]
++    vulkan_icd_link_depends += files('vulkan-app-loader.sym')
+   endif
+ else
+   vulkan_icd_symbols = files('vulkan-icd-symbols.txt')

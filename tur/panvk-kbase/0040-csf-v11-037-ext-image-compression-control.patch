@@ -1,0 +1,34 @@
+From: Christian Gmeiner <cgmeiner@igalia.com>
+Subject: [PATCH csf-v11 037] panvk: Advertise VK_EXT_image_compression_control
+
+Purpose: advertise VK_EXT_image_compression_control (device-proven)
+Source/Reference: upstream Mesa commit 6409a5b16af (author preserved)
+Backport-of: 6409a5b16af
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/036
+Validation test: tests/dxvk/vulkan/backport-ext/icc.c (6 optimal + 16 modifier cases, ICC_FAILS=0)
+
+diff --git a/src/panfrost/vulkan/panvk_vX_physical_device.c b/src/panfrost/vulkan/panvk_vX_physical_device.c
+index 95596c3ed44fb41087d3b8cc465e063d3e2435df..a4d7019e3596fed1650153863c70260ed252d6fb 100644
+--- a/src/panfrost/vulkan/panvk_vX_physical_device.c
++++ b/src/panfrost/vulkan/panvk_vX_physical_device.c
+@@ -173,6 +173,7 @@ panvk_per_arch(get_physical_device_extensions)(
+       .EXT_host_image_copy = true,
+       .EXT_host_query_reset = true,
+       .EXT_image_2d_view_of_3d = true,
++      .EXT_image_compression_control = true,
+       /* EXT_image_drm_format_modifier depends on KHR_sampler_ycbcr_conversion */
+       .EXT_image_drm_format_modifier = true,
+       .EXT_image_robustness = true,
+@@ -595,6 +596,9 @@ panvk_per_arch(get_physical_device_features)(
+       .image2DViewOf3D = true,
+       .sampler2DViewOf3D = true,
+ 
++      /* VK_EXT_image_compression_control */
++      .imageCompressionControl = true,
++
+       /* VK_EXT_image_sliced_view_of_3d */
+       .imageSlicedViewOf3D = true,
+ 

@@ -1,0 +1,24 @@
+From: Valentine Burley <valentine.burley@collabora.com>
+Subject: [PATCH csf-v11 028] panvk: Advertise VK_KHR_incremental_present
+
+Purpose: advertise VK_KHR_incremental_present (device-proven)
+Source/Reference: upstream Mesa commit fb3853764b2 (author preserved)
+Backport-of: fb3853764b2
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/027
+Validation test: tests/dxvk/vulkan/backport-ext/wsi_ext.c (headless swapchain, present regions, WSI_EXT_FAILS=0)
+
+diff --git a/src/panfrost/vulkan/panvk_vX_physical_device.c b/src/panfrost/vulkan/panvk_vX_physical_device.c
+index ae7b73bfdd83cd469842e0d9ba6229fb694914c5..95596c3ed44fb41087d3b8cc465e063d3e2435df 100644
+--- a/src/panfrost/vulkan/panvk_vX_physical_device.c
++++ b/src/panfrost/vulkan/panvk_vX_physical_device.c
+@@ -119,6 +119,7 @@ panvk_per_arch(get_physical_device_extensions)(
+       .KHR_spirv_1_4 = true,
+       .KHR_storage_buffer_storage_class = true,
+ #ifdef PANVK_USE_WSI_PLATFORM
++      .KHR_incremental_present = true,
+       .KHR_present_id = true,
+       .KHR_present_id2 = true,
+       .KHR_present_wait = true,

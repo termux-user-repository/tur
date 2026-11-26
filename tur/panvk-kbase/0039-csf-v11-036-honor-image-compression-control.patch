@@ -1,0 +1,108 @@
+From: Christian Gmeiner <cgmeiner@igalia.com>
+Subject: [PATCH csf-v11 036] panvk: Honor VkImageCompressionControlEXT
+
+Purpose: honor VkImageCompressionControlEXT (dep of 6409a5b16af)
+Source/Reference: upstream Mesa commit e3a315d636a (author preserved)
+Backport-of: e3a315d636a
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/035
+Validation test: icc.c (DEFAULT->AFBC, DISABLED->DISABLED, FIXED_RATE->DEFAULT)
+
+diff --git a/src/panfrost/vulkan/panvk_image.c b/src/panfrost/vulkan/panvk_image.c
+index d20ff52ab1161971357eef1096535cf36d942f6e..acaec08e90d02c09f1a3b52be0317bd4f74f65b0 100644
+--- a/src/panfrost/vulkan/panvk_image.c
++++ b/src/panfrost/vulkan/panvk_image.c
+@@ -182,6 +182,10 @@ panvk_image_can_use_mod(struct panvk_image *image,
+       if (PANVK_DEBUG(NO_AFBC))
+          return false;
+ 
++      /* The application asked for an uncompressed image. */
++      if (image->vk.compr_flags & VK_IMAGE_COMPRESSION_DISABLED_EXT)
++         return false;
++
+       /* Can't do AFBC if store/host copy is requested. */
+       if ((image->vk.usage | image->vk.stencil_usage) &
+           (VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_HOST_TRANSFER_BIT))
+diff --git a/src/panfrost/vulkan/panvk_physical_device.c b/src/panfrost/vulkan/panvk_physical_device.c
+index dadf2c99dcd049c7f9ad1cb54f245ce42ff57193..f2b4c5a52e9f25f5727cfbf732025847d5cbcd0e 100644
+--- a/src/panfrost/vulkan/panvk_physical_device.c
++++ b/src/panfrost/vulkan/panvk_physical_device.c
+@@ -2261,6 +2261,14 @@ get_image_format_properties(struct panvk_physical_device *physical_device,
+       if (!(caps & PAN_MOD_FORMAT_CAP_WSI))
+          goto unsupported;
+ 
++      /* An AFBC modifier can't honor a request for an uncompressed image. */
++      const VkImageCompressionControlEXT *compr_info =
++         vk_find_struct_const(info->pNext, IMAGE_COMPRESSION_CONTROL_EXT);
++      if (compr_info &&
++          (compr_info->flags & VK_IMAGE_COMPRESSION_DISABLED_EXT) &&
++          drm_is_afbc(mod_info->drmFormatModifier))
++         goto unsupported;
++
+       if (info->type == VK_IMAGE_TYPE_1D && !(caps & PAN_MOD_FORMAT_CAP_DIM_1D))
+          goto unsupported;
+       if (info->type == VK_IMAGE_TYPE_2D && !(caps & PAN_MOD_FORMAT_CAP_DIM_2D))
+@@ -2484,10 +2492,15 @@ panvk_get_external_image_format_properties(
+ static bool
+ panvk_physical_device_can_use_afbc(const struct panvk_physical_device *pdev,
+                                    VkFormat format, VkImageType type,
+-                                   VkImageTiling tiling)
++                                   VkImageTiling tiling,
++                                   VkImageCompressionFlagsEXT compr_flags)
+ {
+    enum pipe_format pfmt = vk_format_to_pipe_format(format);
+ 
++   /* The application asked for an uncompressed image. */
++   if (compr_flags & VK_IMAGE_COMPRESSION_DISABLED_EXT)
++      return false;
++
+    if (PANVK_DEBUG(NO_AFBC) || tiling == VK_IMAGE_TILING_LINEAR ||
+        type == VK_IMAGE_TYPE_1D || !pan_query_afbc(&pdev->kmod.dev->props))
+       return false;
+@@ -2513,6 +2526,7 @@ panvk_GetPhysicalDeviceImageFormatProperties2(
+    const VkPhysicalDeviceExternalImageFormatInfo *external_info = NULL;
+    const VkPhysicalDeviceImageViewImageFormatInfoEXT *image_view_info = NULL;
+    const VkPhysicalDeviceImageDrmFormatModifierInfoEXT *drm_info = NULL;
++   const VkImageCompressionControlEXT *compr_info = NULL;
+    VkExternalImageFormatProperties *external_props = NULL;
+    VkFilterCubicImageViewImageFormatPropertiesEXT *cubic_props = NULL;
+    VkFormatFeatureFlags2 format_feature_flags;
+@@ -2539,6 +2553,9 @@ panvk_GetPhysicalDeviceImageFormatProperties2(
+       case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_DRM_FORMAT_MODIFIER_INFO_EXT:
+          drm_info = s;
+          break;
++      case VK_STRUCTURE_TYPE_IMAGE_COMPRESSION_CONTROL_EXT:
++         compr_info = s;
++         break;
+       default:
+          break;
+       }
+@@ -2615,13 +2632,16 @@ panvk_GetPhysicalDeviceImageFormatProperties2(
+       }
+    }
+ 
++   const VkImageCompressionFlagsEXT compr_flags =
++      compr_info ? compr_info->flags : 0;
++
+    if (hic_props) {
+       /* We don't support AFBC for images used for host transfer. So, if an
+        * image could have been tiled as AFBC if it weren't for host transfer,
+        * report suboptimal access. */
+       hic_props->optimalDeviceAccess = !panvk_physical_device_can_use_afbc(
+          physical_device, base_info->format, base_info->type,
+-         base_info->tiling);
++         base_info->tiling, compr_flags);
+ 
+       /* FIXME: we only support host transfer with certain modifiers and for now
+        * there's no easy way to know whether the presence of HOST_TRANSFER will
+@@ -2647,7 +2667,7 @@ panvk_GetPhysicalDeviceImageFormatProperties2(
+       } else {
+          compressed = panvk_physical_device_can_use_afbc(
+             physical_device, base_info->format, base_info->type,
+-            base_info->tiling);
++            base_info->tiling, compr_flags);
+       }
+ 
+       panvk_image_set_compression_props(compression_props, compressed);

@@ -1,0 +1,544 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: Wed, 7 Oct 2026 20:00:00 +0530
+Subject: [PATCH] pan/bi: update LCRA constraints after spilling instead of rebuilding them, spill in one scan biblioklept
+
+After each spill round, register allocation rebuilt liveness and every
+interference constraint from scratch, though spilling only touches the
+spilled nodes and adds fill temporaries.
+
+Spilling a node keeps its definitions, adds stores of it and fills into
+new temporaries, and rewrites only its own sources. Every other node's
+liveness is unchanged, so the constraints between two other nodes are
+too. The constraint state now grows to the new node count, drops the
+spilled nodes' constraints, and an interference pass over the shader
+records only the constraints that involve a spilled or new node (clean
+definitions walk only the live "dirty" nodes). Affinities and forced
+registers are redone for those nodes.
+
+The spilled nodes of a round are also spilled from one scan of the
+shader: the instructions referencing each node (or defining its spill
+point) are collected first, then each node is spilled in turn exactly
+as before, so fills get the same temporaries in the same order.
+
+Output is identical on all 67539 corpus shaders. Host, 18 NFS-range
+synthetic shaders: 472 -> 345 ms, RA 348 -> 218 ms; 65 very large
+synthetic shaders: 13.8 -> 8.0 s.
+---
+diff --git a/src/panfrost/compiler/bifrost/bi_ra.c b/src/panfrost/compiler/bifrost/bi_ra.c
+--- a/src/panfrost/compiler/bifrost/bi_ra.c
++++ b/src/panfrost/compiler/bifrost/bi_ra.c
+@@ -595,19 +595,27 @@ bi_live_set_del(struct bi_live_set *s, unsigned v)
+    }
+ }
+ 
++/* With dirty == NULL, records every constraint. Otherwise only constraints
++ * involving a dirty node, and only dirty nodes' affinities: dls then tracks
++ * the live dirty nodes, so clean definitions only walk those.
++ */
+ static void
+ bi_mark_interference(bi_block *block, struct lcra_state *l, uint8_t *live,
+-                     struct bi_live_set *ls, uint64_t preload_live,
++                     struct bi_live_set *ls, struct bi_live_set *dls,
++                     const BITSET_WORD *dirty, uint64_t preload_live,
+                      bool is_blend, unsigned arch)
+ {
+    bool aligned_sr = arch >= 9;
+ 
++#define IS_DIRTY(v) (!dirty || BITSET_TEST(dirty, (v)))
++
+    bi_foreach_instr_in_block_rev(block, ins) {
+       /* Mark all registers live after the instruction as
+        * interfering with the destination */
+ 
+       bi_foreach_dest(ins, d) {
+          unsigned node = ins->dest[d].value;
++         bool node_dirty = IS_DIRTY(node);
+ 
+          /* Don't allocate to anything that's read later as a
+           * preloaded register. The affinity is the intersection
+@@ -617,7 +625,7 @@ bi_mark_interference(bi_block *block, struct lcra_state *l, uint8_t *live,
+           * offset, so we shift right. */
+          unsigned count = bi_count_write_registers(ins, d);
+          unsigned offset = ins->dest[d].offset;
+-         for (unsigned f = 0; f < 2; ++f) {
++         for (unsigned f = 0; f < 2 && node_dirty; ++f) {
+             uint64_t affinity =
+                bi_make_affinity(preload_live, count, f == 0) >> offset;
+             /* Valhall needs >= 64-bit staging writes to be pair-aligned */
+@@ -627,8 +635,10 @@ bi_mark_interference(bi_block *block, struct lcra_state *l, uint8_t *live,
+             l->aff[f][node] &= affinity;
+          }
+ 
+-         for (unsigned k = 0; k < ls->count; ++k) {
+-            unsigned i = ls->list[k];
++         struct bi_live_set *s = node_dirty ? ls : dls;
++
++         for (unsigned k = 0; k < s->count; ++k) {
++            unsigned i = s->list[k];
+             uint8_t r = live[i];
+ 
+             /* Nodes only interfere if they occupy
+@@ -650,7 +660,7 @@ bi_mark_interference(bi_block *block, struct lcra_state *l, uint8_t *live,
+          }
+ 
+          unsigned node_first = ins->dest[0].value;
+-         if (d == 1) {
++         if (d == 1 && (node_dirty || IS_DIRTY(node_first))) {
+             lcra_add_node_interference(l, node, bi_writemask(ins, 1),
+                                        node_first, bi_writemask(ins, 0));
+          }
+@@ -667,7 +677,8 @@ bi_mark_interference(bi_block *block, struct lcra_state *l, uint8_t *live,
+          const unsigned dmask = bi_writemask(ins, 0);
+ 
+          for (unsigned s = 0; s < 2; ++s) {
+-            if (bi_is_ssa(ins->src[s]))
++            if (bi_is_ssa(ins->src[s]) &&
++                (IS_DIRTY(dnode) || IS_DIRTY(ins->src[s].value)))
+                lcra_add_node_interference(l, dnode, dmask, ins->src[s].value,
+                                           dmask);
+          }
+@@ -676,6 +687,9 @@ bi_mark_interference(bi_block *block, struct lcra_state *l, uint8_t *live,
+       /* Valhall needs >= 64-bit reads to be pair-aligned */
+       if (aligned_sr) {
+          bi_foreach_ssa_src(ins, s) {
++            if (!IS_DIRTY(ins->src[s].value))
++               continue;
++
+             if (bi_count_read_registers(ins, s) >= 2 ||
+                 (s < valhall_opcodes[ins->op].nr_srcs &&
+                  va_src_info(ins->op, s).size > VA_SIZE_32)) {
+@@ -690,37 +704,48 @@ bi_mark_interference(bi_block *block, struct lcra_state *l, uint8_t *live,
+          uint64_t clobber =
+             BITFIELD64_MASK(16) |
+             BITFIELD64_BIT(bi_preload_reg(BI_PRELOAD_BLEND_LINK, arch));
+-         for (unsigned k = 0; k < ls->count; ++k) {
+-            l->aff[0][ls->list[k]] &= ~clobber;
+-            l->aff[1][ls->list[k]] &= ~clobber;
++         struct bi_live_set *s = dirty ? dls : ls;
++
++         for (unsigned k = 0; k < s->count; ++k) {
++            l->aff[0][s->list[k]] &= ~clobber;
++            l->aff[1][s->list[k]] &= ~clobber;
+          }
+       }
+ 
+       /* Update live_in */
+       preload_live = bi_postra_liveness_ins(preload_live, ins);
+ 
+-      /* bi_liveness_ins_update_ra, keeping the live set in sync */
++      /* bi_liveness_ins_update_ra, keeping the live sets in sync */
+       bi_foreach_dest(ins, d) {
+          unsigned v = ins->dest[d].value;
+          live[v] &= ~bi_writemask(ins, d);
+-         if (!live[v])
++         if (!live[v]) {
+             bi_live_set_del(ls, v);
++            if (dirty && BITSET_TEST(dirty, v))
++               bi_live_set_del(dls, v);
++         }
+       }
+ 
+       bi_foreach_ssa_src(ins, src) {
+          unsigned v = ins->src[src].value;
+          unsigned rmask = BITFIELD_MASK(bi_count_read_registers(ins, src));
+          live[v] |= (rmask << ins->src[src].offset);
+-         if (live[v])
++         if (live[v]) {
+             bi_live_set_add(ls, v);
++            if (dirty && BITSET_TEST(dirty, v))
++               bi_live_set_add(dls, v);
++         }
+       }
+    }
+ 
++#undef IS_DIRTY
++
+    block->reg_live_in = preload_live;
+ }
+ 
+ static void
+-bi_compute_interference(bi_context *ctx, struct lcra_state *l)
++bi_compute_interference(bi_context *ctx, struct lcra_state *l,
++                        const BITSET_WORD *dirty)
+ {
+    struct bi_ra_live g;
+    bi_compute_liveness_ra(ctx, &g);
+@@ -732,9 +757,14 @@ bi_compute_interference(bi_context *ctx, struct lcra_state *l)
+       .list = malloc(sizeof(unsigned) * n),
+       .pos = malloc(sizeof(unsigned) * n),
+    };
++   struct bi_live_set dls = {
++      .list = malloc(sizeof(unsigned) * n),
++      .pos = malloc(sizeof(unsigned) * n),
++   };
+    memset(ls.pos, ~0, sizeof(unsigned) * n);
++   memset(dls.pos, ~0, sizeof(unsigned) * n);
+ 
+-   /* live[] and the live set are all clear between blocks: only the global
++   /* live[] and the live sets are all clear between blocks: only the global
+     * nodes live out of the block need to be set up. */
+    bi_foreach_block_rev(ctx, blk) {
+       for (unsigned k = 0; k < g.count; ++k) {
+@@ -742,28 +772,36 @@ bi_compute_interference(bi_context *ctx, struct lcra_state *l)
+             unsigned v = g.glist[k];
+             live[v] = blk->live_out[k];
+             bi_live_set_add(&ls, v);
++            if (dirty && BITSET_TEST(dirty, v))
++               bi_live_set_add(&dls, v);
+          }
+       }
+ 
+-      bi_mark_interference(blk, l, live, &ls, blk->reg_live_out,
++      bi_mark_interference(blk, l, live, &ls, &dls, dirty, blk->reg_live_out,
+                            ctx->inputs->is_blend, ctx->arch);
+ 
+       for (unsigned k = 0; k < ls.count; ++k) {
+          live[ls.list[k]] = 0;
+          ls.pos[ls.list[k]] = ~0u;
+       }
+-      ls.count = 0;
++      for (unsigned k = 0; k < dls.count; ++k)
++         dls.pos[dls.list[k]] = ~0u;
++      ls.count = dls.count = 0;
+    }
+ 
+    free(live);
+    free(ls.list);
+    free(ls.pos);
++   free(dls.list);
++   free(dls.pos);
+    bi_ra_live_fini(&g);
+ }
+ 
+-/* Default affinities and forced registers */
++/* Default affinities (of dirty nodes, or all with dirty == NULL) and forced
++ * registers */
+ static void
+-bi_lcra_init_nodes(bi_context *ctx, struct lcra_state *l)
++bi_lcra_init_nodes(bi_context *ctx, struct lcra_state *l,
++                   const BITSET_WORD *dirty)
+ {
+    /* Blend shaders are restricted to R0-R15. Other shaders at full
+     * occupancy also can access R48-R63. At half occupancy they can access
+@@ -786,8 +824,11 @@ bi_lcra_init_nodes(bi_context *ctx, struct lcra_state *l)
+ 
+    bi_foreach_instr_global(ctx, ins) {
+       bi_foreach_dest(ins, d) {
+-         l->aff[0][ins->dest[d].value] = default_affinity[0];
+-         l->aff[1][ins->dest[d].value] = default_affinity[1];
++         unsigned v = ins->dest[d].value;
++         if (!dirty || BITSET_TEST(dirty, v)) {
++            l->aff[0][v] = default_affinity[0];
++            l->aff[1][v] = default_affinity[1];
++         }
+       }
+ 
+       /* Blend shaders expect the src colour to be in blend_src0_c0
+@@ -843,8 +884,8 @@ bi_build_lcra(bi_context *ctx)
+    util_dynarray_init(&pending, NULL);
+    l->pending = &pending;
+ 
+-   bi_lcra_init_nodes(ctx, l);
+-   bi_compute_interference(ctx, l);
++   bi_lcra_init_nodes(ctx, l, NULL);
++   bi_compute_interference(ctx, l, NULL);
+    lcra_flush_pending(l);
+ 
+    l->pending = NULL;
+@@ -852,6 +893,113 @@ bi_build_lcra(bi_context *ctx)
+    return l;
+ }
+ 
++static void
++nodearray_clear_key(nodearray *a, unsigned key)
++{
++   if (!nodearray_is_sparse(a)) {
++      if (key < a->size)
++         a->dense[key] = 0;
++      return;
++   }
++
++   if (!a->size)
++      return;
++
++   nodearray_sparse *elem;
++   unsigned idx = nodearray_sparse_search(a, key, &elem);
++
++   if (nodearray_sparse_key(elem) == key) {
++      memmove(elem, elem + 1, (a->size - idx - 1) * sizeof(*elem));
++      a->size--;
++   }
++}
++
++static void
++lcra_grow(struct lcra_state *l, unsigned n)
++{
++   unsigned old = l->node_count;
++
++   if (n == old)
++      return;
++
++   l->linear = realloc(l->linear, n * sizeof(l->linear[0]));
++   memset(l->linear + old, 0, (n - old) * sizeof(l->linear[0]));
++
++   for (unsigned i = 0; i < old; ++i) {
++      nodearray *a = &l->linear[i];
++
++      if (!nodearray_is_sparse(a)) {
++         unsigned from = NODEARRAY_DENSE_ALIGN(a->size);
++         unsigned to = NODEARRAY_DENSE_ALIGN(n);
++
++         a->dense = realloc(a->dense, to * sizeof(nodearray_value));
++         memset(a->dense + from, 0, (to - from) * sizeof(nodearray_value));
++         a->size = n;
++      }
++   }
++
++#define GROW(arr)                                                              \
++   do {                                                                        \
++      arr = realloc(arr, n * sizeof(arr[0]));                                  \
++      memset(arr + old, 0, (n - old) * sizeof(arr[0]));                        \
++   } while (0)
++
++   GROW(l->aff[0]);
++   GROW(l->aff[1]);
++   GROW(l->solutions);
++   GROW(l->forced);
++#undef GROW
++
++   free(l->failed);
++   l->failed = NULL;
++   l->node_count = n;
++}
++
++/* Spilling only changes the spilled nodes and adds fill temporaries: no
++ * other node gains or loses a definition, and the spill code reads and
++ * writes nothing else, so every other node's liveness is unchanged. Remove
++ * the spilled nodes' constraints and recompute those involving a spilled
++ * node or a new node. The result is the same as a full rebuild, without
++ * redoing the constraints between all the other nodes.
++ */
++static void
++bi_update_lcra(bi_context *ctx, struct lcra_state *l, const unsigned *spilled,
++               unsigned spilled_count)
++{
++   unsigned old = l->node_count, n = ctx->ssa_alloc;
++
++   lcra_grow(l, n);
++
++   BITSET_WORD *dirty = BITSET_CALLOC(n);
++   BITSET_SET_RANGE(dirty, old, n - 1);
++
++   for (unsigned s = 0; s < spilled_count; ++s) {
++      unsigned x = spilled[s];
++      nodearray *row = &l->linear[x];
++
++      BITSET_SET(dirty, x);
++
++      if (nodearray_is_sparse(row)) {
++         nodearray_sparse_foreach(row, elem)
++            nodearray_clear_key(&l->linear[nodearray_sparse_key(elem)], x);
++      } else {
++         for (unsigned j = 0; j < row->size; ++j) {
++            if (row->dense[j])
++               nodearray_clear_key(&l->linear[j], x);
++         }
++      }
++
++      nodearray_reset(row);
++
++      /* init_nodes only resets the affinity of nodes it finds defined */
++      l->aff[0][x] = l->aff[1][x] = 0;
++   }
++
++   bi_lcra_init_nodes(ctx, l, dirty);
++   bi_compute_interference(ctx, l, dirty);
++   free(dirty);
++}
++
+ static bool
+ bi_solve_lcra(bi_context *ctx, struct lcra_state *l, bool full_regs)
+ {
+@@ -1145,30 +1293,99 @@ bi_compute_reg_alignment(bi_context *ctx)
+    }
+ }
+ 
+-/* Once we've chosen a spill node, spill it and return new (aligned) offset */
++struct bi_spill_ref {
++   bi_block *block;
++   bi_instr *I;
++};
+ 
++static void
++bi_spill_ref_add(struct util_dynarray *refs, bi_block *block, bi_instr *I)
++{
++   struct bi_spill_ref *last =
++      refs->size ? util_dynarray_top_ptr(refs, struct bi_spill_ref) : NULL;
++   if (!last || last->I != I)
++      util_dynarray_append_typed(refs, struct bi_spill_ref,
++                                 ((struct bi_spill_ref){block, I}));
++}
++
++/* Spills nodes[k] with spill point points[k] for each k in turn, returning the
++ * new (aligned) offset. Spilling a node only inserts instructions referencing
++ * that node and new temporaries, and only rewrites that node's sources, so
++ * the instructions referencing each node (or defining its spill point) are
++ * collected in one scan instead of scanning the shader once per node.
++ */
+ static unsigned
+-bi_spill_register(bi_context *ctx, bi_index index, uint32_t offset,
+-                  bi_index spill_point)
++bi_spill_registers(bi_context *ctx, const unsigned *nodes,
++                   const unsigned *points, unsigned count, uint32_t offset)
+ {
+    bi_builder b = {.shader = ctx};
+    if (!ctx->reg_alignment)
+       bi_compute_reg_alignment(ctx);
+-   assert(index.value < ctx->ssa_alloc);
+-   unsigned channels = ctx->reg_alignment[index.value] / 4;
+-   assert(channels > 0);
+-   unsigned alignment = (ctx->arch >= 9) ? ctx->reg_alignment[index.value] : 4;
+ 
+-   /* first figure out the alignment we will need, based on the
+-    * maximum count we see
+-    */
+-   offset = ALIGN_POT(offset, alignment);
++   unsigned n = ctx->ssa_alloc;
++   int *by_node = malloc(sizeof(int) * n);
++   int *by_point = malloc(sizeof(int) * n);
++   int *next_point = malloc(sizeof(int) * MAX2(count, 1));
++   struct util_dynarray *refs = calloc(MAX2(count, 1), sizeof(*refs));
++   memset(by_node, ~0, sizeof(int) * n);
++   memset(by_point, ~0, sizeof(int) * n);
++
++   for (unsigned k = 0; k < count; ++k) {
++      assert(by_node[nodes[k]] < 0);
++      by_node[nodes[k]] = k;
++      next_point[k] = by_point[points[k]];
++      by_point[points[k]] = k;
++      util_dynarray_init(&refs[k], NULL);
++   }
+ 
+-   /* Spill after every store, fill before every load */
+    bi_foreach_block(ctx, block) {
++      bi_foreach_instr_in_block(block, I) {
++         bi_foreach_dest(I, d) {
++            if (I->dest[d].type != BI_INDEX_NORMAL)
++               continue;
++
++            unsigned v = I->dest[d].value;
++            for (int k = by_point[v]; k >= 0; k = next_point[k])
++               bi_spill_ref_add(&refs[k], block, I);
++            if (by_node[v] >= 0)
++               bi_spill_ref_add(&refs[by_node[v]], block, I);
++         }
++
++         bi_foreach_src(I, s) {
++            if (I->src[s].type == BI_INDEX_NORMAL &&
++                by_node[I->src[s].value] >= 0)
++               bi_spill_ref_add(&refs[by_node[I->src[s].value]], block, I);
++         }
++      }
++   }
++
++   for (unsigned k = 0; k < count; ++k) {
++      bi_index index = bi_get_index(nodes[k]);
++      bi_index spill_point = bi_get_index(points[k]);
++      unsigned channels = ctx->reg_alignment[index.value] / 4;
++      assert(channels > 0);
++      unsigned alignment =
++         (ctx->arch >= 9) ? ctx->reg_alignment[index.value] : 4;
++
++      /* first figure out the alignment we will need, based on the
++       * maximum count we see
++       */
++      offset = ALIGN_POT(offset, alignment);
++
++      /* Spill after every store, fill before every load */
++      bi_block *block = NULL;
+       bool fill = true;
+       bool found_spill_point = false;
+-      bi_foreach_instr_in_block_safe(block, I) {
++
++      util_dynarray_foreach(&refs[k], struct bi_spill_ref, ref) {
++         bi_instr *I = ref->I;
++
++         if (ref->block != block) {
++            block = ref->block;
++            fill = true;
++            found_spill_point = false;
++         }
++
+          bi_foreach_dest(I, d) {
+             if (bi_is_equiv(I->dest[d], spill_point)) {
+                found_spill_point = true;
+@@ -1201,9 +1418,16 @@ bi_spill_register(bi_context *ctx, bi_index index, uint32_t offset,
+             ld->no_spill = true;
+          }
+       }
++
++      offset += channels * 4;
++      util_dynarray_fini(&refs[k]);
+    }
+ 
+-   return offset + (channels * 4);
++   free(refs);
++   free(next_point);
++   free(by_point);
++   free(by_node);
++   return offset;
+ }
+ 
+ /*
+@@ -1729,8 +1953,6 @@ bi_register_allocate(bi_context *ctx)
+ 
+    /* Otherwise, use the register file and spill until we succeed */
+    while (!success && ((iter_count++) < max_iters)) {
+-      if (!l)
+-         l = bi_build_lcra(ctx);
+       success = bi_solve_lcra(ctx, l, true);
+ 
+       if (success) {
+@@ -1746,6 +1968,8 @@ bi_register_allocate(bi_context *ctx)
+          BITSET_WORD *no_spill = bi_no_spill_set(ctx, l);
+          unsigned *benefit = malloc(sizeof(*benefit) * l->node_count);
+          memset(benefit, ~0, sizeof(*benefit) * l->node_count);
++         unsigned *spilled_nodes = malloc(sizeof(unsigned) * l->failed_count);
++         unsigned *spill_points = malloc(sizeof(unsigned) * l->failed_count);
+          unsigned spilled = 0;
+ 
+          for (unsigned f = 0; f < l->failed_count; ++f) {
+@@ -1756,24 +1980,26 @@ bi_register_allocate(bi_context *ctx)
+ 
+             /* Don't pick it again for another failed node */
+             BITSET_SET(no_spill, spill_node);
+-            spill_count =
+-               bi_spill_register(ctx, bi_get_index(spill_node), spill_count,
+-                                 bi_get_index(l->failed[f]));
+-            spilled++;
++            spill_points[spilled] = l->failed[f];
++            spilled_nodes[spilled++] = spill_node;
+          }
+ 
++         spill_count = bi_spill_registers(ctx, spilled_nodes, spill_points,
++                                          spilled, spill_count);
++         free(spill_points);
++
+          free(benefit);
+          free(no_spill);
+ 
+          if (spilled == 0)
+             UNREACHABLE("Failed to choose spill node\n");
+ 
+-         lcra_free(l);
+-         l = NULL;
+          /* In case the spill affected an instruction with tied
+           * operands, we need to fix up.
+           */
+          bi_coalesce_tied(ctx);
++         bi_update_lcra(ctx, l, spilled_nodes, spilled);
++         free(spilled_nodes);
+       }
+    }
+ 

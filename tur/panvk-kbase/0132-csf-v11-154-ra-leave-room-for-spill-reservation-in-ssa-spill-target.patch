@@ -1,0 +1,44 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: Wed, 7 Oct 2026 16:00:00 +0530
+Subject: [PATCH] pan/bi: leave room for the spill reservation in the SSA spill target biblioklept
+
+bi_spill_ssa() brings the SSA register demand down to k = 64, but
+bi_calc_register_demand() then adds 8 reserved registers for the
+spiller's parallel copies (reserved_size() in bi_ra_ssa.c), and vector
+widths are rounded up. Demand after SSA spilling was still 77-87, so
+LCRA had to find the rest with its own, much slower and worse, spilling.
+
+Give bi_spill_ssa() k = 64 - 8 (at least 16 for BIFROST_DBG_SPILL).
+More of the spilling happens in the SSA spiller, which places spill
+code better: with csf-v11/153, on 67539 captured shaders (CTS shader
+subset + 47 synthetic D3D9-style stress shaders, x86 host replay):
+
+                       before        after
+  total fills          80721         79843
+  total instrs       8646184       8648305  (+0.02%)
+  32-reg shaders       57908         57908  (no occupancy change)
+  CTS p50 / max      0.30 / 1919 ms   0.30 / 540 ms (max is a 30k-instr CS,
+                                                  no spills)
+  synthetic p50/max  1833 / 62766 ms  85 / 953 ms
+
+Shaders that spill pay +0.9% instructions (geomean) for this; total
+fills go down.
+---
+diff --git a/src/panfrost/compiler/bifrost/bi_ra.c b/src/panfrost/compiler/bifrost/bi_ra.c
+--- a/src/panfrost/compiler/bifrost/bi_ra.c
++++ b/src/panfrost/compiler/bifrost/bi_ra.c
+@@ -1411,7 +1411,12 @@ bi_register_allocate(bi_context *ctx)
+          if (ctx->inputs->is_blend)
+             UNREACHABLE("Blend shaders may not spill");
+ 
+-         bi_spill_ssa(ctx, regs_to_use);
++         /* Spilling reserves 8 registers for its parallel copies on top of
++          * the k it is given (see reserved_size() in bi_ra_ssa.c), so
++          * k = 64 left ~87 registers of demand and LCRA had to spill the
++          * rest one RA pass at a time. Leave room for the reservation.
++          */
++         bi_spill_ssa(ctx, MAX2(regs_to_use - 8, 16));
+          spill_count += bi_lower_spill(ctx, spill_count);
+ 
+          /* By default, we use packed TLS addressing on Valhall.

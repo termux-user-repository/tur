@@ -1,0 +1,177 @@
+From: abhay-byte <zenithblue.dev@gmail.com>
+Subject: [PATCH csf-v11 073] panvk: implement VK_EXT_primitives_generated_query on v10+
+
+Generated-by: LLM
+
+Purpose: Implement VK_EXT_primitives_generated_query on v10+; GS primitives counted by the gpu_prerast GS kernel; biblioklept
+Source/Reference: local, work/mesa-p3 dx-p3 2360779d7f8
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/072
+Validation test: CTS dEQP-VK.transform_feedback.primitives_generated_query.* 107866 cases 75206 Pass 0 Fail
+
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+index f32f331e9dc..07c08a40601 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+@@ -2988,11 +2988,15 @@ update_prims_generated_query(struct panvk_cmd_buffer *cmdbuf,
+    if (!state->ptr)
+       return;
+ 
+-   assert(!draw->index.index_size || !ia->primitive_restart_enable);
++   /* The GS kernel adds the primitives it emits. */
++   if (draw->gpu_prerast_generated && cmdbuf->state.gfx.gs.shader)
++      return;
+ 
+    uint32_t view_count = cmdbuf->state.gfx.render.view_mask ?
+       util_bitcount(cmdbuf->state.gfx.render.view_mask) : 1;
+ 
++   assert(!draw->index.index_size || !ia->primitive_restart_enable);
++
+    if (draw->index.index_size && ia->primitive_restart_enable) {
+       struct panvk_precomp_ctx precomp_ctx = panvk_per_arch(precomp_cs)(cmdbuf);
+ 
+@@ -3717,6 +3721,7 @@ gpu_prerast_gs_run(struct panvk_cmd_buffer *cmdbuf,
+       pstats, VK_QUERY_PIPELINE_STATISTIC_CLIPPING_INVOCATIONS_BIT, true));
+    STORE_GS64(stats[3], panvk_pstats_counter_addr(
+       pstats, VK_QUERY_PIPELINE_STATISTIC_CLIPPING_PRIMITIVES_BIT, true));
++   STORE_GS64(prims_generated, cmdbuf->state.gfx.prims_generated_query.ptr);
+ #undef STORE_GS32
+ #undef STORE_GS64
+ 
+@@ -4502,18 +4507,10 @@ gpu_prerast_tess(struct panvk_cmd_buffer *cmdbuf,
+       panlib_1d(DIV_ROUND_UP(max_patches, 64));
+    const uint64_t prims_generated =
+       gs ? 0 : cmdbuf->state.gfx.prims_generated_query.ptr;
+-   const uint64_t prims_generated_gs =
+-      gs ? cmdbuf->state.gfx.prims_generated_query.ptr : 0;
+    const uint32_t view_count =
+       cmdbuf->state.gfx.render.view_mask
+          ? util_bitcount(cmdbuf->state.gfx.render.view_mask)
+          : 1;
+-   const enum mesa_prim gs_out_prim =
+-      !gs ? MESA_PRIM_POINTS
+-      : gs->gpu_prerast.gs.output_prim == MESA_PRIM_POINTS ? MESA_PRIM_POINTS
+-      : gs->gpu_prerast.gs.output_prim == MESA_PRIM_LINE_STRIP
+-         ? MESA_PRIM_LINE_STRIP
+-         : MESA_PRIM_TRIANGLE_STRIP;
+    const uint64_t c_invs =
+       gs ? 0
+          : panvk_pstats_counter_addr(
+@@ -4599,20 +4596,6 @@ gpu_prerast_tess(struct panvk_cmd_buffer *cmdbuf,
+                prerast_arena + PANVK_GPU_PRERAST_RECORD_OFFSET,
+                prerast_arena + PANVK_GPU_PRERAST_INDEX_OFFSET,
+                TD(gs_prim_base), PANVK_CSF_BARRIER_WAIT);
+-            /* Counted per range, like the GS output draw of gpu_prerast_draw. */
+-            if (prims_generated_gs) {
+-               cs_wait_slots(b, dev->csf.sb.all_iters_mask);
+-               struct panlib_update_prims_generated_query_indirect_args args = {
+-                  .prims_generated = prims_generated_gs,
+-                  .max_draw_count = 1,
+-                  .cmd_stride = sizeof(struct poly_indirect_draw),
+-                  .cmd = prerast_arena + PANVK_GPU_PRERAST_GS_DRAW_OFFSET,
+-                  .view_count = view_count,
+-               };
+-               panlib_update_prims_generated_query_indirect_struct(
+-                  &ctx, panlib_1d(1), PANLIB_BARRIER_NONE, args,
+-                  poly_compact_prim(gs_out_prim));
+-            }
+          }
+          if (xfb) {
+             gpu_prerast_xfb(cmdbuf, &out, prerast_arena, PANLIB_BARRIER_NONE);
+@@ -4803,8 +4786,12 @@ panvk_cmd_draw(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info draw)
+    /* If there's no vertex shader, we can skip the draw. With tessellation,
+     * the TES rasterizes and the VS may be empty.
+     */
++   /* A GS that writes no outputs still generates primitives for the query. */
++   const bool gs_counts_prims = cmdbuf->state.gfx.gs.shader &&
++                                cmdbuf->state.gfx.prims_generated_query.ptr;
+    if (draw.prim != MESA_PRIM_PATCHES && !panvk_priv_mem_check_alloc(vs->spd) &&
+-       (draw.gpu_prerast_generated || !gpu_prerast_xfb_active(cmdbuf)))
++       (draw.gpu_prerast_generated ||
++        (!gpu_prerast_xfb_active(cmdbuf) && !gs_counts_prims)))
+       return;
+ 
+    /* Count once per API draw, before gpu_prerast splits or lowers it. */
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_query.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_query.c
+index 8334a8508c5..15d15b378f7 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_query.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_query.c
+@@ -717,13 +717,15 @@ panvk_cmd_end_prims_generated_query(
+     *
+     * No need to wait on iter_sb because all shader invocations to update the
+     * counter use PANLIB_BARRIER_CSF_WAIT already, and all direct draws update
+-    * the counter synchronously.
++    * the counter synchronously. The gpu_prerast GS kernel adds to the counter
++    * without such a barrier, so wait for all iterators.
+     */
++   struct panvk_device *dev = to_panvk_device(cmd->vk.base.device);
+    cs_move32_to(b, val, 0);
+    cs_flush_caches(
+       b, MALI_CS_FLUSH_MODE_CLEAN, MALI_CS_FLUSH_MODE_CLEAN,
+       MALI_CS_OTHER_FLUSH_MODE_NONE, val,
+-      cs_defer(SB_IMM_MASK, SB_ID(DEFERRED_FLUSH)));
++      cs_defer(dev->csf.sb.all_iters_mask, SB_ID(DEFERRED_FLUSH)));
+ 
+    /* Signal the query syncobj after the flush is effective. */
+    cs_move32_to(b, val, 1);
+diff --git a/src/panfrost/vulkan/panvk_gpu_prerast.h b/src/panfrost/vulkan/panvk_gpu_prerast.h
+index c19ecc33e7e..73f655d8df3 100644
+--- a/src/panfrost/vulkan/panvk_gpu_prerast.h
++++ b/src/panfrost/vulkan/panvk_gpu_prerast.h
+@@ -187,6 +187,8 @@ struct panvk_gpu_prerast_gs_params {
+     * counted: GS invocations, GS primitives, clipping invocations and
+     * clipping primitives. */
+    uint64_t stats[4];
++   /* 32-bit primitives generated query counter, 0 when no query is active. */
++   uint64_t prims_generated;
+ };
+ 
+ static_assert(PANVK_GPU_PRERAST_GS_PARAMS_OFFSET +
+diff --git a/src/panfrost/vulkan/panvk_vX_physical_device.c b/src/panfrost/vulkan/panvk_vX_physical_device.c
+index 1e77308e2a4..eec5c4a138d 100644
+--- a/src/panfrost/vulkan/panvk_vX_physical_device.c
++++ b/src/panfrost/vulkan/panvk_vX_physical_device.c
+@@ -202,6 +202,7 @@ panvk_per_arch(get_physical_device_extensions)(
+ #endif
+       .EXT_private_data = true,
+       .EXT_primitive_topology_list_restart = true,
++      .EXT_primitives_generated_query = PAN_ARCH >= 10,
+       .EXT_provoking_vertex = true,
+       .EXT_queue_family_foreign = true,
+       .EXT_rasterization_order_attachment_access = PAN_ARCH >= 10,
+@@ -613,6 +614,11 @@ panvk_per_arch(get_physical_device_features)(
+       .primitiveTopologyListRestart = true,
+       .primitiveTopologyPatchListRestart = false,
+ 
++      /* VK_EXT_primitives_generated_query */
++      .primitivesGeneratedQuery = PAN_ARCH >= 10,
++      .primitivesGeneratedQueryWithRasterizerDiscard = PAN_ARCH >= 10,
++      .primitivesGeneratedQueryWithNonZeroStreams = false,
++
+       /* VK_EXT_provoking_vertex */
+       .provokingVertexLast = true,
+       .transformFeedbackPreservesProvokingVertex = false,
+diff --git a/src/panfrost/vulkan/panvk_vX_shader.c b/src/panfrost/vulkan/panvk_vX_shader.c
+index b25a12b0bbe..68fc6a34da8 100644
+--- a/src/panfrost/vulkan/panvk_vX_shader.c
++++ b/src/panfrost/vulkan/panvk_vX_shader.c
+@@ -1962,6 +1962,17 @@ panvk_gpu_prerast_lower_gs(nir_shader *nir,
+                            .atomic_op = nir_atomic_op_iadd);
+          nir_pop_if(b, NULL);
+       }
++
++      nir_def *pgq = nir_load_global(
++         b, 1, 64,
++         nir_iadd_imm(b, p,
++                      offsetof(struct panvk_gpu_prerast_gs_params,
++                               prims_generated)),
++         .align_mul = 8);
++      nir_push_if(b, nir_ine_imm(b, pgq, 0));
++      nir_global_atomic(b, 32, pgq, nir_load_var(b, s.prims),
++                        .atomic_op = nir_atomic_op_iadd);
++      nir_pop_if(b, NULL);
+    }
+    nir_pop_if(b, NULL);
+ 

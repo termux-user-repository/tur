@@ -1,0 +1,286 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: Tue, 6 Oct 2026 00:10:00 +0530
+Subject: [PATCH] wsi/x11: sw present via MIT-SHM AttachFd, pace sw FIFO
+
+Software X11 present (no DRI3, the launcher's X server or Termux:X11) sent
+each frame through the X socket with PutImage, and FIFO was not paced:
+the server completes at once and has no real vblank.
+
+- If the server has MIT-SHM >= 1.2, back each swapchain image with a memfd
+  segment passed with xcb_shm_attach_fd (Android has no SysV shm), copy
+  the frame into it once and send ShmPutImage. Damage rects are clipped
+  and copied per rect. Any probe or attach failure keeps the PutImage path
+  for the whole chain. MESA_VK_WSI_DEBUG=noshm turns it off.
+  The memfd gets F_SEAL_SHRINK | F_SEAL_GROW before AttachFd so the
+  server's mapping cannot be SIGBUSed by a shrink (seal failure ignored).
+  The per-present GetGeometry is sent after the ShmPutImage on this path,
+  so its reply proves the server read the segment before the next copy.
+- FIFO / FIFO_RELAXED on the sw path wait on the present thread until the
+  next refresh deadline from MESA_VK_X11_SW_REFRESH_HZ (the launcher sets
+  the display's max refresh rate). Unset or 0 = unpaced, as before.
+  MAILBOX / IMMEDIATE unchanged; present id / vkWaitForPresentKHR (084) and
+  the present-thread fence wait (106) unchanged.
+
+Purpose: cheaper sw X11 present, real FIFO cadence; biblioklept
+Tested GPU: none for this patch (G615 unavailable); host Xwayland check of the same request path, see worklogs/driver-remaining/117-x11-shm-present.md
+Tested Kbase UAPI: n/a
+Mesa base range: 5a07217f034b (26.3.0-devel)
+Dependencies: csf-v11/083, csf-v11/084, csf-v11/106
+Validation test: tests/x11-shm/x11_shm_present_test.c under headless Xwayland: ShmPutImage(attach_fd) 2253-2532 fps vs PutImage 936-998 fps at 1280x720, 445-475 vs 281-301 at 1920x1080 (GetGeometry round trip per frame), readback ok; -extension MIT-SHM falls back to PutImage, readback ok
+
+Generated-by: LLM
+---
+
+diff --git a/src/vulkan/wsi/wsi_common_x11.c b/src/vulkan/wsi/wsi_common_x11.c
+index 0edfffb..eb1801f 100644
+--- a/src/vulkan/wsi/wsi_common_x11.c
++++ b/src/vulkan/wsi/wsi_common_x11.c
+@@ -44,6 +44,7 @@
+ #include <fcntl.h>
+ #include "drm-uapi/drm_fourcc.h"
+ #include "util/libdrm.h"
++#include "util/anon_file.h"
+ #include "util/cnd_monotonic.h"
+ #include "util/hash_table.h"
+ #include "util/mesa-blake3.h"
+@@ -66,6 +67,8 @@
+ #include "wsi_common_queue.h"
+ #include "loader/loader_dri_helper_screen.h"
+ 
++#include <sys/mman.h>
++
+ #ifdef HAVE_SYS_SHM_H
+ #include <sys/ipc.h>
+ #include <sys/shm.h>
+@@ -1239,6 +1242,9 @@ struct x11_image {
+    xcb_shm_seg_t                             shmseg;
+    int                                       shmid;
+    uint8_t *                                 shmaddr;
++   /* sw present via MIT-SHM AttachFd: memfd copy target for ShmPutImage */
++   void *                                    sw_shm_map;
++   size_t                                    sw_shm_size;
+    uint64_t                                  present_id;
+    VkPresentModeKHR                          present_mode;
+    xcb_rectangle_t                           rects[MAX_DAMAGE_RECTS];
+@@ -1274,6 +1280,11 @@ struct x11_swapchain {
+    bool                                         has_mit_shm;
+    bool                                         has_async_may_tear;
+    bool                                         msc_estimate_is_stable;
++   /* sw present: ShmPutImage from memfd segments instead of PutImage */
++   bool                                         sw_shm;
++   /* sw present: FIFO cadence (0 = unpaced) and next present deadline */
++   uint64_t                                     sw_fifo_interval_ns;
++   uint64_t                                     sw_next_present_ns;
+ 
+    xcb_connection_t *                           conn;
+    xcb_window_t                                 window;
+@@ -1879,8 +1890,12 @@ x11_present_to_x11_sw(struct x11_swapchain *chain, uint32_t image_index)
+    struct x11_image *image = &chain->images[image_index];
+ 
+    /* Begin querying this before submitting the frame for improved async performance.
+-    * In this _sw() mode we're expecting network round-trip delay, not just UNIX socket delay. */
+-   xcb_get_geometry_cookie_t geom_cookie = xcb_get_geometry(chain->conn, chain->window);
++    * In this _sw() mode we're expecting network round-trip delay, not just UNIX socket delay.
++    * With MIT-SHM it goes after the put instead: its reply then proves the server
++    * has read the segment, so the next copy into it cannot race. */
++   xcb_get_geometry_cookie_t geom_cookie = { 0 };
++   if (!chain->sw_shm)
++      geom_cookie = xcb_get_geometry(chain->conn, chain->window);
+ 
+    xcb_void_cookie_t cookie;
+    void *myptr = image->base.cpu_map;
+@@ -1889,7 +1904,39 @@ x11_present_to_x11_sw(struct x11_swapchain *chain, uint32_t image_index)
+    size_t size = (hdr_len + stride_b * chain->extent.height) >> 2;
+    uint64_t max_req_len = xcb_get_maximum_request_length(chain->conn);
+ 
+-   if (image->rectangle_count > 0) {
++   if (chain->sw_shm) {
++      /* One CPU copy into the memfd segment; the server reads it directly. */
++      int n = image->rectangle_count;
++      xcb_rectangle_t full = { 0, 0, chain->extent.width, chain->extent.height };
++      const xcb_rectangle_t *rects = n > 0 ? image->rects : &full;
++      for (int i = 0; i < MAX2(n, 1); i++) {
++         xcb_rectangle_t rect = rects[i];
++         /* app damage rects are unclipped: keep copies inside the segment */
++         if (rect.x < 0 || rect.y < 0 ||
++             rect.x >= chain->extent.width || rect.y >= chain->extent.height)
++            continue;
++         rect.width = MIN2(rect.width, chain->extent.width - rect.x);
++         rect.height = MIN2(rect.height, chain->extent.height - rect.y);
++         size_t off = (size_t)rect.y * stride_b + (size_t)rect.x * 4;
++         if (rect.x == 0 && rect.width == chain->extent.width) {
++            memcpy((uint8_t *)image->sw_shm_map + off, (uint8_t *)myptr + off,
++                   (size_t)rect.height * stride_b);
++         } else {
++            for (int j = 0; j < rect.height; j++)
++               memcpy((uint8_t *)image->sw_shm_map + off + (size_t)j * stride_b,
++                      (uint8_t *)myptr + off + (size_t)j * stride_b,
++                      (size_t)rect.width * 4);
++         }
++         cookie = xcb_shm_put_image(chain->conn, chain->window, chain->gc,
++                                    stride_b / 4, chain->extent.height,
++                                    rect.x, rect.y, rect.width, rect.height,
++                                    rect.x, rect.y, chain->depth,
++                                    XCB_IMAGE_FORMAT_Z_PIXMAP, 0,
++                                    image->shmseg, 0);
++         xcb_discard_reply(chain->conn, cookie.sequence);
++      }
++      geom_cookie = xcb_get_geometry(chain->conn, chain->window);
++   } else if (image->rectangle_count > 0) {
+       for (int i = 0; i < image->rectangle_count; i++) {
+          xcb_rectangle_t rect = chain->images[image_index].rects[i];
+          const uint8_t *data = (const uint8_t*)myptr + (rect.y * stride_b) + (rect.x * 4);
+@@ -2580,6 +2627,22 @@ x11_manage_present_queue(void *state)
+          }
+       }
+ 
++      /* sw present has no vblank feedback (the X server completes at once),
++       * so pace FIFO by the display refresh interval. A late frame goes out
++       * immediately; a full missed interval restarts the cadence. */
++      if (chain->sw_fifo_interval_ns &&
++          (present_mode == VK_PRESENT_MODE_FIFO_KHR ||
++           present_mode == VK_PRESENT_MODE_FIFO_RELAXED_KHR)) {
++         MESA_TRACE_SCOPE("sw fifo pace");
++         uint64_t now = os_time_get_nano();
++         if (now < chain->sw_next_present_ns) {
++            os_time_nanosleep_until(chain->sw_next_present_ns);
++            now = os_time_get_nano();
++         }
++         uint64_t next = chain->sw_next_present_ns + chain->sw_fifo_interval_ns;
++         chain->sw_next_present_ns = next > now ? next : now + chain->sw_fifo_interval_ns;
++      }
++
+       mtx_lock(&chain->thread_state_lock);
+ 
+       /* In IMMEDIATE and MAILBOX modes, there is a risk that we have exhausted the presentation queue,
+@@ -2654,6 +2717,67 @@ alloc_shm(struct wsi_image *imagew, unsigned size)
+ #endif
+ }
+ 
++/* sw present: MIT-SHM 1.2 (AttachFd) works without SysV shm, which Android
++ * lacks. Disabled by MESA_VK_WSI_DEBUG=noshm. */
++static bool
++x11_sw_shm_supported(xcb_connection_t *conn)
++{
++   if (WSI_DEBUG & WSI_DEBUG_NOSHM)
++      return false;
++
++   xcb_query_extension_reply_t *ext =
++      xcb_query_extension_reply(conn, xcb_query_extension(conn, 7, "MIT-SHM"), NULL);
++   bool present = ext && ext->present;
++   free(ext);
++   if (!present)
++      return false;
++
++   xcb_shm_query_version_reply_t *ver =
++      xcb_shm_query_version_reply(conn, xcb_shm_query_version(conn), NULL);
++   bool ok = ver && (ver->major_version > 1 ||
++                     (ver->major_version == 1 && ver->minor_version >= 2));
++   free(ver);
++   return ok;
++}
++
++static bool
++x11_image_init_sw_shm(struct x11_swapchain *chain, struct x11_image *image)
++{
++   size_t size = (size_t)image->base.row_pitches[0] * chain->extent.height;
++   /* memfd_create(MFD_ALLOW_SEALING) + ftruncate(size). */
++   int fd = os_create_anonymous_file(size, "wsi-x11-shm");
++   if (fd < 0)
++      return false;
++
++   /* Fix the size so the X server's mapping cannot be SIGBUSed by a shrink.
++    * Best effort: the tmpfile fallback cannot be sealed. */
++#ifdef F_ADD_SEALS
++   if (fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK | F_SEAL_GROW) < 0)
++      mesa_logd("wsi/x11: shm memfd seal failed: %s", strerror(errno));
++#endif
++
++   void *map = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
++   if (map == MAP_FAILED) {
++      close(fd);
++      return false;
++   }
++
++   /* xcb owns and closes the fd once sent. */
++   image->shmseg = xcb_generate_id(chain->conn);
++   xcb_generic_error_t *err =
++      xcb_request_check(chain->conn,
++                        xcb_shm_attach_fd_checked(chain->conn, image->shmseg, fd, 1));
++   if (err) {
++      free(err);
++      munmap(map, size);
++      return false;
++   }
++
++   image->sw_shm_map = map;
++   image->sw_shm_size = size;
++   return true;
++}
++
+ static VkResult
+ x11_image_init(VkDevice device_h, struct x11_swapchain *chain,
+                const VkSwapchainCreateInfoKHR *pCreateInfo,
+@@ -2668,8 +2792,12 @@ x11_image_init(VkDevice device_h, struct x11_swapchain *chain,
+       return result;
+ 
+    image->update_region = None;
+-   if (chain->base.wsi->sw && !chain->has_mit_shm)
++   if (chain->base.wsi->sw && !chain->has_mit_shm) {
++      /* Any failure drops the whole chain back to PutImage. */
++      if (chain->sw_shm && !x11_image_init_sw_shm(chain, image))
++         chain->sw_shm = false;
+       return VK_SUCCESS;
++   }
+ 
+ #ifdef HAVE_X11_DRM
+    xcb_void_cookie_t cookie;
+@@ -2844,6 +2972,12 @@ x11_image_finish(struct x11_swapchain *chain,
+ #endif
+    }
+ 
++   if (image->sw_shm_map) {
++      cookie = xcb_shm_detach(chain->conn, image->shmseg);
++      xcb_discard_reply(chain->conn, cookie.sequence);
++      munmap(image->sw_shm_map, image->sw_shm_size);
++   }
++
+    wsi_destroy_image(&chain->base, &image->base);
+ #ifdef HAVE_SYS_SHM_H
+    if (image->shmaddr)
+@@ -3316,6 +3450,16 @@ x11_surface_create_swapchain(VkIcdSurfaceBase *icd_surface,
+    chain->has_async_may_tear = present_caps & XCB_PRESENT_CAPABILITY_ASYNC_MAY_TEAR;
+    chain->has_reliable_msc = !wsi_conn->is_xwayland;
+ 
++   if (wsi_device->sw && !chain->has_mit_shm) {
++      chain->sw_shm = x11_sw_shm_supported(conn);
++      /* The X server's Present (if any) gives no real vblank here; the
++       * launcher passes the display refresh rate. Unset = unpaced FIFO. */
++      const char *hz_str = getenv("MESA_VK_X11_SW_REFRESH_HZ");
++      double hz = hz_str ? strtod(hz_str, NULL) : 0.0;
++      if (hz >= 1.0 && hz <= 1000.0)
++         chain->sw_fifo_interval_ns = (uint64_t)(1000000000.0 / hz);
++   }
++
+    /* When images in the swapchain don't fit the window, X can still present them, but it won't
+     * happen by flip, only by copy. So this is a suboptimal copy, because if the client would change
+     * the chain extents X may be able to flip
+diff --git a/src/vulkan/wsi/wsi_x11_dlopen.c b/src/vulkan/wsi/wsi_x11_dlopen.c
+index 1e0a840..7ad4f64 100644
+--- a/src/vulkan/wsi/wsi_x11_dlopen.c
++++ b/src/vulkan/wsi/wsi_x11_dlopen.c
+@@ -86,9 +86,13 @@ static const char *const wsi_x11_libs[] = {
+    S(xcb_present_select_input_checked) \
+    S(xcb_shm_attach) \
+    S(xcb_shm_attach_checked) \
++   S(xcb_shm_attach_fd_checked) \
+    S(xcb_shm_create_pixmap_checked) \
+    S(xcb_shm_detach) \
+    S(xcb_shm_detach_checked) \
++   S(xcb_shm_put_image) \
++   S(xcb_shm_query_version) \
++   S(xcb_shm_query_version_reply) \
+    S(xcb_sync_destroy_fence) \
+    S(xcb_xfixes_create_region) \
+    S(xcb_xfixes_destroy_region) \

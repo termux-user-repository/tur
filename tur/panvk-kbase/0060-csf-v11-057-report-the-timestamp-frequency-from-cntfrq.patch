@@ -1,0 +1,63 @@
+From: abhay-byte <zenithblue.dev@gmail.com>
+Subject: [PATCH csf-v11 057] panfrost/kbase: report the timestamp frequency from cntfrq
+Generated-by: LLM
+
+Purpose: TBD; biblioklept
+Source/Reference: TBD, work/mesa e11eb16d3f2
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/056
+Validation test: TBD
+
+diff --git a/src/panfrost/lib/kmod/kbase_kmod.c b/src/panfrost/lib/kmod/kbase_kmod.c
+index 0d0cf3fffdf..7bbc48e6046 100644
+--- a/src/panfrost/lib/kmod/kbase_kmod.c
++++ b/src/panfrost/lib/kmod/kbase_kmod.c
+@@ -364,13 +364,15 @@ kbase_dev_query_props(struct kbase_kmod_dev *kbase_dev,
+    /* Timestamp: expose if gpu_id is non-zero (safe assumption). */
+    props->gpu_can_query_timestamp = (props->gpu_id != 0);
+    props->timestamp_device_coherent = (coherency_mode != 0);
+-   /* The GPU cycle counter frequency is not exposed through the GPU props
+-    * blob in the kbase uAPI.  It can be inferred at runtime by correlating
+-    * KBASE_IOCTL_GET_CPU_GPU_TIMEINFO with OS monotonic time, but that
+-    * requires a sampling window.  Leave it as 0 so the upper layers use
+-    * OS timestamps instead of cycle counts; callers that need accurate
+-    * frequency should perform their own calibration. */
+    props->timestamp_frequency = 0;
++#if defined(__aarch64__)
++   uint64_t cntfrq;
++   __asm__ volatile("mrs %0, cntfrq_el0" : "=r"(cntfrq));
++   props->timestamp_frequency = cntfrq;
++#endif
++   if (props->timestamp_frequency)
++      props->timestamp_cycles_to_ns_factor =
++         1000000000.0 / props->timestamp_frequency;
+ 
+    /* Priorities: kbase currently only advertises medium. */
+    props->allowed_group_priorities_mask =
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c b/src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c
+index 71d01d901db..e66bc930224 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c
+@@ -1525,8 +1525,7 @@ init_utrace(struct panvk_gpu_queue *queue)
+ 
+ #ifdef HAVE_PAN_KMOD_KBASE
+    /* kbase queues use the synchronous submission model and never process
+-    * utrace on the GPU timeline (timestamp_frequency is 0 there), so no
+-    * utrace sync object is needed. */
++    * utrace on the GPU timeline, so no utrace sync object is needed. */
+    if (gpu_queue_uses_kbase(dev))
+       return VK_SUCCESS;
+ #endif
+@@ -2287,6 +2286,10 @@ panvk_queue_submit_init(struct panvk_queue_submit *submit,
+    submit->process_utrace =
+       u_trace_should_process(&submit->dev->utrace.utctx) &&
+       submit->phys_dev->kmod.dev->props.timestamp_frequency;
++#ifdef HAVE_PAN_KMOD_KBASE
++   if (gpu_queue_uses_kbase(submit->dev))
++      submit->process_utrace = false;
++#endif
+ 
+    submit->force_sync = PANVK_DEBUG(TRACE) || PANVK_DEBUG(SYNC);
+ }

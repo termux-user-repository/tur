@@ -1,0 +1,66 @@
+From: panvk-kbase-android worker <panvk-worker@localhost>
+Subject: [PATCH kbase-common 014] panvk: query fd properties without GPU import
+
+Purpose: panvk_GetMemoryFdPropertiesKHR() performs a full transient GPU
+ import (kbase mappings + mmaps) per query just to derive memory type
+ bits, then frees it. On this DDK, repeated import/free cycles of the
+ same dma-buf alias to one GPU VA, and the frees (EINVAL) tear down GPU
+ PTEs that re-import does not restore: the subsequent REAL import hits
+ a dead VA and the GPU faults (TRANSLATION_FAULT) on first access.
+ Compute (no queries) and vendor (single import, no query churn) work;
+ every failing flow (AHB, fd-import) queries first.
+ For kbase devices, answer from the same flag assumptions the import
+ path uses (kmod_flags=0 + IMPORTED: visible + coherent, not cached)
+ without creating any GPU mapping. Behavior-preserving for the reported
+ bits; eliminates the churn entirely. Also validate that fd is non-negative
+ and seekable before reporting success.
+Source/Reference: G615 bring-up forensics (ioctl trace: 3x aliased
+ IMPORT 0x41000 + EINVAL FREEs + TRANSLATION_FAULT; vendor: 1x IMPORT,
+ no fault).
+Tested GPU: Poco X6 Pro / G615 (Gate G).
+Tested Kbase UAPI: CSF 1.21.
+Mesa base range: 26.3.0-devel (pinned 5a07217f).
+Dependencies: 004 (kbase_node_path).
+Validation test: Gate G (single IMPORT per AHB, GPU clear lands).
+
+diff --git a/src/panfrost/vulkan/panvk_device_memory.c b/src/panfrost/vulkan/panvk_device_memory.c
+--- a/src/panfrost/vulkan/panvk_device_memory.c
++++ b/src/panfrost/vulkan/panvk_device_memory.c
+@@ -479,5 +479,37 @@
+    assert(handleType == VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT);
+ 
++#if defined(HAVE_PAN_KMOD_KBASE)
++   /* On kbase, a full transient import per query is not free: repeated
++    * import/free cycles of one dma-buf alias to a single GPU VA, and the
++    * frees can tear down GPU PTEs that re-import does not restore,
++    * breaking the later real import (GPU TRANSLATION_FAULT). Answer from
++    * the same assumptions the fd-import path uses instead.
++    */
++   if (phys_dev->kbase_node_path[0]) {
++      if (fd < 0 || lseek(fd, 0, SEEK_END) < 0)
++         return VK_ERROR_INVALID_EXTERNAL_HANDLE;
++
++      /* Matches kbase_kmod_bo_import_fd(..., kmod_flags=0, external): */
++      const bool can_do_host_visible = true;
++      const bool can_do_host_coherent = true;
++      const bool can_do_host_cached = false;
++      pMemoryFdProperties->memoryTypeBits = 0;
++      for (uint32_t i = 0; i < phys_dev->memory.type_count; i++) {
++         if (!can_do_host_visible && (phys_dev->memory.types[i].propertyFlags &
++                                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT))
++            continue;
++         if (!can_do_host_coherent && (phys_dev->memory.types[i].propertyFlags &
++                                       VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
++            continue;
++         if (!can_do_host_cached && (phys_dev->memory.types[i].propertyFlags &
++                                     VK_MEMORY_PROPERTY_HOST_CACHED_BIT))
++            continue;
++         pMemoryFdProperties->memoryTypeBits |= BITFIELD_BIT(i);
++      }
++      return VK_SUCCESS;
++   }
++#endif
++
+    struct pan_kmod_bo *bo = pan_kmod_bo_import(device->kmod.dev, fd);
+    if (!bo)
+       return VK_ERROR_INVALID_EXTERNAL_HANDLE;

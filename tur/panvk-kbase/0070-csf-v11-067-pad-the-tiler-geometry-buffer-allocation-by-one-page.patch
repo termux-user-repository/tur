@@ -1,0 +1,25 @@
+From: abhay-byte <zenithblue.dev@gmail.com>
+Subject: [PATCH csf-v11 067] panvk/csf: pad the tiler geometry buffer allocation by one page
+Generated-by: LLM
+
+Purpose: Pad the tiler geometry buffer by one page, heavy GS point-size draws faulted past it (CSF 0xc3); biblioklept
+Source/Reference: local, dx9-xfb 6fe44a0a3e8, work/mesa-dxint 1a0ba245c74
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/066
+Validation test: CTS transform_feedback query ptsz groups: 56 DeviceLost before, 0 after
+
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c b/src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c
+index 5a893249ea3..289e0f26d76 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c
+@@ -2027,7 +2027,7 @@ init_tiler(struct panvk_gpu_queue *queue)
+     * so we can pass it through a single 64-bit register to the VERTEX_TILER
+     * command streams. */
+    struct panvk_pool_alloc_info alloc_info = {
+-      .size = (64 * 1024) + 4096,
++      .size = (64 * 1024) + 8192,
+       .alignment = 4096,
+    };
+ 

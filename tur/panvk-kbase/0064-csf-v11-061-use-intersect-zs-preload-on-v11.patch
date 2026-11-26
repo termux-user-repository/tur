@@ -1,0 +1,48 @@
+From: abhay-byte <zenithblue.dev@gmail.com>
+Subject: [PATCH csf-v11 061] panvk: use INTERSECT ZS preload on v11
+Generated-by: LLM
+
+Purpose: TBD; biblioklept
+Source/Reference: TBD, work/mesa 174cd023b13
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/060
+Validation test: TBD
+
+diff --git a/src/panfrost/vulkan/panvk_vX_cmd_frame_shaders.c b/src/panfrost/vulkan/panvk_vX_cmd_frame_shaders.c
+index 594237c399a..7f10154d4d5 100644
+--- a/src/panfrost/vulkan/panvk_vX_cmd_frame_shaders.c
++++ b/src/panfrost/vulkan/panvk_vX_cmd_frame_shaders.c
+@@ -16,6 +16,8 @@
+ #include "pan_shader.h"
+ #include "pan_nir.h"
+ 
++#include "util/u_debug.h"
++
+ PRAGMA_DIAGNOSTIC_PUSH
+ PRAGMA_DIAGNOSTIC_ERROR(-Wpadded)
+ struct panvk_frame_shader_key {
+@@ -785,6 +787,10 @@ always_load(const struct pan_fb_load *load,
+           (pan_fb_shader_key_target_written(&key->key.s) && load->s.always);
+ }
+ 
++#if PAN_ARCH == 11
++DEBUG_GET_ONCE_BOOL_OPTION(zs_preload_always, "PANVK_ZS_PRELOAD_ALWAYS", false)
++#endif
++
+ static VkResult
+ cmd_preload_zs_attachments(struct panvk_cmd_buffer *cmdbuf,
+                            const struct pan_fb_layout *fb,
+@@ -820,6 +826,11 @@ cmd_preload_zs_attachments(struct panvk_cmd_buffer *cmdbuf,
+     */
+ #if PAN_ARCH >= 13
+    fs->modes[dcd_idx] = MALI_PRE_POST_FRAME_SHADER_MODE_PREPASS_ALWAYS;
++#elif PAN_ARCH == 11
++   fs->modes[dcd_idx] = (always_load(load, &key) ||
++                         debug_get_option_zs_preload_always())
++                        ? MALI_PRE_POST_FRAME_SHADER_MODE_EARLY_ZS_ALWAYS
++                        : MALI_PRE_POST_FRAME_SHADER_MODE_INTERSECT;
+ #elif PAN_ARCH >= 9
+    fs->modes[dcd_idx] = MALI_PRE_POST_FRAME_SHADER_MODE_EARLY_ZS_ALWAYS;
+ #else

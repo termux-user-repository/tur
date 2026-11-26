@@ -1,0 +1,92 @@
+From: abhay-byte <abhay02delhi@gmail.com>
+Date: 2026-10-11
+Subject: [PATCH jm-v9 026] panvk: v9 instance-rate attributes add firstInstance for every divisor biblioklept
+
+Purpose: PanProbe draw_params divisor/divisor0 failed on the G57.
+Root cause (002 v9_emit_vs_attrib, copied into the 009 indirect patch
+kernels): firstInstance was folded into the attribute offset as
+(firstInstance / divisor) * stride, and not at all for divisor 0. The
+hardware divides only the 0-based instance number; Vulkan wants element
+firstInstance + (instance - firstInstance) / divisor (= firstInstance for
+divisor 0).
+Fix: add firstInstance * stride for every instance-rate attribute, as CSF
+emit_vs_attrib() does, in the direct path and in
+panlib_v9_draw_indirect_patch / panlib_v9_prerast_indirect;
+v9_inst_attr_info now covers divisor 0. v9 only.
+---
+
+diff --git a/src/panfrost/libpan/draw_helper.cl b/src/panfrost/libpan/draw_helper.cl
+index c5699a8..08a1382 100644
+--- a/src/panfrost/libpan/draw_helper.cl
++++ b/src/panfrost/libpan/draw_helper.cl
+@@ -1587,13 +1587,14 @@ panlib_v9_draw_indirect_patch(global uint32_t *cmd, global uint8_t *job,
+     * the CPU folds it into the Attribute Offset (word 2) for direct draws.
+     * Here inst_attr_info holds {offset, stride, divisor} per attribute and
+     * the Offset is rewritten (not incremented) so a resubmitted command
+-    * buffer gets the same value. */
++    * buffer gets the same value. The hardware divides only the 0-based
++    * instance, so firstInstance is added undivided (any divisor, even 0). */
+    for (uint32_t a = 0; a < 32; a++) {
+       if (!(inst_attr_mask & (1u << a)))
+          continue;
+       global uint32_t *ii = inst_attr_info + a * 3;
+       global int32_t *offset = (global int32_t *)(vs_attribs + a * 32 + 8);
+-      *offset = (int32_t)(ii[0] + (first_instance / ii[2]) * ii[1]);
++      *offset = (int32_t)(ii[0] + first_instance * ii[1]);
+    }
+ }
+ 
+@@ -1727,7 +1728,7 @@ panlib_v9_prerast_indirect(constant struct panlib_v9_prerast_patch *a)
+          continue;
+       global uint32_t *ii = info + i * 3;
+       global int32_t *offset = (global int32_t *)(attribs + i * 32 + 8);
+-      *offset = (int32_t)(ii[0] + (first_instance / ii[2]) * ii[1]);
++      *offset = (int32_t)(ii[0] + first_instance * ii[1]);
+    }
+ }
+ 
+diff --git a/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c
+index c5605c5..c0ca032 100644
+--- a/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/jm/panvk_vX_cmd_draw.c
+@@ -1985,11 +1985,12 @@ v9_emit_vs_attrib(struct panvk_cmd_buffer *cmdbuf, uint32_t attrib_idx,
+    enum pipe_format f = vk_format_to_pipe_format(attrib_info->format);
+ 
+    pan_pack(desc, ATTRIBUTE, cfg) {
+-      /* Valhall doesn't add firstInstance when fetching per-instance
+-       * attributes, so fold it into the attribute offset. */
++      /* Valhall fetches per-instance attributes with the 0-based instance
++       * (divided by the divisor), so fold firstInstance into the attribute
++       * offset: element = firstInstance + (instance - firstInstance) / div,
++       * also for divisor 0. Same as CSF emit_vs_attrib(). */
+       cfg.offset = attrib_info->offset +
+-                   ((per_instance && buf_info->divisor)
+-                       ? (base_instance / buf_info->divisor) * stride : 0);
++                   (per_instance ? base_instance * stride : 0);
+       cfg.format = GENX(pan_format_from_pipe_format)(f)->hw;
+       cfg.table = 0;
+       cfg.buffer_index = vb_desc_offset + attrib_info->binding;
+@@ -2268,10 +2269,9 @@ panvk_skip_fs(unsigned regs, unsigned tls)
+    return (mode == 1 && tls > 0) || (mode == 2 && (tls > 0 || regs > 32));
+ }
+ 
+-/* Instance-rate attributes with a divisor of an indirect draw: the patch
+- * kernels fold the GPU-side firstInstance into their Offset
+- * (v9_emit_vs_attrib only saw the placeholder 0). Returns false when out of
+- * memory. */
++/* Instance-rate attributes of an indirect draw: the patch kernels fold the
++ * GPU-side firstInstance into their Offset (v9_emit_vs_attrib only saw the
++ * placeholder 0). Returns false when out of memory. */
+ static bool
+ v9_inst_attr_info(struct panvk_cmd_buffer *cmdbuf, uint32_t *mask,
+                   uint64_t *info_gpu, uint64_t *vs_attribs)
+@@ -2286,8 +2286,7 @@ v9_inst_attr_info(struct panvk_cmd_buffer *cmdbuf, uint32_t *mask,
+    *vs_attribs = 0;
+    u_foreach_bit(a, vi->attributes_valid) {
+       const uint32_t b = vi->attributes[a].binding;
+-      if (vi->bindings[b].input_rate != VK_VERTEX_INPUT_RATE_INSTANCE ||
+-          !vi->bindings[b].divisor)
++      if (vi->bindings[b].input_rate != VK_VERTEX_INPUT_RATE_INSTANCE)
+          continue;
+       *mask |= BITFIELD_BIT(a);
+       info[a][0] = vi->attributes[a].offset;

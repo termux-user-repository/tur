@@ -1,0 +1,89 @@
+From: abhay-byte <zenithblue.dev@gmail.com>
+Subject: [PATCH csf-v11 043] panvk/csf: account tiler work for heap renewal
+Generated-by: LLM
+
+Purpose: Renew the kbase tiler heap during long GPU workloads; biblioklept
+Source/Reference: local fix, work/mesa 9add58a66ee
+Tested GPU: Mali-G615 MC6 (0xb8a31030, PAN_ARCH 11)
+Tested Kbase UAPI: 1.21
+Mesa base range: 5a07217f034b3e50d8c7c7794f97a2df1742613b
+Dependencies: csf-v11/042
+Validation test: full dEQP-VK.api.copy_and_blit 9620 Pass, 0 Fail, 13144 NotSupported, 0 DeviceLost; 150000 submit stress PASS
+
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_buffer.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_buffer.c
+index ee935eb98df..5d5ce885531 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_buffer.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_buffer.c
+@@ -1083,6 +1083,13 @@ panvk_per_arch(CmdExecuteCommands)(VkCommandBuffer commandBuffer,
+    for (uint32_t i = 0; i < commandBufferCount; i++) {
+       VK_FROM_HANDLE(panvk_cmd_buffer, secondary, pCommandBuffers[i]);
+ 
++      if (UINT64_MAX - primary->state.tiler_work_estimate <
++          secondary->state.tiler_work_estimate)
++         primary->state.tiler_work_estimate = UINT64_MAX;
++      else
++         primary->state.tiler_work_estimate +=
++            secondary->state.tiler_work_estimate;
++
+       /* make sure the CS context is setup properly
+        * to inherit the primary command buffer state
+        */
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+index d33bee77f7e..434a282452d 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_draw.c
+@@ -1222,6 +1222,15 @@ prepare_layer_count_inherited_ctx(struct panvk_cmd_buffer *cmdbuf)
+ #endif
+ }
+ 
++static void
++account_tiler_work(struct panvk_cmd_buffer *cmdbuf, uint64_t work)
++{
++   if (UINT64_MAX - cmdbuf->state.tiler_work_estimate < work)
++      cmdbuf->state.tiler_work_estimate = UINT64_MAX;
++   else
++      cmdbuf->state.tiler_work_estimate += work;
++}
++
+ static VkResult
+ get_tiler_desc(struct panvk_cmd_buffer *cmdbuf)
+ {
+@@ -1251,6 +1260,8 @@ get_tiler_desc(struct panvk_cmd_buffer *cmdbuf)
+          return VK_ERROR_OUT_OF_DEVICE_MEMORY;
+    }
+ 
++   account_tiler_work(cmdbuf, td_count);
++
+    const struct pan_fb_layout *fb = &cmdbuf->state.gfx.render.fb.layout;
+ 
+    /* At this point, we should know sample count and the tile size should have
+@@ -4012,6 +4023,12 @@ panvk_cmd_draw(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info draw)
+       return;
+    }
+ 
++   if (draw.indirect.buffer_dev_addr)
++      account_tiler_work(cmdbuf, (uint64_t)draw.indirect.draw_count * 256);
++   else
++      account_tiler_work(cmdbuf,
++                         (uint64_t)draw.vertex.count * draw.instance.count);
++
+    /* Needs to be done before get_fs() is called because it depends on
+     * fs.required being initialized. */
+    cmdbuf->state.gfx.fs.required =
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c b/src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c
+index e8c09606ae7..71d01d901db 100644
+--- a/src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_gpu_queue.c
+@@ -2303,6 +2303,12 @@ panvk_queue_submit_init_storage(
+       struct panvk_cmd_buffer *cmdbuf = container_of(
+          vk_submit->command_buffers[i], struct panvk_cmd_buffer, vk);
+ 
++      if (UINT64_MAX - submit->tiler_work_estimate <
++          cmdbuf->state.tiler_work_estimate)
++         submit->tiler_work_estimate = UINT64_MAX;
++      else
++         submit->tiler_work_estimate += cmdbuf->state.tiler_work_estimate;
++
+       for (uint32_t j = 0; j < ARRAY_SIZE(cmdbuf->state.cs); j++) {
+          struct cs_builder *b = panvk_get_cs_builder(cmdbuf, j);
+          assert(cs_is_valid(b));
