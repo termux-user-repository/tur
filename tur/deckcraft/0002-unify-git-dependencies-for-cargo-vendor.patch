@@ -1,0 +1,19 @@
+diff --git a/Cargo.toml b/Cargo.toml
+index 675f184..385786f 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -62,11 +62,11 @@ vello_cpu = "0.2"
+ vello_common = { version = "0.2", default-features = false }
+ image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "gif", "tiff", "bmp"] }
+ # Base64 for command payloads (engine); base64_compat keeps the legacy lenient decoder. Same rev as craft-deckcraft-format.
+-craft-mime = { git = "https://github.com/storytold/craft-libs", rev = "254e9a409b410dc93c0e06ff66cd1e767893ac32", version = "=0.1.0" }
++craft-mime = { git = "https://github.com/storytold/craft-libs", rev = "8048f8ef92da80fb3ce5a056d59ca591ee66faf1", version = "=0.1.0" }
+ # craft-media, craft-audio and craft-video share types and stay on one rev.
+ # The .deckcraft package layer (identity, manifest, member names, bounded reads); crates/format maps the presentation onto it.
+-craft-deckcraft-format = { git = "https://github.com/storytold/craft-libs", rev = "254e9a409b410dc93c0e06ff66cd1e767893ac32", version = "=0.1.0" }
+-craft-rtf = { git = "https://github.com/storytold/craft-libs", rev = "d0193d7e94b5ec180ecc2a152ea72047d39ac632", version = "=0.1.0" }
++craft-deckcraft-format = { git = "https://github.com/storytold/craft-libs", rev = "8048f8ef92da80fb3ce5a056d59ca591ee66faf1", version = "=0.1.0" }
++craft-rtf = { git = "https://github.com/storytold/craft-libs", rev = "8048f8ef92da80fb3ce5a056d59ca591ee66faf1", version = "=0.1.0" }
+ craft-media = { git = "https://github.com/storytold/craft-libs", rev = "010702ee9b030844c852939095b1da0d0656a890", version = "=0.1.0", default-features = false }
+ craft-audio = { git = "https://github.com/storytold/craft-libs", rev = "010702ee9b030844c852939095b1da0d0656a890", version = "=0.1.0", default-features = false, features = ["opus-decode"] }
+ # H.264, HEVC, VP9 and AV1 decoders.
