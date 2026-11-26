@@ -1,0 +1,5 @@
+[nuclei]
+source = "github"
+github = "projectdiscovery/nuclei"
+prefix = "v"
+use_max_tag = true
