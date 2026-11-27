@@ -9,12 +9,12 @@ TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_AUTO_UPDATE=true
 
 termux_step_make() {
-    termux_setup_golang
+        termux_setup_golang
     
-    cd "${TERMUX_PKG_SRCDIR}/cmd/nuclei"
-    go build -v -ldflags="-s -w" -o "${TERMUX_PKG_BUILDDIR}/nuclei" .
+        cd "${TERMUX_PKG_SRCDIR}/cmd/nuclei"
+        go build -v -ldflags="-s -w" -o "${TERMUX_PKG_BUILDDIR}/nuclei" .
 }
 
 termux_step_make_install() {
-    install -Dm700 -t "${TERMUX_PREFIX}/bin" "${TERMUX_PKG_BUILDDIR}/nuclei"
+        install -Dm700 -t "${TERMUX_PREFIX}/bin" "${TERMUX_PKG_BUILDDIR}/nuclei"
 }
