@@ -3,9 +3,9 @@ TERMUX_PKG_DESCRIPTION="Offline QR code and barcode scanner for the command line
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_LICENSE_FILE="LICENSE, LICENSING.md, crates/qrcode-ai-scanner/LICENSE-APACHE-2.0, crates/qrcode-ai-scanner/THIRD-PARTY.md"
 TERMUX_PKG_MAINTAINER="@ThibautMelen"
-TERMUX_PKG_VERSION="0.12.1"
+TERMUX_PKG_VERSION="0.12.2"
 TERMUX_PKG_SRCURL="https://github.com/qrcode-ai-com/qrcode-barcode-scanner-rust/releases/download/v${TERMUX_PKG_VERSION}/qrcode-barcode-scanner-cli-${TERMUX_PKG_VERSION}-source.tar.gz"
-TERMUX_PKG_SHA256=2fa08f66f7f5840f4abbbcda947a108ed8b2639c42322a338bbd04805ee4d7ff
+TERMUX_PKG_SHA256=ceed71c46c7a8b908d53ad79a7b7fb67e8bc04c6e4b30e61dbfd9bff6db402f8
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_AUTO_UPDATE=true
 
